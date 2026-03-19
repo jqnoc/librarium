@@ -264,6 +264,107 @@ img { max-width: 100%; height: auto; }
     flex-shrink: 0;
 }
 
+/* ── Library selector ────────────────────────────────────────────────── */
+.library-selector-form { display: inline-flex; align-items: center; }
+.library-selector-form select {
+    font-size: .82rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,.35);
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    cursor: pointer;
+}
+.library-manage-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,.7);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.15rem 0.3rem;
+    line-height: 1;
+}
+.library-manage-btn:hover { color: #fff; }
+
+/* ── Library management modal ────────────────────────────────────────── */
+.modal-dialog {
+    background: var(--an-white);
+    border-radius: var(--an-radius-lg);
+    padding: 1.5rem 2rem;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: var(--an-shadow-lg);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.modal-header h3 { margin: 0; font-size: 1.15rem; }
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--an-text-soft);
+    line-height: 1;
+}
+.modal-body hr { margin: 1rem 0; border: none; border-top: 1px solid var(--an-border); }
+.library-create-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.library-create-form input {
+    flex: 1;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--an-border);
+    border-radius: 5px;
+    font-size: .9rem;
+}
+.library-create-form button {
+    padding: 0.35rem 0.8rem;
+    background: var(--an-orange);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: .85rem;
+}
+.library-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.library-rename-form {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex: 1;
+}
+.library-rename-form input {
+    flex: 1;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--an-border);
+    border-radius: 5px;
+    font-size: .85rem;
+}
+.btn-small {
+    padding: 0.25rem 0.6rem;
+    font-size: .8rem;
+    border: 1px solid var(--an-border);
+    border-radius: 5px;
+    cursor: pointer;
+    background: var(--an-white);
+}
+.btn-danger {
+    background: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+
 .header-nav { display: flex; gap: 1rem; align-items: center; }
 .header-nav a {
     color: rgba(255,255,255,.85);

@@ -17,6 +17,17 @@
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
         'footer.copy':      { en: 'Ashinami',     es: 'Ashinami' },
 
+        // ── Library selector / management ───────────────────────────────
+        'library.select':        { en: 'Select library',        es: 'Seleccionar biblioteca' },
+        'library.manage':        { en: 'Manage libraries',      es: 'Gestionar bibliotecas' },
+        'library.manageTitle':   { en: 'Manage Libraries',      es: 'Gestionar Bibliotecas' },
+        'library.createNew':     { en: 'Create New Library',    es: 'Crear Nueva Biblioteca' },
+        'library.namePlaceholder': { en: 'Library name',        es: 'Nombre de la biblioteca' },
+        'library.create':        { en: 'Create',                es: 'Crear' },
+        'library.existing':      { en: 'Existing Libraries',    es: 'Bibliotecas Existentes' },
+        'library.rename':        { en: 'Rename',                es: 'Renombrar' },
+        'library.delete':        { en: 'Delete',                es: 'Eliminar' },
+
         // ── Index page ──────────────────────────────────────────────────
         'index.title':          { en: 'Library',            es: 'Biblioteca' },
         'index.totalBooks':     { en: 'Total Books',        es: 'Total de Libros' },

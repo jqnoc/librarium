@@ -312,6 +312,79 @@ def migrate_add_photo_hash() -> None:
     print("✅ Migration complete – photo_hash column added.")
 
 
+# ── Migration: Add libraries table ──────────────────────────────────────
+def migrate_add_libraries() -> None:
+    """Add multi-library support: libraries table + library_id on data tables."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=OFF")
+
+    tables = [r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()]
+    if "libraries" in tables:
+        db.close()
+        return
+
+    print("⏳ Migrating: adding multi-library support …")
+
+    # 1. Create libraries table
+    db.execute("""
+        CREATE TABLE libraries (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE
+        )
+    """)
+
+    # 2. Insert default "Books" library
+    db.execute("INSERT INTO libraries (name, slug) VALUES ('Books', 'books')")
+    default_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    # 3. Add library_id to books and sources
+    db.execute(
+        "ALTER TABLE books ADD COLUMN library_id INTEGER NOT NULL DEFAULT %d"
+        " REFERENCES libraries(id)" % default_id
+    )
+    db.execute(
+        "ALTER TABLE sources ADD COLUMN library_id INTEGER NOT NULL DEFAULT %d"
+        " REFERENCES libraries(id)" % default_id
+    )
+
+    # 4. Recreate authors with (name, library_id) composite PK
+    db.execute("""
+        CREATE TABLE authors_new (
+            name        TEXT NOT NULL,
+            library_id  INTEGER NOT NULL REFERENCES libraries(id),
+            photo       BLOB,
+            has_photo   INTEGER NOT NULL DEFAULT 0,
+            birth_date  TEXT NOT NULL DEFAULT '',
+            birth_place TEXT NOT NULL DEFAULT '',
+            death_date  TEXT NOT NULL DEFAULT '',
+            death_place TEXT NOT NULL DEFAULT '',
+            biography   TEXT NOT NULL DEFAULT '',
+            photo_hash  TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (name, library_id)
+        )
+    """)
+    db.execute(
+        "INSERT INTO authors_new "
+        "(name, library_id, photo, has_photo, birth_date, birth_place, "
+        "death_date, death_place, biography, photo_hash) "
+        "SELECT name, %d, photo, has_photo, birth_date, birth_place, "
+        "death_date, death_place, biography, photo_hash FROM authors" % default_id
+    )
+    db.execute("DROP TABLE authors")
+    db.execute("ALTER TABLE authors_new RENAME TO authors")
+
+    db.commit()
+    db.close()
+    print("✅ Migration complete – multi-library support added.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
@@ -400,6 +473,46 @@ def close_db(exc):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+# ── Library helpers ──────────────────────────────────────────────────────
+def _get_current_library_id() -> int:
+    """Return the active library ID from cookie, falling back to the first library."""
+    raw = request.cookies.get("ashinami_library", "")
+    if raw:
+        try:
+            lib_id = int(raw)
+            db = get_db()
+            if db.execute("SELECT 1 FROM libraries WHERE id = ?", (lib_id,)).fetchone():
+                return lib_id
+        except (ValueError, TypeError):
+            pass
+    db = get_db()
+    row = db.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()
+    return row["id"] if row else 1
+
+
+@app.context_processor
+def inject_library_context():
+    """Make current_library and all_libraries available in every template."""
+    try:
+        db = get_db()
+        lib_id = _get_current_library_id()
+        current_lib = db.execute(
+            "SELECT * FROM libraries WHERE id = ?", (lib_id,)
+        ).fetchone()
+        all_libs = db.execute(
+            "SELECT * FROM libraries ORDER BY id"
+        ).fetchall()
+        return {
+            "current_library": dict(current_lib) if current_lib else {"id": 1, "name": "Books", "slug": "books"},
+            "all_libraries": [dict(l) for l in all_libs],
+        }
+    except Exception:
+        return {
+            "current_library": {"id": 1, "name": "Books", "slug": "books"},
+            "all_libraries": [],
+        }
 
 
 # ── Rating dimensions ────────────────────────────────────────────────────
@@ -620,10 +733,11 @@ def _normalize_input_date(value: str) -> str:
 
 
 def _collect_languages() -> list[str]:
-    """Return a sorted list of unique languages used across all books."""
+    """Return a sorted list of unique languages used in the current library."""
     db = get_db()
+    lib_id = _get_current_library_id()
     langs: set[str] = set()
-    for row in db.execute("SELECT language, original_language FROM books").fetchall():
+    for row in db.execute("SELECT language, original_language FROM books WHERE library_id = ?", (lib_id,)).fetchall():
         for val in (row["language"], row["original_language"]):
             if val and val.strip():
                 langs.add(val.strip())
@@ -631,14 +745,15 @@ def _collect_languages() -> list[str]:
 
 
 def _collect_field_values(*fields: str) -> dict[str, list[str]]:
-    """Scan all books and return unique values for each requested field."""
+    """Scan books in the current library and return unique values per field."""
     db = get_db()
+    lib_id = _get_current_library_id()
     # Only query the columns we need
     safe_fields = [f for f in fields if re.match(r'^[a-z_]+$', f)]
     if not safe_fields:
         return {}
     cols = ", ".join(safe_fields)
-    rows = db.execute(f"SELECT {cols} FROM books").fetchall()
+    rows = db.execute(f"SELECT {cols} FROM books WHERE library_id = ?", (lib_id,)).fetchall()
     buckets: dict[str, set[str]] = {f: set() for f in safe_fields}
     for row in rows:
         for f in safe_fields:
@@ -683,8 +798,9 @@ def _get_source_by_id(source_id: str) -> dict | None:
 
 @app.route("/")
 def index():
-    """Main page – list all books."""
+    """Main page – list all books in the current library."""
     db = get_db()
+    lib_id = _get_current_library_id()
     # Use query params if present, otherwise fall back to cookie, then default
     sort1 = request.args.get("sort1") or request.cookies.get("ashinami_sort1", "status")
     sort2 = request.args.get("sort2") or request.cookies.get("ashinami_sort2", "last_session")
@@ -757,7 +873,8 @@ def index():
             WHERE end_date != ''
             GROUP BY reading_id
         ) lr_per ON lr_per.reading_id = lr.lr_id
-    """).fetchall()
+        WHERE b.library_id = ?
+    """, (lib_id,)).fetchall()
 
     books = []
     for r in rows:
@@ -833,7 +950,7 @@ def index():
             return (b["name"],)
 
     # ── Library ribbon stats (computed from the FULL unfiltered book list) ──
-    all_rows = db.execute("SELECT author, pages, status FROM books").fetchall()
+    all_rows = db.execute("SELECT author, pages, status FROM books WHERE library_id = ?", (lib_id,)).fetchall()
     unique_authors: set[str] = set()
     total_library_pages = 0
     reading_count = 0
@@ -893,24 +1010,31 @@ def index():
 
 @app.route("/stats")
 def global_stats():
-    """Global statistics page – aggregate reading stats across all books."""
+    """Global statistics page – aggregate reading stats for the current library."""
     db = get_db()
+    lib_id = _get_current_library_id()
 
     # Pages by year: sessions + periods
     pages_by_year: dict[str, int] = {}
     for row in db.execute(
-        "SELECT SUBSTR(date, 1, 4) AS yr, SUM(pages) AS p FROM sessions WHERE date != '' GROUP BY yr"
+        "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.pages) AS p "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        "WHERE s.date != '' AND b.library_id = ? GROUP BY yr", (lib_id,)
     ).fetchall():
         pages_by_year[row["yr"]] = row["p"]
     for row in db.execute(
-        "SELECT SUBSTR(end_date, 1, 4) AS yr, SUM(pages) AS p FROM periods WHERE end_date != '' AND pages > 0 GROUP BY yr"
+        "SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.pages) AS p "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
     ).fetchall():
         pages_by_year[row["yr"]] = pages_by_year.get(row["yr"], 0) + row["p"]
 
     # Books finished by year – count finished READINGS (not books)
     books_finished_by_year: dict[str, int] = {}
     finished_readings = db.execute(
-        "SELECT id, book_id FROM readings WHERE status = 'finished'"
+        "SELECT r.id, r.book_id FROM readings r "
+        "JOIN books b ON b.id = r.book_id "
+        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
     ).fetchall()
     for fr in finished_readings:
         rid = fr["id"]
@@ -936,7 +1060,7 @@ def global_stats():
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
         "SELECT id, name, status, genre, language, original_language, pages, publisher, has_cover, cover_hash "
-        "FROM books"
+        "FROM books WHERE library_id = ?", (lib_id,)
     ).fetchall()
 
     status_counts: dict[str, int] = Counter()
@@ -1008,7 +1132,10 @@ def global_stats():
 
     # Most re-read book
     reread_row = db.execute(
-        "SELECT book_id, COUNT(*) AS cnt FROM readings GROUP BY book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1"
+        "SELECT r.book_id, COUNT(*) AS cnt FROM readings r "
+        "JOIN books b ON b.id = r.book_id "
+        "WHERE b.library_id = ? GROUP BY r.book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        (lib_id,)
     ).fetchone()
     most_reread = None
     if reread_row:
@@ -1079,6 +1206,7 @@ def api_cumulative_pages():
     Response: list of {date: 'YYYY-MM-DD', pages: int, cumulative: int}
     """
     db = get_db()
+    lib_id = _get_current_library_id()
     book_id = request.args.get('book_id')
     year = request.args.get('year')
 
@@ -1094,12 +1222,12 @@ def api_cumulative_pages():
     else:
         q = (
             "SELECT d AS date, SUM(p) AS pages FROM ("
-            "SELECT date AS d, SUM(pages) AS p FROM sessions WHERE date != '' GROUP BY date "
+            "SELECT s.date AS d, SUM(s.pages) AS p FROM sessions s JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ? GROUP BY s.date "
             "UNION ALL "
-            "SELECT end_date AS d, SUM(pages) AS p FROM periods WHERE end_date != '' AND pages > 0 GROUP BY end_date"
+            "SELECT p.end_date AS d, SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY p.end_date"
             ") GROUP BY d ORDER BY d"
         )
-        params = ()
+        params = (lib_id, lib_id)
 
     rows = db.execute(q, params).fetchall()
 
@@ -1128,18 +1256,21 @@ def api_cumulative_pages_per_book():
     Response: { labels: [dates], datasets: [ { book_id, label, data: [cumulative_values], total } ] }
     """
     db = get_db()
+    lib_id = _get_current_library_id()
     year = request.args.get('year')
     if not year:
         return jsonify({"error": "year query parameter required"}), 400
 
     q = (
-        "SELECT book_id, d AS date, SUM(p) AS pages FROM ("
-        "SELECT book_id, date AS d, pages AS p FROM sessions WHERE date != '' AND SUBSTR(date,1,4) = ? "
+        "SELECT s.book_id, d AS date, SUM(p) AS pages FROM ("
+        "SELECT s.book_id, s.date AS d, s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
+        "WHERE s.date != '' AND SUBSTR(s.date,1,4) = ? AND b.library_id = ? "
         "UNION ALL "
-        "SELECT book_id, end_date AS d, pages AS p FROM periods WHERE end_date != '' AND pages > 0 AND SUBSTR(end_date,1,4) = ? "
-        ") GROUP BY book_id, d ORDER BY book_id, d"
+        "SELECT p.book_id, p.end_date AS d, p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
+        "WHERE p.end_date != '' AND p.pages > 0 AND SUBSTR(p.end_date,1,4) = ? AND b.library_id = ? "
+        ") s GROUP BY s.book_id, d ORDER BY s.book_id, d"
     )
-    rows = db.execute(q, (year, year)).fetchall()
+    rows = db.execute(q, (year, lib_id, year, lib_id)).fetchall()
 
     book_map: dict[str, dict] = {}
     all_dates: set[str] = set()
@@ -1230,15 +1361,16 @@ def api_cumulative_pages_per_book():
 def stats_year(year: str):
     """Yearly statistics page."""
     db = get_db()
+    lib_id = _get_current_library_id()
 
     year_sessions = []
     for row in db.execute("""
         SELECT s.date, s.pages, s.duration_seconds, b.name AS book_name
         FROM sessions s
         JOIN books b ON b.id = s.book_id
-        WHERE SUBSTR(s.date, 1, 4) = ?
+        WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
         ORDER BY s.date
-    """, (year,)).fetchall():
+    """, (year, lib_id)).fetchall():
         year_sessions.append(dict(row))
 
     year_periods = []
@@ -1248,9 +1380,9 @@ def stats_year(year: str):
                b.name AS book_name, p.book_id
         FROM periods p
         JOIN books b ON b.id = p.book_id
-        WHERE SUBSTR(p.end_date, 1, 4) = ?
+        WHERE SUBSTR(p.end_date, 1, 4) = ? AND b.library_id = ?
         ORDER BY p.end_date
-    """, (year,)).fetchall():
+    """, (year, lib_id)).fetchall():
         d = dict(row)
         d["book_id"] = row["book_id"]
         year_periods.append(d)
@@ -1292,8 +1424,8 @@ def stats_year(year: str):
         SELECT s.date, s.book_id, b.name, b.cover_color
         FROM sessions s
         JOIN books b ON b.id = s.book_id
-        WHERE SUBSTR(s.date, 1, 4) = ?
-    """, (year,)).fetchall():
+        WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
+    """, (year, lib_id)).fetchall():
         bid = row["book_id"]
         _ensure_gantt_book(bid, row["name"], row["cover_color"])
         try:
@@ -1306,8 +1438,8 @@ def stats_year(year: str):
         SELECT p.start_date, p.end_date, p.book_id, b.name, b.cover_color
         FROM periods p
         JOIN books b ON b.id = p.book_id
-        WHERE p.end_date >= ? AND p.start_date <= ?
-    """, (f"{year}-01-01", f"{year}-12-31")).fetchall():
+        WHERE p.end_date >= ? AND p.start_date <= ? AND b.library_id = ?
+    """, (f"{year}-01-01", f"{year}-12-31", lib_id)).fetchall():
         bid = row["book_id"]
         _ensure_gantt_book(bid, row["name"], row["cover_color"])
         try:
@@ -1414,9 +1546,15 @@ def stats_year(year: str):
 
     # Determine prev/next years with data
     data_years = set()
-    for row in db.execute("SELECT DISTINCT SUBSTR(date, 1, 4) AS yr FROM sessions WHERE date != ''").fetchall():
+    for row in db.execute(
+        "SELECT DISTINCT SUBSTR(s.date, 1, 4) AS yr FROM sessions s "
+        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
+    ).fetchall():
         data_years.add(row["yr"])
-    for row in db.execute("SELECT DISTINCT SUBSTR(end_date, 1, 4) AS yr FROM periods WHERE end_date != ''").fetchall():
+    for row in db.execute(
+        "SELECT DISTINCT SUBSTR(p.end_date, 1, 4) AS yr FROM periods p "
+        "JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND b.library_id = ?", (lib_id,)
+    ).fetchall():
         data_years.add(row["yr"])
     sorted_years = sorted(data_years)
     prev_year = None
@@ -1446,6 +1584,7 @@ def stats_year(year: str):
 def stats_year_books(year: str):
     """Display all books finished in a specific year with their covers."""
     db = get_db()
+    lib_id = _get_current_library_id()
     sort = request.args.get("sort", "date")
     if sort not in ("alpha", "author", "date", "rating"):
         sort = "date"
@@ -1455,8 +1594,8 @@ def stats_year_books(year: str):
                b.name, b.author, b.has_cover, b.cover_hash
         FROM readings r
         JOIN books b ON b.id = r.book_id
-        WHERE r.status = 'finished'
-    """).fetchall()
+        WHERE r.status = 'finished' AND b.library_id = ?
+    """, (lib_id,)).fetchall()
 
     books_finished = []
     seen_book_ids: set[str] = set()
@@ -1530,20 +1669,23 @@ def stats_year_books(year: str):
 def activity():
     """Activity dashboard – reading habits, trends, and streaks."""
     db = get_db()
+    lib_id = _get_current_library_id()
 
     # 1. Daily session aggregates (all time)
     daily_sessions: dict[str, dict] = {}
     for row in db.execute(
-        "SELECT date, SUM(pages) AS pages, SUM(duration_seconds) AS seconds "
-        "FROM sessions WHERE date != '' GROUP BY date"
+        "SELECT s.date, SUM(s.pages) AS pages, SUM(s.duration_seconds) AS seconds "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        "WHERE s.date != '' AND b.library_id = ? GROUP BY s.date", (lib_id,)
     ).fetchall():
         daily_sessions[row["date"]] = {"pages": row["pages"], "seconds": row["seconds"]}
 
     # 2. Period pages (attributed to end_date; periods have no time granularity)
     daily_periods: dict[str, int] = {}
     for row in db.execute(
-        "SELECT end_date, SUM(pages) AS pages "
-        "FROM periods WHERE end_date != '' AND pages > 0 GROUP BY end_date"
+        "SELECT p.end_date, SUM(p.pages) AS pages "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY p.end_date", (lib_id,)
     ).fetchall():
         daily_periods[row["end_date"]] = row["pages"]
 
@@ -1568,18 +1710,20 @@ def activity():
     # 3. Book activity by date (for "active books in period")
     session_book_dates: list[dict] = []
     for row in db.execute(
-        "SELECT DISTINCT date, book_id FROM sessions WHERE date != ''"
+        "SELECT DISTINCT s.date, s.book_id FROM sessions s "
+        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
     ).fetchall():
         session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
     for row in db.execute(
-        "SELECT DISTINCT end_date AS date, book_id "
-        "FROM periods WHERE end_date != '' AND pages > 0"
+        "SELECT DISTINCT p.end_date AS date, p.book_id "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ?", (lib_id,)
     ).fetchall():
         session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
 
     # 4. Book lookup (id → {name, has_cover})
     all_books: dict[str, dict] = {}
-    for row in db.execute("SELECT id, name, has_cover, cover_hash FROM books").fetchall():
+    for row in db.execute("SELECT id, name, has_cover, cover_hash FROM books WHERE library_id = ?", (lib_id,)).fetchall():
         all_books[row["id"]] = {"name": row["name"], "has_cover": bool(row["has_cover"]), "cover_hash": row["cover_hash"] or ""}
 
     # 5. Books currently being read (for estimated finish dates)
@@ -1598,8 +1742,8 @@ def activity():
                           MAX(end_date) AS last_period
                    FROM periods GROUP BY book_id) p
           ON p.book_id = b.id
-        WHERE b.status = 'reading'
-    """).fetchall():
+        WHERE b.status = 'reading' AND b.library_id = ?
+    """, (lib_id,)).fetchall():
         sp = row["starting_page"] or 0
         tp = row["pages"] or 0
         eff = tp - sp if sp > 0 else tp
@@ -1638,8 +1782,9 @@ def activity():
     # 7. Individual sessions (for longest single session record)
     all_sessions: list[dict] = []
     for row in db.execute(
-        "SELECT date, pages, duration_seconds, book_id "
-        "FROM sessions WHERE date != '' ORDER BY date"
+        "SELECT s.date, s.pages, s.duration_seconds, s.book_id "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        "WHERE s.date != '' AND b.library_id = ? ORDER BY s.date", (lib_id,)
     ).fetchall():
         all_sessions.append({
             "date": row["date"],
@@ -1650,25 +1795,30 @@ def activity():
 
     # 8. Aggregate totals for records
     row = db.execute(
-        "SELECT COALESCE(SUM(pages),0) AS p, COALESCE(SUM(duration_seconds),0) AS s FROM sessions"
+        "SELECT COALESCE(SUM(s.pages),0) AS p, COALESCE(SUM(s.duration_seconds),0) AS s "
+        "FROM sessions s JOIN books b ON b.id = s.book_id WHERE b.library_id = ?", (lib_id,)
     ).fetchone()
     total_all_session_pages = row["p"]
     total_all_session_seconds = row["s"]
     row = db.execute(
-        "SELECT COALESCE(SUM(pages),0) AS p FROM periods"
+        "SELECT COALESCE(SUM(p.pages),0) AS p FROM periods p "
+        "JOIN books b ON b.id = p.book_id WHERE b.library_id = ?", (lib_id,)
     ).fetchone()
     total_all_period_pages = row["p"]
     total_all_pages = total_all_session_pages + total_all_period_pages
     total_all_seconds = total_all_session_seconds  # only sessions have time
 
     books_finished_count = db.execute(
-        "SELECT COUNT(DISTINCT book_id) AS c FROM readings WHERE status = 'finished'"
+        "SELECT COUNT(DISTINCT r.book_id) AS c FROM readings r "
+        "JOIN books b ON b.id = r.book_id "
+        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
     ).fetchone()["c"]
 
     # Books active per day (for most-books-in-parallel record)
     books_per_day: dict[str, set] = {}
     for row in db.execute(
-        "SELECT DISTINCT date, book_id FROM sessions WHERE date != ''"
+        "SELECT DISTINCT s.date, s.book_id FROM sessions s "
+        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
     ).fetchall():
         books_per_day.setdefault(row["date"], set()).add(row["book_id"])
     most_parallel = {"count": 0, "date": ""}
@@ -1682,10 +1832,10 @@ def activity():
         SELECT DISTINCT b.id, b.name, b.pages, b.has_cover
         FROM books b
         JOIN readings r ON r.book_id = b.id
-        WHERE r.status = 'finished' AND b.pages > 0
+        WHERE r.status = 'finished' AND b.pages > 0 AND b.library_id = ?
         ORDER BY b.pages DESC
         LIMIT 1
-    """).fetchone()
+    """, (lib_id,)).fetchone()
     if finished_books:
         longest_finished_book = {
             "name": finished_books["name"],
@@ -1695,7 +1845,10 @@ def activity():
 
     most_reread_book = None
     reread_row = db.execute(
-        "SELECT book_id, COUNT(*) AS cnt FROM readings GROUP BY book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1"
+        "SELECT r.book_id, COUNT(*) AS cnt FROM readings r "
+        "JOIN books b ON b.id = r.book_id "
+        "WHERE b.library_id = ? GROUP BY r.book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        (lib_id,)
     ).fetchone()
     if reread_row:
         rbk = db.execute("SELECT name FROM books WHERE id = ?", (reread_row["book_id"],)).fetchone()
@@ -1732,11 +1885,12 @@ def activity():
 def authors_list():
     """Display a list of all authors with their book counts."""
     db = get_db()
-    rows = db.execute("SELECT id, name, author, has_cover, cover_hash, status FROM books").fetchall()
+    lib_id = _get_current_library_id()
+    rows = db.execute("SELECT id, name, author, has_cover, cover_hash, status FROM books WHERE library_id = ?", (lib_id,)).fetchall()
 
     # Build a map of author names that have photos → photo_hash
     author_photo_info: dict[str, str] = {}
-    for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall():
+    for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1 AND library_id = ?", (lib_id,)).fetchall():
         author_photo_info[ar["name"]] = ar["photo_hash"] or ""
 
     author_map: dict[str, list[dict]] = {}
@@ -1775,8 +1929,10 @@ def authors_list():
 def author_detail(author_name: str):
     """Display all books by a given author, plus author metadata."""
     db = get_db()
+    lib_id = _get_current_library_id()
     rows = db.execute(
-        "SELECT id, name, author, has_cover, cover_hash, status, original_publication_date FROM books"
+        "SELECT id, name, author, has_cover, cover_hash, status, original_publication_date "
+        "FROM books WHERE library_id = ?", (lib_id,)
     ).fetchall()
 
     sort = request.args.get("sort", "date")  # date = original publication date
@@ -1807,7 +1963,7 @@ def author_detail(author_name: str):
         books.sort(key=lambda b: (b["original_publication_date"] or "9999", b["name"].lower()))
 
     # Load author metadata (if exists)
-    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
+    author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
     author_info = dict(author_row) if author_row else {
         "name": author_name, "has_photo": 0, "photo_hash": "", "birth_date": "",
         "birth_place": "", "death_date": "", "death_place": "", "biography": "",
@@ -1820,12 +1976,14 @@ def author_detail(author_name: str):
 def author_photo(author_name: str):
     """Serve the author's photo from the database."""
     db = get_db()
+    lib_id = _get_current_library_id()
 
     # Lightweight hash-only check for conditional requests
     etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
     if etag_from_client:
         hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1", (author_name,)
+            "SELECT photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
+            (author_name, lib_id)
         ).fetchone()
         if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
             resp = make_response("", 304)
@@ -1833,8 +1991,8 @@ def author_photo(author_name: str):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             return resp
 
-    row = db.execute("SELECT photo, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
-                     (author_name,)).fetchone()
+    row = db.execute("SELECT photo, photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
+                     (author_name, lib_id)).fetchone()
     if not row or not row["photo"]:
         abort(404)
 
@@ -1850,14 +2008,15 @@ def author_photo(author_name: str):
 def edit_author(author_name: str):
     """Edit author metadata (photo, dates, places, biography)."""
     db = get_db()
+    lib_id = _get_current_library_id()
 
     # Ensure author row exists
-    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
+    author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
     if not author_row:
         # Auto-create a skeleton row
-        db.execute("INSERT INTO authors (name) VALUES (?)", (author_name,))
+        db.execute("INSERT INTO authors (name, library_id) VALUES (?, ?)", (author_name, lib_id))
         db.commit()
-        author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
+        author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
 
     author_info = dict(author_row)
 
@@ -1871,11 +2030,11 @@ def edit_author(author_name: str):
         db.execute("""
             UPDATE authors SET
                 birth_date=?, birth_place=?, death_date=?, death_place=?, biography=?
-            WHERE name=?
+            WHERE name=? AND library_id=?
         """, (
             author_info["birth_date"], author_info["birth_place"],
             author_info["death_date"], author_info["death_place"],
-            author_info["biography"], author_name,
+            author_info["biography"], author_name, lib_id,
         ))
         db.commit()
 
@@ -1884,14 +2043,14 @@ def edit_author(author_name: str):
         if photo_file and photo_file.filename:
             photo_blob = photo_file.read()
             photo_hash = hashlib.md5(photo_blob).hexdigest()[:12]
-            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ? WHERE name = ?",
-                       (photo_blob, photo_hash, author_name))
+            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ? WHERE name = ? AND library_id = ?",
+                       (photo_blob, photo_hash, author_name, lib_id))
             db.commit()
 
         # Handle photo removal
         if request.form.get("remove_photo") == "1":
-            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '' WHERE name = ?",
-                       (author_name,))
+            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '' WHERE name = ? AND library_id = ?",
+                       (author_name, lib_id))
             db.commit()
 
         flash("Author details updated.", "success")
@@ -2257,6 +2416,7 @@ def save_ratings(book_id: str):
 @app.route("/book/<book_id>/edit", methods=["GET", "POST"])
 def edit_metadata(book_id: str):
     db = get_db()
+    lib_id = _get_current_library_id()
     book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
@@ -2358,7 +2518,7 @@ def edit_metadata(book_id: str):
         flash("Book metadata updated.", "success")
         return redirect(url_for("book_detail", book_id=book_id))
 
-    sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
+    sources = db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()
     sources = [dict(s) for s in sources]
     purchase_sources = [s for s in sources if s["type"] in PURCHASE_SOURCE_TYPES]
     borrow_sources = [s for s in sources if s["type"] in BORROW_SOURCE_TYPES]
@@ -2531,6 +2691,7 @@ def delete_reading_period(book_id: str, idx: int):
 @app.route("/book/new", methods=["GET", "POST"])
 def new_book():
     db = get_db()
+    lib_id = _get_current_library_id()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         author = request.form.get("author", "").strip()
@@ -2597,8 +2758,9 @@ def new_book():
              original_publication_date, publication_date, isbn, pages, starting_page,
              publisher, genre, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
-             borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
+             library_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -2613,6 +2775,7 @@ def new_book():
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
+            lib_id,
         ))
         db.commit()
 
@@ -2626,7 +2789,7 @@ def new_book():
         flash(f"Book '{name}' added.", "success")
         return redirect(url_for("book_detail", book_id=book_id))
 
-    sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
+    sources = db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()
     sources = [dict(s) for s in sources]
     purchase_sources = [s for s in sources if s["type"] in PURCHASE_SOURCE_TYPES]
     borrow_sources = [s for s in sources if s["type"] in BORROW_SOURCE_TYPES]
@@ -2650,13 +2813,15 @@ def new_book():
 def sources_list():
     """Sources management page."""
     db = get_db()
-    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name").fetchall()]
+    lib_id = _get_current_library_id()
+    sources = [dict(r) for r in db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()]
     return render_template("sources.html", sources=sources, source_types=SOURCE_TYPES)
 
 
 @app.route("/sources/add", methods=["POST"])
 def add_source():
     db = get_db()
+    lib_id = _get_current_library_id()
     name = request.form.get("name", "").strip()
     short_name = request.form.get("short_name", "").strip()
     if not name:
@@ -2664,7 +2829,7 @@ def add_source():
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, short_name, location, url, notes) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, short_name, location, url, notes, library_id) VALUES (?,?,?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
             request.form.get("source_type", "").strip(),
@@ -2673,6 +2838,7 @@ def add_source():
             request.form.get("location", "").strip(),
             request.form.get("url", "").strip(),
             request.form.get("notes", "").strip(),
+            lib_id,
         ),
     )
     db.commit()
@@ -2712,6 +2878,107 @@ def delete_source(source_id: str):
     db.commit()
     flash("Source deleted.", "success")
     return redirect(url_for("sources_list"))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Library management
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/library/switch", methods=["POST"])
+def switch_library():
+    """Switch the active library (stores choice in a cookie)."""
+    lib_id = request.form.get("library_id", "")
+    db = get_db()
+    row = db.execute("SELECT id FROM libraries WHERE id = ?", (lib_id,)).fetchone()
+    if not row:
+        abort(400)
+    resp = make_response(redirect(request.referrer or url_for("index")))
+    resp.set_cookie("ashinami_library", str(lib_id), max_age=60 * 60 * 24 * 365 * 5,
+                     samesite="Lax", httponly=True)
+    return resp
+
+
+@app.route("/library/create", methods=["POST"])
+def create_library():
+    """Create a new library."""
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Library name is required.", "error")
+        return redirect(request.referrer or url_for("index"))
+    slug = _slugify(name)
+    db = get_db()
+    existing = db.execute("SELECT id FROM libraries WHERE slug = ?", (slug,)).fetchone()
+    if existing:
+        flash("A library with that name already exists.", "error")
+        return redirect(request.referrer or url_for("index"))
+    db.execute("INSERT INTO libraries (name, slug) VALUES (?, ?)", (name, slug))
+    db.commit()
+    new_lib = db.execute("SELECT id FROM libraries WHERE slug = ?", (slug,)).fetchone()
+    resp = make_response(redirect(request.referrer or url_for("index")))
+    resp.set_cookie("ashinami_library", str(new_lib["id"]), max_age=60 * 60 * 24 * 365 * 5,
+                     samesite="Lax", httponly=True)
+    flash(f"Library '{name}' created.", "success")
+    return resp
+
+
+@app.route("/library/<int:lib_id>/rename", methods=["POST"])
+def rename_library(lib_id: int):
+    """Rename a library."""
+    db = get_db()
+    row = db.execute("SELECT id FROM libraries WHERE id = ?", (lib_id,)).fetchone()
+    if not row:
+        abort(404)
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Library name is required.", "error")
+        return redirect(request.referrer or url_for("index"))
+    slug = _slugify(name)
+    conflict = db.execute("SELECT id FROM libraries WHERE slug = ? AND id != ?", (slug, lib_id)).fetchone()
+    if conflict:
+        flash("A library with that name already exists.", "error")
+        return redirect(request.referrer or url_for("index"))
+    db.execute("UPDATE libraries SET name = ?, slug = ? WHERE id = ?", (name, slug, lib_id))
+    db.commit()
+    flash(f"Library renamed to '{name}'.", "success")
+    return redirect(request.referrer or url_for("index"))
+
+
+@app.route("/library/<int:lib_id>/delete", methods=["POST"])
+def delete_library(lib_id: int):
+    """Delete a library and all its data."""
+    db = get_db()
+    row = db.execute("SELECT id, name FROM libraries WHERE id = ?", (lib_id,)).fetchone()
+    if not row:
+        abort(404)
+    # Prevent deleting the last library
+    count = db.execute("SELECT COUNT(*) AS c FROM libraries").fetchone()["c"]
+    if count <= 1:
+        flash("Cannot delete the only library.", "error")
+        return redirect(request.referrer or url_for("index"))
+    lib_name = row["name"]
+    # Delete all data belonging to this library
+    book_ids = [r["id"] for r in db.execute("SELECT id FROM books WHERE library_id = ?", (lib_id,)).fetchall()]
+    for bid in book_ids:
+        db.execute("DELETE FROM sessions WHERE book_id = ?", (bid,))
+        db.execute("DELETE FROM periods WHERE book_id = ?", (bid,))
+        db.execute("DELETE FROM ratings WHERE book_id = ?", (bid,))
+        db.execute("DELETE FROM readings WHERE book_id = ?", (bid,))
+    db.execute("DELETE FROM books WHERE library_id = ?", (lib_id,))
+    db.execute("DELETE FROM sources WHERE library_id = ?", (lib_id,))
+    db.execute("DELETE FROM authors WHERE library_id = ?", (lib_id,))
+    db.execute("DELETE FROM libraries WHERE id = ?", (lib_id,))
+    db.commit()
+    # If the deleted library was the active one, reset cookie
+    current = request.cookies.get("ashinami_library", "")
+    if current == str(lib_id):
+        first = db.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()
+        resp = make_response(redirect(url_for("index")))
+        resp.set_cookie("ashinami_library", str(first["id"]), max_age=60 * 60 * 24 * 365 * 5,
+                         samesite="Lax", httponly=True)
+        flash(f"Library '{lib_name}' deleted.", "success")
+        return resp
+    flash(f"Library '{lib_name}' deleted.", "success")
+    return redirect(request.referrer or url_for("index"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2872,8 +3139,9 @@ def undo_delete_book():
                 original_publication_date, publication_date, isbn, pages, starting_page,
                 publisher, genre, summary, translator, illustrator, editor, prologue_author,
                 status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
-                borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
+                library_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (book.get("id"), book.get("name"), book.get("slug"), book.get("author"),
              book.get("language"), book.get("original_title"), book.get("original_language"),
@@ -2885,7 +3153,8 @@ def undo_delete_book():
              book.get("source_id"), book.get("purchase_date"), book.get("purchase_price"),
              book.get("borrowed_start"), book.get("borrowed_end"), book.get("is_gift"),
              book.get("has_cover"), book.get("cover"), book.get("cover_color"),
-             book.get("cover_palette"))
+             book.get("cover_palette"), book.get("cover_hash"),
+             book.get("library_id"))
         )
         
         # Re-insert readings
@@ -2949,6 +3218,7 @@ if __name__ == "__main__":
     migrate_add_cover_palette() # Add cover_palette column if needed
     migrate_add_cover_hash()    # Add cover_hash column if needed
     migrate_add_photo_hash()    # Add photo_hash column to authors if needed
+    migrate_add_libraries()     # Add libraries table and library_id columns
     app.run(
         debug=True,
         port=5000,
