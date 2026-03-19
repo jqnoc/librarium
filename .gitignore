@@ -8,6 +8,7 @@ __pycache__/
 venv/
 
 # Database and backups (user data)
+data/ashinami.db
 data/backups/
 
 # Environment variables
