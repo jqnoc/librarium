@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+{% block title %}{{ year }} Reading Stats – Ashinami{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--an-orange); font-weight: 500;" data-i18n="yearStats.backToGlobal">← Back to Global Stats</a>
+        <h1 style="margin: 0; color: var(--an-text-dark);"><span data-i18n="yearStats.title">Reading Statistics for</span> {{ year }}</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        {% if prev_year %}
+        <a href="{{ url_for('stats_year', year=prev_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">← {{ prev_year }}</a>
+        {% endif %}
+        {% if next_year %}
+        <a href="{{ url_for('stats_year', year=next_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">{{ next_year }} →</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ── Year summary statistics ──────────────────────────────────────── -->
+<div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2rem;">
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="yearStats.totalPages">Total Pages</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ total_pages }}</div>
+        </div>
+    </div>
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="yearStats.totalTime">Total Time</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%dh %dm" | format(total_seconds // 3600, (total_seconds % 3600) // 60) }}</div>
+        </div>
+    </div>
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="yearStats.readingSessions">Reading Sessions</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ sessions | length }}</div>
+        </div>
+    </div>
+    {% if period_pages > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="yearStats.periodPages">Period Pages</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ period_pages }}</div>
+            <div style="font-size: 0.8rem; color: var(--an-text-light); margin-top: 0.5rem;" data-i18n="yearStats.inferredTime">(inferred time)</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Gantt chart: reading timeline ──────────────────────────────────── -->
+{% if gantt_data %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin: 0 0 1rem 0; color: var(--an-deep-orange);" data-i18n="yearStats.readingTimeline">Reading Timeline</h3>
+        <div style="overflow-x: auto;">
+            <!-- Month labels -->
+            <div style="display: flex; margin-left: 200px; margin-bottom: 0.25rem; position: relative; height: 1.2rem;">
+                {% set months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+                {% set month_days = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334] %}
+                {% set is_leap = (year|int % 4 == 0 and (year|int % 100 != 0 or year|int % 400 == 0)) %}
+                {% set total_days = 366 if is_leap else 365 %}
+                {% for m in months %}
+                <div style="position: absolute; left: calc({{ month_days[loop.index0] }} / {{ total_days }} * 100%); font-size: 0.7rem; color: var(--an-text-light); white-space: nowrap;">{{ m }}</div>
+                {% endfor %}
+            </div>
+            <!-- Book bars -->
+            {% for item in gantt_data %}
+            <div style="display: flex; align-items: center; margin-bottom: 0.35rem; min-width: 600px;">
+                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--an-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;" title="{{ item.name }}">{{ item.name }}</div>
+                <div style="flex: 1; position: relative; height: 20px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px;">
+                    {# Idle span (full extent, light colour) #}
+                    {% set span_left = item.start / total_days * 100 %}
+                    {% set span_width_raw = (item.end - item.start + 1) / total_days * 100 %}
+                    {% set span_width = span_width_raw if span_width_raw > 0.3 else 0.3 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(span_left) }}%; width: {{ "%.2f" | format(span_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.2;"></div>
+                    {# Active segments (full colour) #}
+                    {% for seg in item.segments %}
+                    {% set seg_left = seg.start / total_days * 100 %}
+                    {% set seg_width_raw = (seg.end - seg.start + 1) / total_days * 100 %}
+                    {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.85;" title="{{ item.name }}"></div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Cumulative progress chart ─────────────────────────────────────── -->
+{% if sessions %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: var(--an-deep-orange);" data-i18n="yearStats.readingProgress">Reading Progress</h3>
+            <div style="display: flex; gap: 1rem; font-size: 0.9rem; align-items: center;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMode" value="cumulative" checked> <span data-i18n="yearStats.cumulative">Cumulative</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMode" value="perday"> <span data-i18n="yearStats.perDay">Per Day</span>
+                </label>
+                <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMetric" value="pages" checked> <span data-i18n="yearStats.pages">Pages</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMetric" value="time"> <span data-i18n="yearStats.time">Time</span>
+                </label>
+                <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="checkbox" id="hideIdleDays"> <span data-i18n="yearStats.hideIdleDays">Hide idle days</span>
+                </label>
+            </div>
+        </div>
+        <canvas id="progressChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+
+<!-- ── Per-book cumulative chart for this year ───────────────────────── -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin: 0 0 1rem 0; color: var(--an-deep-orange);">Per-book Cumulative Pages</h3>
+        <div style="margin-bottom: 0.5rem; color: var(--an-text-light); font-size: 0.9rem;">Each line shows a book's cumulative pages for {{ year }}.</div>
+        <canvas id="booksPerYearCumulative" style="max-height: 500px;"></canvas>
+    </div>
+</div>
+
+<!-- ── Reading sessions table ────────────────────────────────────────── -->
+<h2 data-i18n="yearStats.sessions">Reading Sessions</h2>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th data-i18n="yearStats.colDate">Date</th>
+                <th data-i18n="yearStats.colBook">Book</th>
+                <th data-i18n="yearStats.colPages">Pages</th>
+                <th data-i18n="yearStats.colDuration">Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in sessions %}
+            <tr>
+                <td>{{ session.date }}</td>
+                <td>{{ session.book_name }}</td>
+                <td>{{ session.pages }}</td>
+                <td>{{ "%dh %dm %ds" | format(session.duration_seconds // 3600, (session.duration_seconds % 3600) // 60, session.duration_seconds % 60) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">📊</div>
+    <p><span data-i18n="yearStats.noSessions">No reading sessions in</span> {{ year }}.</p>
+    <a href="{{ url_for('global_stats') }}" class="btn btn-secondary" data-i18n="yearStats.backToGlobal">← Back to Global Stats</a>
+</div>
+{% endif %}
+
+{% if periods %}
+<!-- ── Reading periods table ─────────────────────────────────────────── -->
+<h2 style="margin-top: 2.5rem;" data-i18n="yearStats.periods">Reading Periods</h2>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th data-i18n="yearStats.colStartDate">Start Date</th>
+                <th data-i18n="yearStats.colEndDate">End Date</th>
+                <th data-i18n="yearStats.colBook">Book</th>
+                <th data-i18n="yearStats.colPages">Pages</th>
+                <th data-i18n="yearStats.colNote">Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for period in periods %}
+            <tr>
+                <td>{{ period.start_date }}</td>
+                <td>{{ period.end_date }}</td>
+                <td><a href="{{ url_for('book_detail', book_id=period.book_id) }}">{{ period.book_name }}</a></td>
+                <td>{{ period.pages }}</td>
+                <td style="color: var(--an-text-light); font-size: 0.9rem;">{{ period.note }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+{% if sessions %}
+const sessions = {{ sessions | tojson }};
+
+// Group sessions by date and calculate cumulative totals
+const dateMap = new Map();
+sessions.forEach(s => {
+    if (!dateMap.has(s.date)) {
+        dateMap.set(s.date, { pages: 0, seconds: 0 });
+    }
+    const current = dateMap.get(s.date);
+    current.pages += s.pages;
+    current.seconds += s.duration_seconds || 0;
+});
+
+// Sort by date and build cumulative array
+const sortedDates = Array.from(dateMap.keys()).sort();
+let cumulative = 0;
+let cumulativeSeconds = 0;
+const chartData = [];
+
+// Add starting point (previous day with 0 pages) for better visualization
+if (sortedDates.length > 0) {
+    const firstDate = new Date(sortedDates[0]);
+    const prevDate = new Date(firstDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split('T')[0];
+    chartData.push({
+        date: prevDateStr,
+        pages: 0,
+        dayPages: 0,
+        daySeconds: 0,
+        cumulativeSeconds: 0,
+        isInvisible: true
+    });
+}
+
+// Build data with filled-in gaps for missing dates
+for (let i = 0; i < sortedDates.length; i++) {
+    const date = sortedDates[i];
+    const dayData = dateMap.get(date);
+    cumulative += dayData.pages;
+    cumulativeSeconds += dayData.seconds;
+    
+    // Fill in missing dates if there's a gap
+    if (i > 0) {
+        const prevDate = new Date(sortedDates[i - 1]);
+        const currentDate = new Date(date);
+        const daysBetween = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
+        
+        // Add intermediate dates with same cumulative value (before the new reading)
+        for (let d = 1; d < daysBetween; d++) {
+            const intermDate = new Date(prevDate);
+            intermDate.setDate(intermDate.getDate() + d);
+            const intermDateStr = intermDate.toISOString().split('T')[0];
+            chartData.push({
+                date: intermDateStr,
+                pages: cumulative - dayData.pages, // Use previous cumulative
+                dayPages: 0,
+                daySeconds: 0,
+                cumulativeSeconds: cumulativeSeconds - dayData.seconds,
+                isGap: true
+            });
+        }
+    }
+    
+    // Add the actual reading session date
+    chartData.push({ 
+        date, 
+        pages: cumulative, 
+        dayPages: dayData.pages,
+        daySeconds: dayData.seconds,
+        cumulativeSeconds: cumulativeSeconds,
+        isReading: true
+    });
+}
+
+// Build per-day data (all dates from first to last, 0 for non-reading days, no invisible start)
+const perDayData = [];
+if (sortedDates.length > 0) {
+    const firstDate = new Date(sortedDates[0]);
+    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const dayData = dateMap.get(dateStr);
+        if (dayData) {
+            perDayData.push({ date: dateStr, pages: dayData.pages, seconds: dayData.seconds, isReading: true });
+        } else {
+            perDayData.push({ date: dateStr, pages: 0, seconds: 0, isGap: true });
+        }
+    }
+}
+
+let activeData = chartData;
+let currentMode = 'cumulative';
+let currentMetric = 'pages';
+
+// Compact data (idle days removed)
+const compactChartData = chartData.filter(d => !d.isGap);
+const compactPerDayData = perDayData.filter(d => d.isReading);
+
+// Helper to format seconds to readable time
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
+}
+
+function formatMinutes(totalMinutes) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h';
+    return m + 'm';
+}
+
+// Create chart
+const ctx = document.getElementById('progressChart').getContext('2d');
+function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+const progressChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: chartData.map(d => d.isInvisible ? '' : d.date),
+        datasets: [{
+            label: 'Cumulative Pages Read',
+            data: chartData.map(d => d.pages),
+            backgroundColor: cssVar('--an-chart-fill'),
+            borderColor: cssVar('--an-chart-line'),
+            borderWidth: 3,
+            fill: true,
+            tension: 0.3,
+            pointRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 5),
+            pointBackgroundColor: cssVar('--an-chart-line'),
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 7)
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: cssVar('--an-chart-tooltip-bg'),
+                titleColor: cssVar('--an-chart-tooltip-title'),
+                bodyColor: '#fff',
+                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                    label: function(context) {
+                        const dataPoint = activeData[context.dataIndex];
+                        if (dataPoint.isInvisible || dataPoint.isGap) return null;
+                        const daySecs = dataPoint.daySeconds || dataPoint.seconds || 0;
+                        const dayPgs = dataPoint.dayPages != null ? dataPoint.dayPages : dataPoint.pages;
+                        const timeStr = formatDuration(daySecs);
+                        if (currentMode === 'cumulative') {
+                            if (currentMetric === 'pages') {
+                                return [
+                                    `Cumulative: ${context.parsed.y} pages`,
+                                    `Read that day: ${dayPgs} pages in ${timeStr}`
+                                ];
+                            } else {
+                                const cumTimeStr = formatDuration(dataPoint.cumulativeSeconds || 0);
+                                return [
+                                    `Cumulative time: ${cumTimeStr}`,
+                                    `Read that day: ${dayPgs} pages in ${timeStr}`
+                                ];
+                            }
+                        } else {
+                            if (currentMetric === 'pages') {
+                                return [
+                                    `Pages: ${context.parsed.y}`,
+                                    `Duration: ${timeStr}`
+                                ];
+                            } else {
+                                return [
+                                    `Duration: ${timeStr}`,
+                                    `Pages read: ${dayPgs}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                filter: function(tooltipItem) {
+                    const dataPoint = activeData[tooltipItem.dataIndex];
+                    return !dataPoint.isInvisible && !dataPoint.isGap;
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#6B7280',
+                    callback: function(value) {
+                        return value.toFixed(0);
+                    }
+                },
+                grid: {
+                    color: 'rgba(229, 231, 235, 0.5)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#6B7280',
+                    maxRotation: 45,
+                    minRotation: 45
+                },
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+
+// ── Chart update (mode + hide idle) ───────────────────────────────────
+function updateChart() {
+    currentMode = document.querySelector('input[name="chartMode"]:checked').value;
+    currentMetric = document.querySelector('input[name="chartMetric"]:checked').value;
+    const hideIdle = document.getElementById('hideIdleDays').checked;
+
+    if (currentMode === 'cumulative') {
+        const data = hideIdle ? compactChartData : chartData;
+        activeData = data;
+        progressChart.data.labels = data.map(d => d.isInvisible ? '' : d.date);
+        if (currentMetric === 'pages') {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+        } else {
+            progressChart.data.datasets[0].data = data.map(d => (d.cumulativeSeconds || 0) / 60);
+        }
+        progressChart.data.datasets[0].pointRadius = data.map(d => (d.isInvisible || d.isGap) ? 0 : 5);
+        progressChart.data.datasets[0].pointHoverRadius = data.map(d => (d.isInvisible || d.isGap) ? 0 : 7);
+        progressChart.data.datasets[0].fill = true;
+    } else {
+        const data = hideIdle ? compactPerDayData : perDayData;
+        activeData = data;
+        progressChart.data.labels = data.map(d => d.date);
+        if (currentMetric === 'pages') {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+        } else {
+            progressChart.data.datasets[0].data = data.map(d => (d.seconds || 0) / 60);
+        }
+        progressChart.data.datasets[0].pointRadius = data.map(d => d.isReading ? 5 : 0);
+        progressChart.data.datasets[0].pointHoverRadius = data.map(d => d.isReading ? 7 : 0);
+        progressChart.data.datasets[0].fill = false;
+    }
+    progressChart.options.scales.y.ticks.callback = currentMetric === 'time'
+        ? function(value) { return formatMinutes(value); }
+        : function(value) { return value.toFixed(0); };
+    progressChart.update();
+}
+
+document.querySelectorAll('input[name="chartMode"]').forEach(radio => {
+    radio.addEventListener('change', updateChart);
+});
+document.querySelectorAll('input[name="chartMetric"]').forEach(radio => {
+    radio.addEventListener('change', updateChart);
+});
+document.getElementById('hideIdleDays').addEventListener('change', updateChart);
+
+/* Per-book cumulative chart for the year */
+(function() {
+    const canvas = document.getElementById('booksPerYearCumulative');
+    if (!canvas) return;
+
+    fetch(`/api/cumulative_pages_per_book?year={{ year }}`)
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(json => {
+            const labels = json.labels || [];
+            function hexToRgba(hex, a) {
+                if (!hex) return `rgba(136,136,136,${a})`;
+                let h = (hex || '').replace('#', '').trim();
+                if (h.length === 3) h = h.split('').map(c => c + c).join('');
+                if (h.length !== 6) return `rgba(136,136,136,${a})`;
+                const r = parseInt(h.substring(0,2), 16);
+                const g = parseInt(h.substring(2,4), 16);
+                const b = parseInt(h.substring(4,6), 16);
+                return `rgba(${r}, ${g}, ${b}, ${a})`;
+            }
+
+            const datasets = (json.datasets || []).map((d, i) => {
+                const raw = (d.data || []).slice();
+                // prefer server-provided color (cover_color), fallback to generated hue
+                const providedColor = (d.color || '').trim();
+                const color = providedColor || `hsl(${Math.floor((i * 137.5) % 360)}, 70%, 40%)`;
+                const border = color;
+                const bg = providedColor ? hexToRgba(providedColor, 0.12) : `hsla(${Math.floor((i * 137.5) % 360)},70%,92%,0.9)`;
+
+                // If server already emits nulls, use them; otherwise clamp leading/trailing nulls.
+                // Treat zero as a valid value (we intentionally add a 0 on the day
+                // before the first session) so do not filter it out here.
+                let transformed = raw.slice();
+                let hasNonNull = transformed.some(v => v != null);
+                if (hasNonNull) {
+                    let firstIdx = transformed.findIndex(v => v != null);
+                    let lastIdx = transformed.length - 1 - transformed.slice().reverse().findIndex(v => v != null);
+                    transformed = transformed.map((v, idx) => (idx < firstIdx || idx > lastIdx) ? null : v);
+                } else {
+                    transformed = transformed.map(() => null);
+                }
+
+                return {
+                    label: d.label || (`Book ${d.book_id}`),
+                    data: transformed,
+                    borderColor: border,
+                    backgroundColor: bg,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                };
+            });
+
+            const ctx = canvas.getContext('2d');
+            if (window.booksPerYearChart) window.booksPerYearChart.destroy();
+            window.booksPerYearChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.2,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, padding: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed.y;
+                                    return `${context.dataset.label}: ${val} pages`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6B7280' }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { color: '#6B7280' }, grid: { color: 'rgba(229, 231, 235, 0.5)' } }
+                    }
+                }
+            });
+        })
+        .catch(err => console.error('Failed to load per-book cumulative data', err));
+})();
+
+{% endif %}
+</script>
+{% endblock %}

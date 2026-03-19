@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Add New Book – Ashinami{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="bookForm.backToLibrary">← Back to Library</a>
+</div>
+
+<h1 data-i18n="bookForm.addNewBook">Add New Book</h1>
+
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('new_book') }}">
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.basicInfo">Basic Information</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="name" data-i18n="bookForm.titleReq">Title *</label>
+                    <input type="text" id="name" name="name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="author" data-i18n="bookForm.authorReq">Author(s) *</label>
+                    <input type="text" id="author" name="author" class="form-control" list="author-list" required>
+                    <datalist id="author-list">
+                        {% for v in suggestions.author %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="genre" data-i18n="bookForm.genre">Genre</label>
+                    <input type="text" id="genre" name="genre" class="form-control" list="genre-list">
+                    <datalist id="genre-list">
+                        {% for v in suggestions.genre %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="status" data-i18n="bookForm.status">Status</label>
+                    <select id="status" name="status" class="form-control">
+                        <option value="reading" data-i18n="bookForm.statusReading">Reading</option>
+                        <option value="finished" data-i18n="bookForm.statusFinished">Finished</option>
+                        <option value="not-started" selected data-i18n="bookForm.statusNotStarted">Not Started</option>
+                        <option value="abandoned" data-i18n="bookForm.statusAbandoned">Abandoned</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pages" data-i18n="bookForm.pages">Pages</label>
+                    <input type="number" id="pages" name="pages" class="form-control" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
+                    <input type="number" id="starting_page" name="starting_page" class="form-control" value="0" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="language" data-i18n="bookForm.language">Language</label>
+                    <input type="text" id="language" name="language" class="form-control" list="language-list">
+                    <datalist id="language-list">
+                        {% for lang in languages %}<option value="{{ lang }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <!-- Empty column for alignment -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.pubDetails">Publication Details</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="publisher" data-i18n="bookForm.publisher">Publisher</label>
+                    <input type="text" id="publisher" name="publisher" class="form-control" list="publisher-list">
+                    <datalist id="publisher-list">
+                        {% for v in suggestions.publisher %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="publication_date" data-i18n="bookForm.pubDate">Publication Date</label>
+                    <input type="text" id="publication_date" name="publication_date" class="form-control" placeholder="e.g. 2021, 2021-04, or 2021-04-30" pattern="\d{4}(-\d{2}(-\d{2})?)?">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="isbn" data-i18n="bookForm.isbn">ISBN</label>
+                    <input type="text" id="isbn" name="isbn" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="cover" data-i18n="bookForm.coverImage">Cover Image</label>
+                    <input type="file" id="cover" name="cover" class="form-control" accept="image/*">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.originalWork">Original Work</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="original_title" data-i18n="bookForm.origTitle">Original Title</label>
+                    <input type="text" id="original_title" name="original_title" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="original_language" data-i18n="bookForm.origLang">Original Language</label>
+                    <input type="text" id="original_language" name="original_language" class="form-control" list="language-list">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="original_publication_date" data-i18n="bookForm.origPubDate">Original Publication Date</label>
+                <input type="text" id="original_publication_date" name="original_publication_date" class="form-control"
+                       placeholder="e.g. 1835 or 1835-01-15">
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.contributors">Contributors</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="translator" data-i18n="bookForm.translator">Translator(s)</label>
+                    <input type="text" id="translator" name="translator" class="form-control" list="translator-list">
+                    <datalist id="translator-list">
+                        {% for v in suggestions.translator %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="illustrator" data-i18n="bookForm.illustrator">Illustrator(s)</label>
+                    <input type="text" id="illustrator" name="illustrator" class="form-control" list="illustrator-list">
+                    <datalist id="illustrator-list">
+                        {% for v in suggestions.illustrator %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editor" data-i18n="bookForm.editor">Editor(s)</label>
+                    <input type="text" id="editor" name="editor" class="form-control" list="editor-list">
+                    <datalist id="editor-list">
+                        {% for v in suggestions.editor %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="prologue_author" data-i18n="bookForm.prologueAuthor">Prologue Author(s)</label>
+                    <input type="text" id="prologue_author" name="prologue_author" class="form-control" list="prologue_author-list">
+                    <datalist id="prologue_author-list">
+                        {% for v in suggestions.prologue_author %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.summary">Summary</h3>
+            <div class="form-group">
+                <textarea id="summary" name="summary" class="form-control" rows="5"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.bookSource">Book Source</h3>
+            <div class="form-group">
+                <div class="source-radio-group">
+                    <label class="source-radio-label">
+                        <input type="radio" name="source_type" value="" checked onchange="toggleSourceFields()">
+                        <span data-i18n="bookForm.notSet">Not set</span>
+                    </label>
+                    <label class="source-radio-label">
+                        <input type="radio" name="source_type" value="owned" onchange="toggleSourceFields()">
+                        <span data-i18n="bookForm.owned">Owned</span>
+                    </label>
+                    <label class="source-radio-label">
+                        <input type="radio" name="source_type" value="borrowed" onchange="toggleSourceFields()">
+                        <span data-i18n="bookForm.borrowed">Borrowed</span>
+                    </label>
+                </div>
+            </div>
+            <div id="owned-fields" style="display: none;">
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label class="source-radio-label" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                        <input type="checkbox" id="is_gift" name="is_gift" value="1" onchange="toggleGiftFields()">
+                        <span data-i18n="bookForm.receivedAsGift">🎁 Received as gift</span>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="purchase_date" id="label_purchase_date" data-i18n="bookForm.purchaseDate">Purchase Date</label>
+                        <input type="text" id="purchase_date" name="purchase_date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="source_id_owned" id="label_source_id_owned" data-i18n="bookForm.purchasePlace">Purchase Place</label>
+                        <select id="source_id_owned" name="source_id" class="form-control">
+                            <option value="">— Select —</option>
+                            {% for s in purchase_sources %}
+                            <option value="{{ s.id }}">{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            {% endfor %}
+                        </select>
+                        <select id="source_id_gift" name="source_id" class="form-control" style="display: none;">
+                            <option value="">— Select —</option>
+                            {% for s in gift_sources %}
+                            <option value="{{ s.id }}">{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" id="price-row">
+                    <div class="form-group">
+                        <label for="purchase_price" data-i18n="bookForm.price">Price</label>
+                        <input type="text" id="purchase_price" name="purchase_price" class="form-control" placeholder="e.g. 15.99€">
+                    </div>
+                    <div class="form-group"></div>
+                </div>
+            </div>
+            <div id="borrowed-fields" style="display: none;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="source_id_borrowed" data-i18n="bookForm.origOwner">Original Owner</label>
+                        <select id="source_id_borrowed" name="source_id" class="form-control">
+                            <option value="">— Select —</option>
+                            {% for s in borrow_sources %}
+                            <option value="{{ s.id }}">{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="borrowed_start" data-i18n="bookForm.borrowedFrom">Borrowed From</label>
+                        <input type="text" id="borrowed_start" name="borrowed_start" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="borrowed_end" data-i18n="bookForm.returnedOn">Returned On</label>
+                        <input type="text" id="borrowed_end" name="borrowed_end" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button type="submit" class="btn btn-primary" data-i18n="bookForm.addBookBtn">📚 Add Book</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary" data-i18n="form.cancel">Cancel</a>
+    </div>
+</form>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+flatpickr('#purchase_date, #borrowed_start, #borrowed_end', {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: true
+});
+
+function toggleSourceFields() {
+    const selected = document.querySelector('input[name="source_type"]:checked').value;
+    document.getElementById('owned-fields').style.display = selected === 'owned' ? 'block' : 'none';
+    document.getElementById('borrowed-fields').style.display = selected === 'borrowed' ? 'block' : 'none';
+    // Disable hidden selects so only the visible one submits
+    document.getElementById('source_id_owned').disabled = true;
+    document.getElementById('source_id_gift').disabled = true;
+    document.getElementById('source_id_borrowed').disabled = (selected !== 'borrowed');
+    if (selected === 'owned') {
+        toggleGiftFields();
+    }
+    // Reset gift checkbox when switching away from owned
+    if (selected !== 'owned') {
+        document.getElementById('is_gift').checked = false;
+    }
+}
+
+function toggleGiftFields() {
+    const isGift = document.getElementById('is_gift').checked;
+    // Toggle labels (i18n-aware)
+    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var dateLbl = document.getElementById('label_purchase_date');
+    var placeLbl = document.getElementById('label_source_id_owned');
+    dateLbl.textContent = isGift ? t('bookForm.dateReceived') : t('bookForm.purchaseDate');
+    dateLbl.setAttribute('data-i18n', isGift ? 'bookForm.dateReceived' : 'bookForm.purchaseDate');
+    placeLbl.textContent = isGift ? t('bookForm.giftFrom') : t('bookForm.purchasePlace');
+    placeLbl.setAttribute('data-i18n', isGift ? 'bookForm.giftFrom' : 'bookForm.purchasePlace');
+    // Toggle price row visibility
+    document.getElementById('price-row').style.display = isGift ? 'none' : 'flex';
+    // Toggle between purchase-source and gift-source selects
+    document.getElementById('source_id_owned').style.display = isGift ? 'none' : '';
+    document.getElementById('source_id_owned').disabled = isGift;
+    document.getElementById('source_id_gift').style.display = isGift ? '' : 'none';
+    document.getElementById('source_id_gift').disabled = !isGift;
+}
+toggleSourceFields();
+</script>
+{% endblock %}

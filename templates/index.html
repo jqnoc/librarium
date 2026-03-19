@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Ashinami – Library{% endblock %}
+
+{% block content %}
+<h1 data-i18n="index.title">Library</h1>
+
+<!-- Library Stats Ribbon -->
+<div class="library-stat-ribbon">
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📚</div>
+        <div class="library-stat-value">{{ total_books }}</div>
+        <div class="library-stat-label" data-i18n="index.totalBooks">Total Books</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📄</div>
+        <div class="library-stat-value">{{ "{:,}".format(total_library_pages) }}</div>
+        <div class="library-stat-label" data-i18n="index.totalPages">Total Pages</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">⏱️</div>
+        <div class="library-stat-value">{{ total_library_time }}</div>
+        <div class="library-stat-label" data-i18n="index.totalTimeRead">Total Time Read</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">✍️</div>
+        <div class="library-stat-value">{{ unique_authors }}</div>
+        <div class="library-stat-label" data-i18n="index.uniqueAuthors">Unique Authors</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">✅</div>
+        <div class="library-stat-value">{{ finished_count }}</div>
+        <div class="library-stat-label" data-i18n="index.finished">Finished</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📖</div>
+        <div class="library-stat-value">{{ reading_count }}</div>
+        <div class="library-stat-label" data-i18n="index.currentlyReading">Currently Reading</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📕</div>
+        <div class="library-stat-value">{{ not_started_count }}</div>
+        <div class="library-stat-label" data-i18n="index.notStarted">Not Started</div>
+    </div>
+</div>
+
+<div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <!-- View switcher -->
+        <span style="color: var(--an-text-light); font-size: 0.9rem;" data-i18n="index.view">View:</span>
+        <div class="view-switcher">
+            <button class="view-btn active" data-view="card" data-i18n-title="index.btnCardView" title="Card view">🃏</button>
+            <button class="view-btn" data-view="cover" data-i18n-title="index.btnCoverView" title="Cover view">🖼️</button>
+            <button class="view-btn" data-view="list" data-i18n-title="index.btnListView" title="List view">📋</button>
+        </div>
+
+        <span style="color: var(--an-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.filter">Filter:</span>
+        <select id="statusFilter" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+            <option value="all" {{ 'selected' if status_filter == 'all' else '' }} data-i18n="index.filterAll">All</option>
+            <option value="reading" {{ 'selected' if status_filter == 'reading' else '' }} data-i18n="index.filterReading">Reading</option>
+            <option value="finished" {{ 'selected' if status_filter == 'finished' else '' }} data-i18n="index.filterFinished">Finished</option>
+            <option value="not-started" {{ 'selected' if status_filter == 'not-started' else '' }} data-i18n="index.filterNotStarted">Not Started</option>
+            <option value="abandoned" {{ 'selected' if status_filter == 'abandoned' else '' }} data-i18n="index.filterAbandoned">Abandoned</option>
+        </select>
+        <span style="color: var(--an-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.sortBy">Sort by:</span>
+        <select id="sort1" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+            <option value="name" {{ 'selected' if sort1 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
+            <option value="author" {{ 'selected' if sort1 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
+            <option value="last_session" {{ 'selected' if sort1 == 'last_session' else '' }} data-i18n="index.sortLastSession">Last Reading Session/Period</option>
+            <option value="rating" {{ 'selected' if sort1 == 'rating' else '' }} data-i18n="index.sortRating">Rating</option>
+            <option value="status" {{ 'selected' if sort1 == 'status' else '' }} data-i18n="index.sortStatus">Status</option>
+            <option value="time_read" {{ 'selected' if sort1 == 'time_read' else '' }} data-i18n="index.sortTimeRead">Time Read</option>
+        </select>
+        <span style="color: var(--an-text-light); font-size: 0.9rem;" data-i18n="index.thenBy">then by:</span>
+        <select id="sort2" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+            <option value="" {{ 'selected' if sort2 == '' else '' }} data-i18n="index.sortNone">— None —</option>
+            <option value="name" {{ 'selected' if sort2 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
+            <option value="author" {{ 'selected' if sort2 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
+            <option value="last_session" {{ 'selected' if sort2 == 'last_session' else '' }} data-i18n="index.sortLastSession">Last Reading Session/Period</option>
+            <option value="rating" {{ 'selected' if sort2 == 'rating' else '' }} data-i18n="index.sortRating">Rating</option>
+            <option value="status" {{ 'selected' if sort2 == 'status' else '' }} data-i18n="index.sortStatus">Status</option>
+            <option value="time_read" {{ 'selected' if sort2 == 'time_read' else '' }} data-i18n="index.sortTimeRead">Time Read</option>
+        </select>
+    </div>
+</div>
+
+<script>
+// Load saved view preference
+window.addEventListener('DOMContentLoaded', function() {
+    const savedView = localStorage.getItem('ashinami_view') || 'card';
+    switchView(savedView);
+});
+
+function updateSort() {
+    const sort1 = document.getElementById('sort1').value;
+    const sort2 = document.getElementById('sort2').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    
+    let url = `/?sort1=${sort1}&status_filter=${statusFilter}`;
+    if (sort2) {
+        url += `&sort2=${sort2}`;
+    }
+    window.location.href = url;
+}
+
+function switchView(view) {
+    // Remove the preload style injected before page paint (if still present)
+    var preload = document.getElementById('ashinami-view-preload');
+    if (preload) preload.parentNode.removeChild(preload);
+    document.querySelectorAll('.library-view').forEach(el => el.style.display = 'none');
+    const target = document.getElementById('view-' + view);
+    if (target) target.style.display = '';
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`.view-btn[data-view="${view}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+    localStorage.setItem('ashinami_view', view);
+}
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('view-btn')) {
+        switchView(e.target.dataset.view);
+    }
+});
+
+// ── List column visibility ──────────────────────────────────────────
+function toggleColumns() {
+    const boxes = document.querySelectorAll('#columnCheckboxes input[type="checkbox"]');
+    const visible = {};
+    boxes.forEach(cb => { visible[cb.value] = cb.checked; });
+    localStorage.setItem('ashinami_list_cols', JSON.stringify(visible));
+    applyColumnVisibility(visible);
+}
+
+function applyColumnVisibility(visible) {
+    const allCols = ['cover','title','author','status','first_session','last_session','time_read','pub_date','publisher','rating','pages','language'];
+    allCols.forEach(col => {
+        const show = visible[col] !== false; // default true for missing keys
+        document.querySelectorAll('.col-' + col).forEach(el => {
+            el.style.display = show ? '' : 'none';
+        });
+    });
+}
+
+function restoreColumns() {
+    const saved = localStorage.getItem('ashinami_list_cols');
+    if (saved) {
+        try {
+            const visible = JSON.parse(saved);
+            // Restore checkboxes
+            document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(cb => {
+                if (cb.value === 'title') return; // always on
+                if (visible[cb.value] !== undefined) cb.checked = visible[cb.value];
+            });
+            applyColumnVisibility(visible);
+        } catch(e) {}
+    } else {
+        // Default: hide the extra columns
+        const defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:false, pages:false, language:false};
+        document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(cb => {
+            if (cb.value === 'title') return;
+            if (defaults[cb.value] !== undefined) cb.checked = defaults[cb.value];
+        });
+        applyColumnVisibility(defaults);
+    }
+}
+document.addEventListener('DOMContentLoaded', restoreColumns);
+</script>
+
+{% if books %}
+
+<!-- Blocking preload: hide all views before paint, show only the saved one -->
+<script>
+(function() {
+    var v = localStorage.getItem('ashinami_view') || 'card';
+    var s = document.createElement('style');
+    s.id = 'ashinami-view-preload';
+    s.textContent = '.library-view { display: none !important; } #view-' + v + ' { display: block !important; }';
+    document.head.appendChild(s);
+    // Buttons are already in the DOM at this point — update active state immediately
+    document.querySelectorAll('.view-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.view === v);
+    });
+})();
+</script>
+
+<!-- ── Card View ──────────────────────────────────────────────────────── -->
+<div id="view-card" class="library-view">
+    <div class="book-grid">
+        {% for book in books %}
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="card book-card" style="text-decoration:none; color:inherit;">
+            <div class="cover-wrap">
+                {% if book.has_cover %}
+                <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}">
+                {% else %}
+                <span class="cover-placeholder">📖</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="book-title">{{ book.name }}</div>
+                <div class="book-author">{{ book.author | format_authors }}</div>
+                <div class="book-stats">
+                    <span class="badge status-{{ book.status }}">{{ book.status | format_status }}</span>
+                    <span class="badge">{{ book.reading_days }} day{{ 's' if book.reading_days != 1 else '' }}</span>
+                    <span class="badge">{{ book.pages_read }}/{{ book.effective_pages }} pp</span>
+                    {% if book.avg_rating %}
+                    <span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ── Cover View ─────────────────────────────────────────────────────── -->
+<div id="view-cover" class="library-view" style="display:none;">
+    <div class="cover-grid">
+        {% for book in books %}
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="cover-grid-item" style="text-decoration:none; color:inherit;">
+            <div class="book-cover-large">
+                {% if book.has_cover %}
+                <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}" style="width:100%; height:auto; display:block;">
+                {% else %}
+                <div class="cover-placeholder">📖</div>
+                {% endif %}
+            </div>
+            <div class="cover-grid-info">
+                <div class="book-title" style="font-size:1rem; font-weight:600; line-height:1.3;">{{ book.name }}</div>
+                <div class="book-author" style="font-size:0.9rem; color:var(--an-text-light); margin-top:0.25rem;">{{ book.author | format_authors }}</div>
+                {% if book.avg_rating %}
+                <div style="font-size:0.8rem; color:var(--an-deep-orange); margin-top:0.25rem; font-weight:500;">⭐ {{ "%.2f" | format(book.avg_rating) }} / 5</div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ── List View ──────────────────────────────────────────────────────── -->
+<div id="view-list" class="library-view" style="display:none;">
+    <div class="list-column-selector" style="margin-bottom: 0.75rem;">
+        <label style="color: var(--an-text-light); font-size: 0.9rem; margin-right: 0.5rem;" data-i18n="index.columns">Columns:</label>
+        <div class="column-checkboxes" id="columnCheckboxes">
+            <label class="col-check"><input type="checkbox" value="cover" checked onchange="toggleColumns()"> <span data-i18n="index.colCover">Cover</span></label>
+            <label class="col-check"><input type="checkbox" value="title" checked onchange="toggleColumns()" disabled> <span data-i18n="index.colTitle">Title</span></label>
+            <label class="col-check"><input type="checkbox" value="author" checked onchange="toggleColumns()"> <span data-i18n="index.colAuthor">Author</span></label>
+            <label class="col-check"><input type="checkbox" value="status" checked onchange="toggleColumns()"> <span data-i18n="index.colStatus">Status</span></label>
+            <label class="col-check"><input type="checkbox" value="first_session" checked onchange="toggleColumns()"> <span data-i18n="index.colStartDate">Start Date</span></label>
+            <label class="col-check"><input type="checkbox" value="last_session" checked onchange="toggleColumns()"> <span data-i18n="index.colLatestDate">Latest Date</span></label>
+            <label class="col-check"><input type="checkbox" value="time_read" checked onchange="toggleColumns()"> <span data-i18n="index.colTimeRead">Time Read</span></label>
+            <label class="col-check"><input type="checkbox" value="pub_date" onchange="toggleColumns()"> <span data-i18n="index.colPubDate">Publication Date</span></label>
+            <label class="col-check"><input type="checkbox" value="publisher" onchange="toggleColumns()"> <span data-i18n="index.colPublisher">Publisher</span></label>
+            <label class="col-check"><input type="checkbox" value="rating" onchange="toggleColumns()"> <span data-i18n="index.colRating">Rating</span></label>
+            <label class="col-check"><input type="checkbox" value="pages" onchange="toggleColumns()"> <span data-i18n="index.colPages">Pages</span></label>
+            <label class="col-check"><input type="checkbox" value="language" onchange="toggleColumns()"> <span data-i18n="index.colLanguage">Language</span></label>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="library-list-table">
+            <thead>
+                <tr>
+                    <th class="col-cover" style="width:60px;" data-i18n="index.colCover">Cover</th>
+                    <th class="col-title" data-i18n="index.colTitle">Title</th>
+                    <th class="col-author" data-i18n="index.colAuthor">Author</th>
+                    <th class="col-status" data-i18n="index.colStatus">Status</th>
+                    <th class="col-first_session" data-i18n="index.colStartDate">Start Date</th>
+                    <th class="col-last_session" data-i18n="index.colLatestDate">Latest Date</th>
+                    <th class="col-time_read" data-i18n="index.colTimeRead">Time Read</th>
+                    <th class="col-pub_date" data-i18n="index.colPubDate">Publication Date</th>
+                    <th class="col-publisher" data-i18n="index.colPublisher">Publisher</th>
+                    <th class="col-rating" data-i18n="index.colRating">Rating</th>
+                    <th class="col-pages" data-i18n="index.colPages">Pages</th>
+                    <th class="col-language" data-i18n="index.colLanguage">Language</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in books %}
+                <tr onclick="window.location='{{ url_for('book_detail', book_id=book.id) }}'" style="cursor:pointer;">
+                    <td class="col-cover" style="padding: 0.4rem 0.5rem;">
+                        <div class="list-cover-thumb">
+                            {% if book.has_cover %}
+                            <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}">
+                            {% else %}
+                            <span class="cover-placeholder" style="font-size:1.2rem;">📖</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="col-title" style="font-weight:600;">{{ book.name }}</td>
+                    <td class="col-author">{{ book.author | format_authors }}</td>
+                    <td class="col-status"><span class="badge status-{{ book.status }}">{{ book.status | format_status }}</span></td>
+                    <td class="col-first_session">{{ book.first_session_date if book.first_session_date != '0000-00-00' else '—' }}</td>
+                    <td class="col-last_session">{{ book.last_session_date if book.last_session_date != '0000-00-00' else '—' }}</td>
+                    <td class="col-time_read">{{ book.total_time if book.total_seconds_raw > 0 else '—' }}</td>
+                    <td class="col-pub_date">{{ book.publication_date or '—' }}</td>
+                    <td class="col-publisher">{{ book.publisher or '—' }}</td>
+                    <td class="col-rating">{% if book.avg_rating %}<span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>{% else %}—{% endif %}</td>
+                    <td class="col-pages">{{ book.pages or '—' }}</td>
+                    <td class="col-language">{{ book.language or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+{% if status_filter != 'all' %}
+<div class="empty-state">
+    <div class="icon">🔍</div>
+    <p>No books found with status "{{ status_filter | format_status }}".</p>
+    <button onclick="document.getElementById('statusFilter').value='all'; updateSort();" class="btn btn-secondary" data-i18n="index.noBooks">Show All Books</button>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="icon">📚</div>
+    <p data-i18n="index.emptyLibrary">Your library is empty. Add your first book to get started!</p>
+    <a href="{{ url_for('new_book') }}" class="btn btn-primary" data-i18n="nav.addBook">+ Add Book</a>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Authors – Ashinami{% endblock %}
+
+{% block content %}
+<script>
+// Blocking redirect: apply saved sort BEFORE any content renders
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has('sort')) {
+        var saved = localStorage.getItem('ashinami_authors_sort');
+        if (saved && saved !== 'name') {
+            window.location.replace('{{ url_for('authors_list') }}?sort=' + saved);
+        }
+    }
+})();
+</script>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <h1 style="margin: 0; color: var(--an-text-dark);" data-i18n="authors.title">Authors</h1>
+        <span style="color: var(--an-text-light); font-size: 1rem;">{{ authors | length }} author{{ 's' if authors | length != 1 else '' }}</span>
+    </div>
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--an-text-light);">
+        <span data-i18n="authors.sortBy">Sort by:</span>
+        <select id="authorSort" onchange="updateAuthorSort()"
+                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); cursor: pointer;">
+            <option value="name"  {% if sort == 'name'  %}selected{% endif %} data-i18n="authors.sortName">Name</option>
+            <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="authors.sortBooks">Number of Books</option>
+        </select>
+    </label>
+</div>
+
+<script>
+function updateAuthorSort() {
+    var value = document.getElementById('authorSort').value;
+    localStorage.setItem('ashinami_authors_sort', value);
+    window.location.href = '{{ url_for('authors_list') }}?sort=' + value;
+}
+</script>
+
+{% if authors %}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">
+    {% for author in authors %}
+    <a href="{{ url_for('author_detail', author_name=author.name) }}" style="text-decoration: none; color: inherit;">
+        <div class="card" style="transition: box-shadow 0.15s;">
+            <div class="card-body" style="display: flex; align-items: center; gap: 1rem;">
+                <!-- Author photo or first available cover as thumbnail -->
+                <div style="flex-shrink: 0; width: 48px; height: 68px; overflow: hidden; border-radius: 4px; background: var(--an-surface-alt, #f3f4f6);">
+                    {% if author.has_photo %}
+                    <img src="{{ url_for('author_photo', author_name=author.name, v=author.photo_hash) }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    {% set ns = namespace(cover_book=none) %}
+                    {% for book in author.books %}
+                        {% if book.has_cover and ns.cover_book is none %}
+                            {% set ns.cover_book = book %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if ns.cover_book %}
+                    <img src="{{ url_for('book_cover', book_id=ns.cover_book.id, v=ns.cover_book.cover_hash) }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📖</div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <div>
+                    <div style="font-weight: 600; font-size: 1rem; line-height: 1.3; color: var(--an-text-dark);">{{ author.name }}</div>
+                    <div style="font-size: 0.85rem; color: var(--an-text-light); margin-top: 0.2rem;">
+                        {{ author.book_count }} book{{ 's' if author.book_count != 1 else '' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">✍️</div>
+    <p data-i18n="authors.empty">No authors found. Add some books to your library first.</p>
+    <a href="{{ url_for('new_book') }}" class="btn btn-primary" data-i18n="nav.addBook">+ Add Book</a>
+</div>
+{% endif %}
+{% endblock %}

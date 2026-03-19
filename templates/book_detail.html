@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+{% block title %}{{ info.get('name', 'Book') }} – Ashinami{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="book.backToLibrary">← Back to Library</a>
+</div>
+
+<h1>{{ info.get('name', 'Untitled') }}</h1>
+
+<!-- ── Hero: cover + metadata ────────────────────────────────────────── -->
+<div class="book-hero">
+    <div class="book-cover-large">
+        {% if has_cover %}
+        <img src="{{ url_for('book_cover', book_id=book_id, v=info.get('cover_hash', '')) }}" alt="{{ info.get('name', '') }}">
+        {% else %}
+        <div class="cover-placeholder">📖</div>
+        {% endif %}
+    </div>
+
+    <div>
+        <div class="meta-grid">
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.authors' if ';' in info.get('author', '') else 'book.author' }}">{{ 'Authors' if ';' in info.get('author', '') else 'Author' }}</div>
+                <div class="meta-value">
+                    {% set authors_list = info.get('author', '').split(';') | map('trim') | select | list %}
+                    {% if authors_list %}
+                        {% for a in authors_list %}
+                            <a href="{{ url_for('author_detail', author_name=a) }}" style="color: var(--an-orange); text-decoration: none;">{{ a }}</a>
+                            {%- if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}
+                        {% endfor %}
+                    {% else %}
+                        —
+                    {% endif %}
+                </div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.status">Status</div>
+                <div class="meta-value">
+                    <span class="badge status-{{ info.get('status', 'reading') }}">{{ info.get('status', 'reading') | format_status }}</span>
+                </div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.pages">Pages</div>
+                <div class="meta-value">{{ info.get('pages', 0) }}{% if info.get('starting_page', 0) > 0 %} ({{ effective_pages }} readable){% endif %}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.genre">Genre</div>
+                <div class="meta-value">{{ info.get('genre', '—') }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.language">Language</div>
+                <div class="meta-value">{{ info.get('language', '—') }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.publisher">Publisher</div>
+                <div class="meta-value">{{ info.get('publisher', '—') }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.pubDate">Publication Date</div>
+                <div class="meta-value">{{ info.get('publication_date', '—') }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.isbn">ISBN</div>
+                <div class="meta-value">{{ info.get('isbn', '—') }}</div>
+            </div>
+            {% if info.get('original_title') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.originalTitle">Original Title</div>
+                <div class="meta-value">{{ info.get('original_title') }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('original_language') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.originalLang">Original Language</div>
+                <div class="meta-value">{{ info.get('original_language') }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('original_publication_date') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.originalDate">Original Date</div>
+                <div class="meta-value">{{ info.get('original_publication_date') }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('translator') and info.get('translator') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.translators' if ';' in info.get('translator', '') else 'book.translator' }}">{{ 'Translators' if ';' in info.get('translator', '') else 'Translator' }}</div>
+                <div class="meta-value">{{ info.get('translator') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('illustrator') and info.get('illustrator') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.illustrators' if ';' in info.get('illustrator', '') else 'book.illustrator' }}">{{ 'Illustrators' if ';' in info.get('illustrator', '') else 'Illustrator' }}</div>
+                <div class="meta-value">{{ info.get('illustrator') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('editor') and info.get('editor') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.editors' if ';' in info.get('editor', '') else 'book.editor' }}">{{ 'Editors' if ';' in info.get('editor', '') else 'Editor' }}</div>
+                <div class="meta-value">{{ info.get('editor') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('prologue_author') and info.get('prologue_author') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.prologueAuthors' if ';' in info.get('prologue_author', '') else 'book.prologueAuthor' }}">{{ 'Prologue Authors' if ';' in info.get('prologue_author', '') else 'Prologue Author' }}</div>
+                <div class="meta-value">{{ info.get('prologue_author') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('source_type') == 'owned' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.source">Source</div>
+                <div class="meta-value" data-i18n="{{ 'book.gift' if info.get('is_gift') else 'book.owned' }}">{{ 'Gift 🎁' if info.get('is_gift') else 'Owned' }}</div>
+            </div>
+            {% if source_obj %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.giftFrom' if info.get('is_gift') else 'book.purchasePlace' }}">{{ 'Gift From' if info.get('is_gift') else 'Purchase Place' }}</div>
+                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--an-text-light); font-size: 0.85em;">({{ source_obj.type | source_type_label }})</span></div>
+            </div>
+            {% endif %}
+            {% if info.get('purchase_date') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.dateReceived' if info.get('is_gift') else 'book.purchaseDate' }}">{{ 'Date Received' if info.get('is_gift') else 'Purchase Date' }}</div>
+                <div class="meta-value">{{ info.get('purchase_date') }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('purchase_price') and not info.get('is_gift') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.price">Price</div>
+                <div class="meta-value">{{ info.get('purchase_price') }}</div>
+            </div>
+            {% endif %}
+            {% elif info.get('source_type') == 'borrowed' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.source">Source</div>
+                <div class="meta-value" data-i18n="book.borrowed">Borrowed</div>
+            </div>
+            {% if source_obj %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.originalOwner">Original Owner</div>
+                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--an-text-light); font-size: 0.85em;">({{ source_obj.type | source_type_label }})</span></div>
+            </div>
+            {% endif %}
+            {% if info.get('borrowed_start') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.borrowedFrom">Borrowed From</div>
+                <div class="meta-value">{{ info.get('borrowed_start') }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('borrowed_end') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.returnedOn">Returned On</div>
+                <div class="meta-value">{{ info.get('borrowed_end') }}</div>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        {% if info.get('summary') %}
+        <div class="book-summary">{{ info.get('summary') }}</div>
+        {% endif %}
+
+        <div class="btn-group">
+            <a href="{{ url_for('edit_metadata', book_id=book_id) }}" class="btn btn-secondary btn-sm" data-i18n="book.editMetadata">✏️ Edit Metadata</a>
+            {% if has_cover %}
+            <a href="{{ url_for('book_cover', book_id=book_id, v=info.get('cover_hash', '')) }}"
+               download="{{ info.get('name', 'cover') }}.jpg"
+               class="btn btn-secondary btn-sm" data-i18n="book.exportCover">⬇ Export Cover</a>
+            {% endif %}
+            {% if info.get('status') in ('finished', 'abandoned') %}
+            <form method="POST" action="{{ url_for('start_reread', book_id=book_id) }}" style="display:inline;"
+                  onsubmit="return confirm('Start a new re-read of this book?');">
+                <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.startReRead">🔄 Start Re-Read</button>
+            </form>
+            {% endif %}
+            <button class="btn btn-danger btn-sm" onclick="document.getElementById('deleteModal').classList.add('active')" data-i18n="book.deleteBook">🗑️ Delete Book</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Ratings ────────────────────────────────────────────────────────── -->
+<h2>Rating{% if avg_rating %} — <span style="color: var(--an-deep-orange);">{{ "%.2f" | format(avg_rating) }} / 5</span>{% endif %}</h2>
+<form method="POST" action="{{ url_for('save_ratings', book_id=book_id) }}">
+    <div class="ratings-section">
+        {% for group in rating_dimensions %}
+        <div class="rating-group">
+            <h3 class="rating-group-title">{{ group['group'] }}</h3>
+            <div class="rating-items">
+                {% for item in group['items'] %}
+                <div class="rating-item">
+                    <label class="rating-label" title="{{ item.tip }}">{{ item.label }}</label>
+                    <select name="{{ item.key }}" class="rating-select" onchange="recalcAverage()">
+                        <option value="">—</option>
+                        {% for v in range(1, 6) %}
+                        <option value="{{ v }}" {{ 'selected' if ratings.get(item.key) == v else '' }}>{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 1rem;">
+        <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.saveRatings">💾 Save Ratings</button>
+        <span id="liveAvg" style="font-weight:600; color: var(--an-deep-orange);"></span>
+    </div>
+</form>
+
+<script>
+function recalcAverage() {
+    const groups = document.querySelectorAll('.rating-group');
+    const groupAvgs = [];
+    groups.forEach(group => {
+        const selects = group.querySelectorAll('.rating-select');
+        let sum = 0, count = 0;
+        selects.forEach(s => {
+            const v = parseInt(s.value);
+            if (v > 0) { sum += v; count++; }
+        });
+        if (count > 0) groupAvgs.push(sum / count);
+    });
+    const el = document.getElementById('liveAvg');
+    if (groupAvgs.length > 0) {
+        const avg = groupAvgs.reduce((a, b) => a + b, 0) / groupAvgs.length;
+        el.textContent = 'Average: ' + avg.toFixed(2) + ' / 5';
+    } else {
+        el.textContent = '';
+    }
+}
+document.addEventListener('DOMContentLoaded', recalcAverage);
+</script>
+<!-- ── Readings timeline ─────────────────────────────────────────────── -->
+{% if readings %}
+<h2>Readings</h2>
+<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    {% for rd in readings %}
+    <div class="card" style="flex: 1; min-width: 200px; max-width: 350px; {{ 'border-left: 3px solid var(--an-deep-orange);' if rd.id == current_reading_id else '' }}">
+        <div class="card-body" style="padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong style="color: var(--an-deep-orange);">Reading #{{ rd.reading_number }}</strong>
+                <span class="badge status-{{ rd.status }}">{{ rd.status | format_status }}</span>
+            </div>
+            {% if rd.date_started %}
+            <div style="font-size: 0.85rem; color: var(--an-text-light);">
+                Started: {{ rd.date_started }}
+            </div>
+            {% endif %}
+            {% if rd.date_finished %}
+            <div style="font-size: 0.85rem; color: var(--an-text-light);">
+                Finished: {{ rd.date_finished }}
+            </div>
+            {% endif %}
+            <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                {{ rd.total_pages }} pages · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}
+            </div>
+            {% if readings | length > 1 %}
+            <div style="margin-top: 0.5rem; text-align: right;">
+                <form method="POST" action="{{ url_for('delete_reading', book_id=book_id, reading_id=rd.id) }}" style="display:inline;"
+                      onsubmit="return confirm('Delete Reading #{{ rd.reading_number }} and all its sessions/periods? This cannot be undone.');">
+                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;">🗑️ Delete</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+<!-- ── Reading statistics summary ────────────────────────────────────── -->
+<h2 data-i18n="book.readingStats">Reading Stats</h2>{% if readings | length > 1 %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Current Reading #{{ readings[-1].reading_number }})</span>{% endif %}</h2>
+<div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">    {% if date_started and info.get('status') in ('reading', 'finished') %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.dateStarted">Date Started</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ date_started }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if date_finished and info.get('status') == 'finished' %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.dateFinished">Date Finished</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ date_finished }}</div>
+        </div>
+    </div>
+    {% endif %}    {% if reading_days > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.readingDays">Reading Days</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ reading_days }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if total_pages > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.pagesRead">Pages Read</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ total_pages }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if total_time and total_time != '0s' %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.totalTime">Total Time</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ total_time }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if avg_pages_per_day > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.avgPagesDay">Avg Pages/Day</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%.1f" | format(avg_pages_per_day) }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if info.get('status') == 'finished' and max_pages_per_day > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.mostPagesDay">Most Pages/Day</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ max_pages_per_day }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if info.get('status') == 'finished' and max_time_per_day %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.mostTimeDay">Most Time/Day</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ max_time_per_day }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if avg_pages_per_hour > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.avgPagesHour">Avg Pages/Hour</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%.1f" | format(avg_pages_per_hour) }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if info.get('status') == 'reading' and progress_pct > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.progress">Progress</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%.1f" | format(progress_pct) }}%</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if info.get('status') == 'reading' and pages_remaining > 0 %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.pagesRemaining">Pages Remaining</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ pages_remaining }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if est_time_to_finish %}
+    <div class="card" style="flex:1; min-width:150px;">
+        <div class="card-body" style="text-align:center;">
+            <div class="meta-label" data-i18n="book.estFinish">Est. Time to Finish</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ est_time_to_finish }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Cumulative progress chart ─────────────────────────────────────── -->
+{% if sessions %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-body">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: var(--an-deep-orange);" data-i18n="book.readingProgress">Reading Progress</h3>
+            <div style="display: flex; gap: 1rem; font-size: 0.9rem; align-items: center;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMode" value="cumulative" checked> <span data-i18n="book.cumulative">Cumulative</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMode" value="perday"> <span data-i18n="book.perDay">Per Day</span>
+                </label>
+                <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMetric" value="pages" checked> <span data-i18n="book.chartPages">Pages</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="radio" name="chartMetric" value="time"> <span data-i18n="book.chartTime">Time</span>
+                </label>
+                <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                    <input type="checkbox" id="hideIdleDays"> <span data-i18n="book.hideIdleDays">Hide idle days</span>
+                </label>
+            </div>
+        </div>
+        <canvas id="progressChart" style="max-height: 300px;"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Reading Timeline (Gantt) ───────────────────────────────────────── -->
+{% if book_gantt %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-body">
+        <h3 style="margin: 0 0 1rem 0; color: var(--an-deep-orange);" data-i18n="book.readingTimeline">Reading Timeline</h3>
+        <div style="overflow: hidden;">
+            <!-- Month labels -->
+            <div style="display: flex; position: relative; height: 1.2rem; margin-bottom: 0.25rem; overflow: hidden;">
+                {% for m in book_gantt.months %}
+                <div style="position: absolute; left: calc({{ m.offset }} / {{ book_gantt.total_days }} * 100%); font-size: 0.7rem; color: var(--an-text-light); white-space: nowrap;">{{ m.label }}</div>
+                {% endfor %}
+            </div>
+            <!-- Bar -->
+            <div style="position: relative; height: 22px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px; overflow: hidden;">
+                {# Idle span (full extent, light colour) #}
+                <div style="position: absolute; left: 0; width: 100%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.15;"></div>
+                {# Active segments (full colour) #}
+                {% for seg in book_gantt.segments %}
+                {% set seg_left = seg.start / book_gantt.total_days * 100 %}
+                {% set seg_width_raw = (seg.end - seg.start + 1) / book_gantt.total_days * 100 %}
+                {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
+                <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.85;"></div>
+                {% endfor %}
+            </div>
+            <!-- Date range label -->
+            <div style="display: flex; justify-content: space-between; margin-top: 0.35rem; font-size: 0.75rem; color: var(--an-text-light);">
+                <span>{{ book_gantt.start_label }}</span>
+                <span>{{ book_gantt.end_label }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Sessions table ────────────────────────────────────────────────── -->
+<h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);" data-i18n="book.allReadings">(all readings)</span>{% endif %}</h2>
+
+{% if all_sessions %}
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                {% if has_multiple_readings %}<th data-i18n="book.colReading">Reading</th>{% endif %}
+                <th data-i18n="book.colDate">Date</th>
+                <th data-i18n="book.colPages">Pages</th>
+                <th data-i18n="book.colDuration">Duration</th>
+                <th data-i18n="book.colActions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in all_sessions %}
+            <tr id="session-row-{{ s.id }}">
+                <td>{{ loop.index }}</td>
+                {% if has_multiple_readings %}<td>#{{ reading_num_map.get(s.reading_id, '?') }}</td>{% endif %}
+                <td>{{ s.date | date_ddmmyyyy }}</td>
+                <td>{{ s.pages }}</td>
+                <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">✏️</button>
+                    <form method="POST" action="{{ url_for('delete_session', book_id=book_id, idx=s.id) }}" style="display:inline;"
+                          onsubmit="return confirm('Delete this session?');">
+                        <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            <tr class="session-edit-row" id="session-edit-{{ s.id }}">
+                <td colspan="{{ 6 if has_multiple_readings else 5 }}">
+                    <form method="POST" action="{{ url_for('edit_session', book_id=book_id, idx=s.id) }}" class="inline-form">
+                        <label>Date</label>
+                        <input type="text" name="date" value="{{ s.date }}" class="date-input" required>
+                        <label>Pages</label>
+                        <input type="number" name="pages" value="{{ s.pages }}" min="1" required>
+                        <label>Hours</label>
+                        <input type="number" name="hours" value="{{ (s.duration_seconds // 3600) }}" min="0">
+                        <label>Min</label>
+                        <input type="number" name="minutes" value="{{ ((s.duration_seconds % 3600) // 60) }}" min="0" required>
+                        <label>Sec</label>
+                        <input type="number" name="seconds" value="{{ (s.duration_seconds % 60) }}" min="0" max="59" required>
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1.5rem;">
+    <p data-i18n="book.noSessions">No reading sessions yet.</p>
+</div>
+{% endif %}
+
+<!-- ── Add session panel ─────────────────────────────────────────────── -->
+<div class="add-session-panel">
+    <h3 data-i18n="book.addSession">Add New Session</h3>
+    <form method="POST" action="{{ url_for('add_session', book_id=book_id) }}" class="inline-form" style="margin-top: .75rem;">
+        <div class="form-group">
+            <label data-i18n="form.date">Date</label>
+            <input type="text" name="date" class="form-control date-input" value="{{ last_date }}" required>
+        </div>
+        <div class="form-group">
+            <label data-i18n="form.pages">Pages</label>
+            <input type="number" name="pages" class="form-control" min="1" required style="width:80px;">
+        </div>
+        <div class="form-group">
+            <label data-i18n="form.hours">Hours</label>
+            <input type="number" name="hours" class="form-control" min="0" value="0" style="width:80px;">
+        </div>
+        <div class="form-group">
+            <label data-i18n="form.minutes">Minutes</label>
+            <input type="number" name="minutes" class="form-control" min="0" value="0" required style="width:80px;">
+        </div>
+        <div class="form-group">
+            <label data-i18n="form.seconds">Seconds</label>
+            <input type="number" name="seconds" class="form-control" min="0" max="59" value="0" required style="width:80px;">
+        </div>
+        <div class="form-group" style="align-self: flex-end;">
+            <button type="submit" class="btn btn-primary" data-i18n="book.addSessionBtn">+ Add Session</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Reading Periods panel ─────────────────────────────────────────── -->
+<h2><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);" data-i18n="book.allReadings">(all readings)</span>{% endif %}</h2>
+<p style="color: var(--an-text-light); font-size: 0.9rem; margin-top: 0;" data-i18n="book.periodsDesc">Date ranges when you read this book without detailed session tracking. Reading time is inferred from your tracked sessions' average speed.</p>
+
+{% if all_periods %}
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                {% if has_multiple_readings %}<th data-i18n="book.colReading">Reading</th>{% endif %}
+                <th data-i18n="book.colStartDate">Start Date</th>
+                <th data-i18n="book.colEndDate">End Date</th>
+                <th data-i18n="book.colPages">Pages</th>
+                <th data-i18n="book.colNote">Note</th>
+                <th data-i18n="book.colActions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in all_periods %}
+            <tr id="period-row-{{ p.id }}">
+                <td>{{ loop.index }}</td>
+                {% if has_multiple_readings %}<td>#{{ reading_num_map.get(p.reading_id, '?') }}</td>{% endif %}
+                <td>{{ p.start_date | date_ddmmyyyy or '—' }}</td>
+                <td>{{ p.end_date | date_ddmmyyyy or '—' }}</td>
+                <td>{{ p.pages }}</td>
+                <td>{{ p.note or '—' }}</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="togglePeriodEdit({{ p.id }})">✏️</button>
+                    <form method="POST" action="{{ url_for('delete_reading_period', book_id=book_id, idx=p.id) }}" style="display:inline;"
+                          onsubmit="return confirm('Delete this reading period?');">
+                        <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            <tr class="session-edit-row" id="period-edit-{{ p.id }}">
+                <td colspan="{{ 7 if has_multiple_readings else 6 }}">
+                    <form method="POST" action="{{ url_for('edit_reading_period', book_id=book_id, idx=p.id) }}" class="inline-form">
+                        <label>Start</label>
+                        <input type="text" name="start_date" value="{{ p.start_date or '' }}" class="date-input" style="width:150px;">
+                        <label>End</label>
+                        <input type="text" name="end_date" value="{{ p.end_date or '' }}" class="date-input" style="width:150px;">
+                        <label>Pages</label>
+                        <input type="number" name="pages" value="{{ p.pages }}" min="1" required style="width:80px;">
+                        <label>Note</label>
+                        <input type="text" name="note" value="{{ p.note or '' }}" style="width:200px;">
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="togglePeriodEdit({{ p.id }})">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1.5rem;">
+    <p data-i18n="book.noPeriods">No reading periods yet.</p>
+</div>
+{% endif %}
+
+<div class="add-session-panel">
+    <h3 data-i18n="book.addPeriod">Add Reading Period</h3>
+    <form method="POST" action="{{ url_for('add_reading_period', book_id=book_id) }}" class="inline-form" style="margin-top: .75rem;">
+        <div class="form-group">
+            <label>Start Date</label>
+            <input type="text" name="start_date" class="form-control date-input" style="width:150px;">
+        </div>
+        <div class="form-group">
+            <label>End Date</label>
+            <input type="text" name="end_date" class="form-control date-input" style="width:150px;">
+        </div>
+        <div class="form-group">
+            <label>Pages</label>
+            <input type="number" name="pages" class="form-control" min="1" required style="width:80px;">
+        </div>
+        <div class="form-group">
+            <label>Note</label>
+            <input type="text" name="note" class="form-control" placeholder="Optional note" style="width:200px;">
+        </div>
+        <div class="form-group" style="align-self: flex-end;">
+            <button type="submit" class="btn btn-primary" data-i18n="book.addPeriodBtn">+ Add Reading Period</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Delete confirmation modal ─────────────────────────────────────── -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+        <h3 data-i18n="book.deleteTitle">Delete Book</h3>
+        <p>Are you sure you want to delete <strong>{{ info.get('name', 'this book') }}</strong>? This will remove all data and cannot be undone.</p>
+        <div class="btn-group">
+            <form method="POST" action="{{ url_for('delete_book', book_id=book_id) }}">
+                <button type="submit" class="btn btn-danger" data-i18n="book.yesDelete">Yes, Delete</button>
+            </form>
+            <button class="btn btn-secondary" onclick="document.getElementById('deleteModal').classList.remove('active')" data-i18n="form.cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+flatpickr('.date-input', {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd/m/Y',
+    allowInput: true
+});
+
+function toggleEdit(idx) {
+    const row = document.getElementById('session-edit-' + idx);
+    row.classList.toggle('active');
+}
+
+function togglePeriodEdit(idx) {
+    const row = document.getElementById('period-edit-' + idx);
+    row.classList.toggle('active');
+}
+
+// ── Build cumulative progress chart ──────────────────────────────────
+{% if sessions %}
+const sessions = {{ sessions | tojson }};
+const effectivePages = {{ effective_pages }};
+
+// Group sessions by date and calculate cumulative totals
+const dateMap = new Map();
+sessions.forEach(s => {
+    if (!dateMap.has(s.date)) {
+        dateMap.set(s.date, { pages: 0, seconds: 0 });
+    }
+    const current = dateMap.get(s.date);
+    current.pages += s.pages;
+    current.seconds += s.duration_seconds || 0;
+});
+
+// Sort by date and build cumulative array
+const sortedDates = Array.from(dateMap.keys()).sort();
+let cumulative = 0;
+let cumulativeSeconds = 0;
+const chartData = [];
+
+// Add starting point (previous day with 0 pages) for better visualization
+if (sortedDates.length > 0) {
+    const firstDate = new Date(sortedDates[0]);
+    const prevDate = new Date(firstDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split('T')[0];
+    chartData.push({
+        date: prevDateStr,
+        pages: 0,
+        dayPages: 0,
+        daySeconds: 0,
+        cumulativeSeconds: 0,
+        isInvisible: true
+    });
+}
+
+// Build data with filled-in gaps for missing dates
+for (let i = 0; i < sortedDates.length; i++) {
+    const date = sortedDates[i];
+    const dayData = dateMap.get(date);
+    cumulative += dayData.pages;
+    cumulativeSeconds += dayData.seconds;
+    
+    // Fill in missing dates if there's a gap
+    if (i > 0) {
+        const prevDate = new Date(sortedDates[i - 1]);
+        const currentDate = new Date(date);
+        const daysBetween = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
+        
+        // Add intermediate dates with same cumulative value (before the new reading)
+        for (let d = 1; d < daysBetween; d++) {
+            const intermDate = new Date(prevDate);
+            intermDate.setDate(intermDate.getDate() + d);
+            const intermDateStr = intermDate.toISOString().split('T')[0];
+            chartData.push({
+                date: intermDateStr,
+                pages: cumulative - dayData.pages, // Use previous cumulative
+                dayPages: 0,
+                daySeconds: 0,
+                cumulativeSeconds: cumulativeSeconds - dayData.seconds,
+                isGap: true
+            });
+        }
+    }
+    
+    // Add the actual reading session date
+    chartData.push({ 
+        date, 
+        pages: cumulative, 
+        dayPages: dayData.pages,
+        daySeconds: dayData.seconds,
+        cumulativeSeconds: cumulativeSeconds,
+        isReading: true
+    });
+}
+
+// Build per-day data (all dates from first to last, 0 for non-reading days, no invisible start)
+const perDayData = [];
+if (sortedDates.length > 0) {
+    const firstDate = new Date(sortedDates[0]);
+    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const dayData = dateMap.get(dateStr);
+        if (dayData) {
+            perDayData.push({ date: dateStr, pages: dayData.pages, seconds: dayData.seconds, isReading: true });
+        } else {
+            perDayData.push({ date: dateStr, pages: 0, seconds: 0, isGap: true });
+        }
+    }
+}
+
+let activeData = chartData;
+let currentMode = 'cumulative';
+let currentMetric = 'pages';
+
+// Compact data (idle days removed)
+const compactChartData = chartData.filter(d => !d.isGap);
+const compactPerDayData = perDayData.filter(d => d.isReading);
+
+// Helper to format seconds to readable time
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
+}
+
+function formatMinutes(totalMinutes) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h';
+    return m + 'm';
+}
+
+// Create chart
+const ctx = document.getElementById('progressChart').getContext('2d');
+function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+const progressChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: chartData.map(d => d.isInvisible ? '' : d.date),
+        datasets: [{
+            label: 'Cumulative Pages Read',
+            data: chartData.map(d => d.pages),
+            backgroundColor: cssVar('--an-chart-fill'),
+            borderColor: cssVar('--an-chart-line'),
+            borderWidth: 3,
+            fill: true,
+            tension: 0.3,
+            pointRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 5),
+            pointBackgroundColor: cssVar('--an-chart-line'),
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 7)
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: cssVar('--an-chart-tooltip-bg'),
+                titleColor: cssVar('--an-chart-tooltip-title'),
+                bodyColor: '#fff',
+                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                    label: function(context) {
+                        const dataPoint = activeData[context.dataIndex];
+                        if (dataPoint.isInvisible || dataPoint.isGap) return null;
+                        const daySecs = dataPoint.daySeconds || dataPoint.seconds || 0;
+                        const dayPgs = dataPoint.dayPages != null ? dataPoint.dayPages : dataPoint.pages;
+                        const timeStr = formatDuration(daySecs);
+                        if (currentMode === 'cumulative') {
+                            if (currentMetric === 'pages') {
+                                const percentage = effectivePages > 0 ? ((context.parsed.y / effectivePages) * 100).toFixed(1) : 0;
+                                return [
+                                    `Cumulative: ${context.parsed.y} pages (${percentage}%)`,
+                                    `Read that day: ${dayPgs} pages in ${timeStr}`
+                                ];
+                            } else {
+                                const cumTimeStr = formatDuration(dataPoint.cumulativeSeconds || 0);
+                                return [
+                                    `Cumulative time: ${cumTimeStr}`,
+                                    `Read that day: ${dayPgs} pages in ${timeStr}`
+                                ];
+                            }
+                        } else {
+                            if (currentMetric === 'pages') {
+                                return [
+                                    `Pages: ${context.parsed.y}`,
+                                    `Duration: ${timeStr}`
+                                ];
+                            } else {
+                                return [
+                                    `Duration: ${timeStr}`,
+                                    `Pages read: ${dayPgs}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                filter: function(tooltipItem) {
+                    const dataPoint = activeData[tooltipItem.dataIndex];
+                    return !dataPoint.isInvisible && !dataPoint.isGap;
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: Math.max(effectivePages, cumulative),
+                ticks: {
+                    color: '#6B7280',
+                    callback: function(value) {
+                        return value.toFixed(0);
+                    }
+                },
+                grid: {
+                    color: 'rgba(229, 231, 235, 0.5)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#6B7280',
+                    maxRotation: 45,
+                    minRotation: 45
+                },
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+
+// ── Chart update (mode + hide idle) ───────────────────────────────────
+function updateChart() {
+    currentMode = document.querySelector('input[name="chartMode"]:checked').value;
+    currentMetric = document.querySelector('input[name="chartMetric"]:checked').value;
+    const hideIdle = document.getElementById('hideIdleDays').checked;
+
+    if (currentMode === 'cumulative') {
+        const data = hideIdle ? compactChartData : chartData;
+        activeData = data;
+        progressChart.data.labels = data.map(d => d.isInvisible ? '' : d.date);
+        if (currentMetric === 'pages') {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+            progressChart.options.scales.y.max = Math.max(effectivePages, cumulative);
+        } else {
+            progressChart.data.datasets[0].data = data.map(d => (d.cumulativeSeconds || 0) / 60);
+            progressChart.options.scales.y.max = undefined;
+        }
+        progressChart.data.datasets[0].pointRadius = data.map(d => (d.isInvisible || d.isGap) ? 0 : 5);
+        progressChart.data.datasets[0].pointHoverRadius = data.map(d => (d.isInvisible || d.isGap) ? 0 : 7);
+        progressChart.data.datasets[0].fill = true;
+    } else {
+        const data = hideIdle ? compactPerDayData : perDayData;
+        activeData = data;
+        progressChart.data.labels = data.map(d => d.date);
+        if (currentMetric === 'pages') {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+        } else {
+            progressChart.data.datasets[0].data = data.map(d => (d.seconds || 0) / 60);
+        }
+        progressChart.data.datasets[0].pointRadius = data.map(d => d.isReading ? 5 : 0);
+        progressChart.data.datasets[0].pointHoverRadius = data.map(d => d.isReading ? 7 : 0);
+        progressChart.data.datasets[0].fill = false;
+        progressChart.options.scales.y.max = undefined;
+    }
+    progressChart.options.scales.y.ticks.callback = currentMetric === 'time'
+        ? function(value) { return formatMinutes(value); }
+        : function(value) { return value.toFixed(0); };
+    progressChart.update();
+}
+
+document.querySelectorAll('input[name="chartMode"]').forEach(radio => {
+    radio.addEventListener('change', updateChart);
+});
+document.querySelectorAll('input[name="chartMetric"]').forEach(radio => {
+    radio.addEventListener('change', updateChart);
+});
+document.getElementById('hideIdleDays').addEventListener('change', updateChart);
+{% endif %}
+</script>
+{% endblock %}

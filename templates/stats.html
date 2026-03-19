@@ -1,0 +1,699 @@
+{% extends "base.html" %}
+{% block title %}Global Stats – Ashinami{% endblock %}
+
+{% block content %}
+<h1 data-i18n="stats.title">Global Reading Statistics</h1>
+
+{% if years %}
+<!-- ── Books finished by year ────────────────────────────────────────── -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);"><span data-i18n="stats.booksFinished">Books Finished by Year</span> <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="stats.clickCovers">(click to view covers)</span></h3>
+        <canvas id="booksChart" style="max-height: 350px; cursor: pointer;"></canvas>
+    </div>
+</div>
+
+<!-- ── Cumulative pages read by year ─────────────────────────────────── -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);"><span data-i18n="stats.pagesRead">Pages Read by Year</span> <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <canvas id="pagesChart" style="max-height: 350px; cursor: pointer;"></canvas>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Library Stats                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2 style="color: var(--an-deep-orange); margin-top: 2.5rem; margin-bottom: 1.5rem;" data-i18n="stats.libraryStats">Library Stats 📊</h2>
+
+<!-- Summary cards row -->
+<div class="library-records-row" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
+    {% if highest_rated_book %}
+    <div class="record-card" style="flex: 1; min-width: 180px;">
+        <div class="record-icon">⭐</div>
+        <div class="record-label" data-i18n="stats.highestRated">Highest Rated Book</div>
+        <div class="record-value">{{ "%.2f" | format(highest_rated_book.rating) }}</div>
+        <a href="{{ url_for('book_detail', book_id=highest_rated_book.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ highest_rated_book.name }}</a>
+    </div>
+    {% endif %}
+    {% if avg_finished_rating %}
+    <div class="record-card" style="flex: 1; min-width: 180px;">
+        <div class="record-icon">📊</div>
+        <div class="record-label" data-i18n="stats.avgRating">Average Rating (Finished)</div>
+        <div class="record-value">{{ "%.2f" | format(avg_finished_rating) }}</div>
+        <div class="record-date" data-i18n="stats.acrossRated">across rated books</div>
+    </div>
+    {% endif %}
+    {% if longest_finished %}
+    <div class="record-card" style="flex: 1; min-width: 180px;">
+        <div class="record-icon">📏</div>
+        <div class="record-label" data-i18n="stats.longestBook">Longest Book Read</div>
+        <div class="record-value">{{ "{:,}".format(longest_finished.pages) }} pp</div>
+        <a href="{{ url_for('book_detail', book_id=longest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ longest_finished.name }}</a>
+    </div>
+    {% endif %}
+    {% if shortest_finished %}
+    <div class="record-card" style="flex: 1; min-width: 180px;">
+        <div class="record-icon">📐</div>
+        <div class="record-label" data-i18n="stats.shortestBook">Shortest Book Read</div>
+        <div class="record-value">{{ "{:,}".format(shortest_finished.pages) }} pp</div>
+        <a href="{{ url_for('book_detail', book_id=shortest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ shortest_finished.name }}</a>
+    </div>
+    {% endif %}
+    {% if most_reread %}
+    <div class="record-card" style="flex: 1; min-width: 180px;">
+        <div class="record-icon">🔁</div>
+        <div class="record-label" data-i18n="stats.mostReread">Most Re-read</div>
+        <div class="record-value">{{ most_reread.count }} times</div>
+        <a href="{{ url_for('book_detail', book_id=most_reread.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ most_reread.name }}</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Library bar charts -->
+<div class="library-charts-stack">
+    <div class="library-charts-grid">
+        <div class="card">
+            <div class="card-body">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byStatus">Books by Status</h3>
+                <canvas id="statusBar"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byLanguage">Books by Language</h3>
+                <canvas id="languageBar"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byGenre">Books by Genre</h3>
+            <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                <label for="genreTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                <select id="genreTopN" style="min-width:6rem;">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="15" selected>15</option>
+                    <option value="20">20</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <canvas id="genreBar" style="max-height: 400px;"></canvas>
+        </div>
+    </div>
+    <div class="library-charts-grid">
+        <div class="card">
+            <div class="card-body">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byOrigLang">Books by Original Language</h3>
+                <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                    <label for="origLangTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                    <select id="origLangTopN" style="min-width:6rem;">
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15" selected>15</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <canvas id="origLangBar"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.ratingDist">Rating Distribution</h3>
+                <canvas id="ratingKDE"></canvas>
+            </div>
+        </div>
+    
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byPublisher">Books by Publisher</h3>
+            <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+                <label for="publisherTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                <select id="publisherTopN" style="min-width:6rem;">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="15" selected>15</option>
+                    <option value="20">20</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                    <option value="all">All</option>
+                </select>
+                
+            </div>
+            <canvas id="publisherBar" style="max-height: 400px;"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Top Authors bar chart -->
+{% if top_authors %}
+<div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.topAuthors">Top Authors by Number of Books</h3>
+        <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
+            <label for="topAuthorsTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+            <select id="topAuthorsTopN" style="min-width:6rem;">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="15" selected>15</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+                <option value="all">All</option>
+            </select>
+        </div>
+        <canvas id="topAuthorsChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">📊</div>
+    <p data-i18n="stats.empty">No reading data yet. Start tracking your reading to see statistics!</p>
+    <a href="{{ url_for('new_book') }}" class="btn btn-primary">+ Add Book</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+{% if years %}
+const years = {{ years | tojson }};
+const pagesData = {{ pages_data | tojson }};
+const booksData = {{ books_data | tojson }};
+
+function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// ── Pages Read by Year Chart ──────────────────────────────────────────
+const pagesCtx = document.getElementById('pagesChart').getContext('2d');
+const pagesChart = new Chart(pagesCtx, {
+    type: 'bar',
+    data: {
+        labels: years,
+        datasets: [{
+            label: 'Pages Read',
+            data: pagesData,
+            backgroundColor: cssVar('--an-chart-bar1'),
+            borderColor: cssVar('--an-chart-line'),
+            borderWidth: 2,
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
+        onClick: (event, activeElements) => {
+            if (activeElements.length > 0) {
+                const index = activeElements[0].index;
+                const year = years[index];
+                window.location.href = `/stats/year/${year}`;
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: cssVar('--an-chart-tooltip-bg'),
+                titleColor: cssVar('--an-chart-tooltip-title'),
+                bodyColor: '#fff',
+                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                    label: function(context) {
+                        return `${context.parsed.y.toLocaleString()} pages read`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#6B7280',
+                    callback: function(value) {
+                        return value.toLocaleString();
+                    }
+                },
+                grid: {
+                    color: 'rgba(229, 231, 235, 0.5)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#6B7280',
+                    font: {
+                        size: 14,
+                        weight: 600
+                    }
+                },
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+
+// ── Books Finished by Year Chart ──────────────────────────────────────
+const booksCtx = document.getElementById('booksChart').getContext('2d');
+const booksChart = new Chart(booksCtx, {
+    type: 'bar',
+    data: {
+        labels: years,
+        datasets: [{
+            label: 'Books Finished',
+            data: booksData,
+            backgroundColor: cssVar('--an-chart-bar2'),
+            borderColor: cssVar('--an-chart-tooltip-border'),
+            borderWidth: 2,
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
+        onClick: (event, activeElements) => {
+            if (activeElements.length > 0) {
+                const index = activeElements[0].index;
+                const year = years[index];
+                window.location.href = `/stats/year/${year}/books`;
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: cssVar('--an-chart-tooltip-bg'),
+                titleColor: cssVar('--an-chart-tooltip-title'),
+                bodyColor: '#fff',
+                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                    label: function(context) {
+                        const count = context.parsed.y;
+                        return `${count} book${count !== 1 ? 's' : ''} finished`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#6B7280',
+                    stepSize: 1,
+                    callback: function(value) {
+                        return Number.isInteger(value) ? value : null;
+                    }
+                },
+                grid: {
+                    color: 'rgba(229, 231, 235, 0.5)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#6B7280',
+                    font: {
+                        size: 14,
+                        weight: 600
+                    }
+                },
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+{% endif %}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Library Stats – Bar charts
+// ═══════════════════════════════════════════════════════════════════════
+
+const STATUS_COLORS = {
+    'Reading':     cssVar('--an-reading'),
+    'Finished':    cssVar('--an-finished'),
+    'Not Started': cssVar('--an-not-started'),
+    'Abandoned':   cssVar('--an-abandoned'),
+};
+
+const TOOLTIP_OPTS = {
+    backgroundColor: cssVar('--an-chart-tooltip-bg') || '#1f2937',
+    titleColor: cssVar('--an-chart-tooltip-title') || '#FFC300',
+    bodyColor: '#fff',
+    borderColor: cssVar('--an-chart-tooltip-border') || '#374151',
+    borderWidth: 1,
+    padding: 12,
+    displayColors: false,
+};
+
+/**
+ * Build a sorted horizontal bar chart.
+ * @param {string}   canvasId  – id of the <canvas> element
+ * @param {Object}   dataMap   – { label: count, … }
+ * @param {Object=}  colorMap  – optional per-label colour map
+ * @param {boolean=} sorted    – sort descending by value (default true)
+ * @param {number=}  aspectRatio – chart aspect ratio
+ */
+function makeHBar(canvasId, dataMap, colorMap, sorted, aspectRatio) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    let entries = Object.entries(dataMap);
+    if (sorted !== false) entries.sort((a, b) => b[1] - a[1]);
+    const labels = entries.map(e => e[0]);
+    const data   = entries.map(e => e[1]);
+    const defaultColor = cssVar('--an-chart-bar1') || 'rgba(255,95,0,0.8)';
+    const colors = labels.map(l => (colorMap && colorMap[l]) ? colorMap[l] : defaultColor);
+    const ctx = canvas.getContext('2d');
+    // Destroy any existing Chart.js instance on this canvas to force redraw
+    try {
+        const existing = Chart.getChart(canvas) || Chart.getChart(ctx);
+        if (existing) existing.destroy();
+    } catch (e) {
+        // ignore if getChart isn't available
+    }
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: colors,
+                borderColor: colors.map(c => c),
+                borderWidth: 1,
+                borderRadius: 6,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: aspectRatio || Math.max(1.2, 4 - labels.length * 0.15),
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_OPTS,
+                    callbacks: {
+                        label(ctx) {
+                            const total = ctx.dataset.data.reduce((s, v) => s + v, 0);
+                            const pct = total > 0 ? ((ctx.parsed.x / total) * 100).toFixed(1) : 0;
+                            const c = ctx.parsed.x;
+                            return `${c} book${c !== 1 ? 's' : ''} (${pct}%)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: { color: '#6B7280', stepSize: 1, callback: v => Number.isInteger(v) ? v : null },
+                    grid: { color: 'rgba(229,231,235,0.5)' }
+                },
+                y: {
+                    ticks: { color: '#6B7280', font: { size: 13 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Rating Distribution – KDE (Kernel Density Estimate)
+// ═══════════════════════════════════════════════════════════════════════
+(function() {
+    const rawRatings = {{ all_avg_ratings | tojson }};
+    const canvas = document.getElementById('ratingKDE');
+    if (!canvas || rawRatings.length === 0) return;
+    // Gaussian kernel density estimation
+    const bandwidth = 0.25, steps = 200, xMin = 1, xMax = 5;
+    const xs = [], ys = [];
+    for (let i = 0; i <= steps; i++) {
+        const x = xMin + (xMax - xMin) * i / steps;
+        xs.push(x);
+        let density = 0;
+        rawRatings.forEach(r => {
+            const z = (x - r) / bandwidth;
+            density += Math.exp(-0.5 * z * z) / (bandwidth * Math.sqrt(2 * Math.PI));
+        });
+        ys.push(density / rawRatings.length);
+    }
+    const lineColor = cssVar('--an-deep-orange') || '#FF5F00';
+    const fillColor = (cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.8)').replace(/[\d.]+\)$/, '0.25)');
+    new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: xs.map(x => x.toFixed(2)),
+            datasets: [{
+                data: ys,
+                borderColor: lineColor, borderWidth: 2.5,
+                backgroundColor: fillColor, fill: true,
+                pointRadius: 0, tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true, aspectRatio: 2,
+            plugins: { legend: { display: false },
+                tooltip: { ...TOOLTIP_OPTS, intersect: false, mode: 'index',
+                    callbacks: {
+                        title(items) { return 'Rating ≈ ' + parseFloat(items[0].label).toFixed(2); },
+                        label(ctx) { return 'Density: ' + ctx.parsed.y.toFixed(4); }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Density', color: '#6B7280' },
+                     ticks: { color: '#6B7280' }, grid: { color: 'rgba(229,231,235,0.5)' } },
+                x: { type: 'linear', min: 1, max: 5,
+                     title: { display: true, text: 'Rating', color: '#6B7280' },
+                     ticks: { color: '#6B7280', stepSize: 0.5 }, grid: { display: false } }
+            }
+        }
+    });
+})();
+
+// Status bar (use per-status colours)
+const statusData = {{ status_chart | tojson }};
+makeHBar('statusBar', statusData, STATUS_COLORS, true, 2);
+
+// Genre bar (dynamic top-N)
+const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
+(function(){
+    const STORAGE_KEY = 'ashinami_genre_top_n';
+    const select = document.getElementById('genreTopN');
+
+    function renderFor(value) {
+        const val = value === undefined ? (localStorage.getItem(STORAGE_KEY) || '15') : value;
+        const topN = (val === 'all') ? null : parseInt(val, 10);
+        let entries = Object.entries(FULL_GENRE_COUNTS).sort((a,b) => b[1] - a[1]);
+        if (Number.isInteger(topN)) entries = entries.slice(0, topN);
+        makeHBar('genreBar', Object.fromEntries(entries));
+    }
+
+    if (select) {
+        const stored = localStorage.getItem(STORAGE_KEY) || '15';
+        select.value = stored;
+        select.addEventListener('change', function(e){
+            const v = e.target.value;
+            try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {}
+            renderFor(v);
+        });
+    }
+    renderFor();
+})();
+
+// Language bar
+const langData = {{ language_counts | tojson }};
+makeHBar('languageBar', langData, null, true, 2);
+
+// Original language bar (dynamic top-N)
+const FULL_ORIG_LANG_COUNTS = {{ orig_lang_counts | tojson }};
+(function(){
+    const STORAGE_KEY = 'ashinami_orig_lang_top_n';
+    const select = document.getElementById('origLangTopN');
+
+    function renderFor(value) {
+        const val = value === undefined ? (localStorage.getItem(STORAGE_KEY) || '15') : value;
+        const topN = (val === 'all') ? null : parseInt(val, 10);
+        let entries = Object.entries(FULL_ORIG_LANG_COUNTS).sort((a,b) => b[1] - a[1]);
+        if (Number.isInteger(topN)) entries = entries.slice(0, topN);
+        makeHBar('origLangBar', Object.fromEntries(entries), null, true, 2);
+    }
+
+    if (select) {
+        const stored = localStorage.getItem(STORAGE_KEY) || '15';
+        select.value = stored;
+        select.addEventListener('change', function(e){
+            const v = e.target.value;
+            try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {}
+            renderFor(v);
+        });
+    }
+    renderFor();
+})();
+
+// Publisher bar (dynamic top-N controlled by user; changes saved in localStorage)
+const FULL_PUB_COUNTS = {{ publisher_counts | tojson }};
+(function(){
+    const STORAGE_KEY = 'ashinami_publisher_top_n';
+    const select = document.getElementById('publisherTopN');
+
+    function renderFor(value) {
+        const val = value === undefined ? (localStorage.getItem(STORAGE_KEY) || '15') : value;
+        const topN = (val === 'all') ? null : parseInt(val, 10);
+        let entries = Object.entries(FULL_PUB_COUNTS).sort((a,b) => b[1] - a[1]);
+        if (Number.isInteger(topN)) entries = entries.slice(0, topN);
+        makeHBar('publisherBar', Object.fromEntries(entries));
+    }
+
+    if (select) {
+        // initialize select from storage
+        const stored = localStorage.getItem(STORAGE_KEY) || '15';
+        select.value = stored;
+        select.addEventListener('change', function(e){
+            const v = e.target.value;
+            try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {}
+            renderFor(v);
+        });
+    }
+    renderFor();
+})();
+
+// Top Authors horizontal bar chart (dynamic top-N)
+{% if top_authors %}
+const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
+(function(){
+    const STORAGE_KEY = 'ashinami_top_authors_n';
+    const select = document.getElementById('topAuthorsTopN');
+
+    function renderFor(value) {
+        const val = value === undefined ? (localStorage.getItem(STORAGE_KEY) || '15') : value;
+        const topN = (val === 'all') ? null : parseInt(val, 10);
+        let entries = Object.entries(FULL_AUTHOR_COUNTS).sort((a,b) => b[1] - a[1]);
+        if (Number.isInteger(topN)) entries = entries.slice(0, topN);
+        makeHBar('topAuthorsChart', Object.fromEntries(entries));
+    }
+
+    if (select) {
+        const stored = localStorage.getItem(STORAGE_KEY) || '15';
+        select.value = stored;
+        select.addEventListener('change', function(e){
+            const v = e.target.value;
+            try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {}
+            renderFor(v);
+        });
+    }
+    renderFor();
+})();
+{% endif %}
+
+// Library cumulative pages chart: fetch data and render (daily + cumulative)
+(function(){
+    const canvas = document.getElementById('libraryCumulativeChart');
+    if (!canvas) return;
+    let libraryChart = null;
+
+    async function loadLibraryCum(year) {
+        const yr = year || '';
+        const url = yr ? `/api/cumulative_pages?year=${encodeURIComponent(yr)}` : `/api/cumulative_pages`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) {
+                console.error('Failed to load cumulative pages', res.status);
+                return;
+            }
+            const data = await res.json();
+            const labels = data.map(r => r.date);
+            const daily = data.map(r => r.pages);
+            const cumulative = data.map(r => r.cumulative);
+
+            const ctx = canvas.getContext('2d');
+            try {
+                const existing = Chart.getChart(canvas) || Chart.getChart(ctx);
+                if (existing) existing.destroy();
+            } catch(e){}
+
+            libraryChart = new Chart(ctx, {
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Daily pages',
+                            data: daily,
+                            backgroundColor: cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.6)',
+                            borderRadius: 3,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Cumulative pages',
+                            data: cumulative,
+                            borderColor: cssVar('--an-deep-orange') || '#FF5F00',
+                            backgroundColor: (cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.6)').replace(/\)$/, ',0.12)'),
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: {
+                            ...TOOLTIP_OPTS,
+                            callbacks: {
+                                label(ctx) {
+                                    const v = ctx.parsed.y;
+                                    return `${ctx.dataset.label}: ${v.toLocaleString()} pages`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6B7280' }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { color: '#6B7280', callback: v => v.toLocaleString() }, grid: { color: 'rgba(229,231,235,0.5)' } }
+                    }
+                }
+            });
+        } catch (err) {
+            console.error('Error fetching cumulative pages', err);
+        }
+    }
+
+    const yearSelect = document.getElementById('libraryCumYear');
+    if (yearSelect) {
+        yearSelect.addEventListener('change', function(e){
+            loadLibraryCum(e.target.value);
+        });
+    }
+
+    // initial load (All)
+    loadLibraryCum(yearSelect ? yearSelect.value : '');
+})();
+
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Books Finished {{ year }} – Ashinami{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--an-orange); font-weight: 500;" data-i18n="yearBooks.backToGlobal">← Back to Global Stats</a>
+        <h1 style="margin: 0; color: var(--an-text-dark);"><span data-i18n="yearBooks.title">Books Finished in</span> {{ year }}</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        {% if prev_year %}
+        <a href="{{ url_for('stats_year_books', year=prev_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">← {{ prev_year }}</a>
+        {% endif %}
+        {% if next_year %}
+        <a href="{{ url_for('stats_year_books', year=next_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">{{ next_year }} →</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if books %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <p style="color: var(--an-text-light); margin: 0;">
+        {{ books | length }} book{{ 's' if books | length != 1 else '' }} <span data-i18n="yearBooks.finished">finished</span>
+    </p>
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--an-text-light);">
+        <span data-i18n="yearBooks.sortBy">Sort by:</span>
+        <select onchange="window.location.href='{{ url_for('stats_year_books', year=year) }}?sort=' + this.value"
+                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); cursor: pointer;">
+            <option value="date"    {% if sort == 'date'   %}selected{% endif %} data-i18n="yearBooks.sortDate">Date Finished</option>
+            <option value="alpha"   {% if sort == 'alpha'  %}selected{% endif %} data-i18n="yearBooks.sortTitle">Title</option>
+            <option value="author"  {% if sort == 'author' %}selected{% endif %} data-i18n="yearBooks.sortAuthor">Author</option>
+            <option value="rating"  {% if sort == 'rating' %}selected{% endif %} data-i18n="yearBooks.sortRating">Rating</option>
+        </select>
+    </label>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem;">
+    {% for book in books %}
+    <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="book-cover-large">
+                {% if book.has_cover %}
+                <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}" style="width: 100%; height: auto; display: block;">
+                {% else %}
+                <div class="cover-placeholder">📖</div>
+                {% endif %}
+            </div>
+            <div>
+                <div class="book-title" style="font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0;">{{ book.name }}</div>
+                <div class="book-author" style="font-size: 0.9rem; color: var(--an-text-light); margin: 0.25rem 0 0 0;">{{ book.author | format_authors }}</div>
+                <div style="font-size: 0.8rem; color: var(--an-text-lighter); margin-top: 0.5rem;"><span data-i18n="yearBooks.finishedLabel">Finished:</span> {{ book.finish_date }}</div>
+                {% if book.rating > 0 %}
+                <div style="font-size: 0.8rem; color: var(--an-deep-orange); margin-top: 0.25rem; font-weight: 500;">⭐ {{ "%.2f" | format(book.rating) }} / 5</div>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">📚</div>
+    <p><span data-i18n="yearBooks.empty">No books were finished in</span> {{ year }}.</p>
+    <a href="{{ url_for('global_stats') }}" class="btn btn-secondary" data-i18n="yearBooks.backToGlobal">← Back to Global Stats</a>
+</div>
+{% endif %}
+{% endblock %}
