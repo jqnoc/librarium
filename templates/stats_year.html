@@ -67,7 +67,7 @@
             <!-- Book bars -->
             {% for item in gantt_data %}
             <div style="display: flex; align-items: center; margin-bottom: 0.35rem; min-width: 600px;">
-                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--an-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;" title="{{ item.name }}">{{ item.name }}</div>
+                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--an-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;{% if item.status == 'reading' %} font-style: italic;{% endif %}" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}">{{ item.name }}</div>
                 <div style="flex: 1; position: relative; height: 20px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px;">
                     {# Idle span (full extent, light colour) #}
                     {% set span_left = item.start / total_days * 100 %}
@@ -79,7 +79,7 @@
                     {% set seg_left = seg.start / total_days * 100 %}
                     {% set seg_width_raw = (seg.end - seg.start + 1) / total_days * 100 %}
                     {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
-                    <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.85;" title="{{ item.name }}"></div>
+                    <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.85;" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}"></div>
                     {% endfor %}
                 </div>
             </div>
@@ -515,7 +515,8 @@ document.getElementById('hideIdleDays').addEventListener('change', updateChart);
                     backgroundColor: bg,
                     borderWidth: 2,
                     pointRadius: 0,
-                    tension: 0.25
+                    tension: 0.25,
+                    spanGaps: true
                 };
             });
 

@@ -1,12 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{{ info.get('name', 'Book') }} – Ashinami{% endblock %}
+{% block title %}{{ info.get('name', 'Book') }}{% if info.get('subtitle') %} – {{ info.get('subtitle') }}{% endif %} – Ashinami{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
     <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="book.backToLibrary">← Back to Library</a>
 </div>
 
-<h1>{{ info.get('name', 'Untitled') }}</h1>
+<h1{% if info.get('subtitle') %} style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;"{% endif %}>{{ info.get('name', 'Untitled') }}</h1>
+{% if info.get('subtitle') %}
+<div style="font-size: 1.1rem; color: var(--an-deep-orange); border-bottom: 3px solid var(--an-deep-orange); padding-bottom: .3em; margin-bottom: 1.5rem;">{{ info.get('subtitle') }}</div>
+{% endif %}
 
 <!-- ── Hero: cover + metadata ────────────────────────────────────────── -->
 <div class="book-hero">
@@ -156,7 +159,7 @@
         </div>
 
         {% if info.get('summary') %}
-        <div class="book-summary">{{ info.get('summary') }}</div>
+        <div class="book-summary">{{ info.get('summary') | safe }}</div>
         {% endif %}
 
         <div class="btn-group">
@@ -648,6 +651,19 @@ function togglePeriodEdit(idx) {
 const sessions = {{ sessions | tojson }};
 const effectivePages = {{ effective_pages }};
 
+// Book cover color (same as Gantt and Per-book Cumulative charts)
+const bookCoverColor = '{{ book_gantt.color if book_gantt else "#888888" }}';
+function hexToRgba(hex, a) {
+    if (!hex) return `rgba(136,136,136,${a})`;
+    let h = (hex || '').replace('#', '').trim();
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length !== 6) return `rgba(136,136,136,${a})`;
+    const r = parseInt(h.substring(0,2), 16);
+    const g = parseInt(h.substring(2,4), 16);
+    const b = parseInt(h.substring(4,6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 // Group sessions by date and calculate cumulative totals
 const dateMap = new Map();
 sessions.forEach(s => {
@@ -777,13 +793,13 @@ const progressChart = new Chart(ctx, {
         datasets: [{
             label: 'Cumulative Pages Read',
             data: chartData.map(d => d.pages),
-            backgroundColor: cssVar('--an-chart-fill'),
-            borderColor: cssVar('--an-chart-line'),
-            borderWidth: 3,
+            backgroundColor: hexToRgba(bookCoverColor, 0.12),
+            borderColor: bookCoverColor,
+            borderWidth: 2,
             fill: true,
-            tension: 0.3,
+            tension: 0.25,
             pointRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 5),
-            pointBackgroundColor: cssVar('--an-chart-line'),
+            pointBackgroundColor: bookCoverColor,
             pointBorderColor: '#fff',
             pointBorderWidth: 2,
             pointHoverRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 7)

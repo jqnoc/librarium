@@ -18,6 +18,10 @@
                     <input type="text" id="name" name="name" class="form-control" required>
                 </div>
                 <div class="form-group">
+                    <label for="subtitle" data-i18n="bookForm.subtitle">Subtitle</label>
+                    <input type="text" id="subtitle" name="subtitle" class="form-control">
+                </div>
+                <div class="form-group">
                     <label for="author" data-i18n="bookForm.authorReq">Author(s) *</label>
                     <input type="text" id="author" name="author" class="form-control" list="author-list" required>
                     <datalist id="author-list">
@@ -162,6 +166,7 @@
             <div class="form-group">
                 <textarea id="summary" name="summary" class="form-control" rows="5"></textarea>
             </div>
+            <script>document.addEventListener('DOMContentLoaded',function(){window.ashinamiI18n.initRichTextToolbar('summary');});</script>
         </div>
     </div>
 

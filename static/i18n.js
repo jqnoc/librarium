@@ -211,6 +211,17 @@
         'editAuthor.biography':     { en: 'Biography',            es: 'Biografía' },
         'editAuthor.saveChanges':   { en: '💾 Save Changes',      es: '💾 Guardar Cambios' },
 
+        // ── Rich-text toolbar ───────────────────────────────────────────
+        'rt.bold':          { en: 'Bold',           es: 'Negrita' },
+        'rt.italic':        { en: 'Italic',         es: 'Cursiva' },
+        'rt.underline':     { en: 'Underline',      es: 'Subrayado' },
+        'rt.strike':        { en: 'Strikethrough',  es: 'Tachado' },
+        'rt.heading':       { en: 'Heading',        es: 'Encabezado' },
+        'rt.ul':            { en: 'Bulleted list',  es: 'Lista con viñetas' },
+        'rt.ol':            { en: 'Numbered list',  es: 'Lista numerada' },
+        'rt.link':          { en: 'Insert link',    es: 'Insertar enlace' },
+        'rt.clear':         { en: 'Clear formatting', es: 'Limpiar formato' },
+
         // ── New book & Edit metadata (shared) ───────────────────────────
         'bookForm.backToLibrary':   { en: '← Back to Library',   es: '← Volver a la Biblioteca' },
         'bookForm.backToBook':      { en: '← Back to Book',      es: '← Volver al Libro' },
@@ -219,6 +230,7 @@
         'bookForm.basicInfo':       { en: 'Basic Information',   es: 'Información Básica' },
         'bookForm.title':           { en: 'Title',               es: 'Título' },
         'bookForm.titleReq':        { en: 'Title *',             es: 'Título *' },
+        'bookForm.subtitle':        { en: 'Subtitle',            es: 'Subtítulo' },
         'bookForm.authorReq':       { en: 'Author(s) *',        es: 'Autor(es) *' },
         'bookForm.authorLabel':     { en: 'Author(s)',           es: 'Autor(es)' },
         'bookForm.genre':           { en: 'Genre',               es: 'Género' },
@@ -477,6 +489,78 @@
         init();
     }
 
+    // ── Rich-text toolbar for textareas ──────────────────────────────
+    function initRichTextToolbar(textareaId) {
+        var ta = document.getElementById(textareaId);
+        if (!ta) return;
+
+        var toolbar = document.createElement('div');
+        toolbar.className = 'rt-toolbar';
+
+        var buttons = [
+            { label: '<b>B</b>',  key: 'rt.bold',      tag: 'b' },
+            { label: '<i>I</i>',  key: 'rt.italic',    tag: 'i' },
+            { label: '<u>U</u>',  key: 'rt.underline', tag: 'u' },
+            { label: '<s>S</s>',  key: 'rt.strike',    tag: 's' },
+            { sep: true },
+            { label: 'H',         key: 'rt.heading',   tag: 'h4' },
+            { label: '• ―',       key: 'rt.ul',        tag: 'ul', wrap: 'li' },
+            { label: '1. ―',      key: 'rt.ol',        tag: 'ol', wrap: 'li' },
+            { sep: true },
+            { label: '🔗',        key: 'rt.link',      action: 'link' },
+            { label: '✕',         key: 'rt.clear',     action: 'clear' }
+        ];
+
+        buttons.forEach(function (b) {
+            if (b.sep) {
+                var sep = document.createElement('span');
+                sep.className = 'rt-sep';
+                toolbar.appendChild(sep);
+                return;
+            }
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rt-btn';
+            btn.innerHTML = b.label;
+            btn.setAttribute('data-i18n-title', b.key);
+            btn.title = t(b.key);
+            btn.addEventListener('click', function () {
+                handleToolbarAction(ta, b);
+            });
+            toolbar.appendChild(btn);
+        });
+
+        ta.parentNode.insertBefore(toolbar, ta);
+    }
+
+    function handleToolbarAction(ta, b) {
+        var start = ta.selectionStart;
+        var end   = ta.selectionEnd;
+        var text  = ta.value;
+        var sel   = text.substring(start, end);
+        var replacement;
+
+        if (b.action === 'link') {
+            var url = prompt(t('rt.link'), 'https://');
+            if (!url) return;
+            replacement = '<a href="' + url.replace(/"/g, '&quot;') + '">' + (sel || url) + '</a>';
+        } else if (b.action === 'clear') {
+            replacement = sel.replace(/<[^>]+>/g, '');
+        } else if (b.wrap) {
+            var lines = sel ? sel.split('\n') : [''];
+            var items = lines.map(function (l) { return '<' + b.wrap + '>' + l.trim() + '</' + b.wrap + '>'; }).join('\n');
+            replacement = '<' + b.tag + '>\n' + items + '\n</' + b.tag + '>';
+        } else {
+            replacement = '<' + b.tag + '>' + sel + '</' + b.tag + '>';
+        }
+
+        ta.value = text.substring(0, start) + replacement + text.substring(end);
+        ta.focus();
+        var cursorPos = start + replacement.length;
+        ta.setSelectionRange(cursorPos, cursorPos);
+        ta.dispatchEvent(new Event('input'));
+    }
+
     // Expose for usage in inline scripts
-    window.ashinamiI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations };
+    window.ashinamiI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar };
 })();

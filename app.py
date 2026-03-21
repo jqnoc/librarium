@@ -14,6 +14,7 @@ import sqlite3
 import uuid as uuid_module
 from collections import Counter
 from datetime import datetime, date
+from html.parser import HTMLParser
 from pathlib import Path
 
 from PIL import Image
@@ -45,6 +46,57 @@ MAX_BACKUPS = 5
 
 app = Flask(__name__)
 app.secret_key = "ashinami-local-dev-key"
+
+
+# ── HTML sanitiser (allowlist-based) ───────────────────────────────────
+_ALLOWED_TAGS = frozenset({
+    'b', 'strong', 'i', 'em', 'u', 's', 'h4',
+    'ul', 'ol', 'li', 'a', 'br', 'p',
+})
+_ALLOWED_ATTRS = {'a': frozenset({'href'})}
+
+
+class _Sanitiser(HTMLParser):
+    """Strip tags and attributes not on the allowlist."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in _ALLOWED_TAGS:
+            return
+        allowed = _ALLOWED_ATTRS.get(tag, frozenset())
+        safe_attrs = []
+        for k, v in attrs:
+            if k in allowed:
+                if k == 'href' and v:
+                    v_check = v.strip().lower()
+                    if v_check.startswith('javascript:'):
+                        continue
+                safe_attrs.append(f'{k}="{v}"')
+        if safe_attrs:
+            self._parts.append(f'<{tag} {" ".join(safe_attrs)}>')
+        else:
+            self._parts.append(f'<{tag}>')
+
+    def handle_endtag(self, tag):
+        if tag in _ALLOWED_TAGS:
+            self._parts.append(f'</{tag}>')
+
+    def handle_data(self, data):
+        from markupsafe import escape
+        self._parts.append(str(escape(data)))
+
+    def get_clean(self) -> str:
+        return ''.join(self._parts)
+
+
+def sanitize_html(raw: str) -> str:
+    """Return *raw* with only safe HTML tags/attrs preserved."""
+    s = _Sanitiser()
+    s.feed(raw)
+    return s.get_clean()
 
 
 # ── Database Validation & Recovery ──────────────────────────────────────
@@ -310,6 +362,24 @@ def migrate_add_photo_hash() -> None:
     db.commit()
     db.close()
     print("✅ Migration complete – photo_hash column added.")
+
+
+# ── Migration: Add subtitle column ──────────────────────────────────────
+def migrate_add_subtitle() -> None:
+    """Add subtitle column to books table."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "subtitle" in cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding subtitle column …")
+    db.execute("ALTER TABLE books ADD COLUMN subtitle TEXT NOT NULL DEFAULT ''")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – subtitle column added.")
 
 
 # ── Migration: Add libraries table ──────────────────────────────────────
@@ -810,6 +880,7 @@ def index():
         SELECT
             b.id,
             b.name,
+            b.subtitle,
             b.author,
             b.status,
             b.pages,
@@ -904,6 +975,7 @@ def index():
         books.append({
             "id": r["id"],
             "name": r["name"],
+            "subtitle": r["subtitle"] or "",
             "author": r["author"] or "",
             "status": r["status"] or "reading",
             "pages": r["pages"] or 0,
@@ -1290,54 +1362,87 @@ def api_cumulative_pages_per_book():
     if not book_map:
         return jsonify({'labels': [], 'datasets': []})
 
-    # Add a zero-valued point on the day before each book's first activity
-    # (only if that previous day is within the same requested year). This
-    # ensures each book's line starts at 0 instead of jumping straight to
-    # the first cumulative value on its first session date.
+    # Get carry-over pages for each book (total pages read before this year)
     from datetime import timedelta
+    year_start = f"{year}-01-01"
+    year_int = int(year)
+    for bid in book_map:
+        carry_q = (
+            "SELECT COALESCE(SUM(p), 0) AS total FROM ("
+            "SELECT s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
+            "WHERE s.book_id = ? AND s.date != '' AND s.date < ? AND b.library_id = ? "
+            "UNION ALL "
+            "SELECT p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
+            "WHERE p.book_id = ? AND p.end_date != '' AND p.pages > 0 AND p.end_date < ? AND b.library_id = ? "
+            ") s"
+        )
+        carry = db.execute(carry_q, (bid, year_start, lib_id, bid, year_start, lib_id)).fetchone()
+        book_map[bid]['carry_over'] = int(carry['total']) if carry else 0
+
+    # Build per-book anchor points so the chart shows a step pattern:
+    # - For each reading day, also add the day before with the previous
+    #   cumulative value so the line is flat during idle periods and jumps
+    #   on the actual reading day.
+    # - Books starting this year (carry_over==0): day before first read → 0
+    # - Books starting in a previous year: Jan 1 → carry_over value
     for bid, info in book_map.items():
-        try:
-            if info.get('dates'):
-                book_dates = sorted(info['dates'].keys())
-                first = date.fromisoformat(book_dates[0])
-                prev = first - timedelta(days=1)
-                if prev.year == int(year):
-                    prev_s = prev.isoformat()
-                    all_dates.add(prev_s)
-                    info['prev_date'] = prev_s
-                else:
-                    info['prev_date'] = None
-            else:
-                info['prev_date'] = None
-        except Exception:
-            info['prev_date'] = None
+        if not info['dates']:
+            continue
+        book_dates = sorted(info['dates'].keys())
+        carry = info['carry_over']
+        anchors: dict[str, int] = {}
+
+        cum = carry
+        for i, d in enumerate(book_dates):
+            prev_cum = cum
+            try:
+                dt = date.fromisoformat(d)
+                prev_dt = dt - timedelta(days=1)
+                prev_s = prev_dt.isoformat()
+                # Don't overwrite an actual reading day with an anchor
+                if prev_s not in info['dates'] and prev_s not in anchors:
+                    if prev_dt.year == year_int:
+                        anchors[prev_s] = prev_cum
+            except Exception:
+                pass
+            cum += int(info['dates'][d])
+
+        # For books started in a previous year, anchor Jan 1 with carry_over
+        if carry > 0:
+            jan1 = year_start
+            if jan1 not in info['dates'] and jan1 not in anchors:
+                anchors[jan1] = carry
+
+        info['anchors'] = anchors
+        all_dates.update(anchors.keys())
 
     labels = sorted(all_dates)
 
     datasets = []
     for bid, info in book_map.items():
         dates = info['dates']
-        # find first/last active date for this book
-        book_dates = sorted(dates.keys())
-        if not book_dates:
+        if not dates:
             continue
+        carry = info.get('carry_over', 0)
+        anchors = info.get('anchors', {})
+        book_dates = sorted(dates.keys())
         first_date = book_dates[0]
-        last_date = book_dates[-1]
+        # Find the earliest relevant date for this book (anchor or reading)
+        all_book_dates = sorted(set(book_dates) | set(anchors.keys()))
+        earliest = all_book_dates[0] if all_book_dates else first_date
 
-        cum = 0
+        cum = carry
         series = []
-        prev_s = info.get('prev_date')
         for d in labels:
-            # Explicit zero point on the day before first activity (if present)
-            if prev_s and d == prev_s:
-                series.append(0)
-                continue
-            # outside the book's active span emit null (so Chart.js won't draw)
-            if d < first_date or d > last_date:
+            if d < earliest:
                 series.append(None)
-            else:
-                cum += int(dates.get(d, 0) or 0)
+            elif d in dates:
+                cum += int(dates[d])
                 series.append(cum)
+            elif d in anchors:
+                series.append(anchors[d])
+            else:
+                series.append(None)
 
         # last non-null value as total
         total = 0
@@ -1409,11 +1514,13 @@ def stats_year(year: str):
     # book_id → {name, color, active_dates: set[date], has_before, has_after}
     gantt_books: dict[str, dict] = {}
 
-    def _ensure_gantt_book(bid, name, color):
+    def _ensure_gantt_book(bid, name, color, status="", subtitle=""):
         if bid not in gantt_books:
             gantt_books[bid] = {
                 "name": name,
+                "subtitle": subtitle or "",
                 "color": color or "#888888",
+                "status": status,
                 "active_dates": set(),
                 "has_before": False,
                 "has_after": False,
@@ -1421,13 +1528,13 @@ def stats_year(year: str):
 
     # Sessions in the current year → active dates
     for row in db.execute("""
-        SELECT s.date, s.book_id, b.name, b.cover_color
+        SELECT s.date, s.book_id, b.name, b.subtitle, b.cover_color, b.status
         FROM sessions s
         JOIN books b ON b.id = s.book_id
         WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
     """, (year, lib_id)).fetchall():
         bid = row["book_id"]
-        _ensure_gantt_book(bid, row["name"], row["cover_color"])
+        _ensure_gantt_book(bid, row["name"], row["cover_color"], row["status"], row["subtitle"])
         try:
             gantt_books[bid]["active_dates"].add(date.fromisoformat(row["date"]))
         except (ValueError, TypeError):
@@ -1435,13 +1542,13 @@ def stats_year(year: str):
 
     # Periods overlapping the current year → expand into active dates
     for row in db.execute("""
-        SELECT p.start_date, p.end_date, p.book_id, b.name, b.cover_color
+        SELECT p.start_date, p.end_date, p.book_id, b.name, b.subtitle, b.cover_color, b.status
         FROM periods p
         JOIN books b ON b.id = p.book_id
         WHERE p.end_date >= ? AND p.start_date <= ? AND b.library_id = ?
     """, (f"{year}-01-01", f"{year}-12-31", lib_id)).fetchall():
         bid = row["book_id"]
-        _ensure_gantt_book(bid, row["name"], row["cover_color"])
+        _ensure_gantt_book(bid, row["name"], row["cover_color"], row["status"], row["subtitle"])
         try:
             sd = date.fromisoformat(row["start_date"])
             ed = date.fromisoformat(row["end_date"])
@@ -1534,7 +1641,9 @@ def stats_year(year: str):
 
         gantt_data.append({
             "name": info["name"],
+            "subtitle": info["subtitle"],
             "color": info["color"],
+            "status": info["status"],
             "start": start_day,
             "end": end_day,
             "segments": active_segments,
@@ -1591,7 +1700,7 @@ def stats_year_books(year: str):
 
     finished_readings = db.execute("""
         SELECT r.id AS reading_id, r.book_id,
-               b.name, b.author, b.has_cover, b.cover_hash
+               b.name, b.subtitle, b.author, b.has_cover, b.cover_hash
         FROM readings r
         JOIN books b ON b.id = r.book_id
         WHERE r.status = 'finished' AND b.library_id = ?
@@ -1631,6 +1740,7 @@ def stats_year_books(year: str):
                     books_finished.append({
                         "id": book_id,
                         "name": fr["name"],
+                        "subtitle": fr["subtitle"] or "",
                         "author": fr["author"] or "",
                         "has_cover": bool(fr["has_cover"]),
                         "cover_hash": fr["cover_hash"] or "",
@@ -1931,7 +2041,7 @@ def author_detail(author_name: str):
     db = get_db()
     lib_id = _get_current_library_id()
     rows = db.execute(
-        "SELECT id, name, author, has_cover, cover_hash, status, original_publication_date "
+        "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
         "FROM books WHERE library_id = ?", (lib_id,)
     ).fetchall()
 
@@ -1948,6 +2058,7 @@ def author_detail(author_name: str):
         books.append({
             "id": r["id"],
             "name": r["name"],
+            "subtitle": r["subtitle"] or "",
             "has_cover": bool(r["has_cover"]),
             "cover_hash": r["cover_hash"] or "",
             "status": r["status"],
@@ -2025,7 +2136,7 @@ def edit_author(author_name: str):
         author_info["birth_place"] = request.form.get("birth_place", "").strip()
         author_info["death_date"] = request.form.get("death_date", "").strip()
         author_info["death_place"] = request.form.get("death_place", "").strip()
-        author_info["biography"] = request.form.get("biography", "").strip()
+        author_info["biography"] = sanitize_html(request.form.get("biography", "").strip())
 
         db.execute("""
             UPDATE authors SET
@@ -2424,7 +2535,7 @@ def edit_metadata(book_id: str):
 
     if request.method == "POST":
         text_fields = (
-            "name", "author", "language", "original_title",
+            "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
             "publication_date", "isbn", "publisher", "genre",
             "summary", "translator", "illustrator",
@@ -2432,6 +2543,7 @@ def edit_metadata(book_id: str):
         )
         for field in text_fields:
             info[field] = request.form.get(field, "").strip()
+        info["summary"] = sanitize_html(info["summary"])
         pages_str = request.form.get("pages", "0").strip()
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
@@ -2464,7 +2576,7 @@ def edit_metadata(book_id: str):
 
         db.execute("""
             UPDATE books SET
-                name=?, author=?, slug=?, language=?, original_title=?,
+                name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
                 publisher=?, genre=?, summary=?, translator=?, illustrator=?,
@@ -2473,7 +2585,7 @@ def edit_metadata(book_id: str):
                 borrowed_start=?, borrowed_end=?, is_gift=?
             WHERE id=?
         """, (
-            info["name"], info["author"], _slugify(info["name"]),
+            info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
@@ -2703,13 +2815,14 @@ def new_book():
 
         info: dict = {}
         for field in (
-            "name", "author", "language", "original_title",
+            "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
             "publication_date", "isbn", "publisher", "genre",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
         ):
             info[field] = request.form.get(field, "").strip()
+        info["summary"] = sanitize_html(info["summary"])
         pages_str = request.form.get("pages", "0").strip()
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
@@ -2754,15 +2867,15 @@ def new_book():
 
         db.execute("""
             INSERT INTO books
-            (id, name, author, slug, language, original_title, original_language,
+            (id, name, subtitle, author, slug, language, original_title, original_language,
              original_publication_date, publication_date, isbn, pages, starting_page,
              publisher, genre, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
              library_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            book_id, info["name"], info["author"], _slugify(info["name"]),
+            book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
@@ -3135,15 +3248,15 @@ def undo_delete_book():
         book = backup["book"]
         db.execute(
             """INSERT INTO books 
-               (id, name, slug, author, language, original_title, original_language,
+               (id, name, subtitle, slug, author, language, original_title, original_language,
                 original_publication_date, publication_date, isbn, pages, starting_page,
                 publisher, genre, summary, translator, illustrator, editor, prologue_author,
                 status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
                 borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
                 library_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (book.get("id"), book.get("name"), book.get("slug"), book.get("author"),
+            (book.get("id"), book.get("name"), book.get("subtitle", ""), book.get("slug"), book.get("author"),
              book.get("language"), book.get("original_title"), book.get("original_language"),
              book.get("original_publication_date"), book.get("publication_date"),
              book.get("isbn"), book.get("pages"), book.get("starting_page"),
@@ -3218,6 +3331,7 @@ if __name__ == "__main__":
     migrate_add_cover_palette() # Add cover_palette column if needed
     migrate_add_cover_hash()    # Add cover_hash column if needed
     migrate_add_photo_hash()    # Add photo_hash column to authors if needed
+    migrate_add_subtitle()      # Add subtitle column to books if needed
     migrate_add_libraries()     # Add libraries table and library_id columns
     app.run(
         debug=True,
