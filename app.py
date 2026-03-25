@@ -1292,7 +1292,8 @@ def _compute_status_timeline(db, lib_id):
     # ── 1. All editions in the library ───────────────────────────────────
     books = db.execute(
         "SELECT id, status, purchase_date, borrowed_start "
-        "FROM books WHERE library_id = ?",
+        "FROM books WHERE library_id = ? "
+        "AND (work_id IS NULL OR is_primary_edition = 1)",
         (lib_id,),
     ).fetchall()
     if not books:
@@ -1435,7 +1436,8 @@ def global_stats():
     finished_readings = db.execute(
         "SELECT r.id, r.book_id FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
+        "WHERE r.status = 'finished' AND b.library_id = ? "
+        "AND (b.work_id IS NULL OR b.is_primary_edition = 1)", (lib_id,)
     ).fetchall()
     for fr in finished_readings:
         rid = fr["id"]
@@ -2106,6 +2108,7 @@ def stats_year_books(year: str):
         FROM readings r
         JOIN books b ON b.id = r.book_id
         WHERE r.status = 'finished' AND b.library_id = ?
+          AND (b.work_id IS NULL OR b.is_primary_edition = 1)
     """, (lib_id,)).fetchall()
 
     books_finished = []
@@ -2338,7 +2341,7 @@ def activity():
     total_all_seconds = total_all_session_seconds  # only sessions have time
 
     books_finished_count = db.execute(
-        "SELECT COUNT(DISTINCT r.book_id) AS c FROM readings r "
+        "SELECT COUNT(DISTINCT COALESCE(b.work_id, b.id)) AS c FROM readings r "
         "JOIN books b ON b.id = r.book_id "
         "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
     ).fetchone()["c"]
@@ -2362,6 +2365,7 @@ def activity():
         FROM books b
         JOIN readings r ON r.book_id = b.id
         WHERE r.status = 'finished' AND b.pages > 0 AND b.library_id = ?
+          AND (b.work_id IS NULL OR b.is_primary_edition = 1)
         ORDER BY b.pages DESC
         LIMIT 1
     """, (lib_id,)).fetchone()
