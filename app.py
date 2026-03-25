@@ -544,6 +544,25 @@ def migrate_add_editions() -> None:
     print("✅ Migration complete – edition columns added.")
 
 
+def migrate_add_format() -> None:
+    """Add format, binding, and audio_format columns to books."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "format" in cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding format columns to books …")
+    db.execute("ALTER TABLE books ADD COLUMN format TEXT DEFAULT 'paper'")
+    db.execute("ALTER TABLE books ADD COLUMN binding TEXT DEFAULT NULL")
+    db.execute("ALTER TABLE books ADD COLUMN audio_format TEXT DEFAULT NULL")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – format columns added.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
@@ -3171,10 +3190,15 @@ def edit_metadata(book_id: str):
             "publication_date", "isbn", "publisher", "genre",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
+            "format", "binding", "audio_format",
         )
         for field in text_fields:
             info[field] = request.form.get(field, "").strip()
         info["summary"] = sanitize_html(info["summary"])
+        if info["format"] != "paper":
+            info["binding"] = ""
+        if info["format"] != "audiobook":
+            info["audio_format"] = ""
         pages_str = request.form.get("pages", "0").strip()
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
@@ -3239,7 +3263,8 @@ def edit_metadata(book_id: str):
                 publisher=?, genre=?, summary=?, translator=?, illustrator=?,
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
-                borrowed_start=?, borrowed_end=?, is_gift=?
+                borrowed_start=?, borrowed_end=?, is_gift=?,
+                format=?, binding=?, audio_format=?
             WHERE id=?
         """, (
             info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
@@ -3254,6 +3279,7 @@ def edit_metadata(book_id: str):
             info["purchase_date"], info["purchase_price"],
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
+            info["format"], info["binding"], info["audio_format"],
             book_id,
         ))
         db.commit()
@@ -3491,9 +3517,14 @@ def new_book():
             "publication_date", "isbn", "publisher", "genre",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
+            "format", "binding", "audio_format",
         ):
             info[field] = request.form.get(field, "").strip()
         info["summary"] = sanitize_html(info["summary"])
+        if info["format"] != "paper":
+            info["binding"] = ""
+        if info["format"] != "audiobook":
+            info["audio_format"] = ""
         pages_str = request.form.get("pages", "0").strip()
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
@@ -3561,8 +3592,9 @@ def new_book():
              publisher, genre, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-             library_id, work_id, is_primary_edition)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             library_id, work_id, is_primary_edition,
+             format, binding, audio_format)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -3578,6 +3610,7 @@ def new_book():
             info["is_gift"],
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
             lib_id, link_work_id or None, is_primary,
+            info["format"], info["binding"], info["audio_format"],
         ))
 
         # Insert book_series entries
@@ -4090,6 +4123,7 @@ if __name__ == "__main__":
     migrate_add_series()        # Add series table and series columns
     migrate_book_series_m2m()   # Add book_series junction table (many-to-many)
     migrate_add_editions()      # Add work_id / is_primary_edition columns
+    migrate_add_format()        # Add format / binding / audio_format columns
     app.run(
         debug=True,
         port=5000,

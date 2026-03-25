@@ -65,6 +65,24 @@
                 <div class="meta-label" data-i18n="book.language">Language</div>
                 <div class="meta-value">{{ info.get('language', '—') }}</div>
             </div>
+            {% if info.get('format') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.format">Format</div>
+                <div class="meta-value" data-i18n="book.format{{ {'paper':'Paper','audiobook':'Audiobook','ebook':'Ebook'}.get(info.get('format',''), '') }}">{{ {'paper':'Paper Book','audiobook':'Audiobook','ebook':'Ebook'}.get(info.get('format', ''), info.get('format', '—')) }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('binding') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.binding">Binding</div>
+                <div class="meta-value" data-i18n="book.binding{{ {'paperback':'Paperback','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding',''), '') }}">{{ {'paperback':'Paperback','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding', ''), info.get('binding', '')) }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('audio_format') %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.audioFormat">Audio Format</div>
+                <div class="meta-value" data-i18n="book.audio{{ {'digital_file':'DigitalFile','cd':'Cd','streaming':'Streaming'}.get(info.get('audio_format',''), '') }}">{{ {'digital_file':'Digital File','cd':'CD','streaming':'Streaming'}.get(info.get('audio_format', ''), info.get('audio_format', '')) }}</div>
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.publisher">Publisher</div>
                 <div class="meta-value">{{ info.get('publisher', '—') }}</div>

@@ -234,7 +234,8 @@ books       (id TEXT PK, title, subtitle, author, status, pages, isbn,
              publisher, pub_year, language, original_language, source_id,
              date_added, date_started, date_finished, genres, notes,
              cover_blob, cover_mime, cover_color, cover_palette,
-             cover_hash, library_id, work_id, is_primary_edition)
+             cover_hash, library_id, work_id, is_primary_edition,
+             format, binding, audio_format)
 
 readings    (id INTEGER PK, book_id FK, reading_number, status,
              date_started, date_finished)

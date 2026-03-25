@@ -78,6 +78,36 @@
             <h3 style="margin-top:0;" data-i18n="bookForm.pubDetails">Publication Details</h3>
             <div class="form-row">
                 <div class="form-group">
+                    <label for="format" data-i18n="bookForm.format">Format</label>
+                    <select id="format" name="format" class="form-control" onchange="toggleFormatFields()">
+                        <option value="paper" {{ 'selected' if info.get('format', 'paper') == 'paper' }} data-i18n="bookForm.formatPaper">Paper Book</option>
+                        <option value="audiobook" {{ 'selected' if info.get('format') == 'audiobook' }} data-i18n="bookForm.formatAudiobook">Audiobook</option>
+                        <option value="ebook" {{ 'selected' if info.get('format') == 'ebook' }} data-i18n="bookForm.formatEbook">Ebook</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div id="binding-fields" {% if info.get('format', 'paper') != 'paper' %}style="display:none;"{% endif %}>
+                        <label for="binding" data-i18n="bookForm.binding">Binding</label>
+                        <select id="binding" name="binding" class="form-control" {% if info.get('format', 'paper') != 'paper' %}disabled{% endif %}>
+                            <option value="">—</option>
+                            <option value="paperback" {{ 'selected' if info.get('binding') == 'paperback' }} data-i18n="bookForm.bindingPaperback">Paperback</option>
+                            <option value="hardcover" {{ 'selected' if info.get('binding') == 'hardcover' }} data-i18n="bookForm.bindingHardcover">Hardcover</option>
+                            <option value="manga" {{ 'selected' if info.get('binding') == 'manga' }} data-i18n="bookForm.bindingManga">Manga</option>
+                        </select>
+                    </div>
+                    <div id="audio-format-fields" {% if info.get('format') != 'audiobook' %}style="display:none;"{% endif %}>
+                        <label for="audio_format" data-i18n="bookForm.audioFormat">Audio Format</label>
+                        <select id="audio_format" name="audio_format" class="form-control" {% if info.get('format') != 'audiobook' %}disabled{% endif %}>
+                            <option value="">—</option>
+                            <option value="digital_file" {{ 'selected' if info.get('audio_format') == 'digital_file' }} data-i18n="bookForm.audioDigitalFile">Digital File</option>
+                            <option value="cd" {{ 'selected' if info.get('audio_format') == 'cd' }} data-i18n="bookForm.audioCd">CD</option>
+                            <option value="streaming" {{ 'selected' if info.get('audio_format') == 'streaming' }} data-i18n="bookForm.audioStreaming">Streaming</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
                     <label for="publisher" data-i18n="bookForm.publisher">Publisher</label>
                     <input type="text" id="publisher" name="publisher" class="form-control" list="publisher-list" value="{{ info.get('publisher', '') }}">
                     <datalist id="publisher-list">
@@ -347,6 +377,15 @@ flatpickr('#purchase_date, #borrowed_start, #borrowed_end', {
     altFormat: 'd/m/Y',
     allowInput: true
 });
+
+function toggleFormatFields() {
+    var fmt = document.getElementById('format').value;
+    document.getElementById('binding-fields').style.display = fmt === 'paper' ? '' : 'none';
+    document.getElementById('binding').disabled = fmt !== 'paper';
+    document.getElementById('audio-format-fields').style.display = fmt === 'audiobook' ? '' : 'none';
+    document.getElementById('audio_format').disabled = fmt !== 'audiobook';
+}
+toggleFormatFields();
 
 function toggleSourceFields() {
     const selected = document.querySelector('input[name="source_type"]:checked').value;
