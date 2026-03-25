@@ -60,6 +60,7 @@
             <option value="finished" {{ 'selected' if status_filter == 'finished' else '' }} data-i18n="index.filterFinished">Finished</option>
             <option value="not-started" {{ 'selected' if status_filter == 'not-started' else '' }} data-i18n="index.filterNotStarted">Not Started</option>
             <option value="abandoned" {{ 'selected' if status_filter == 'abandoned' else '' }} data-i18n="index.filterAbandoned">Abandoned</option>
+            <option value="draft" {{ 'selected' if status_filter == 'draft' else '' }} data-i18n="index.filterDraft">Draft</option>
         </select>
         <span style="color: var(--an-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.sortBy">Sort by:</span>
         <select id="sort1" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
@@ -205,6 +206,9 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                     {% if book.avg_rating %}
                     <span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>
                     {% endif %}
+                    {% if book.edition_count > 1 %}
+                    <span class="badge" style="background: var(--an-deep-orange); color: white;" data-i18n="index.editionsBadge" data-i18n-options='{"count": {{ book.edition_count }}}'>{{ book.edition_count }} editions</span>
+                    {% endif %}
                 </div>
             </div>
         </a>
@@ -276,7 +280,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
             </thead>
             <tbody>
                 {% for book in books %}
-                <tr onclick="window.location='{{ url_for('book_detail', book_id=book.id) }}'" style="cursor:pointer;">
+                <tr onclick="if(event.ctrlKey||event.metaKey){window.open('{{ url_for('book_detail', book_id=book.id) }}','_blank')}else{window.location='{{ url_for('book_detail', book_id=book.id) }}'}" style="cursor:pointer;">
                     <td class="col-cover" style="padding: 0.4rem 0.5rem;">
                         <div class="list-cover-thumb">
                             {% if book.has_cover %}

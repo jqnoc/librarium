@@ -455,6 +455,95 @@ def migrate_add_libraries() -> None:
     print("✅ Migration complete – multi-library support added.")
 
 
+# ── Migration: Add series table ─────────────────────────────────────────
+def migrate_add_series() -> None:
+    """Add series table and series_id/series_index columns to books."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+
+    tables = [r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()]
+    if "series" not in tables:
+        print("⏳ Migrating: adding series table …")
+        db.execute("""
+            CREATE TABLE series (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT    NOT NULL,
+                library_id INTEGER NOT NULL REFERENCES libraries(id),
+                UNIQUE(name, library_id)
+            )
+        """)
+        db.commit()
+        print("✅ Migration complete – series table created.")
+
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "series_id" not in cols:
+        print("⏳ Migrating: adding series columns to books …")
+        db.execute("ALTER TABLE books ADD COLUMN series_id INTEGER REFERENCES series(id) ON DELETE SET NULL")
+        db.execute("ALTER TABLE books ADD COLUMN series_index TEXT NOT NULL DEFAULT ''")
+        db.commit()
+        print("✅ Migration complete – series columns added to books.")
+
+    db.close()
+
+
+# ── Migration: Add book_series junction table (many-to-many) ────────────
+def migrate_book_series_m2m() -> None:
+    """Create book_series junction table and migrate data from books columns."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+
+    tables = [r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()]
+    if "book_series" not in tables:
+        print("⏳ Migrating: creating book_series junction table …")
+        db.execute("""
+            CREATE TABLE book_series (
+                book_id   TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                series_id INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+                series_index TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (book_id, series_id)
+            )
+        """)
+        # Migrate existing data from books.series_id / books.series_index
+        db.execute("""
+            INSERT OR IGNORE INTO book_series (book_id, series_id, series_index)
+            SELECT id, series_id, COALESCE(series_index, '')
+            FROM books
+            WHERE series_id IS NOT NULL
+        """)
+        db.commit()
+        print("✅ Migration complete – book_series junction table created.")
+
+    db.close()
+
+
+def migrate_add_editions() -> None:
+    """Add work_id and is_primary_edition columns to books for multi-edition support."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "work_id" in cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding edition columns to books …")
+    db.execute("ALTER TABLE books ADD COLUMN work_id TEXT DEFAULT NULL")
+    db.execute("ALTER TABLE books ADD COLUMN is_primary_edition INTEGER NOT NULL DEFAULT 1")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – edition columns added.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
@@ -836,6 +925,31 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     return {f: sorted(vals) for f, vals in buckets.items()}
 
 
+# ── Edition helpers ──────────────────────────────────────────────────────
+def _get_work_id(book: dict) -> str:
+    """Return the effective work ID for a book (its work_id or its own id if standalone)."""
+    return book.get("work_id") or book["id"]
+
+
+def _get_editions(db, work_id: str) -> list[dict]:
+    """Return all editions that share the given work_id, primary first."""
+    rows = db.execute(
+        "SELECT id, name, subtitle, language, publisher, pages, has_cover, cover_hash, is_primary_edition "
+        "FROM books WHERE work_id = ? ORDER BY is_primary_edition DESC, name COLLATE NOCASE",
+        (work_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _get_primary_edition(db, work_id: str) -> dict | None:
+    """Return the primary edition row for a work_id, or None."""
+    row = db.execute(
+        "SELECT * FROM books WHERE work_id = ? AND is_primary_edition = 1 LIMIT 1",
+        (work_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
 # ── Source helpers ───────────────────────────────────────────────────────
 SOURCE_TYPES = {
     "physical_store": "Physical Store",
@@ -891,6 +1005,7 @@ def index():
             b.publisher,
             b.language,
             b.publication_date,
+            b.work_id,
             COALESCE(sess.total_pages, 0)   AS session_pages,
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
@@ -944,7 +1059,7 @@ def index():
             WHERE end_date != ''
             GROUP BY reading_id
         ) lr_per ON lr_per.reading_id = lr.lr_id
-        WHERE b.library_id = ?
+        WHERE b.library_id = ? AND (b.work_id IS NULL OR b.is_primary_edition = 1)
     """, (lib_id,)).fetchall()
 
     books = []
@@ -972,6 +1087,14 @@ def index():
 
         ratings = _load_ratings(r["id"])
 
+        # Edition count (how many editions share this work_id)
+        edition_count = 1
+        if r["work_id"]:
+            ec_row = db.execute(
+                "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (r["work_id"],)
+            ).fetchone()
+            edition_count = ec_row["c"] if ec_row else 1
+
         books.append({
             "id": r["id"],
             "name": r["name"],
@@ -993,6 +1116,7 @@ def index():
             "publisher": r["publisher"] or "",
             "language": r["language"] or "",
             "publication_date": r["publication_date"] or "",
+            "edition_count": edition_count,
         })
 
     # Sorting helpers
@@ -1005,7 +1129,7 @@ def index():
         def __ge__(self, o): return self.v <= o.v
         def __eq__(self, o): return self.v == o.v
 
-    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4}
+    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4, "draft": 5}
 
     def _sort_key_for(criterion, b):
         if criterion == "last_session":
@@ -1021,8 +1145,11 @@ def index():
         else:
             return (b["name"],)
 
-    # ── Library ribbon stats (computed from the FULL unfiltered book list) ──
-    all_rows = db.execute("SELECT author, pages, status FROM books WHERE library_id = ?", (lib_id,)).fetchall()
+    # ── Library ribbon stats (computed from primary editions + standalone books) ──
+    all_rows = db.execute(
+        "SELECT author, pages, status FROM books "
+        "WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
+    ).fetchall()
     unique_authors: set[str] = set()
     total_library_pages = 0
     reading_count = 0
@@ -1080,6 +1207,141 @@ def index():
 # Routes – Global Stats
 # ═══════════════════════════════════════════════════════════════════════════
 
+
+def _compute_status_timeline(db, lib_id):
+    """Compute edition-status counts over time for a library.
+
+    Returns ``{"dates": [...], "series": {"reading": [...], ...}}``.
+    Each edition (row in *books*) is counted independently.  The status of
+    each edition on a given date is derived from its readings' dated
+    sessions / periods.  Books with no date information appear from today.
+    """
+    from datetime import date as _date, timedelta
+
+    today = _date.today()
+    today_s = today.isoformat()
+    STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
+
+    # ── 1. All editions in the library ───────────────────────────────────
+    books = db.execute(
+        "SELECT id, status, purchase_date, borrowed_start "
+        "FROM books WHERE library_id = ?",
+        (lib_id,),
+    ).fetchall()
+    if not books:
+        return {"dates": [], "series": {s: [] for s in STATUSES}}
+
+    book_map = {b["id"]: dict(b) for b in books}
+    bids = list(book_map.keys())
+    ph = ",".join("?" * len(bids))
+
+    # ── 2. Readings by book ──────────────────────────────────────────────
+    readings_by_book: dict[str, list[dict]] = {}
+    for r in db.execute(
+        f"SELECT id, book_id, reading_number, status FROM readings "
+        f"WHERE book_id IN ({ph}) ORDER BY book_id, reading_number",
+        bids,
+    ).fetchall():
+        readings_by_book.setdefault(r["book_id"], []).append(dict(r))
+
+    all_rids = [r["id"] for rlist in readings_by_book.values() for r in rlist]
+
+    # ── 3. Session / period date ranges per reading ──────────────────────
+    sess_range: dict[int, tuple[str, str]] = {}
+    per_range: dict[int, tuple[str, str]] = {}
+    if all_rids:
+        rph = ",".join("?" * len(all_rids))
+        for row in db.execute(
+            f"SELECT reading_id, MIN(date) AS d0, MAX(date) AS d1 "
+            f"FROM sessions WHERE reading_id IN ({rph}) AND date != '' "
+            f"GROUP BY reading_id",
+            all_rids,
+        ).fetchall():
+            sess_range[row["reading_id"]] = (row["d0"], row["d1"])
+        for row in db.execute(
+            f"SELECT reading_id, "
+            f"MIN(start_date) AS d0, "
+            f"MAX(CASE WHEN end_date != '' THEN end_date ELSE start_date END) AS d1 "
+            f"FROM periods WHERE reading_id IN ({rph}) AND start_date != '' "
+            f"GROUP BY reading_id",
+            all_rids,
+        ).fetchall():
+            per_range[row["reading_id"]] = (row["d0"], row["d1"])
+
+    # ── 4. Build status-change events per edition ────────────────────────
+    events: list[tuple[str, str, str]] = []  # (date, book_id, new_status)
+
+    for bid, bk in book_map.items():
+        rlist = readings_by_book.get(bid, [])
+        entry = bk["purchase_date"] or bk["borrowed_start"] or ""
+
+        transitions: list[tuple[str, str]] = []
+        first_start: str | None = None
+
+        for r in rlist:
+            rid = r["id"]
+            ds = [d for d in (*sess_range.get(rid, ()), *per_range.get(rid, ())) if d]
+            if not ds:
+                continue
+            start, end = min(ds), max(ds)
+            if first_start is None or start < first_start:
+                first_start = start
+            transitions.append((start, "reading"))
+            if r["status"] in ("finished", "abandoned"):
+                transitions.append((end, r["status"]))
+
+        if not transitions:
+            # No dated readings → edition sits in its current status from entry (or today)
+            transitions.append((entry or today_s, bk["status"] or "not-started"))
+        elif entry and first_start and entry < first_start:
+            initial = "draft" if bk["status"] == "draft" else "not-started"
+            transitions.insert(0, (entry, initial))
+
+        transitions.sort()
+        for d, s in transitions:
+            events.append((d, bid, s))
+
+    events.sort()
+    if not events:
+        return {"dates": [], "series": {s: [] for s in STATUSES}}
+
+    # ── 5. Walk the timeline, emitting sampled data points ───────────────
+    start_date = _date.fromisoformat(events[0][0])
+    total_days = (today - start_date).days + 1
+    interval = max(1, total_days // 500)  # ≈ 500 data points
+
+    current: dict[str, str] = {}  # bid → status
+    counts = {s: 0 for s in STATUSES}
+
+    result_dates: list[str] = []
+    result_series: dict[str, list[int]] = {s: [] for s in STATUSES}
+    ei = 0
+    d = start_date
+    day_num = 0
+
+    while d <= today:
+        ds = d.isoformat()
+        while ei < len(events) and events[ei][0] <= ds:
+            _, bid, new_st = events[ei]
+            old_st = current.get(bid)
+            if old_st != new_st:
+                if old_st and old_st in counts:
+                    counts[old_st] -= 1
+                counts[new_st] = counts.get(new_st, 0) + 1
+                current[bid] = new_st
+            ei += 1
+
+        if day_num % interval == 0 or d == today:
+            result_dates.append(ds)
+            for s in STATUSES:
+                result_series[s].append(counts.get(s, 0))
+
+        d += timedelta(days=1)
+        day_num += 1
+
+    return {"dates": result_dates, "series": result_series}
+
+
 @app.route("/stats")
 def global_stats():
     """Global statistics page – aggregate reading stats for the current library."""
@@ -1132,7 +1394,7 @@ def global_stats():
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
         "SELECT id, name, status, genre, language, original_language, pages, publisher, has_cover, cover_hash "
-        "FROM books WHERE library_id = ?", (lib_id,)
+        "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
     ).fetchall()
 
     status_counts: dict[str, int] = Counter()
@@ -1202,18 +1464,23 @@ def global_stats():
                 shortest_finished_pages = book_pages
                 shortest_finished = {"name": bk["name"], "id": bk["id"], "pages": book_pages, "has_cover": bool(bk["has_cover"])}
 
-    # Most re-read book
+    # Most re-read work (group readings across all editions of a work)
     reread_row = db.execute(
-        "SELECT r.book_id, COUNT(*) AS cnt FROM readings r "
+        "SELECT COALESCE(b.work_id, r.book_id) AS wid, COUNT(*) AS cnt FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE b.library_id = ? GROUP BY r.book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        "WHERE b.library_id = ? GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
         (lib_id,)
     ).fetchone()
     most_reread = None
     if reread_row:
-        rbk = db.execute("SELECT name, has_cover FROM books WHERE id = ?", (reread_row["book_id"],)).fetchone()
+        # Get the primary edition for display
+        rbk = db.execute(
+            "SELECT id, name, has_cover FROM books WHERE (work_id = ? OR id = ?) "
+            "ORDER BY is_primary_edition DESC LIMIT 1",
+            (reread_row["wid"], reread_row["wid"]),
+        ).fetchone()
         if rbk:
-            most_reread = {"name": rbk["name"], "id": reread_row["book_id"], "count": reread_row["cnt"], "has_cover": bool(rbk["has_cover"])}
+            most_reread = {"name": rbk["name"], "id": rbk["id"], "count": reread_row["cnt"], "has_cover": bool(rbk["has_cover"])}
 
     avg_finished_rating = round(rated_sum / rated_count, 2) if rated_count > 0 else None
 
@@ -1221,7 +1488,7 @@ def global_stats():
     top_authors = author_counts.most_common(10)
 
     # Format status labels
-    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned"}
+    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned", "draft": "Draft"}
     status_chart = {status_labels_map.get(k, k.title()): v for k, v in status_counts.items()}
 
     # Remove 'Unknown' entries from all count maps — they don't represent a real value
@@ -1316,6 +1583,14 @@ def api_cumulative_pages():
         out.append({ 'date': d, 'pages': pages, 'cumulative': cum })
 
     return jsonify(out)
+
+
+@app.route("/api/status_timeline")
+def api_status_timeline():
+    """Return status-count timeseries for the stacked area chart."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+    return jsonify(_compute_status_timeline(db, lib_id))
 
 
 @app.route('/api/cumulative_pages_per_book')
@@ -1511,12 +1786,18 @@ def stats_year(year: str):
     year_end = date(year_int, 12, 31)
     total_days = (year_end - year_start).days + 1  # 365 or 366
 
-    # book_id → {name, color, active_dates: set[date], has_before, has_after}
-    gantt_books: dict[str, dict] = {}
+    # (book_id, reading_id) → {name, color, active_dates, …}
+    gantt_books: dict[tuple, dict] = {}
+    # book_id → count of distinct readings appearing in this year (for labelling)
+    book_reading_counts: dict[str, set] = {}
 
-    def _ensure_gantt_book(bid, name, color, status="", subtitle=""):
-        if bid not in gantt_books:
-            gantt_books[bid] = {
+    def _ensure_gantt_entry(bid, rid, name, color, status="", subtitle="", reading_number=None):
+        key = (bid, rid)
+        if key not in gantt_books:
+            gantt_books[key] = {
+                "book_id": bid,
+                "reading_id": rid,
+                "reading_number": reading_number,
                 "name": name,
                 "subtitle": subtitle or "",
                 "color": color or "#888888",
@@ -1525,75 +1806,108 @@ def stats_year(year: str):
                 "has_before": False,
                 "has_after": False,
             }
+        book_reading_counts.setdefault(bid, set())
+        if rid:
+            book_reading_counts[bid].add(rid)
 
-    # Sessions in the current year → active dates
+    # Sessions in the current year → active dates (per reading)
     for row in db.execute("""
-        SELECT s.date, s.book_id, b.name, b.subtitle, b.cover_color, b.status
+        SELECT s.date, s.book_id, s.reading_id, b.name, b.subtitle, b.cover_color, b.status,
+               r.reading_number
         FROM sessions s
         JOIN books b ON b.id = s.book_id
+        LEFT JOIN readings r ON r.id = s.reading_id
         WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
     """, (year, lib_id)).fetchall():
         bid = row["book_id"]
-        _ensure_gantt_book(bid, row["name"], row["cover_color"], row["status"], row["subtitle"])
+        rid = row["reading_id"] or "__none__"
+        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
         try:
-            gantt_books[bid]["active_dates"].add(date.fromisoformat(row["date"]))
+            gantt_books[(bid, rid)]["active_dates"].add(date.fromisoformat(row["date"]))
         except (ValueError, TypeError):
             pass
 
-    # Periods overlapping the current year → expand into active dates
+    # Periods overlapping the current year → expand into active dates (per reading)
     for row in db.execute("""
-        SELECT p.start_date, p.end_date, p.book_id, b.name, b.subtitle, b.cover_color, b.status
+        SELECT p.start_date, p.end_date, p.book_id, p.reading_id, b.name, b.subtitle, b.cover_color, b.status,
+               r.reading_number
         FROM periods p
         JOIN books b ON b.id = p.book_id
+        LEFT JOIN readings r ON r.id = p.reading_id
         WHERE p.end_date >= ? AND p.start_date <= ? AND b.library_id = ?
     """, (f"{year}-01-01", f"{year}-12-31", lib_id)).fetchall():
         bid = row["book_id"]
-        _ensure_gantt_book(bid, row["name"], row["cover_color"], row["status"], row["subtitle"])
+        rid = row["reading_id"] or "__none__"
+        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
         try:
             sd = date.fromisoformat(row["start_date"])
             ed = date.fromisoformat(row["end_date"])
             d = max(sd, year_start)
             end_clamp = min(ed, year_end)
             while d <= end_clamp:
-                gantt_books[bid]["active_dates"].add(d)
+                gantt_books[(bid, rid)]["active_dates"].add(d)
                 d += timedelta(days=1)
         except (ValueError, TypeError):
             pass
 
-    # Check for activity before / after the year for each book
-    for bid in list(gantt_books.keys()):
-        # Sessions before this year?
-        r = db.execute(
-            "SELECT 1 FROM sessions WHERE book_id = ? AND date < ? AND date != '' LIMIT 1",
-            (bid, f"{year}-01-01"),
-        ).fetchone()
-        if r:
-            gantt_books[bid]["has_before"] = True
-        # Sessions after this year?
-        r = db.execute(
-            "SELECT 1 FROM sessions WHERE book_id = ? AND date > ? LIMIT 1",
-            (bid, f"{year}-12-31"),
-        ).fetchone()
-        if r:
-            gantt_books[bid]["has_after"] = True
-        # Periods starting before this year?
-        r = db.execute(
-            "SELECT 1 FROM periods WHERE book_id = ? AND start_date < ? AND end_date != '' LIMIT 1",
-            (bid, f"{year}-01-01"),
-        ).fetchone()
-        if r:
-            gantt_books[bid]["has_before"] = True
-        # Periods ending after this year?
-        r = db.execute(
-            "SELECT 1 FROM periods WHERE book_id = ? AND end_date > ? LIMIT 1",
-            (bid, f"{year}-12-31"),
-        ).fetchone()
-        if r:
-            gantt_books[bid]["has_after"] = True
+    # Check for activity before / after the year for each entry
+    for (bid, rid), info in list(gantt_books.items()):
+        if rid == "__none__":
+            # Legacy data without reading_id – check by book_id
+            r = db.execute(
+                "SELECT 1 FROM sessions WHERE book_id = ? AND date < ? AND date != '' LIMIT 1",
+                (bid, f"{year}-01-01"),
+            ).fetchone()
+            if r:
+                info["has_before"] = True
+            r = db.execute(
+                "SELECT 1 FROM sessions WHERE book_id = ? AND date > ? LIMIT 1",
+                (bid, f"{year}-12-31"),
+            ).fetchone()
+            if r:
+                info["has_after"] = True
+            r = db.execute(
+                "SELECT 1 FROM periods WHERE book_id = ? AND start_date < ? AND end_date != '' LIMIT 1",
+                (bid, f"{year}-01-01"),
+            ).fetchone()
+            if r:
+                info["has_before"] = True
+            r = db.execute(
+                "SELECT 1 FROM periods WHERE book_id = ? AND end_date > ? LIMIT 1",
+                (bid, f"{year}-12-31"),
+            ).fetchone()
+            if r:
+                info["has_after"] = True
+        else:
+            # Check per reading_id
+            r = db.execute(
+                "SELECT 1 FROM sessions WHERE reading_id = ? AND date < ? AND date != '' LIMIT 1",
+                (rid, f"{year}-01-01"),
+            ).fetchone()
+            if r:
+                info["has_before"] = True
+            r = db.execute(
+                "SELECT 1 FROM sessions WHERE reading_id = ? AND date > ? LIMIT 1",
+                (rid, f"{year}-12-31"),
+            ).fetchone()
+            if r:
+                info["has_after"] = True
+            r = db.execute(
+                "SELECT 1 FROM periods WHERE reading_id = ? AND start_date < ? AND end_date != '' LIMIT 1",
+                (rid, f"{year}-01-01"),
+            ).fetchone()
+            if r:
+                info["has_before"] = True
+            r = db.execute(
+                "SELECT 1 FROM periods WHERE reading_id = ? AND end_date > ? LIMIT 1",
+                (rid, f"{year}-12-31"),
+            ).fetchone()
+            if r:
+                info["has_after"] = True
 
     # Build gantt_data with active segments
     gantt_data = []
-    for bid, info in gantt_books.items():
+    for (bid, rid), info in gantt_books.items():
         active = sorted(info["active_dates"])
         if not active:
             continue
@@ -1623,24 +1937,45 @@ def stats_year(year: str):
             "end": (seg_end - year_start).days,
         })
 
-        # Earliest-ever reading date for this book (sessions + periods)
+        # Earliest-ever reading date for this reading (or book if no reading_id)
         first_ever = None
-        r = db.execute(
-            "SELECT MIN(date) AS d FROM sessions WHERE book_id = ? AND date != ''",
-            (bid,),
-        ).fetchone()
-        if r and r["d"]:
-            first_ever = r["d"]
-        r = db.execute(
-            "SELECT MIN(start_date) AS d FROM periods WHERE book_id = ? AND start_date != ''",
-            (bid,),
-        ).fetchone()
-        if r and r["d"]:
-            if first_ever is None or r["d"] < first_ever:
+        if rid != "__none__":
+            r = db.execute(
+                "SELECT MIN(date) AS d FROM sessions WHERE reading_id = ? AND date != ''",
+                (rid,),
+            ).fetchone()
+            if r and r["d"]:
                 first_ever = r["d"]
+            r = db.execute(
+                "SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''",
+                (rid,),
+            ).fetchone()
+            if r and r["d"]:
+                if first_ever is None or r["d"] < first_ever:
+                    first_ever = r["d"]
+        else:
+            r = db.execute(
+                "SELECT MIN(date) AS d FROM sessions WHERE book_id = ? AND date != ''",
+                (bid,),
+            ).fetchone()
+            if r and r["d"]:
+                first_ever = r["d"]
+            r = db.execute(
+                "SELECT MIN(start_date) AS d FROM periods WHERE book_id = ? AND start_date != ''",
+                (bid,),
+            ).fetchone()
+            if r and r["d"]:
+                if first_ever is None or r["d"] < first_ever:
+                    first_ever = r["d"]
+
+        # Add reading number label for books with multiple readings
+        display_name = info["name"]
+        has_multi = len(book_reading_counts.get(bid, set())) > 1
+        if has_multi and info["reading_number"]:
+            display_name = f"{info['name']} (#{info['reading_number']})"
 
         gantt_data.append({
-            "name": info["name"],
+            "name": display_name,
             "subtitle": info["subtitle"],
             "color": info["color"],
             "status": info["status"],
@@ -1955,17 +2290,21 @@ def activity():
 
     most_reread_book = None
     reread_row = db.execute(
-        "SELECT r.book_id, COUNT(*) AS cnt FROM readings r "
+        "SELECT COALESCE(b.work_id, r.book_id) AS wid, COUNT(*) AS cnt FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE b.library_id = ? GROUP BY r.book_id HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        "WHERE b.library_id = ? GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
         (lib_id,)
     ).fetchone()
     if reread_row:
-        rbk = db.execute("SELECT name FROM books WHERE id = ?", (reread_row["book_id"],)).fetchone()
+        rbk = db.execute(
+            "SELECT id, name FROM books WHERE (work_id = ? OR id = ?) "
+            "ORDER BY is_primary_edition DESC LIMIT 1",
+            (reread_row["wid"], reread_row["wid"]),
+        ).fetchone()
         if rbk:
             most_reread_book = {
                 "name": rbk["name"],
-                "id": reread_row["book_id"],
+                "id": rbk["id"],
                 "count": reread_row["cnt"],
             }
 
@@ -2042,7 +2381,7 @@ def author_detail(author_name: str):
     lib_id = _get_current_library_id()
     rows = db.execute(
         "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
-        "FROM books WHERE library_id = ?", (lib_id,)
+        "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
     ).fetchall()
 
     sort = request.args.get("sort", "date")  # date = original publication date
@@ -2172,6 +2511,229 @@ def edit_author(author_name: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Routes – Series
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/series")
+def series_list():
+    """Display all series in the current library."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+
+    rows = db.execute("""
+        SELECT s.id, s.name,
+               COUNT(CASE WHEN b.work_id IS NULL OR b.is_primary_edition = 1 THEN 1 END) AS book_count
+        FROM series s
+        LEFT JOIN book_series bs ON bs.series_id = s.id
+        LEFT JOIN books b ON b.id = bs.book_id
+        WHERE s.library_id = ?
+        GROUP BY s.id
+        ORDER BY s.name COLLATE NOCASE
+    """, (lib_id,)).fetchall()
+
+    series = []
+    for r in rows:
+        # Fetch up to 10 covers for the collage (ordered by series index)
+        cover_books = db.execute("""
+            SELECT b.id, b.cover_hash
+            FROM books b
+            JOIN book_series bs ON bs.book_id = b.id
+            WHERE bs.series_id = ? AND b.has_cover = 1
+              AND (b.work_id IS NULL OR b.is_primary_edition = 1)
+            ORDER BY CAST(bs.series_index AS REAL) ASC, COALESCE(NULLIF(b.original_publication_date, ''), '9999') ASC
+            LIMIT 10
+        """, (r["id"],)).fetchall()
+        series.append({
+            "id": r["id"],
+            "name": r["name"],
+            "book_count": r["book_count"],
+            "covers": [{"id": c["id"], "cover_hash": c["cover_hash"] or ""} for c in cover_books],
+        })
+
+    sort = request.args.get("sort", "name")
+    if sort == "books":
+        series.sort(key=lambda s: (-s["book_count"], s["name"].lower()))
+    else:
+        series.sort(key=lambda s: s["name"].lower())
+
+    return render_template("series.html", series=series, sort=sort)
+
+
+@app.route("/series/<int:series_id>")
+def series_detail(series_id: int):
+    """Display all books in a series, ordered by series index."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+
+    series_row = db.execute(
+        "SELECT * FROM series WHERE id = ? AND library_id = ?", (series_id, lib_id)
+    ).fetchone()
+    if not series_row:
+        abort(404)
+    series_info = dict(series_row)
+
+    rows = db.execute("""
+        SELECT b.id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, b.status,
+               b.original_publication_date, bs.series_index
+        FROM books b
+        JOIN book_series bs ON bs.book_id = b.id
+        WHERE bs.series_id = ? AND b.library_id = ?
+              AND (b.work_id IS NULL OR b.is_primary_edition = 1)
+    """, (series_id, lib_id)).fetchall()
+
+    books = []
+    for r in rows:
+        ratings = _load_ratings(r["id"])
+        avg = _calc_avg_rating(ratings)
+        idx_raw = (r["series_index"] or "").strip()
+        try:
+            idx_num = float(idx_raw) if idx_raw else None
+        except (ValueError, TypeError):
+            idx_num = None
+        books.append({
+            "id": r["id"],
+            "name": r["name"],
+            "subtitle": r["subtitle"] or "",
+            "author": r["author"] or "",
+            "has_cover": bool(r["has_cover"]),
+            "cover_hash": r["cover_hash"] or "",
+            "status": r["status"],
+            "original_publication_date": r["original_publication_date"] or "",
+            "series_index": idx_raw,
+            "series_index_num": idx_num,
+            "rating": avg or 0,
+        })
+
+    # Sort: books with numeric index first (by index), then books without index (by original_publication_date)
+    indexed = [b for b in books if b["series_index_num"] is not None]
+    unindexed = [b for b in books if b["series_index_num"] is None]
+    indexed.sort(key=lambda b: b["series_index_num"])
+    unindexed.sort(key=lambda b: (b["original_publication_date"] or "9999", b["name"].lower()))
+    books = indexed + unindexed
+
+    return render_template("series_detail.html", series=series_info, books=books)
+
+
+@app.route("/series/<int:series_id>/rename", methods=["POST"])
+def rename_series(series_id: int):
+    """Rename a series."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+    new_name = request.form.get("name", "").strip()
+    if not new_name:
+        flash("Series name cannot be empty.", "error")
+        return redirect(url_for("series_detail", series_id=series_id))
+    db.execute("UPDATE series SET name = ? WHERE id = ? AND library_id = ?",
+               (new_name, series_id, lib_id))
+    db.commit()
+    flash("Series renamed.", "success")
+    return redirect(url_for("series_detail", series_id=series_id))
+
+
+@app.route("/series/<int:series_id>/delete", methods=["POST"])
+def delete_series(series_id: int):
+    """Delete a series (unlinks books but doesn't delete them)."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+    db.execute("""
+        DELETE FROM book_series WHERE series_id = ? AND book_id IN (
+            SELECT id FROM books WHERE library_id = ?
+        )
+    """, (series_id, lib_id))
+    db.execute("DELETE FROM series WHERE id = ? AND library_id = ?", (series_id, lib_id))
+    db.commit()
+    flash("Series deleted.", "success")
+    return redirect(url_for("series_list"))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Editions
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/book/<book_id>/link-edition", methods=["POST"])
+def link_edition(book_id: str):
+    """Link an existing book as another edition of the same work."""
+    db = get_db()
+    book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+    target_id = request.form.get("target_book_id", "").strip()
+    if not target_id or target_id == book_id:
+        flash("Invalid target book.", "error")
+        return redirect(url_for("book_detail", book_id=book_id))
+    target = db.execute("SELECT * FROM books WHERE id = ?", (target_id,)).fetchone()
+    if not target:
+        flash("Target book not found.", "error")
+        return redirect(url_for("book_detail", book_id=book_id))
+
+    # Determine or create work_id
+    work_id = book["work_id"] or target["work_id"]
+    if not work_id:
+        # Neither book is part of a work yet. Use the current book id as work_id.
+        work_id = book_id
+
+    # Assign work_id to both books. Current book is primary if it was standalone.
+    db.execute("UPDATE books SET work_id = ?, is_primary_edition = 1 WHERE id = ?", (work_id, book_id))
+    db.execute("UPDATE books SET work_id = ?, is_primary_edition = 0 WHERE id = ?", (work_id, target_id))
+    # If the target already had other editions, absorb them too
+    if target["work_id"] and target["work_id"] != work_id:
+        db.execute("UPDATE books SET work_id = ? WHERE work_id = ?", (work_id, target["work_id"]))
+    db.commit()
+    flash("Books linked as editions of the same work.", "success")
+    return redirect(url_for("book_detail", book_id=book_id))
+
+
+@app.route("/book/<book_id>/unlink-edition", methods=["POST"])
+def unlink_edition(book_id: str):
+    """Remove a book from an edition group, making it standalone again."""
+    db = get_db()
+    book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book or not book["work_id"]:
+        abort(404)
+
+    work_id = book["work_id"]
+    was_primary = bool(book["is_primary_edition"])
+
+    # Make this book standalone
+    db.execute("UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE id = ?", (book_id,))
+
+    # If this was the primary, promote another edition
+    if was_primary:
+        remaining = db.execute(
+            "SELECT id FROM books WHERE work_id = ? ORDER BY name COLLATE NOCASE LIMIT 1",
+            (work_id,),
+        ).fetchone()
+        if remaining:
+            db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (remaining["id"],))
+
+    # If only one edition remains in the group, dissolve the group
+    remaining_count = db.execute(
+        "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (work_id,)
+    ).fetchone()["c"]
+    if remaining_count == 1:
+        db.execute("UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE work_id = ?", (work_id,))
+
+    db.commit()
+    flash("Book unlinked from edition group.", "success")
+    return redirect(url_for("book_detail", book_id=book_id))
+
+
+@app.route("/book/<book_id>/set-primary-edition", methods=["POST"])
+def set_primary_edition(book_id: str):
+    """Set this edition as the primary edition for its work."""
+    db = get_db()
+    book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book or not book["work_id"]:
+        abort(404)
+    work_id = book["work_id"]
+    db.execute("UPDATE books SET is_primary_edition = 0 WHERE work_id = ?", (work_id,))
+    db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (book_id,))
+    db.commit()
+    flash("Primary edition updated.", "success")
+    return redirect(url_for("book_detail", book_id=book_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Routes – Book detail
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -2200,8 +2762,17 @@ def book_detail(book_id: str):
             (book_id,),
         ).fetchall()
 
-    current_reading = readings_rows[-1]  # latest reading
+    current_reading = readings_rows[-1]  # default: latest reading
     current_reading_id = current_reading["id"]
+
+    # Allow selecting a specific reading via query param
+    selected_reading_num = request.args.get("reading", "")
+    if selected_reading_num:
+        for rr in readings_rows:
+            if str(rr["reading_number"]) == selected_reading_num:
+                current_reading = rr
+                current_reading_id = rr["id"]
+                break
 
     # ── Load ALL sessions (with reading_id) ──
     sessions_rows = db.execute(
@@ -2341,76 +2912,97 @@ def book_detail(book_id: str):
     ratings = _load_ratings(book_id)
     avg_rating = _calc_avg_rating(ratings)
 
-    # ── Build Gantt timeline for this book ──
+    # ── Build Gantt timeline for this book (per-reading bars) ──
     from datetime import timedelta as _td
     book_color = info.get("cover_color", "") or "#888888"
-    active_dates: set[date] = set()
+
+    # Collect active dates per reading
+    reading_active_dates: dict[str, set[date]] = {}  # reading_id → set of dates
     for s in all_sessions_data:
-        if s["date"]:
+        if s["date"] and s["reading_id"]:
+            rid = s["reading_id"]
+            reading_active_dates.setdefault(rid, set())
             try:
-                active_dates.add(date.fromisoformat(s["date"]))
+                reading_active_dates[rid].add(date.fromisoformat(s["date"]))
             except (ValueError, TypeError):
                 pass
     for p in all_periods_data:
         sd_str = p.get("start_date", "")
         ed_str = p.get("end_date", "")
-        if sd_str and ed_str:
+        rid = p.get("reading_id")
+        if sd_str and ed_str and rid:
+            reading_active_dates.setdefault(rid, set())
             try:
                 sd = date.fromisoformat(sd_str)
                 ed = date.fromisoformat(ed_str)
                 d = sd
                 while d <= ed:
-                    active_dates.add(d)
+                    reading_active_dates[rid].add(d)
                     d += _td(days=1)
             except (ValueError, TypeError):
                 pass
 
+    # Global span across all readings
+    all_dates: set[date] = set()
+    for dates in reading_active_dates.values():
+        all_dates |= dates
+
     book_gantt_data = None
-    if active_dates:
-        sorted_active = sorted(active_dates)
-        span_start = sorted_active[0]
-        span_end = sorted_active[-1]
-        total_span_days = (span_end - span_start).days + 1
+    if all_dates:
+        global_start = min(all_dates)
+        global_end = max(all_dates)
+        total_span_days = (global_end - global_start).days + 1
 
-        # Group consecutive active dates into segments
-        gantt_segments = []
-        seg_start = sorted_active[0]
-        seg_end = sorted_active[0]
-        for d in sorted_active[1:]:
-            if (d - seg_end).days <= 1:
-                seg_end = d
-            else:
-                gantt_segments.append({
-                    "start": (seg_start - span_start).days,
-                    "end": (seg_end - span_start).days,
-                })
-                seg_start = d
-                seg_end = d
-        gantt_segments.append({
-            "start": (seg_start - span_start).days,
-            "end": (seg_end - span_start).days,
-        })
+        def _build_segments(sorted_active, ref_start):
+            segs = []
+            if not sorted_active:
+                return segs
+            seg_s = sorted_active[0]
+            seg_e = sorted_active[0]
+            for d in sorted_active[1:]:
+                if (d - seg_e).days <= 1:
+                    seg_e = d
+                else:
+                    segs.append({"start": (seg_s - ref_start).days, "end": (seg_e - ref_start).days})
+                    seg_s = d
+                    seg_e = d
+            segs.append({"start": (seg_s - ref_start).days, "end": (seg_e - ref_start).days})
+            return segs
 
-        # Build month labels relative to the span
+        # Build per-reading bars, ordered by reading_number
+        gantt_readings = []
+        for rr in readings_rows:
+            rid = rr["id"]
+            dates = reading_active_dates.get(rid, set())
+            if not dates:
+                continue
+            sorted_d = sorted(dates)
+            gantt_readings.append({
+                "reading_number": rr["reading_number"],
+                "reading_id": rid,
+                "segments": _build_segments(sorted_d, global_start),
+                "start_day": (sorted_d[0] - global_start).days,
+                "end_day": (sorted_d[-1] - global_start).days,
+                "start_label": sorted_d[0].isoformat(),
+                "end_label": sorted_d[-1].isoformat(),
+            })
+
+        # Build month labels relative to global span
         gantt_months = []
-        # Determine step: show fewer labels for longer spans
         total_months_approx = total_span_days / 30.4
         if total_months_approx > 48:
-            month_step = 12   # yearly
+            month_step = 12
         elif total_months_approx > 24:
-            month_step = 6    # every 6 months
+            month_step = 6
         elif total_months_approx > 12:
-            month_step = 3    # quarterly
+            month_step = 3
         else:
-            month_step = 1    # monthly
-
-        # Walk month-by-month from span_start to span_end
-        m_date = span_start.replace(day=1)
+            month_step = 1
+        m_date = global_start.replace(day=1)
         month_idx = 0
-        while m_date <= span_end:
-            label_date = max(m_date, span_start)
-            offset_day = (label_date - span_start).days
-            # Skip labels that would land in the last 5% (prevent overflow)
+        while m_date <= global_end:
+            label_date = max(m_date, global_start)
+            offset_day = (label_date - global_start).days
             if offset_day <= total_span_days * 0.95:
                 if month_idx % month_step == 0:
                     gantt_months.append({
@@ -2418,7 +3010,6 @@ def book_detail(book_id: str):
                         "offset": offset_day,
                     })
             month_idx += 1
-            # Next month
             if m_date.month == 12:
                 m_date = m_date.replace(year=m_date.year + 1, month=1)
             else:
@@ -2426,15 +3017,50 @@ def book_detail(book_id: str):
 
         book_gantt_data = {
             "color": book_color,
-            "segments": gantt_segments,
+            "readings": gantt_readings,
             "total_days": total_span_days,
             "months": gantt_months,
-            "start_label": span_start.isoformat(),
-            "end_label": span_end.isoformat(),
+            "start_label": global_start.isoformat(),
+            "end_label": global_end.isoformat(),
         }
 
     # Build reading_id → reading_number map for template
     reading_num_map = {rr["id"]: rr["reading_number"] for rr in readings_rows}
+
+    # Series info (many-to-many)
+    series_list_book = []
+    sr_rows = db.execute("""
+        SELECT s.id, s.name, bs.series_index
+        FROM book_series bs
+        JOIN series s ON s.id = bs.series_id
+        WHERE bs.book_id = ?
+        ORDER BY s.name COLLATE NOCASE
+    """, (book_id,)).fetchall()
+    for sr in sr_rows:
+        series_list_book.append({"id": sr["id"], "name": sr["name"], "series_index": sr["series_index"] or ""})
+
+    # ── Edition data ────────────────────────────────────────────────────
+    work_id = info.get("work_id")
+    editions = []
+    work_total_readings = 0
+    if work_id:
+        editions = _get_editions(db, work_id)
+        # Count total finished readings across all editions of this work
+        ed_ids = [e["id"] for e in editions]
+        if ed_ids:
+            ph = ",".join("?" * len(ed_ids))
+            work_total_readings = db.execute(
+                f"SELECT COUNT(*) AS c FROM readings WHERE book_id IN ({ph}) AND status = 'finished'",
+                ed_ids,
+            ).fetchone()["c"]
+
+    # Books that can be linked as editions (same library, not already in this work group)
+    exclude_ids = [e["id"] for e in editions] if editions else [book_id]
+    ph = ",".join("?" * len(exclude_ids))
+    all_linkable_books = db.execute(
+        f"SELECT id, name, language FROM books WHERE library_id = ? AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASE",
+        [info["library_id"]] + exclude_ids,
+    ).fetchall()
 
     return render_template(
         "book_detail.html",
@@ -2466,9 +3092,14 @@ def book_detail(book_id: str):
         date_finished=date_finished,
         readings=readings_data,
         current_reading_id=current_reading_id,
+        current_reading_number=current_reading["reading_number"],
         reading_num_map=reading_num_map,
         has_multiple_readings=len(readings_data) > 1,
         book_gantt=book_gantt_data,
+        series_list_book=series_list_book,
+        editions=editions,
+        work_total_readings=work_total_readings,
+        all_linkable_books=all_linkable_books,
     )
 
 
@@ -2574,6 +3205,32 @@ def edit_metadata(book_id: str):
             info["borrowed_start"] = ""
             info["borrowed_end"] = ""
 
+        # Handle series (many-to-many)
+        series_names = request.form.getlist("series_name[]")
+        series_indexes = request.form.getlist("series_index[]")
+        # Clear old links for this book
+        db.execute("DELETE FROM book_series WHERE book_id = ?", (book_id,))
+        for s_name, s_idx in zip(series_names, series_indexes):
+            s_name = s_name.strip()
+            s_idx = s_idx.strip()
+            if not s_name:
+                continue
+            existing = db.execute(
+                "SELECT id FROM series WHERE name = ? AND library_id = ?",
+                (s_name, lib_id)
+            ).fetchone()
+            if existing:
+                sid = existing["id"]
+            else:
+                db.execute("INSERT INTO series (name, library_id) VALUES (?, ?)",
+                           (s_name, lib_id))
+                db.commit()
+                sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            db.execute(
+                "INSERT OR IGNORE INTO book_series (book_id, series_id, series_index) VALUES (?, ?, ?)",
+                (book_id, sid, s_idx)
+            )
+
         db.execute("""
             UPDATE books SET
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
@@ -2647,11 +3304,25 @@ def edit_metadata(book_id: str):
     except (json.JSONDecodeError, TypeError):
         pass
 
+    # Fetch all series for autocomplete and current book's series
+    all_series = [dict(r) for r in db.execute(
+        "SELECT id, name FROM series WHERE library_id = ? ORDER BY name COLLATE NOCASE", (lib_id,)
+    ).fetchall()]
+    book_series_entries = [dict(r) for r in db.execute("""
+        SELECT s.name, bs.series_index
+        FROM book_series bs
+        JOIN series s ON s.id = bs.series_id
+        WHERE bs.book_id = ?
+        ORDER BY s.name COLLATE NOCASE
+    """, (book_id,)).fetchall()]
+
     return render_template("edit_metadata.html", book_id=book_id, info=info,
                            purchase_sources=purchase_sources, borrow_sources=borrow_sources,
                            gift_sources=gift_sources,
                            languages=languages, suggestions=suggestions,
-                           cover_palette=cover_palette)
+                           cover_palette=cover_palette,
+                           all_series=all_series, book_series_entries=book_series_entries,
+                           is_secondary_edition=bool(info.get("work_id") and not info.get("is_primary_edition")))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2865,6 +3536,24 @@ def new_book():
             cover_palette_json = json.dumps(palette)
             cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
 
+        # Handle series (many-to-many)
+        series_names = request.form.getlist("series_name[]")
+        series_indexes = request.form.getlist("series_index[]")
+
+        # Handle edition linking
+        link_work_id = request.form.get("work_id", "").strip()
+        is_primary = 1
+        if link_work_id:
+            is_primary = 0  # new edition is secondary
+            # Ensure the parent book has a work_id; if not, assign one (use parent's own id)
+            parent = db.execute("SELECT id, work_id FROM books WHERE id = ?", (link_work_id,)).fetchone()
+            if parent and not parent["work_id"]:
+                db.execute("UPDATE books SET work_id = ?, is_primary_edition = 1 WHERE id = ?",
+                           (link_work_id, link_work_id))
+            elif parent and parent["work_id"]:
+                # Parent already has a work_id; use that instead
+                link_work_id = parent["work_id"]
+
         db.execute("""
             INSERT INTO books
             (id, name, subtitle, author, slug, language, original_title, original_language,
@@ -2872,8 +3561,8 @@ def new_book():
              publisher, genre, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-             library_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             library_id, work_id, is_primary_edition)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -2888,8 +3577,30 @@ def new_book():
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
-            lib_id,
+            lib_id, link_work_id or None, is_primary,
         ))
+
+        # Insert book_series entries
+        for s_name, s_idx in zip(series_names, series_indexes):
+            s_name = s_name.strip()
+            s_idx = s_idx.strip()
+            if not s_name:
+                continue
+            existing = db.execute(
+                "SELECT id FROM series WHERE name = ? AND library_id = ?",
+                (s_name, lib_id)
+            ).fetchone()
+            if existing:
+                sid = existing["id"]
+            else:
+                db.execute("INSERT INTO series (name, library_id) VALUES (?, ?)",
+                           (s_name, lib_id))
+                db.commit()
+                sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            db.execute(
+                "INSERT OR IGNORE INTO book_series (book_id, series_id, series_index) VALUES (?, ?, ?)",
+                (book_id, sid, s_idx)
+            )
         db.commit()
 
         # Create initial reading for the new book
@@ -2912,10 +3623,36 @@ def new_book():
         "author", "genre", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
+    all_series = [dict(r) for r in db.execute(
+        "SELECT id, name FROM series WHERE library_id = ? ORDER BY name COLLATE NOCASE", (lib_id,)
+    ).fetchall()]
+
+    # Pre-fill for "new edition" flow
+    prefill = {}
+    parent_work_id = request.args.get("work_id", "").strip()
+    parent_book_name = ""
+    if parent_work_id:
+        primary = _get_primary_edition(db, parent_work_id)
+        if not primary:
+            # The parent book may not have a work_id yet; look up by book id
+            primary = db.execute("SELECT * FROM books WHERE id = ?", (parent_work_id,)).fetchone()
+            if primary:
+                primary = dict(primary)
+        if primary:
+            parent_book_name = primary.get("name", "")
+            for f in ("author", "original_title", "original_language",
+                      "original_publication_date", "genre", "summary",
+                      "illustrator", "editor", "prologue_author"):
+                prefill[f] = primary.get(f, "")
+
     return render_template("new_book.html",
                            purchase_sources=purchase_sources, borrow_sources=borrow_sources,
                            gift_sources=gift_sources,
-                           languages=languages, suggestions=suggestions)
+                           languages=languages, suggestions=suggestions,
+                           all_series=all_series,
+                           prefill=prefill,
+                           parent_work_id=parent_work_id,
+                           parent_book_name=parent_book_name)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3221,6 +3958,23 @@ def delete_book(book_id: str):
     }
     session["deleted_book_backup"] = backup
     session.modified = True
+
+    # Edition handling: if deleting a primary edition, promote another
+    wid = book_dict.get("work_id")
+    if wid and book_dict.get("is_primary_edition"):
+        other = db.execute(
+            "SELECT id FROM books WHERE work_id = ? AND id != ? LIMIT 1",
+            (wid, book_id),
+        ).fetchone()
+        if other:
+            db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (other["id"],))
+            # If only one edition remains after deletion, dissolve the group
+            remaining = db.execute(
+                "SELECT COUNT(*) AS c FROM books WHERE work_id = ? AND id != ?",
+                (wid, book_id),
+            ).fetchone()["c"]
+            if remaining == 1:
+                db.execute("UPDATE books SET work_id = NULL WHERE work_id = ? AND id != ?", (wid, book_id))
     
     # Delete from DB
     db.execute("DELETE FROM readings WHERE book_id = ?", (book_id,))
@@ -3253,8 +4007,8 @@ def undo_delete_book():
                 publisher, genre, summary, translator, illustrator, editor, prologue_author,
                 status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
                 borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-                library_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                library_id, work_id, is_primary_edition)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (book.get("id"), book.get("name"), book.get("subtitle", ""), book.get("slug"), book.get("author"),
              book.get("language"), book.get("original_title"), book.get("original_language"),
@@ -3267,7 +4021,7 @@ def undo_delete_book():
              book.get("borrowed_start"), book.get("borrowed_end"), book.get("is_gift"),
              book.get("has_cover"), book.get("cover"), book.get("cover_color"),
              book.get("cover_palette"), book.get("cover_hash"),
-             book.get("library_id"))
+             book.get("library_id"), book.get("work_id"), book.get("is_primary_edition", 1))
         )
         
         # Re-insert readings
@@ -3333,6 +4087,9 @@ if __name__ == "__main__":
     migrate_add_photo_hash()    # Add photo_hash column to authors if needed
     migrate_add_subtitle()      # Add subtitle column to books if needed
     migrate_add_libraries()     # Add libraries table and library_id columns
+    migrate_add_series()        # Add series table and series columns
+    migrate_book_series_m2m()   # Add book_series junction table (many-to-many)
+    migrate_add_editions()      # Add work_id / is_primary_edition columns
     app.run(
         debug=True,
         port=5000,

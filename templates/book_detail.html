@@ -51,6 +51,16 @@
                 <div class="meta-label" data-i18n="book.genre">Genre</div>
                 <div class="meta-value">{{ info.get('genre', '—') }}</div>
             </div>
+            {% if series_list_book %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.series">Series</div>
+                <div class="meta-value">
+                    {% for si in series_list_book %}
+                    <a href="{{ url_for('series_detail', series_id=si.id) }}" style="color: var(--an-orange); text-decoration: none;">{{ si.name }}</a>{% if si.series_index %}<span style="color: var(--an-text-light);"> #{{ si.series_index }}</span>{% endif %}{% if not loop.last %}<span style="color: var(--an-text-light);"> · </span>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.language">Language</div>
                 <div class="meta-value">{{ info.get('language', '—') }}</div>
@@ -237,7 +247,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <h2>Readings</h2>
 <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
     {% for rd in readings %}
-    <div class="card" style="flex: 1; min-width: 200px; max-width: 350px; {{ 'border-left: 3px solid var(--an-deep-orange);' if rd.id == current_reading_id else '' }}">
+    <a href="{{ url_for('book_detail', book_id=book_id, reading=rd.reading_number) }}" style="text-decoration: none; color: inherit; flex: 1; min-width: 200px; max-width: 350px;">
+    <div class="card" style="height: 100%; {{ 'border-left: 3px solid var(--an-deep-orange);' if rd.id == current_reading_id else '' }}{{ 'cursor: pointer;' if has_multiple_readings else '' }}">
         <div class="card-body" style="padding: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <strong style="color: var(--an-deep-orange);">Reading #{{ rd.reading_number }}</strong>
@@ -259,18 +270,20 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% if readings | length > 1 %}
             <div style="margin-top: 0.5rem; text-align: right;">
                 <form method="POST" action="{{ url_for('delete_reading', book_id=book_id, reading_id=rd.id) }}" style="display:inline;"
+                      onclick="event.stopPropagation(); event.preventDefault();"
                       onsubmit="return confirm('Delete Reading #{{ rd.reading_number }} and all its sessions/periods? This cannot be undone.');">
-                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;">🗑️ Delete</button>
+                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;" onclick="event.stopPropagation(); this.closest('form').requestSubmit();">🗑️ Delete</button>
                 </form>
             </div>
             {% endif %}
         </div>
     </div>
+    </a>
     {% endfor %}
 </div>
 {% endif %}
 <!-- ── Reading statistics summary ────────────────────────────────────── -->
-<h2 data-i18n="book.readingStats">Reading Stats</h2>{% if readings | length > 1 %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Current Reading #{{ readings[-1].reading_number }})</span>{% endif %}</h2>
+<h2 data-i18n="book.readingStats">Reading Stats</h2>{% if readings | length > 1 %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}
 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">    {% if date_started and info.get('status') in ('reading', 'finished') %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
@@ -411,18 +424,27 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <div style="position: absolute; left: calc({{ m.offset }} / {{ book_gantt.total_days }} * 100%); font-size: 0.7rem; color: var(--an-text-light); white-space: nowrap;">{{ m.label }}</div>
                 {% endfor %}
             </div>
-            <!-- Bar -->
-            <div style="position: relative; height: 22px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px; overflow: hidden;">
-                {# Idle span (full extent, light colour) #}
-                <div style="position: absolute; left: 0; width: 100%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.15;"></div>
-                {# Active segments (full colour) #}
-                {% for seg in book_gantt.segments %}
-                {% set seg_left = seg.start / book_gantt.total_days * 100 %}
-                {% set seg_width_raw = (seg.end - seg.start + 1) / book_gantt.total_days * 100 %}
-                {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
-                <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.85;"></div>
-                {% endfor %}
+            <!-- Per-reading bars -->
+            {% for rbar in book_gantt.readings %}
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: {{ '0.35rem' if not loop.last else '0' }};">
+                {% if book_gantt.readings | length > 1 %}
+                <div style="font-size: 0.7rem; color: var(--an-text-light); min-width: 1.5rem; text-align: right;">#{{ rbar.reading_number }}</div>
+                {% endif %}
+                <div style="flex: 1; position: relative; height: 22px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px; overflow: hidden;">
+                    {# Idle span covering this reading's range #}
+                    {% set idle_left = rbar.start_day / book_gantt.total_days * 100 %}
+                    {% set idle_width = (rbar.end_day - rbar.start_day + 1) / book_gantt.total_days * 100 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(idle_left) }}%; width: {{ "%.2f" | format(idle_width) }}%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.15;"></div>
+                    {# Active segments (full colour) #}
+                    {% for seg in rbar.segments %}
+                    {% set seg_left = seg.start / book_gantt.total_days * 100 %}
+                    {% set seg_width_raw = (seg.end - seg.start + 1) / book_gantt.total_days * 100 %}
+                    {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ book_gantt.color }}; border-radius: 3px; opacity: 0.85;"></div>
+                    {% endfor %}
+                </div>
             </div>
+            {% endfor %}
             <!-- Date range label -->
             <div style="display: flex; justify-content: space-between; margin-top: 0.35rem; font-size: 0.75rem; color: var(--an-text-light);">
                 <span>{{ book_gantt.start_label }}</span>
@@ -434,15 +456,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 
 <!-- ── Sessions table ────────────────────────────────────────────────── -->
-<h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);" data-i18n="book.allReadings">(all readings)</span>{% endif %}</h2>
+<h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
-{% if all_sessions %}
+{% if sessions %}
 <div class="table-wrap">
     <table>
         <thead>
             <tr>
                 <th>#</th>
-                {% if has_multiple_readings %}<th data-i18n="book.colReading">Reading</th>{% endif %}
                 <th data-i18n="book.colDate">Date</th>
                 <th data-i18n="book.colPages">Pages</th>
                 <th data-i18n="book.colDuration">Duration</th>
@@ -450,10 +471,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </tr>
         </thead>
         <tbody>
-            {% for s in all_sessions %}
+            {% for s in sessions %}
             <tr id="session-row-{{ s.id }}">
                 <td>{{ loop.index }}</td>
-                {% if has_multiple_readings %}<td>#{{ reading_num_map.get(s.reading_id, '?') }}</td>{% endif %}
                 <td>{{ s.date | date_ddmmyyyy }}</td>
                 <td>{{ s.pages }}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
@@ -466,7 +486,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </td>
             </tr>
             <tr class="session-edit-row" id="session-edit-{{ s.id }}">
-                <td colspan="{{ 6 if has_multiple_readings else 5 }}">
+                <td colspan="5">
                     <form method="POST" action="{{ url_for('edit_session', book_id=book_id, idx=s.id) }}" class="inline-form">
                         <label>Date</label>
                         <input type="text" name="date" value="{{ s.date }}" class="date-input" required>
@@ -524,16 +544,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 
 <!-- ── Reading Periods panel ─────────────────────────────────────────── -->
-<h2><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);" data-i18n="book.allReadings">(all readings)</span>{% endif %}</h2>
+<h2><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 <p style="color: var(--an-text-light); font-size: 0.9rem; margin-top: 0;" data-i18n="book.periodsDesc">Date ranges when you read this book without detailed session tracking. Reading time is inferred from your tracked sessions' average speed.</p>
 
-{% if all_periods %}
+{% if reading_periods %}
 <div class="table-wrap">
     <table>
         <thead>
             <tr>
                 <th>#</th>
-                {% if has_multiple_readings %}<th data-i18n="book.colReading">Reading</th>{% endif %}
                 <th data-i18n="book.colStartDate">Start Date</th>
                 <th data-i18n="book.colEndDate">End Date</th>
                 <th data-i18n="book.colPages">Pages</th>
@@ -542,10 +561,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </tr>
         </thead>
         <tbody>
-            {% for p in all_periods %}
+            {% for p in reading_periods %}
             <tr id="period-row-{{ p.id }}">
                 <td>{{ loop.index }}</td>
-                {% if has_multiple_readings %}<td>#{{ reading_num_map.get(p.reading_id, '?') }}</td>{% endif %}
                 <td>{{ p.start_date | date_ddmmyyyy or '—' }}</td>
                 <td>{{ p.end_date | date_ddmmyyyy or '—' }}</td>
                 <td>{{ p.pages }}</td>
@@ -559,7 +577,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </td>
             </tr>
             <tr class="session-edit-row" id="period-edit-{{ p.id }}">
-                <td colspan="{{ 7 if has_multiple_readings else 6 }}">
+                <td colspan="6">
                     <form method="POST" action="{{ url_for('edit_reading_period', book_id=book_id, idx=p.id) }}" class="inline-form">
                         <label>Start</label>
                         <input type="text" name="start_date" value="{{ p.start_date or '' }}" class="date-input" style="width:150px;">
@@ -607,6 +625,78 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <button type="submit" class="btn btn-primary" data-i18n="book.addPeriodBtn">+ Add Reading Period</button>
         </div>
     </form>
+</div>
+
+<!-- ── Editions ────────────────────────────────────────────────────────── -->
+{% if editions and editions | length > 1 %}
+<h2 data-i18n="book.editions">Editions</h2>
+<div style="font-size: 0.9rem; color: var(--an-text-light); margin-bottom: 0.75rem;">
+    <span data-i18n="book.editionsTotalReadings">Total readings across all editions:</span> <strong style="color: var(--an-deep-orange);">{{ work_total_readings }}</strong>
+</div>
+<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    {% for ed in editions %}
+    <div class="card" style="flex: 0 0 auto; min-width: 180px; max-width: 260px; {{ 'border: 2px solid var(--an-deep-orange);' if ed.id == book_id else 'opacity: 0.85;' }}">
+        <div class="card-body" style="padding: 0.75rem;">
+            {% if ed.id == book_id %}
+            <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--an-deep-orange); font-weight: 700; margin-bottom: 0.25rem;" data-i18n="book.currentEdition">Current</div>
+            {% endif %}
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                {% if ed.id != book_id %}<a href="{{ url_for('book_detail', book_id=ed.id) }}" style="color: var(--an-orange); text-decoration: none;">{% endif %}
+                {{ ed.name }}
+                {% if ed.id != book_id %}</a>{% endif %}
+            </div>
+            <div style="font-size: 0.85rem; color: var(--an-text-light);">
+                {% if ed.language %}{{ ed.language }}{% endif %}
+                {% if ed.publisher %} · {{ ed.publisher }}{% endif %}
+                {% if ed.pages %} · {{ ed.pages }}p{% endif %}
+            </div>
+            {% if ed.is_primary_edition and editions | length > 1 %}
+            <span class="badge" style="background: var(--an-deep-orange); color: white; font-size: 0.7rem; margin-top: 0.35rem;" data-i18n="book.primaryEdition">Primary</span>
+            {% endif %}
+            {% if ed.id != book_id %}
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                {% if not ed.is_primary_edition %}
+                <form method="POST" action="{{ url_for('set_primary_edition', book_id=ed.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.setPrimary">Set Primary</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="{{ url_for('unlink_edition', book_id=ed.id) }}" style="display:inline;"
+                      onsubmit="return confirm('Remove this edition from the group?');">
+                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.unlinkEdition">Unlink</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    <a href="{{ url_for('new_book', work_id=book_id) }}" class="btn btn-secondary btn-sm" data-i18n="book.addNewEdition">📗 Add New Edition</a>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('linkEditionModal').classList.add('active')" data-i18n="book.linkExistingEdition">🔗 Link Existing Book as Edition</button>
+</div>
+
+<!-- Link edition modal -->
+<div class="modal-overlay" id="linkEditionModal">
+    <div class="modal-box">
+        <h3 data-i18n="book.linkEditionTitle">Link Existing Book as Edition</h3>
+        <form method="POST" action="{{ url_for('link_edition', book_id=book_id) }}">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label data-i18n="book.selectBookToLink">Select a book to link:</label>
+                <select name="target_book_id" class="form-control" required>
+                    <option value="">— Select —</option>
+                    {% for lb in all_linkable_books %}
+                    <option value="{{ lb.id }}">{{ lb.name }}{% if lb.language %} ({{ lb.language }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary" data-i18n="book.linkBtn">Link</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('linkEditionModal').classList.remove('active')" data-i18n="form.cancel">Cancel</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- ── Delete confirmation modal ─────────────────────────────────────── -->

@@ -1,91 +1,193 @@
 # Ashinami
 
 A Flask-based personal book reading tracker and statistics application.
+Track books, sessions, ratings, series, authors, and reading habits —
+all stored locally in a single SQLite database.
 
 ## Running the Project
 
 ### Prerequisites
+
 - Python 3.12+
-- Flask 3.1.2
+- pip
 
 ### Installation
 
-1. Navigate to the project directory:
-```powershell
-cd 'c:\Users\Joaquin\Joaquín Dropbox\JqnOC\Ashinami'
-```
-
-2. Install dependencies (optional, if not already installed):
 ```powershell
 pip install -r requirements.txt
 ```
 
 ### Start the Application
 
-Run the Flask development server:
 ```powershell
 python app.py
 ```
 
-The application will start on **http://127.0.0.1:5000**
+Or on Windows, double-click `run-ashinami.bat` to start the server and
+open the browser automatically.
 
-Open your browser and navigate to that URL to access Ashinami.
+The application runs at **http://127.0.0.1:5000** (localhost only).
 
 ## Features
 
-- **Library Management**: Add, edit, and organize your book collection with multiple view modes (card, cover, list)
-- **Reading Tracking**: Log reading sessions with date, pages read, and duration (hours/minutes/seconds)
-- **Reading Periods**: Track date ranges of reading without detailed session logging; reading time is inferred from session averages
-- **Statistics**: View cumulative and per-day reading progress charts, pages and books finished by year
-- **Book Metadata**: Track author, publication dates, languages, ISBN, cover images, and other details
-- **Rating System**: Multi-dimensional book ratings across 7 categories (Emotional Impact, Story & Plot, Writing & Style, etc.) with grouped averages
-- **Source Management**: Maintain a database of places where you purchased or borrowed books
-- **Status Tracking**: Categorize books as Reading, Finished, Not Started, or Abandoned
-- **Author Pages**: Browse books grouped by author
-- **Language Support**: Autocomplete for work and original languages with new language addition
-- **Automatic Backups**: Daily database backup with integrity checks and automatic recovery
+### Library Management
+
+- Add, edit, and organise books with cover images, metadata, and notes
+- Three view modes: **card**, **cover**, and **list**
+- Filter and sort by status, genre, language, author, source, and series
+- **Multi-library** support — create separate libraries and switch between
+  them from the navbar
+- Soft-delete with undo
+
+### Reading Tracking
+
+- **Sessions**: log date, page range, and duration (hours / minutes / seconds)
+- **Periods**: track date ranges without detailed session data; reading
+  time is inferred from session averages
+- **Re-reads**: start a new reading of the same book; each reading has its
+  own sessions and periods
+
+### Multi-Edition System
+
+- Link multiple editions of the same work (e.g. hardcover + ebook)
+- Mark one edition as primary — only the primary appears in library
+  listings
+- Unlink editions at any time
+
+### Five Book Statuses
+
+| Status | Colour |
+|--------|--------|
+| Reading | Blue (#3B82F6) |
+| Finished | Green (#10B981) |
+| Not Started | Purple (#8B5CF6) |
+| Abandoned | Red (#DC2626) |
+| Draft | Grey (#6B7280) |
+
+### Rating System
+
+39 dimensions across 7 groups, each rated 1–10:
+
+1. **Emotional Impact** — heartfelt, tear, inspiring, melancholy,
+   nostalgia, cathartic
+2. **Story & Plot** — plot quality, predictability, pacing, plot twists,
+   worldbuilding, character arc
+3. **Writing & Style** — writing quality, vocabulary gain, dialogue,
+   voice, symbolism, editorial quality
+4. **Genre-Specific** — suspense, thrill, humor, romance, mystery, horror
+5. **Engagement** — addiction, afterglow, rereadability, originality
+6. **Intellectual** — thought-provoking, complexity, historical/cultural
+   value, argumentation, clarity
+7. **Non-Fiction** — research depth, accuracy, evidence, practicality,
+   objectivity, relevance
+
+Overall score is the **grouped average**: average of each non-empty
+group's average, so groups with fewer ratings are not under-weighted.
+
+### Series
+
+- Create named series and assign books with position numbers
+- Many-to-many: a book can belong to multiple series
+- Series list and detail pages with reading progress
+
+### Authors
+
+- Dedicated author pages with bio and photo (stored in DB)
+- HEIF/AVIF photo support via pillow-heif
+- Browse all books by a specific author
+
+### Sources
+
+- Track where books were acquired (bookshop, library, gift, etc.)
+- Store name, type, city, country, URL, and notes for each source
+
+### Statistics
+
+- **Global stats** (`/stats`): pages and books finished by year,
+  status breakdown pie chart, genre / language / publisher / author bar
+  charts, rating distribution (KDE), status timeline stacked area chart
+  with absolute / relative toggle
+- **Yearly stats** (`/stats/year/<year>`): Gantt chart showing reading
+  timelines per book, cumulative pages chart, per-book cumulative pages
+- **Yearly books** (`/stats/year/<year>/books`): grid of books finished
+  in a given year
+- **Activity dashboard** (`/activity`): calendar heatmap, streak
+  tracking, per-day and per-week reading activity
+
+### Theming
+
+Six colour palettes, switchable from the navbar:
+
+| Key | Name |
+|-----|------|
+| *(default)* | Orange |
+| `green` | Mori |
+| `hone` | Hone **(default)** |
+| `kawara` | Kawara |
+| `umi` | Umi |
+| `hinode` | Hinode |
+
+Palettes override CSS custom properties (prefixed `--an-`). Chart
+colours update automatically.
+
+### Internationalisation
+
+- **English** and **Spanish** — toggle from the navbar
+- Translations in `static/i18n.js`, applied via `data-i18n` attributes
+- Language preference persisted in `localStorage`
+
+### Data Safety
+
+- **Integrity check** on every startup; automatic restore from backup
+  if the database is corrupted
+- **Daily backups** using SQLite's Online Backup API (last 5 kept)
+- Database uses WAL mode for safe concurrent reads
 
 ## Data Storage
 
-All data (including cover images) is stored in a single SQLite database at `data/ashinami.db`. No external database server is required.
-
-### Automatic Backups
-
-Every time the application starts, a daily backup of the database is created in `data/backups/`. Only the last 5 backups are kept; older ones are automatically deleted. Backups use SQLite's Online Backup API, so they are always consistent even if the database is in use.
+All data — including cover images and author photos — lives in a single
+SQLite file at `data/ashinami.db`. No external database server required.
 
 ## Project Structure
 
 ```
 Ashinami/
-├── app.py              # Flask application and routes
-├── requirements.txt    # Python dependencies
-├── README.md           # This file
-├── templates/          # Jinja2 HTML templates
-│   ├── base.html
-│   ├── index.html          # Library page (card/cover/list views)
-│   ├── book_detail.html    # Book detail, sessions, periods, ratings
-│   ├── edit_metadata.html  # Edit book metadata
-│   ├── new_book.html       # Add a new book
-│   ├── sources.html        # Source management
-│   ├── authors.html        # Authors list
-│   ├── author_detail.html  # Books by a specific author
-│   ├── stats.html          # Global reading statistics
-│   ├── stats_year.html     # Yearly stats with charts
-│   └── stats_year_books.html # Books finished in a year
+├── app.py                    # Entire Flask application (~4 500+ lines)
+├── requirements.txt          # Python dependencies
+├── run-ashinami.bat          # Windows launcher
+├── README.md
+├── .github/
+│   └── copilot-instructions.md
 ├── static/
-│   ├── style.css           # Stylesheet
-│   ├── favicon.ico
-│   ├── logo.png
-│   └── logo.svg
-└── data/               # Data storage
-    ├── ashinami.db     # SQLite database
-    └── backups/        # Daily automatic backups
+│   ├── style.css             # Stylesheet (6 palettes, layout, components)
+│   └── i18n.js               # EN / ES translations
+├── templates/
+│   ├── base.html             # Base layout (navbar, palette switcher, CDNs)
+│   ├── index.html            # Library (card / cover / list views)
+│   ├── book_detail.html      # Book detail, sessions, periods, ratings
+│   ├── edit_metadata.html    # Edit book form
+│   ├── new_book.html         # Add book form
+│   ├── stats.html            # Global statistics dashboard
+│   ├── stats_year.html       # Yearly stats with Gantt charts
+│   ├── stats_year_books.html # Books finished in a year
+│   ├── activity.html         # Activity dashboard
+│   ├── authors.html          # Authors list
+│   ├── author_detail.html    # Author detail
+│   ├── edit_author.html      # Edit author form
+│   ├── sources.html          # Source management
+│   └── series pages          # (rendered via series list/detail routes)
+└── data/
+    ├── ashinami.db           # SQLite database (gitignored)
+    └── backups/              # Automatic daily backups
 ```
 
 ## Technologies
 
-- **Backend**: Flask 3.1.2
-- **Frontend**: HTML5, CSS3, JavaScript (ES6)
-- **Charts**: Chart.js 4.4.1 (CDN)
-- **Storage**: SQLite (single-file database)
-- **Python Version**: 3.12
+| Layer | Technology |
+|-------|-----------|
+| Backend | Flask 3.x, Python 3.12+ |
+| Database | SQLite (raw SQL, WAL mode) |
+| Templates | Jinja2 |
+| Frontend | HTML5, CSS3, vanilla JavaScript (ES6) |
+| Charts | Chart.js 4.4.1 (CDN) + chartjs-adapter-date-fns |
+| Images | Pillow 10.x, pillow-heif 0.16+ (HEIF/AVIF support) |

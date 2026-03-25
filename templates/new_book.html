@@ -8,7 +8,20 @@
 
 <h1 data-i18n="bookForm.addNewBook">Add New Book</h1>
 
+{% if parent_work_id %}
+<div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--an-deep-orange);">
+    <div class="card-body" style="padding: 0.75rem 1rem;">
+        <strong data-i18n="bookForm.addingEditionOf">Adding new edition of:</strong>
+        <span style="color: var(--an-deep-orange); font-weight: 600;">{{ parent_book_name }}</span>
+        <div style="font-size: 0.85rem; color: var(--an-text-light); margin-top: 0.25rem;" data-i18n="bookForm.editionHint">Work-level fields (author, original work info, genre) are pre-filled. Edition-level fields (language, publisher, pages, cover) are for this specific edition.</div>
+    </div>
+</div>
+{% endif %}
+
 <form method="POST" enctype="multipart/form-data" action="{{ url_for('new_book') }}">
+    {% if parent_work_id %}
+    <input type="hidden" name="work_id" value="{{ parent_work_id }}">
+    {% endif %}
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
             <h3 style="margin-top:0;" data-i18n="bookForm.basicInfo">Basic Information</h3>
@@ -23,7 +36,7 @@
                 </div>
                 <div class="form-group">
                     <label for="author" data-i18n="bookForm.authorReq">Author(s) *</label>
-                    <input type="text" id="author" name="author" class="form-control" list="author-list" required>
+                    <input type="text" id="author" name="author" class="form-control" list="author-list" required value="{{ prefill.get('author', '') }}">
                     <datalist id="author-list">
                         {% for v in suggestions.author %}<option value="{{ v }}">{% endfor %}
                     </datalist>
@@ -32,7 +45,7 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="genre" data-i18n="bookForm.genre">Genre</label>
-                    <input type="text" id="genre" name="genre" class="form-control" list="genre-list">
+                    <input type="text" id="genre" name="genre" class="form-control" list="genre-list" value="{{ prefill.get('genre', '') }}">
                     <datalist id="genre-list">
                         {% for v in suggestions.genre %}<option value="{{ v }}">{% endfor %}
                     </datalist>
@@ -44,6 +57,7 @@
                         <option value="finished" data-i18n="bookForm.statusFinished">Finished</option>
                         <option value="not-started" selected data-i18n="bookForm.statusNotStarted">Not Started</option>
                         <option value="abandoned" data-i18n="bookForm.statusAbandoned">Abandoned</option>
+                        <option value="draft" data-i18n="bookForm.statusDraft">Draft</option>
                     </select>
                 </div>
             </div>
@@ -107,17 +121,17 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="original_title" data-i18n="bookForm.origTitle">Original Title</label>
-                    <input type="text" id="original_title" name="original_title" class="form-control">
+                    <input type="text" id="original_title" name="original_title" class="form-control" value="{{ prefill.get('original_title', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="original_language" data-i18n="bookForm.origLang">Original Language</label>
-                    <input type="text" id="original_language" name="original_language" class="form-control" list="language-list">
+                    <input type="text" id="original_language" name="original_language" class="form-control" list="language-list" value="{{ prefill.get('original_language', '') }}">
                 </div>
             </div>
             <div class="form-group">
                 <label for="original_publication_date" data-i18n="bookForm.origPubDate">Original Publication Date</label>
                 <input type="text" id="original_publication_date" name="original_publication_date" class="form-control"
-                       placeholder="e.g. 1835 or 1835-01-15">
+                       placeholder="e.g. 1835 or 1835-01-15" value="{{ prefill.get('original_publication_date', '') }}">
             </div>
         </div>
     </div>
@@ -135,7 +149,7 @@
                 </div>
                 <div class="form-group">
                     <label for="illustrator" data-i18n="bookForm.illustrator">Illustrator(s)</label>
-                    <input type="text" id="illustrator" name="illustrator" class="form-control" list="illustrator-list">
+                    <input type="text" id="illustrator" name="illustrator" class="form-control" list="illustrator-list" value="{{ prefill.get('illustrator', '') }}">
                     <datalist id="illustrator-list">
                         {% for v in suggestions.illustrator %}<option value="{{ v }}">{% endfor %}
                     </datalist>
@@ -144,14 +158,14 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="editor" data-i18n="bookForm.editor">Editor(s)</label>
-                    <input type="text" id="editor" name="editor" class="form-control" list="editor-list">
+                    <input type="text" id="editor" name="editor" class="form-control" list="editor-list" value="{{ prefill.get('editor', '') }}">
                     <datalist id="editor-list">
                         {% for v in suggestions.editor %}<option value="{{ v }}">{% endfor %}
                     </datalist>
                 </div>
                 <div class="form-group">
                     <label for="prologue_author" data-i18n="bookForm.prologueAuthor">Prologue Author(s)</label>
-                    <input type="text" id="prologue_author" name="prologue_author" class="form-control" list="prologue_author-list">
+                    <input type="text" id="prologue_author" name="prologue_author" class="form-control" list="prologue_author-list" value="{{ prefill.get('prologue_author', '') }}">
                     <datalist id="prologue_author-list">
                         {% for v in suggestions.prologue_author %}<option value="{{ v }}">{% endfor %}
                     </datalist>
@@ -162,9 +176,49 @@
 
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.seriesSection">Series</h3>
+            <datalist id="series-list">
+                {% for s in all_series %}<option value="{{ s.name }}">{% endfor %}
+            </datalist>
+            <template id="series-row-template">
+                <div class="form-row series-entry" style="align-items: flex-end; margin-bottom: 0.5rem;">
+                    <div class="form-group" style="flex: 2;">
+                        <label data-i18n="bookForm.seriesName">Series Name</label>
+                        <input type="text" name="series_name[]" class="form-control" list="series-list">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="bookForm.seriesIndex">Index in Series</label>
+                        <input type="text" name="series_index[]" class="form-control" placeholder="e.g. 1, 2.5">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto; padding-bottom: 0.1rem;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.series-entry').remove()" data-i18n="bookForm.seriesRemove">✕</button>
+                    </div>
+                </div>
+            </template>
+            <div id="series-entries">
+                <div class="form-row series-entry" style="align-items: flex-end; margin-bottom: 0.5rem;">
+                    <div class="form-group" style="flex: 2;">
+                        <label data-i18n="bookForm.seriesName">Series Name</label>
+                        <input type="text" name="series_name[]" class="form-control" list="series-list">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="bookForm.seriesIndex">Index in Series</label>
+                        <input type="text" name="series_index[]" class="form-control" placeholder="e.g. 1, 2.5">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto; padding-bottom: 0.1rem;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.series-entry').remove()" data-i18n="bookForm.seriesRemove">✕</button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-series-btn" data-i18n="bookForm.seriesAdd">+ Add Series</button>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
             <h3 style="margin-top:0;" data-i18n="bookForm.summary">Summary</h3>
             <div class="form-group">
-                <textarea id="summary" name="summary" class="form-control" rows="5"></textarea>
+                <textarea id="summary" name="summary" class="form-control" rows="5">{{ prefill.get('summary', '') }}</textarea>
             </div>
             <script>document.addEventListener('DOMContentLoaded',function(){window.ashinamiI18n.initRichTextToolbar('summary');});</script>
         </div>
@@ -304,5 +358,16 @@ function toggleGiftFields() {
     document.getElementById('source_id_gift').disabled = !isGift;
 }
 toggleSourceFields();
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('add-series-btn').addEventListener('click', function() {
+    var tmpl = document.getElementById('series-row-template');
+    var clone = tmpl.content.cloneNode(true);
+    document.getElementById('series-entries').appendChild(clone);
+    if (window.ashinamiI18n) window.ashinamiI18n.apply();
+});
 </script>
 {% endblock %}

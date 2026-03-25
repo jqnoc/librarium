@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <script>
         // Apply saved palette immediately before first paint
@@ -22,7 +22,7 @@
     <header class="site-header">
         <div class="header-inner">
             <div class="site-title">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Ashinami logo" class="site-logo">
+                <img src="{{ url_for('static', filename='logo.svg') }}" alt="Ashinami logo" class="site-logo">
                 <a href="{{ url_for('index') }}">Ashinami</a>
                 <form method="POST" action="{{ url_for('switch_library') }}" id="librarySwitchForm" class="library-selector-form">
                     <select name="library_id" id="librarySelector" onchange="document.getElementById('librarySwitchForm').submit()" title="Select library" data-i18n-title="library.select">
@@ -36,12 +36,13 @@
             <nav class="header-nav">
                 <a href="{{ url_for('index') }}" data-i18n="nav.library">Library</a>
                 <a href="{{ url_for('authors_list') }}" data-i18n="nav.authors">Authors</a>
+                <a href="{{ url_for('series_list') }}" data-i18n="nav.series">Series</a>
                 <a href="{{ url_for('global_stats') }}" data-i18n="nav.stats">Stats</a>
                 <a href="{{ url_for('activity') }}" data-i18n="nav.activity">Activity</a>
                 <a href="{{ url_for('sources_list') }}" data-i18n="nav.sources">Sources</a>
                 <a href="{{ url_for('new_book') }}" data-i18n="nav.addBook">+ Add Book</a>
                 <span class="lang-toggle"><button class="lang-btn" data-lang="en">EN</button><span class="lang-sep">|</span><button class="lang-btn" data-lang="es">ES</button></span>
-                <select id="palettePicker" onchange="applyPalette(this.value)" title="Color palette" style="margin-left:0.75rem; font-size:0.8rem; padding:0.2rem 0.4rem; border-radius:5px; border:1px solid rgba(255,255,255,.35); color:#fff; cursor:pointer;">
+                <select id="palettePicker" onchange="applyPalette(this.value)" title="Color palette" style="display:none; margin-left:0.75rem; font-size:0.8rem; padding:0.2rem 0.4rem; border-radius:5px; border:1px solid rgba(255,255,255,.35); color:#fff; cursor:pointer;">
                     <option value="orange" style="background:#FF5F00; color:#fff;">🟠 Ashinami</option>
                     <option value="green"  style="background:#1b3c10; color:#fff;">🟢 Mori</option>
                     <option value="hone"   style="background:#2a4a5a; color:#fff;">🩵 Hone</option>
@@ -60,7 +61,7 @@
         };
         (function() {
             var sel = document.getElementById('palettePicker');
-            var saved = localStorage.getItem('ashinami_palette') || 'orange';
+            var saved = localStorage.getItem('ashinami_palette') || 'hone';
             sel.value = saved;
             sel.style.background = _paletteColors[saved] || '#FF5F00';
         })();

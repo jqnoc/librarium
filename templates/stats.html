@@ -24,6 +24,25 @@
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Stats                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ── Status timeline (stacked area) ────────────────────────────────── -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+            <h3 style="margin:0; color: var(--an-deep-orange);" data-i18n="stats.statusTimeline">Books by Status Over Time</h3>
+            <div style="display:flex; gap:1rem; align-items:center;">
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--an-text-light); font-size:0.9rem;">
+                    <input type="radio" name="timelineMode" value="absolute" checked> <span data-i18n="stats.timelineAbsolute">Absolute</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--an-text-light); font-size:0.9rem;">
+                    <input type="radio" name="timelineMode" value="relative"> <span data-i18n="stats.timelineRelative">Relative (%)</span>
+                </label>
+            </div>
+        </div>
+        <canvas id="statusTimeline" style="width: 100%;"></canvas>
+    </div>
+</div>
+
 <h2 style="color: var(--an-deep-orange); margin-top: 2.5rem; margin-bottom: 1.5rem;" data-i18n="stats.libraryStats">Library Stats 📊</h2>
 
 <!-- Summary cards row -->
@@ -185,6 +204,7 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script>
 {% if years %}
 const years = {{ years | tojson }};
@@ -693,6 +713,126 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
 
     // initial load (All)
     loadLibraryCum(yearSelect ? yearSelect.value : '');
+})();
+
+// ═══════════════════════════════════════════════════════════════════════
+// Status timeline – stacked area chart
+// ═══════════════════════════════════════════════════════════════════════
+(async function() {
+    const canvas = document.getElementById('statusTimeline');
+    if (!canvas) return;
+    try {
+        const res = await fetch('/api/status_timeline');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.dates || data.dates.length === 0) {
+            canvas.parentElement.innerHTML = '<p style="color:var(--an-muted);text-align:center;">Not enough data yet.</p>';
+            return;
+        }
+
+        const STATUS_CFG = [
+            { key: 'finished',    label: 'Finished',    color: cssVar('--an-finished')    || '#10B981' },
+            { key: 'reading',     label: 'Reading',     color: cssVar('--an-reading')     || '#3B82F6' },
+            { key: 'not-started', label: 'Not Started', color: cssVar('--an-not-started') || '#8B5CF6' },
+            { key: 'draft',       label: 'Draft',       color: cssVar('--an-draft')       || '#6B7280' },
+            { key: 'abandoned',   label: 'Abandoned',   color: cssVar('--an-abandoned')   || '#DC2626' },
+        ];
+
+        // Pre-compute totals per date index
+        const totals = data.dates.map((_, i) =>
+            STATUS_CFG.reduce((s, cfg) => s + ((data.series[cfg.key] || [])[i] || 0), 0)
+        );
+
+        function makeDatasets(relative) {
+            return STATUS_CFG.map(cfg => ({
+                label: cfg.label,
+                data: data.dates.map((d, i) => {
+                    const raw = (data.series[cfg.key] || [])[i] || 0;
+                    return { x: d, y: relative ? (totals[i] > 0 ? raw / totals[i] * 100 : 0) : raw };
+                }),
+                borderColor: cfg.color,
+                backgroundColor: cfg.color + '55',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHitRadius: 6,
+                borderWidth: 1.5,
+            }));
+        }
+
+        let isRelative = false;
+
+        const chart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { datasets: makeDatasets(false) },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 3,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 16 }
+                    },
+                    tooltip: {
+                        ...TOOLTIP_OPTS,
+                        callbacks: {
+                            title(items) {
+                                if (!items.length) return '';
+                                const d = new Date(items[0].parsed.x);
+                                return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+                            },
+                            label(ctx) {
+                                if (isRelative) {
+                                    return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`;
+                                }
+                                return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+                            },
+                            footer(items) {
+                                if (isRelative) return '';
+                                const total = items.reduce((s, it) => s + it.parsed.y, 0);
+                                return `Total: ${total}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'month', tooltipFormat: 'PP' },
+                        ticks: { color: '#6B7280', maxTicksLimit: 14 },
+                        grid: { display: false }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#6B7280',
+                            callback: function(v) {
+                                if (isRelative) return v + '%';
+                                return Number.isInteger(v) ? v : null;
+                            }
+                        },
+                        max: undefined,
+                        grid: { color: 'rgba(229,231,235,0.5)' }
+                    }
+                }
+            }
+        });
+
+        document.querySelectorAll('input[name="timelineMode"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                isRelative = this.value === 'relative';
+                chart.data.datasets = makeDatasets(isRelative);
+                chart.options.scales.y.max = isRelative ? 100 : undefined;
+                chart.options.scales.y.ticks.stepSize = isRelative ? 10 : 1;
+                chart.update();
+            });
+        });
+    } catch (e) {
+        console.error('Error loading status timeline', e);
+    }
 })();
 
 </script>

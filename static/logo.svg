@@ -1,27 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
   <defs>
-    <!-- Main radial gradient: deep-orange core → amber rim -->
     <radialGradient id="bg" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#FF8C00"/>
-      <stop offset="100%" stop-color="#FF5F00"/>
+      <stop offset="0%" stop-color="#3a6a7a"/>
+      <stop offset="100%" stop-color="#2a4a5a"/>
     </radialGradient>
-    <!-- Subtle inner glow for depth -->
     <radialGradient id="glow" cx="50%" cy="40%" r="50%">
-      <stop offset="0%"   stop-color="#FFD400" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#FFD400" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#EC8F8D" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#EC8F8D" stop-opacity="0"/>
     </radialGradient>
-    <!-- Thin gold ring gradient -->
     <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#FFD400"/>
-      <stop offset="50%"  stop-color="#FFC300"/>
-      <stop offset="100%" stop-color="#FF8C00"/>
+      <stop offset="0%" stop-color="#EC8F8D"/>
+      <stop offset="50%" stop-color="#44A194"/>
+      <stop offset="100%" stop-color="#537D96"/>
     </linearGradient>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#FF5F00" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#2a4a5a" flood-opacity="0.45"/>
     </filter>
   </defs>
 
-  <!-- Outer gold ring -->
+  <!-- Outer ring -->
   <circle cx="100" cy="100" r="97" fill="none" stroke="url(#ring)" stroke-width="3"/>
 
   <!-- Main disc -->
@@ -30,25 +27,39 @@
   <!-- Inner glow overlay -->
   <circle cx="100" cy="100" r="94" fill="url(#glow)"/>
 
-  <!-- Hairline inner ring for polish -->
-  <circle cx="100" cy="100" r="86" fill="none" stroke="#FFD400" stroke-width="1" stroke-opacity="0.5"/>
+  <!-- Hairline inner ring -->
+  <circle cx="100" cy="100" r="86" fill="none" stroke="#44A194" stroke-width="1" stroke-opacity="0.5"/>
 
-  <!-- Japanese characters 足並 -->
-  <text
-    x="100" y="118"
-    font-family="'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Serif JP', serif"
-    font-size="72"
-    font-weight="700"
-    text-anchor="middle"
-    fill="#1A1A2E"
-    fill-opacity="0.15"
-    letter-spacing="2">足並</text>
-  <text
-    x="100" y="116"
-    font-family="'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Serif JP', serif"
-    font-size="72"
-    font-weight="700"
-    text-anchor="middle"
-    fill="#FFFFFF"
-    letter-spacing="2">足並</text>
+  <!-- Book stack icon -->
+  <!-- Bottom book (coral) -->
+  <rect x="55" y="118" width="90" height="16" rx="2" fill="#EC8F8D" opacity="0.95"/>
+  <rect x="55" y="118" width="6" height="16" rx="1" fill="#d87573"/>
+
+  <!-- Middle book (teal) -->
+  <rect x="60" y="98" width="80" height="16" rx="2" fill="#44A194" opacity="0.95"/>
+  <rect x="60" y="98" width="6" height="16" rx="1" fill="#37877a"/>
+
+  <!-- Top book (slate blue) -->
+  <rect x="52" y="78" width="96" height="16" rx="2" fill="#537D96" opacity="0.95"/>
+  <rect x="52" y="78" width="6" height="16" rx="1" fill="#436a80"/>
+
+  <!-- Open book on top -->
+  <!-- Left page -->
+  <path d="M100 52 Q80 56 68 62 L68 76 Q80 70 100 66 Z" fill="#F4F0E4" opacity="0.92"/>
+  <!-- Right page -->
+  <path d="M100 52 Q120 56 132 62 L132 76 Q120 70 100 66 Z" fill="#e8e4d8" opacity="0.92"/>
+  <!-- Spine line -->
+  <line x1="100" y1="52" x2="100" y2="66" stroke="#2a4a5a" stroke-width="1.5" stroke-opacity="0.5"/>
+  <!-- Page lines left -->
+  <line x1="78" y1="62" x2="96" y2="57" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+  <line x1="76" y1="66" x2="96" y2="60" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+  <line x1="74" y1="70" x2="96" y2="63" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+  <!-- Page lines right -->
+  <line x1="104" y1="57" x2="122" y2="62" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+  <line x1="104" y1="60" x2="124" y2="66" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+  <line x1="104" y1="63" x2="126" y2="70" stroke="#537D96" stroke-width="0.7" stroke-opacity="0.4"/>
+
+  <!-- Small text label -->
+  <text x="100" y="154" font-family="'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600"
+    text-anchor="middle" fill="#F4F0E4" fill-opacity="0.7" letter-spacing="3">ASHINAMI</text>
 </svg>

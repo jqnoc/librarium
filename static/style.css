@@ -25,6 +25,7 @@
     --an-finished:      #10B981;
     --an-not-started:   #8B5CF6;
     --an-abandoned:     #DC2626;
+    --an-draft:          #6B7280;
 
     --an-gradient:      linear-gradient(135deg, var(--an-deep-orange) 0%, var(--an-orange) 50%, var(--an-amber) 100%);
     --an-gradient-dark: linear-gradient(135deg, #1A1A2E 0%, var(--an-deep-orange) 100%);
@@ -533,6 +534,7 @@ h3 {
 .badge.status-finished   { background: #ECFDF5; color: var(--an-finished);    border-color: #A7F3D0; }
 .badge.status-not-started{ background: #F3E8FF; color: var(--an-not-started); border-color: #DDD6FE; }
 .badge.status-abandoned  { background: #FEF2F2; color: var(--an-abandoned);   border-color: #FECACA; }
+.badge.status-draft      { background: #F3F4F6; color: var(--an-draft);       border-color: #D1D5DB; }
 
 /* ── Book detail layout ────────────────────────────────────────────────── */
 .book-hero {
@@ -1347,3 +1349,29 @@ select.form-control { cursor: pointer; }
     .library-charts-grid { grid-template-columns: 1fr; }
     .library-charts-stack > .card { margin-bottom: 0; }
 }
+
+/* ── Series ────────────────────────────────────────────────────────────── */
+.series-view-btn {
+    background: transparent;
+    border: 1px solid var(--an-border);
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--an-text-light);
+    transition: background .15s, color .15s;
+}
+.series-view-btn.active {
+    background: var(--an-deep-orange);
+    color: #fff;
+    border-color: var(--an-deep-orange);
+}
+.series-view-btn:hover:not(.active) {
+    background: var(--an-surface-alt, #f3f4f6);
+}
+.series-card:hover {
+    box-shadow: var(--an-shadow-lg);
+    transform: translateY(-2px);
+}
+
+

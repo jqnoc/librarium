@@ -44,6 +44,7 @@
                         <option value="finished" {{ 'selected' if info.get('status') == 'finished' }} data-i18n="bookForm.statusFinished">Finished</option>
                         <option value="not-started" {{ 'selected' if info.get('status') == 'not-started' }} data-i18n="bookForm.statusNotStarted">Not Started</option>
                         <option value="abandoned" {{ 'selected' if info.get('status') == 'abandoned' }} data-i18n="bookForm.statusAbandoned">Abandoned</option>
+                        <option value="draft" {{ 'selected' if info.get('status') == 'draft' }} data-i18n="bookForm.statusDraft">Draft</option>
                     </select>
                 </div>
             </div>
@@ -179,6 +180,63 @@
                     </datalist>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.seriesSection">Series</h3>
+            <datalist id="series-list">
+                {% for s in all_series %}<option value="{{ s.name }}">{% endfor %}
+            </datalist>
+            <template id="series-row-template">
+                <div class="form-row series-entry" style="align-items: flex-end; margin-bottom: 0.5rem;">
+                    <div class="form-group" style="flex: 2;">
+                        <label data-i18n="bookForm.seriesName">Series Name</label>
+                        <input type="text" name="series_name[]" class="form-control" list="series-list">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="bookForm.seriesIndex">Index in Series</label>
+                        <input type="text" name="series_index[]" class="form-control" placeholder="e.g. 1, 2.5">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto; padding-bottom: 0.1rem;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.series-entry').remove()" data-i18n="bookForm.seriesRemove">✕</button>
+                    </div>
+                </div>
+            </template>
+            <div id="series-entries">
+                {% for entry in book_series_entries %}
+                <div class="form-row series-entry" style="align-items: flex-end; margin-bottom: 0.5rem;">
+                    <div class="form-group" style="flex: 2;">
+                        <label data-i18n="bookForm.seriesName">Series Name</label>
+                        <input type="text" name="series_name[]" class="form-control" list="series-list" value="{{ entry.name }}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="bookForm.seriesIndex">Index in Series</label>
+                        <input type="text" name="series_index[]" class="form-control" placeholder="e.g. 1, 2.5" value="{{ entry.series_index }}">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto; padding-bottom: 0.1rem;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.series-entry').remove()" data-i18n="bookForm.seriesRemove">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not book_series_entries %}
+                <div class="form-row series-entry" style="align-items: flex-end; margin-bottom: 0.5rem;">
+                    <div class="form-group" style="flex: 2;">
+                        <label data-i18n="bookForm.seriesName">Series Name</label>
+                        <input type="text" name="series_name[]" class="form-control" list="series-list">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="bookForm.seriesIndex">Index in Series</label>
+                        <input type="text" name="series_index[]" class="form-control" placeholder="e.g. 1, 2.5">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto; padding-bottom: 0.1rem;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.series-entry').remove()" data-i18n="bookForm.seriesRemove">✕</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-series-btn" data-i18n="bookForm.seriesAdd">+ Add Series</button>
         </div>
     </div>
 
@@ -326,5 +384,16 @@ function toggleGiftFields() {
     document.getElementById('source_id_gift').disabled = !isGift;
 }
 toggleSourceFields();
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('add-series-btn').addEventListener('click', function() {
+    var tmpl = document.getElementById('series-row-template');
+    var clone = tmpl.content.cloneNode(true);
+    document.getElementById('series-entries').appendChild(clone);
+    if (window.ashinamiI18n) window.ashinamiI18n.apply();
+});
 </script>
 {% endblock %}
