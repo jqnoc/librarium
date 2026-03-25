@@ -63,6 +63,8 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 9. `migrate_add_series` — series table + series columns
 10. `migrate_book_series_m2m` — book_series junction table (many-to-many)
 11. `migrate_add_editions` — work_id / is_primary_edition columns
+12. `migrate_add_format` — format, binding, audio_format columns on books
+13. `migrate_add_total_time` — total_time_seconds on books, progress_pct on sessions and periods
 
 When adding a new migration:
 
@@ -235,16 +237,16 @@ books       (id TEXT PK, title, subtitle, author, status, pages, isbn,
              date_added, date_started, date_finished, genres, notes,
              cover_blob, cover_mime, cover_color, cover_palette,
              cover_hash, library_id, work_id, is_primary_edition,
-             format, binding, audio_format)
+             format, binding, audio_format, total_time_seconds)
 
 readings    (id INTEGER PK, book_id FK, reading_number, status,
              date_started, date_finished)
 
 sessions    (id INTEGER PK, reading_id FK, book_id FK, date, page_start,
-             page_end, hours, minutes, seconds)
+             page_end, hours, minutes, seconds, progress_pct)
 
 periods     (id INTEGER PK, reading_id FK, book_id FK, date_from,
-             date_to, pages, notes)
+             date_to, pages, notes, progress_pct)
 
 ratings     (id INTEGER PK, book_id FK, dimension_key, value)
 

@@ -23,6 +23,7 @@
 
     <div>
         <div class="meta-grid">
+            <!-- ── Core info ── -->
             <div class="meta-item">
                 <div class="meta-label" data-i18n="{{ 'book.authors' if ';' in info.get('author', '') else 'book.author' }}">{{ 'Authors' if ';' in info.get('author', '') else 'Author' }}</div>
                 <div class="meta-value">
@@ -44,10 +45,6 @@
                 </div>
             </div>
             <div class="meta-item">
-                <div class="meta-label" data-i18n="book.pages">Pages</div>
-                <div class="meta-value">{{ info.get('pages', 0) }}{% if info.get('starting_page', 0) > 0 %} ({{ effective_pages }} readable){% endif %}</div>
-            </div>
-            <div class="meta-item">
                 <div class="meta-label" data-i18n="book.genre">Genre</div>
                 <div class="meta-value">{{ info.get('genre', '—') }}</div>
             </div>
@@ -65,6 +62,7 @@
                 <div class="meta-label" data-i18n="book.language">Language</div>
                 <div class="meta-value">{{ info.get('language', '—') }}</div>
             </div>
+            <!-- ── Edition details ── -->
             {% if info.get('format') %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.format">Format</div>
@@ -83,6 +81,18 @@
                 <div class="meta-value" data-i18n="book.audio{{ {'digital_file':'DigitalFile','cd':'Cd','streaming':'Streaming'}.get(info.get('audio_format',''), '') }}">{{ {'digital_file':'Digital File','cd':'CD','streaming':'Streaming'}.get(info.get('audio_format', ''), info.get('audio_format', '')) }}</div>
             </div>
             {% endif %}
+            {% if info.get('format') == 'audiobook' and info.get('total_time_seconds') %}
+            {% set tt = info.get('total_time_seconds', 0) %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.totalTime">Total Time</div>
+                <div class="meta-value">{{ tt // 3600 }}h {{ (tt % 3600) // 60 }}m {{ tt % 60 }}s</div>
+            </div>
+            {% else %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="book.pages">Pages</div>
+                <div class="meta-value">{{ info.get('pages', 0) }}{% if info.get('starting_page', 0) > 0 %} ({{ effective_pages }} readable){% endif %}</div>
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.publisher">Publisher</div>
                 <div class="meta-value">{{ info.get('publisher', '—') }}</div>
@@ -95,6 +105,7 @@
                 <div class="meta-label" data-i18n="book.isbn">ISBN</div>
                 <div class="meta-value">{{ info.get('isbn', '—') }}</div>
             </div>
+            <!-- ── Original work ── -->
             {% if info.get('original_title') %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.originalTitle">Original Title</div>
@@ -113,6 +124,7 @@
                 <div class="meta-value">{{ info.get('original_publication_date') }}</div>
             </div>
             {% endif %}
+            <!-- ── Contributors ── -->
             {% if info.get('translator') and info.get('translator') != 'N/A' %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="{{ 'book.translators' if ';' in info.get('translator', '') else 'book.translator' }}">{{ 'Translators' if ';' in info.get('translator', '') else 'Translator' }}</div>
@@ -137,6 +149,7 @@
                 <div class="meta-value">{{ info.get('prologue_author') | format_authors }}</div>
             </div>
             {% endif %}
+            <!-- ── Source ── -->
             {% if info.get('source_type') == 'owned' %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.source">Source</div>
@@ -283,7 +296,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </div>
             {% endif %}
             <div style="font-size: 0.85rem; margin-top: 0.25rem;">
-                {{ rd.total_pages }} pages · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}
+                {% if is_pct_format %}{{ "%.1f" | format(rd.total_pages) }}% · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% else %}{{ rd.total_pages }} pages · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% endif %}
             </div>
             {% if readings | length > 1 %}
             <div style="margin-top: 0.5rem; text-align: right;">
@@ -328,8 +341,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% if total_pages > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
+            {% if is_pct_format %}
+            <div class="meta-label" data-i18n="book.progress">Progress</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%.1f" | format(total_pages) }}%</div>
+            {% else %}
             <div class="meta-label" data-i18n="book.pagesRead">Pages Read</div>
             <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ total_pages }}</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -341,7 +359,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
     {% endif %}
-    {% if avg_pages_per_day > 0 %}
+    {% if not is_pct_format and avg_pages_per_day > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.avgPagesDay">Avg Pages/Day</div>
@@ -349,7 +367,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
     {% endif %}
-    {% if info.get('status') == 'finished' and max_pages_per_day > 0 %}
+    {% if not is_pct_format and info.get('status') == 'finished' and max_pages_per_day > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.mostPagesDay">Most Pages/Day</div>
@@ -365,7 +383,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
     {% endif %}
-    {% if avg_pages_per_hour > 0 %}
+    {% if not is_pct_format and avg_pages_per_hour > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.avgPagesHour">Avg Pages/Hour</div>
@@ -381,7 +399,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
     {% endif %}
-    {% if info.get('status') == 'reading' and pages_remaining > 0 %}
+    {% if not is_pct_format and info.get('status') == 'reading' and pages_remaining > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.pagesRemaining">Pages Remaining</div>
@@ -412,6 +430,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="radio" name="chartMode" value="perday"> <span data-i18n="book.perDay">Per Day</span>
                 </label>
+                {% if not is_pct_format %}
                 <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="radio" name="chartMetric" value="pages" checked> <span data-i18n="book.chartPages">Pages</span>
@@ -419,6 +438,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="radio" name="chartMetric" value="time"> <span data-i18n="book.chartTime">Time</span>
                 </label>
+                {% endif %}
                 <span style="border-left: 1px solid #ccc; height: 1.2rem;"></span>
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="checkbox" id="hideIdleDays"> <span data-i18n="book.hideIdleDays">Hide idle days</span>
@@ -483,7 +503,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <tr>
                 <th>#</th>
                 <th data-i18n="book.colDate">Date</th>
-                <th data-i18n="book.colPages">Pages</th>
+                <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
                 <th data-i18n="book.colDuration">Duration</th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
@@ -493,7 +513,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <tr id="session-row-{{ s.id }}">
                 <td>{{ loop.index }}</td>
                 <td>{{ s.date | date_ddmmyyyy }}</td>
-                <td>{{ s.pages }}</td>
+                <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">✏️</button>
@@ -508,8 +528,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                     <form method="POST" action="{{ url_for('edit_session', book_id=book_id, idx=s.id) }}" class="inline-form">
                         <label>Date</label>
                         <input type="text" name="date" value="{{ s.date }}" class="date-input" required>
+                        {% if is_pct_format %}
+                        <label data-i18n="form.progressPct">Progress (%)</label>
+                        <input type="number" name="progress_pct" value="{{ "%.1f" | format(s.progress_pct or 0) }}" min="0" max="100" step="0.1" required>
+                        {% else %}
                         <label>Pages</label>
                         <input type="number" name="pages" value="{{ s.pages }}" min="1" required>
+                        {% endif %}
                         <label>Hours</label>
                         <input type="number" name="hours" value="{{ (s.duration_seconds // 3600) }}" min="0">
                         <label>Min</label>
@@ -539,10 +564,17 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <label data-i18n="form.date">Date</label>
             <input type="text" name="date" class="form-control date-input" value="{{ last_date }}" required>
         </div>
+        {% if is_pct_format %}
+        <div class="form-group">
+            <label data-i18n="form.progressPct">Progress (%)</label>
+            <input type="number" name="progress_pct" class="form-control" min="0" max="100" step="0.1" required style="width:80px;">
+        </div>
+        {% else %}
         <div class="form-group">
             <label data-i18n="form.pages">Pages</label>
             <input type="number" name="pages" class="form-control" min="1" required style="width:80px;">
         </div>
+        {% endif %}
         <div class="form-group">
             <label data-i18n="form.hours">Hours</label>
             <input type="number" name="hours" class="form-control" min="0" value="0" style="width:80px;">
@@ -573,7 +605,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th>#</th>
                 <th data-i18n="book.colStartDate">Start Date</th>
                 <th data-i18n="book.colEndDate">End Date</th>
-                <th data-i18n="book.colPages">Pages</th>
+                <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
                 <th data-i18n="book.colNote">Note</th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
@@ -584,7 +616,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td>{{ loop.index }}</td>
                 <td>{{ p.start_date | date_ddmmyyyy or '—' }}</td>
                 <td>{{ p.end_date | date_ddmmyyyy or '—' }}</td>
-                <td>{{ p.pages }}</td>
+                <td>{% if is_pct_format %}{{ "%.1f" | format(p.progress_pct or 0) }}%{% else %}{{ p.pages }}{% endif %}</td>
                 <td>{{ p.note or '—' }}</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="togglePeriodEdit({{ p.id }})">✏️</button>
@@ -601,8 +633,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                         <input type="text" name="start_date" value="{{ p.start_date or '' }}" class="date-input" style="width:150px;">
                         <label>End</label>
                         <input type="text" name="end_date" value="{{ p.end_date or '' }}" class="date-input" style="width:150px;">
+                        {% if is_pct_format %}
+                        <label data-i18n="form.progressPct">Progress (%)</label>
+                        <input type="number" name="progress_pct" value="{{ "%.1f" | format(p.progress_pct or 0) }}" min="0" max="100" step="0.1" required style="width:80px;">
+                        {% else %}
                         <label>Pages</label>
                         <input type="number" name="pages" value="{{ p.pages }}" min="1" required style="width:80px;">
+                        {% endif %}
                         <label>Note</label>
                         <input type="text" name="note" value="{{ p.note or '' }}" style="width:200px;">
                         <button type="submit" class="btn btn-primary btn-sm">Save</button>
@@ -631,10 +668,17 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <label>End Date</label>
             <input type="text" name="end_date" class="form-control date-input" style="width:150px;">
         </div>
+        {% if is_pct_format %}
+        <div class="form-group">
+            <label data-i18n="form.progressPct">Progress (%)</label>
+            <input type="number" name="progress_pct" class="form-control" min="0" max="100" step="0.1" required style="width:80px;">
+        </div>
+        {% else %}
         <div class="form-group">
             <label>Pages</label>
             <input type="number" name="pages" class="form-control" min="1" required style="width:80px;">
         </div>
+        {% endif %}
         <div class="form-group">
             <label>Note</label>
             <input type="text" name="note" class="form-control" placeholder="Optional note" style="width:200px;">
@@ -758,6 +802,7 @@ function togglePeriodEdit(idx) {
 {% if sessions %}
 const sessions = {{ sessions | tojson }};
 const effectivePages = {{ effective_pages }};
+const isPctFormat = {{ 'true' if is_pct_format else 'false' }};
 
 // Book cover color (same as Gantt and Per-book Cumulative charts)
 const bookCoverColor = '{{ book_gantt.color if book_gantt else "#888888" }}';
@@ -772,14 +817,19 @@ function hexToRgba(hex, a) {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-// Group sessions by date and calculate cumulative totals
+// Group sessions by date
 const dateMap = new Map();
 sessions.forEach(s => {
     if (!dateMap.has(s.date)) {
-        dateMap.set(s.date, { pages: 0, seconds: 0 });
+        dateMap.set(s.date, { pages: 0, pct: 0, seconds: 0 });
     }
     const current = dateMap.get(s.date);
-    current.pages += s.pages;
+    if (isPctFormat) {
+        // For % format: take the max progress_pct for each date (absolute value)
+        current.pct = Math.max(current.pct, s.progress_pct || 0);
+    } else {
+        current.pages += s.pages;
+    }
     current.seconds += s.duration_seconds || 0;
 });
 
@@ -809,7 +859,12 @@ if (sortedDates.length > 0) {
 for (let i = 0; i < sortedDates.length; i++) {
     const date = sortedDates[i];
     const dayData = dateMap.get(date);
-    cumulative += dayData.pages;
+    if (isPctFormat) {
+        // For % format: dayData.pct is already the absolute progress
+        cumulative = dayData.pct;
+    } else {
+        cumulative += dayData.pages;
+    }
     cumulativeSeconds += dayData.seconds;
     
     // Fill in missing dates if there's a gap
@@ -818,6 +873,10 @@ for (let i = 0; i < sortedDates.length; i++) {
         const currentDate = new Date(date);
         const daysBetween = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
         
+        // Previous cumulative value (before this day's data)
+        const prevCumulative = isPctFormat ? (dateMap.get(sortedDates[i - 1])?.pct || 0) : (cumulative - dayData.pages);
+        const prevCumulativeSeconds = cumulativeSeconds - dayData.seconds;
+        
         // Add intermediate dates with same cumulative value (before the new reading)
         for (let d = 1; d < daysBetween; d++) {
             const intermDate = new Date(prevDate);
@@ -825,10 +884,10 @@ for (let i = 0; i < sortedDates.length; i++) {
             const intermDateStr = intermDate.toISOString().split('T')[0];
             chartData.push({
                 date: intermDateStr,
-                pages: cumulative - dayData.pages, // Use previous cumulative
+                pages: prevCumulative,
                 dayPages: 0,
                 daySeconds: 0,
-                cumulativeSeconds: cumulativeSeconds - dayData.seconds,
+                cumulativeSeconds: prevCumulativeSeconds,
                 isGap: true
             });
         }
@@ -838,7 +897,7 @@ for (let i = 0; i < sortedDates.length; i++) {
     chartData.push({ 
         date, 
         pages: cumulative, 
-        dayPages: dayData.pages,
+        dayPages: isPctFormat ? dayData.pct : dayData.pages,
         daySeconds: dayData.seconds,
         cumulativeSeconds: cumulativeSeconds,
         isReading: true
@@ -850,11 +909,19 @@ const perDayData = [];
 if (sortedDates.length > 0) {
     const firstDate = new Date(sortedDates[0]);
     const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    let prevPct = 0;
     for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0];
         const dayData = dateMap.get(dateStr);
         if (dayData) {
-            perDayData.push({ date: dateStr, pages: dayData.pages, seconds: dayData.seconds, isReading: true });
+            let dayPages;
+            if (isPctFormat) {
+                dayPages = dayData.pct - prevPct;
+                prevPct = dayData.pct;
+            } else {
+                dayPages = dayData.pages;
+            }
+            perDayData.push({ date: dateStr, pages: dayPages, seconds: dayData.seconds, isReading: true });
         } else {
             perDayData.push({ date: dateStr, pages: 0, seconds: 0, isGap: true });
         }
@@ -863,7 +930,7 @@ if (sortedDates.length > 0) {
 
 let activeData = chartData;
 let currentMode = 'cumulative';
-let currentMetric = 'pages';
+let currentMetric = isPctFormat ? 'pct' : 'pages';
 
 // Compact data (idle days removed)
 const compactChartData = chartData.filter(d => !d.isGap);
@@ -899,7 +966,7 @@ const progressChart = new Chart(ctx, {
     data: {
         labels: chartData.map(d => d.isInvisible ? '' : d.date),
         datasets: [{
-            label: 'Cumulative Pages Read',
+            label: isPctFormat ? 'Progress (%)' : 'Cumulative Pages Read',
             data: chartData.map(d => d.pages),
             backgroundColor: hexToRgba(bookCoverColor, 0.12),
             borderColor: bookCoverColor,
@@ -936,6 +1003,19 @@ const progressChart = new Chart(ctx, {
                         const daySecs = dataPoint.daySeconds || dataPoint.seconds || 0;
                         const dayPgs = dataPoint.dayPages != null ? dataPoint.dayPages : dataPoint.pages;
                         const timeStr = formatDuration(daySecs);
+                        if (isPctFormat) {
+                            if (currentMode === 'cumulative') {
+                                return [
+                                    `Progress: ${context.parsed.y.toFixed(1)}%`,
+                                    `Session time: ${timeStr}`
+                                ];
+                            } else {
+                                return [
+                                    `Δ Progress: ${context.parsed.y.toFixed(1)}%`,
+                                    `Duration: ${timeStr}`
+                                ];
+                            }
+                        }
                         if (currentMode === 'cumulative') {
                             if (currentMetric === 'pages') {
                                 const percentage = effectivePages > 0 ? ((context.parsed.y / effectivePages) * 100).toFixed(1) : 0;
@@ -974,11 +1054,11 @@ const progressChart = new Chart(ctx, {
         scales: {
             y: {
                 beginAtZero: true,
-                max: Math.max(effectivePages, cumulative),
+                max: isPctFormat ? 100 : Math.max(effectivePages, cumulative),
                 ticks: {
                     color: '#6B7280',
                     callback: function(value) {
-                        return value.toFixed(0);
+                        return isPctFormat ? value.toFixed(0) + '%' : value.toFixed(0);
                     }
                 },
                 grid: {
@@ -1002,14 +1082,18 @@ const progressChart = new Chart(ctx, {
 // ── Chart update (mode + hide idle) ───────────────────────────────────
 function updateChart() {
     currentMode = document.querySelector('input[name="chartMode"]:checked').value;
-    currentMetric = document.querySelector('input[name="chartMetric"]:checked').value;
+    const metricRadio = document.querySelector('input[name="chartMetric"]:checked');
+    currentMetric = metricRadio ? metricRadio.value : (isPctFormat ? 'pct' : 'pages');
     const hideIdle = document.getElementById('hideIdleDays').checked;
 
     if (currentMode === 'cumulative') {
         const data = hideIdle ? compactChartData : chartData;
         activeData = data;
         progressChart.data.labels = data.map(d => d.isInvisible ? '' : d.date);
-        if (currentMetric === 'pages') {
+        if (isPctFormat) {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+            progressChart.options.scales.y.max = 100;
+        } else if (currentMetric === 'pages') {
             progressChart.data.datasets[0].data = data.map(d => d.pages);
             progressChart.options.scales.y.max = Math.max(effectivePages, cumulative);
         } else {
@@ -1023,7 +1107,9 @@ function updateChart() {
         const data = hideIdle ? compactPerDayData : perDayData;
         activeData = data;
         progressChart.data.labels = data.map(d => d.date);
-        if (currentMetric === 'pages') {
+        if (isPctFormat) {
+            progressChart.data.datasets[0].data = data.map(d => d.pages);
+        } else if (currentMetric === 'pages') {
             progressChart.data.datasets[0].data = data.map(d => d.pages);
         } else {
             progressChart.data.datasets[0].data = data.map(d => (d.seconds || 0) / 60);
@@ -1033,9 +1119,13 @@ function updateChart() {
         progressChart.data.datasets[0].fill = false;
         progressChart.options.scales.y.max = undefined;
     }
-    progressChart.options.scales.y.ticks.callback = currentMetric === 'time'
-        ? function(value) { return formatMinutes(value); }
-        : function(value) { return value.toFixed(0); };
+    if (isPctFormat) {
+        progressChart.options.scales.y.ticks.callback = function(value) { return value.toFixed(0) + '%'; };
+    } else {
+        progressChart.options.scales.y.ticks.callback = currentMetric === 'time'
+            ? function(value) { return formatMinutes(value); }
+            : function(value) { return value.toFixed(0); };
+    }
     progressChart.update();
 }
 

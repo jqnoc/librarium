@@ -63,16 +63,6 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="pages" data-i18n="bookForm.pages">Pages</label>
-                    <input type="number" id="pages" name="pages" class="form-control" min="1">
-                </div>
-                <div class="form-group">
-                    <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
-                    <input type="number" id="starting_page" name="starting_page" class="form-control" value="0" min="0">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
                     <label for="language" data-i18n="bookForm.language">Language</label>
                     <input type="text" id="language" name="language" class="form-control" list="language-list">
                     <datalist id="language-list">
@@ -118,6 +108,30 @@
                         </select>
                     </div>
                 </div>
+            </div>
+            <div class="form-row" id="pages-row">
+                <div class="form-group">
+                    <label for="pages" data-i18n="bookForm.pages">Pages</label>
+                    <input type="number" id="pages" name="pages" class="form-control" min="1">
+                </div>
+                <div class="form-group" id="frontmatter-group">
+                    <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
+                    <input type="number" id="starting_page" name="starting_page" class="form-control" value="0" min="0">
+                </div>
+            </div>
+            <div class="form-row" id="total-time-row" style="display:none;">
+                <div class="form-group">
+                    <label data-i18n="bookForm.totalTime">Total Time</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="total_time_hours" name="total_time_hours" class="form-control" min="0" value="0" style="width:70px;">
+                        <span>h</span>
+                        <input type="number" id="total_time_minutes" name="total_time_minutes" class="form-control" min="0" max="59" value="0" style="width:70px;">
+                        <span>m</span>
+                        <input type="number" id="total_time_seconds" name="total_time_seconds" class="form-control" min="0" max="59" value="0" style="width:70px;">
+                        <span>s</span>
+                    </div>
+                </div>
+                <div class="form-group"></div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -358,6 +372,16 @@ function toggleFormatFields() {
     document.getElementById('binding').disabled = fmt !== 'paper';
     document.getElementById('audio-format-fields').style.display = fmt === 'audiobook' ? '' : 'none';
     document.getElementById('audio_format').disabled = fmt !== 'audiobook';
+    document.getElementById('pages-row').style.display = fmt === 'audiobook' ? 'none' : '';
+    document.getElementById('pages').disabled = fmt === 'audiobook';
+    document.getElementById('total-time-row').style.display = fmt === 'audiobook' ? '' : 'none';
+    document.getElementById('total_time_hours').disabled = fmt !== 'audiobook';
+    document.getElementById('total_time_minutes').disabled = fmt !== 'audiobook';
+    document.getElementById('total_time_seconds').disabled = fmt !== 'audiobook';
+    var fmg = document.getElementById('frontmatter-group');
+    if (fmg) { fmg.style.display = fmt === 'audiobook' ? 'none' : ''; }
+    var sp = document.getElementById('starting_page');
+    if (sp) sp.disabled = fmt === 'audiobook';
 }
 toggleFormatFields();
 

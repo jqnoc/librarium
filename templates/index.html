@@ -202,7 +202,11 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                 <div class="book-stats">
                     <span class="badge status-{{ book.status }}">{{ book.status | format_status }}</span>
                     <span class="badge">{{ book.reading_days }} day{{ 's' if book.reading_days != 1 else '' }}</span>
+                    {% if book.is_pct_format %}
+                    <span class="badge">{{ "%.1f" | format(book.max_progress_pct) }}%</span>
+                    {% else %}
                     <span class="badge">{{ book.pages_read }}/{{ book.effective_pages }} pp</span>
+                    {% endif %}
                     {% if book.avg_rating %}
                     <span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>
                     {% endif %}
@@ -299,7 +303,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                     <td class="col-pub_date">{{ book.publication_date or '—' }}</td>
                     <td class="col-publisher">{{ book.publisher or '—' }}</td>
                     <td class="col-rating">{% if book.avg_rating %}<span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>{% else %}—{% endif %}</td>
-                    <td class="col-pages">{{ book.pages or '—' }}</td>
+                    <td class="col-pages">{% if book.format == 'audiobook' and book.total_time_seconds %}{% set tt = book.total_time_seconds %}{{ tt // 3600 }}h {{ (tt % 3600) // 60 }}m{% elif book.pages %}{{ book.pages }}{% else %}—{% endif %}</td>
                     <td class="col-language">{{ book.language or '—' }}</td>
                 </tr>
                 {% endfor %}

@@ -563,6 +563,37 @@ def migrate_add_format() -> None:
     print("✅ Migration complete – format columns added.")
 
 
+def migrate_add_total_time() -> None:
+    """Add total_time_seconds to books, progress_pct to sessions and periods."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    book_cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    sess_cols = [r[1] for r in db.execute("PRAGMA table_info(sessions)").fetchall()]
+    per_cols  = [r[1] for r in db.execute("PRAGMA table_info(periods)").fetchall()]
+    needed = False
+    if "total_time_seconds" not in book_cols:
+        needed = True
+    if "progress_pct" not in sess_cols:
+        needed = True
+    if "progress_pct" not in per_cols:
+        needed = True
+    if not needed:
+        db.close()
+        return
+    print("⏳ Migrating: adding total_time_seconds / progress_pct …")
+    if "total_time_seconds" not in book_cols:
+        db.execute("ALTER TABLE books ADD COLUMN total_time_seconds INTEGER DEFAULT NULL")
+    if "progress_pct" not in sess_cols:
+        db.execute("ALTER TABLE sessions ADD COLUMN progress_pct REAL DEFAULT NULL")
+    if "progress_pct" not in per_cols:
+        db.execute("ALTER TABLE periods ADD COLUMN progress_pct REAL DEFAULT NULL")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – total_time_seconds / progress_pct added.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
@@ -1025,6 +1056,8 @@ def index():
             b.language,
             b.publication_date,
             b.work_id,
+            b.format,
+            b.total_time_seconds,
             COALESCE(sess.total_pages, 0)   AS session_pages,
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
@@ -1034,7 +1067,8 @@ def index():
             per.first_period_start,
             per.last_period_end,
             lr_sess.lr_last_date,
-            lr_per.lr_last_period_end
+            lr_per.lr_last_period_end,
+            COALESCE(pct.max_pct, 0) AS max_progress_pct
         FROM books b
         LEFT JOIN (
             SELECT book_id, MAX(id) AS lr_id
@@ -1078,6 +1112,13 @@ def index():
             WHERE end_date != ''
             GROUP BY reading_id
         ) lr_per ON lr_per.reading_id = lr.lr_id
+        LEFT JOIN (
+            SELECT book_id, MAX(pct) AS max_pct FROM (
+                SELECT book_id, MAX(progress_pct) AS pct FROM sessions WHERE progress_pct IS NOT NULL GROUP BY book_id
+                UNION ALL
+                SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
+            ) GROUP BY book_id
+        ) pct ON pct.book_id = b.id
         WHERE b.library_id = ? AND (b.work_id IS NULL OR b.is_primary_edition = 1)
     """, (lib_id,)).fetchall()
 
@@ -1114,6 +1155,9 @@ def index():
             ).fetchone()
             edition_count = ec_row["c"] if ec_row else 1
 
+        book_fmt = r["format"] or "paper"
+        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+
         books.append({
             "id": r["id"],
             "name": r["name"],
@@ -1123,6 +1167,10 @@ def index():
             "pages": r["pages"] or 0,
             "effective_pages": effective_pages,
             "pages_read": total_pages_display,
+            "max_progress_pct": r["max_progress_pct"],
+            "is_pct_format": is_pct_fmt,
+            "format": book_fmt,
+            "total_time_seconds": r["total_time_seconds"] or 0,
             "total_time": _format_duration(total_seconds_display),
             "total_seconds_raw": total_seconds_display,
             "reading_days": r["reading_days"],
@@ -2194,9 +2242,11 @@ def activity():
     reading_books: list[dict] = []
     for row in db.execute("""
         SELECT b.id, b.name, b.pages, b.starting_page, b.has_cover, b.cover_hash,
+               b.format,
                COALESCE(s.tp, 0) AS session_pages,
                COALESCE(p.pp, 0) AS period_pages,
-               s.last_date, p.last_period
+               s.last_date, p.last_period,
+               COALESCE(pct.max_pct, 0) AS max_pct
         FROM books b
         LEFT JOIN (SELECT book_id, SUM(pages) AS tp,
                           MAX(date) AS last_date
@@ -2206,13 +2256,28 @@ def activity():
                           MAX(end_date) AS last_period
                    FROM periods GROUP BY book_id) p
           ON p.book_id = b.id
+        LEFT JOIN (
+            SELECT book_id, MAX(pct) AS max_pct FROM (
+                SELECT book_id, MAX(progress_pct) AS pct FROM sessions WHERE progress_pct IS NOT NULL GROUP BY book_id
+                UNION ALL
+                SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
+            ) GROUP BY book_id
+        ) pct ON pct.book_id = b.id
         WHERE b.status = 'reading' AND b.library_id = ?
     """, (lib_id,)).fetchall():
         sp = row["starting_page"] or 0
         tp = row["pages"] or 0
         eff = tp - sp if sp > 0 else tp
-        total_read = row["session_pages"] + row["period_pages"]
-        remaining = max(eff - total_read, 0)
+        book_fmt = row["format"] or "paper"
+        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+        if is_pct_fmt:
+            total_read = 0
+            remaining = 0
+            prog_pct = round(row["max_pct"], 1)
+        else:
+            total_read = row["session_pages"] + row["period_pages"]
+            remaining = max(eff - total_read, 0)
+            prog_pct = round(min(total_read / eff * 100, 100), 1) if eff > 0 else 0
         last_candidates = [d for d in (row["last_date"], row["last_period"]) if d]
         last_activity = max(last_candidates) if last_candidates else "0000-00-00"
         reading_books.append({
@@ -2224,7 +2289,7 @@ def activity():
             "effective_pages": eff,
             "pages_read": total_read,
             "pages_remaining": remaining,
-            "progress_pct": round(min(total_read / eff * 100, 100), 1) if eff > 0 else 0,
+            "progress_pct": prog_pct,
             "last_activity": last_activity,
         })
     reading_books.sort(key=lambda b: b["last_activity"], reverse=True)
@@ -2826,20 +2891,30 @@ def book_detail(book_id: str):
         except ValueError:
             return iso
 
+    book_fmt = info.get("format", "paper") or "paper"
+    is_pct_format = book_fmt in ("audiobook", "ebook")
+
     readings_data = []
     for rr in readings_rows:
         rid = rr["id"]
         r_sessions = [s for s in all_sessions_data if s["reading_id"] == rid]
         r_periods  = [p for p in all_periods_data  if p["reading_id"] == rid]
 
-        r_sess_pages = sum(s["pages"] for s in r_sessions)
-        r_sess_secs  = sum(s["duration_seconds"] for s in r_sessions)
-        r_per_pages  = sum(p["pages"] for p in r_periods)
-        r_per_secs   = 0
-        if r_per_pages > 0 and r_sess_pages > 0:
-            r_per_secs = int(r_per_pages * (r_sess_secs / r_sess_pages))
-        r_total_pages = r_sess_pages + r_per_pages
-        r_total_secs  = r_sess_secs + r_per_secs
+        if is_pct_format:
+            r_pcts = [s["progress_pct"] for s in r_sessions if s.get("progress_pct") is not None]
+            r_pcts += [p["progress_pct"] for p in r_periods if p.get("progress_pct") is not None]
+            r_total_pages = max(r_pcts) if r_pcts else 0  # stores % for display
+            r_sess_secs = sum(s["duration_seconds"] for s in r_sessions)
+            r_total_secs = r_sess_secs
+        else:
+            r_sess_pages = sum(s["pages"] for s in r_sessions)
+            r_sess_secs  = sum(s["duration_seconds"] for s in r_sessions)
+            r_per_pages  = sum(p["pages"] for p in r_periods)
+            r_per_secs   = 0
+            if r_per_pages > 0 and r_sess_pages > 0:
+                r_per_secs = int(r_per_pages * (r_sess_secs / r_sess_pages))
+            r_total_pages = r_sess_pages + r_per_pages
+            r_total_secs  = r_sess_secs + r_per_secs
 
         sess_dates   = [s["date"] for s in r_sessions if s["date"]]
         per_starts   = [p["start_date"] for p in r_periods if p.get("start_date")]
@@ -2863,16 +2938,24 @@ def book_detail(book_id: str):
     cur_sessions = [s for s in all_sessions_data if s["reading_id"] == current_reading_id]
     cur_periods  = [p for p in all_periods_data  if p["reading_id"] == current_reading_id]
 
-    tracked_pages = sum(s["pages"] for s in cur_sessions)
     tracked_seconds = sum(s["duration_seconds"] for s in cur_sessions)
 
-    period_pages = sum(p["pages"] for p in cur_periods)
-    period_seconds = 0
-    if period_pages > 0 and tracked_pages > 0:
-        period_seconds = int(period_pages * (tracked_seconds / tracked_pages))
-
-    total_pages = tracked_pages + period_pages
-    total_seconds = tracked_seconds + period_seconds
+    if is_pct_format:
+        cur_pcts = [s["progress_pct"] for s in cur_sessions if s.get("progress_pct") is not None]
+        cur_pcts += [p["progress_pct"] for p in cur_periods if p.get("progress_pct") is not None]
+        max_pct = max(cur_pcts) if cur_pcts else 0.0
+        total_pages = max_pct  # stores % value
+        total_seconds = tracked_seconds
+        tracked_pages = 0
+        period_pages = 0
+    else:
+        tracked_pages = sum(s["pages"] for s in cur_sessions)
+        period_pages = sum(p["pages"] for p in cur_periods)
+        period_seconds = 0
+        if period_pages > 0 and tracked_pages > 0:
+            period_seconds = int(period_pages * (tracked_seconds / tracked_pages))
+        total_pages = tracked_pages + period_pages
+        total_seconds = tracked_seconds + period_seconds
 
     starting_page = info.get("starting_page", 0) or 0
     total_book_pages = info.get("pages", 0) or 0
@@ -2887,7 +2970,7 @@ def book_detail(book_id: str):
 
     unique_dates = set(s["date"] for s in cur_sessions if s["date"])
     reading_days = len(unique_dates)
-    avg_pages_per_day = tracked_pages / reading_days if reading_days > 0 else 0
+    avg_pages_per_day = (tracked_pages / reading_days) if (reading_days > 0 and not is_pct_format) else 0
 
     # Max pages and minutes on any single day (current reading)
     pages_by_date: dict[str, int] = {}
@@ -2896,24 +2979,33 @@ def book_detail(book_id: str):
         if s["date"]:
             pages_by_date[s["date"]] = pages_by_date.get(s["date"], 0) + s["pages"]
             seconds_by_date[s["date"]] = seconds_by_date.get(s["date"], 0) + s["duration_seconds"]
-    max_pages_per_day = max(pages_by_date.values()) if pages_by_date else 0
+    max_pages_per_day = (max(pages_by_date.values()) if pages_by_date else 0) if not is_pct_format else 0
     _max_seconds_per_day = max(seconds_by_date.values()) if seconds_by_date else 0
     max_time_per_day = _format_duration(_max_seconds_per_day) if _max_seconds_per_day > 0 else ""
 
     avg_pages_per_hour = 0.0
-    if tracked_seconds > 0:
+    if tracked_seconds > 0 and not is_pct_format:
         avg_pages_per_hour = tracked_pages / (tracked_seconds / 3600)
 
     status = info.get("status", "")
     progress_pct = 0.0
     pages_remaining = 0
     est_time_to_finish = ""
-    if effective_pages > 0 and total_pages > 0:
-        progress_pct = min(total_pages / effective_pages * 100, 100.0)
-        pages_remaining = max(effective_pages - total_pages, 0)
-    if pages_remaining > 0 and avg_pages_per_hour > 0 and status == "reading":
-        est_seconds = int(pages_remaining / avg_pages_per_hour * 3600)
-        est_time_to_finish = _format_duration(est_seconds)
+
+    if is_pct_format:
+        progress_pct = min(total_pages, 100.0)  # total_pages holds % for audiobook/ebook
+        # Est. time to finish based on content time for audiobooks
+        audiobook_total = info.get("total_time_seconds") or 0
+        if audiobook_total > 0 and progress_pct > 0 and progress_pct < 100 and status == "reading":
+            remaining_content = audiobook_total * (1 - progress_pct / 100)
+            est_time_to_finish = _format_duration(int(remaining_content))
+    else:
+        if effective_pages > 0 and total_pages > 0:
+            progress_pct = min(total_pages / effective_pages * 100, 100.0)
+            pages_remaining = max(effective_pages - total_pages, 0)
+        if pages_remaining > 0 and avg_pages_per_hour > 0 and status == "reading":
+            est_seconds = int(pages_remaining / avg_pages_per_hour * 3600)
+            est_time_to_finish = _format_duration(est_seconds)
 
     source_obj = None
     if info.get("source_id"):
@@ -3100,6 +3192,7 @@ def book_detail(book_id: str):
         progress_pct=progress_pct,
         pages_remaining=pages_remaining,
         est_time_to_finish=est_time_to_finish,
+        is_pct_format=is_pct_format,
         reading_periods=cur_periods,
         all_periods=all_periods_data,
         now_year=datetime.now().year,
@@ -3204,6 +3297,17 @@ def edit_metadata(book_id: str):
         starting_page_str = request.form.get("starting_page", "0").strip()
         info["starting_page"] = int(starting_page_str) if starting_page_str.isdigit() else 0
 
+        # Total time (audiobook)
+        if info["format"] == "audiobook":
+            tth = int(request.form.get("total_time_hours", "0").strip() or 0)
+            ttm = int(request.form.get("total_time_minutes", "0").strip() or 0)
+            tts = int(request.form.get("total_time_seconds", "0").strip() or 0)
+            info["total_time_seconds"] = tth * 3600 + ttm * 60 + tts
+            info["pages"] = 0
+            info["starting_page"] = 0
+        else:
+            info["total_time_seconds"] = None
+
         source_type = request.form.get("source_type", "").strip()
         info["source_type"] = source_type
         is_gift = 1 if request.form.get("is_gift") else 0
@@ -3264,7 +3368,7 @@ def edit_metadata(book_id: str):
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
-                format=?, binding=?, audio_format=?
+                format=?, binding=?, audio_format=?, total_time_seconds=?
             WHERE id=?
         """, (
             info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
@@ -3280,6 +3384,7 @@ def edit_metadata(book_id: str):
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
             info["format"], info["binding"], info["audio_format"],
+            info["total_time_seconds"],
             book_id,
         ))
         db.commit()
@@ -3358,12 +3463,13 @@ def edit_metadata(book_id: str):
 @app.route("/book/<book_id>/sessions/add", methods=["POST"])
 def add_session(book_id: str):
     db = get_db()
-    if not db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
+    book = db.execute("SELECT id, format FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
         abort(404)
 
+    book_fmt = book["format"] or "paper"
     date = _normalize_input_date(request.form.get("date", ""))
     try:
-        pages_val = int(request.form.get("pages", "0").strip() or 0)
         hours_val = int(request.form.get("hours", "0").strip() or 0)
         minutes_val = int(request.form.get("minutes", "0").strip() or 0)
         seconds_val = int(request.form.get("seconds", "0").strip() or 0)
@@ -3373,10 +3479,26 @@ def add_session(book_id: str):
 
     dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
     reading_id = _get_current_reading_id(db, book_id)
-    db.execute(
-        "INSERT INTO sessions (book_id, date, pages, duration_seconds, reading_id) VALUES (?,?,?,?,?)",
-        (book_id, date, pages_val, dur_seconds, reading_id),
-    )
+
+    if book_fmt in ("audiobook", "ebook"):
+        try:
+            pct_val = float(request.form.get("progress_pct", "0").strip() or 0)
+        except ValueError:
+            pct_val = 0.0
+        pct_val = max(0.0, min(pct_val, 100.0))
+        db.execute(
+            "INSERT INTO sessions (book_id, date, pages, duration_seconds, reading_id, progress_pct) VALUES (?,?,0,?,?,?)",
+            (book_id, date, dur_seconds, reading_id, pct_val),
+        )
+    else:
+        try:
+            pages_val = int(request.form.get("pages", "0").strip() or 0)
+        except ValueError:
+            pages_val = 0
+        db.execute(
+            "INSERT INTO sessions (book_id, date, pages, duration_seconds, reading_id) VALUES (?,?,?,?,?)",
+            (book_id, date, pages_val, dur_seconds, reading_id),
+        )
     db.commit()
     flash("Reading session added.", "success")
     return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
@@ -3389,9 +3511,9 @@ def edit_session(book_id: str, idx: int):
     if not row:
         abort(404)
 
+    book_fmt = (db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone() or {}).get("format", "paper") or "paper"
     date = _normalize_input_date(request.form.get("date", ""))
     try:
-        pages_val = int(request.form.get("pages", "0").strip() or 0)
         hours_val = int(request.form.get("hours", "0").strip() or 0)
         minutes_val = int(request.form.get("minutes", "0").strip() or 0)
         seconds_val = int(request.form.get("seconds", "0").strip() or 0)
@@ -3400,10 +3522,26 @@ def edit_session(book_id: str, idx: int):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
 
     dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
-    db.execute(
-        "UPDATE sessions SET date=?, pages=?, duration_seconds=? WHERE id=?",
-        (date, pages_val, dur_seconds, idx),
-    )
+
+    if book_fmt in ("audiobook", "ebook"):
+        try:
+            pct_val = float(request.form.get("progress_pct", "0").strip() or 0)
+        except ValueError:
+            pct_val = 0.0
+        pct_val = max(0.0, min(pct_val, 100.0))
+        db.execute(
+            "UPDATE sessions SET date=?, pages=0, duration_seconds=?, progress_pct=? WHERE id=?",
+            (date, dur_seconds, pct_val, idx),
+        )
+    else:
+        try:
+            pages_val = int(request.form.get("pages", "0").strip() or 0)
+        except ValueError:
+            pages_val = 0
+        db.execute(
+            "UPDATE sessions SET date=?, pages=?, duration_seconds=? WHERE id=?",
+            (date, pages_val, dur_seconds, idx),
+        )
     db.commit()
     flash("Reading session updated.", "success")
     return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
@@ -3428,26 +3566,39 @@ def delete_session(book_id: str, idx: int):
 @app.route("/book/<book_id>/periods/add", methods=["POST"])
 def add_reading_period(book_id: str):
     db = get_db()
-    if not db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
+    book = db.execute("SELECT id, format FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
         abort(404)
 
+    book_fmt = book["format"] or "paper"
     start_date = _normalize_input_date(request.form.get("start_date", ""))
     end_date = _normalize_input_date(request.form.get("end_date", ""))
-    pages = request.form.get("pages", "0").strip()
     note = request.form.get("note", "").strip()
 
-    try:
-        pages = int(pages)
-        if pages < 1:
-            pages = 1
-    except ValueError:
-        pages = 1
-
     reading_id = _get_current_reading_id(db, book_id)
-    db.execute(
-        "INSERT INTO periods (book_id, start_date, end_date, pages, note, reading_id) VALUES (?,?,?,?,?,?)",
-        (book_id, start_date, end_date, pages, note, reading_id),
-    )
+
+    if book_fmt in ("audiobook", "ebook"):
+        try:
+            pct_val = float(request.form.get("progress_pct", "0").strip() or 0)
+        except ValueError:
+            pct_val = 0.0
+        pct_val = max(0.0, min(pct_val, 100.0))
+        db.execute(
+            "INSERT INTO periods (book_id, start_date, end_date, pages, note, reading_id, progress_pct) VALUES (?,?,?,0,?,?,?)",
+            (book_id, start_date, end_date, note, reading_id, pct_val),
+        )
+    else:
+        pages = request.form.get("pages", "0").strip()
+        try:
+            pages = int(pages)
+            if pages < 1:
+                pages = 1
+        except ValueError:
+            pages = 1
+        db.execute(
+            "INSERT INTO periods (book_id, start_date, end_date, pages, note, reading_id) VALUES (?,?,?,?,?,?)",
+            (book_id, start_date, end_date, pages, note, reading_id),
+        )
     db.commit()
     flash("Reading period added.", "success")
     return redirect(url_for("book_detail", book_id=book_id, _anchor="add-period"))
@@ -3460,22 +3611,33 @@ def edit_reading_period(book_id: str, idx: int):
     if not row:
         abort(404)
 
+    book_fmt = (db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone() or {}).get("format", "paper") or "paper"
     start_date = _normalize_input_date(request.form.get("start_date", ""))
     end_date = _normalize_input_date(request.form.get("end_date", ""))
-    pages = request.form.get("pages", "0").strip()
     note = request.form.get("note", "").strip()
 
-    try:
-        pages = int(pages)
-        if pages < 1:
+    if book_fmt in ("audiobook", "ebook"):
+        try:
+            pct_val = float(request.form.get("progress_pct", "0").strip() or 0)
+        except ValueError:
+            pct_val = 0.0
+        pct_val = max(0.0, min(pct_val, 100.0))
+        db.execute(
+            "UPDATE periods SET start_date=?, end_date=?, pages=0, note=?, progress_pct=? WHERE id=?",
+            (start_date, end_date, note, pct_val, idx),
+        )
+    else:
+        pages = request.form.get("pages", "0").strip()
+        try:
+            pages = int(pages)
+            if pages < 1:
+                pages = 1
+        except ValueError:
             pages = 1
-    except ValueError:
-        pages = 1
-
-    db.execute(
-        "UPDATE periods SET start_date=?, end_date=?, pages=?, note=? WHERE id=?",
-        (start_date, end_date, pages, note, idx),
-    )
+        db.execute(
+            "UPDATE periods SET start_date=?, end_date=?, pages=?, note=? WHERE id=?",
+            (start_date, end_date, pages, note, idx),
+        )
     db.commit()
     flash("Reading period updated.", "success")
     return redirect(url_for("book_detail", book_id=book_id, _anchor="add-period"))
@@ -3529,6 +3691,17 @@ def new_book():
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
         info["starting_page"] = int(starting_page_str) if starting_page_str.isdigit() else 0
+
+        # Total time (audiobook)
+        if info["format"] == "audiobook":
+            tth = int(request.form.get("total_time_hours", "0").strip() or 0)
+            ttm = int(request.form.get("total_time_minutes", "0").strip() or 0)
+            tts = int(request.form.get("total_time_seconds", "0").strip() or 0)
+            info["total_time_seconds"] = tth * 3600 + ttm * 60 + tts
+            info["pages"] = 0
+            info["starting_page"] = 0
+        else:
+            info["total_time_seconds"] = None
 
         source_type = request.form.get("source_type", "").strip()
         info["source_type"] = source_type
@@ -3593,8 +3766,8 @@ def new_book():
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
              library_id, work_id, is_primary_edition,
-             format, binding, audio_format)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             format, binding, audio_format, total_time_seconds)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -3611,6 +3784,7 @@ def new_book():
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
             lib_id, link_work_id or None, is_primary,
             info["format"], info["binding"], info["audio_format"],
+            info["total_time_seconds"],
         ))
 
         # Insert book_series entries
@@ -4124,6 +4298,7 @@ if __name__ == "__main__":
     migrate_book_series_m2m()   # Add book_series junction table (many-to-many)
     migrate_add_editions()      # Add work_id / is_primary_edition columns
     migrate_add_format()        # Add format / binding / audio_format columns
+    migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
     app.run(
         debug=True,
         port=5000,
