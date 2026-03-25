@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 
 <!-- ── Sessions table ────────────────────────────────────────────────── -->
-<h2 id="sessions"><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
+<h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
 {% if sessions %}
 <div class="table-wrap">
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 
 <!-- ── Add session panel ─────────────────────────────────────────────── -->
-<div class="add-session-panel">
+<div id="add-session" class="add-session-panel">
     <h3 data-i18n="book.addSession">Add New Session</h3>
     <form method="POST" action="{{ url_for('add_session', book_id=book_id) }}" class="inline-form" style="margin-top: .75rem;">
         <div class="form-group">
@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 
 <!-- ── Reading Periods panel ─────────────────────────────────────────── -->
-<h2 id="periods"><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
+<h2><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 <p style="color: var(--an-text-light); font-size: 0.9rem; margin-top: 0;" data-i18n="book.periodsDesc">Date ranges when you read this book without detailed session tracking. Reading time is inferred from your tracked sessions' average speed.</p>
 
 {% if reading_periods %}
@@ -602,7 +602,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 {% endif %}
 
-<div class="add-session-panel">
+<div id="add-period" class="add-session-panel">
     <h3 data-i18n="book.addPeriod">Add Reading Period</h3>
     <form method="POST" action="{{ url_for('add_reading_period', book_id=book_id) }}" class="inline-form" style="margin-top: .75rem;">
         <div class="form-group">
@@ -1029,5 +1029,15 @@ document.querySelectorAll('input[name="chartMetric"]').forEach(radio => {
 });
 document.getElementById('hideIdleDays').addEventListener('change', updateChart);
 {% endif %}
+
+/* ── Scroll anchor to center of viewport ──────────────────────────── */
+if (window.location.hash) {
+    var el = document.querySelector(window.location.hash);
+    if (el) {
+        setTimeout(function() {
+            el.scrollIntoView({ behavior: 'auto', block: 'center' });
+        }, 0);
+    }
+}
 </script>
 {% endblock %}
