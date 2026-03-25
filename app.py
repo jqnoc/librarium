@@ -3343,7 +3343,7 @@ def add_session(book_id: str):
         seconds_val = int(request.form.get("seconds", "0").strip() or 0)
     except ValueError:
         flash("Invalid numeric input.", "error")
-        return redirect(url_for("book_detail", book_id=book_id))
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="sessions"))
 
     dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
     reading_id = _get_current_reading_id(db, book_id)
@@ -3353,7 +3353,7 @@ def add_session(book_id: str):
     )
     db.commit()
     flash("Reading session added.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="sessions"))
 
 
 @app.route("/book/<book_id>/sessions/<int:idx>/edit", methods=["POST"])
@@ -3371,7 +3371,7 @@ def edit_session(book_id: str, idx: int):
         seconds_val = int(request.form.get("seconds", "0").strip() or 0)
     except ValueError:
         flash("Invalid numeric input.", "error")
-        return redirect(url_for("book_detail", book_id=book_id))
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="sessions"))
 
     dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
     db.execute(
@@ -3380,7 +3380,7 @@ def edit_session(book_id: str, idx: int):
     )
     db.commit()
     flash("Reading session updated.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="sessions"))
 
 
 @app.route("/book/<book_id>/sessions/<int:idx>/delete", methods=["POST"])
@@ -3392,7 +3392,7 @@ def delete_session(book_id: str, idx: int):
     db.execute("DELETE FROM sessions WHERE id = ?", (idx,))
     db.commit()
     flash("Reading session deleted.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="sessions"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3424,7 +3424,7 @@ def add_reading_period(book_id: str):
     )
     db.commit()
     flash("Reading period added.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="periods"))
 
 
 @app.route("/book/<book_id>/periods/<int:idx>/edit", methods=["POST"])
@@ -3452,7 +3452,7 @@ def edit_reading_period(book_id: str, idx: int):
     )
     db.commit()
     flash("Reading period updated.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="periods"))
 
 
 @app.route("/book/<book_id>/periods/<int:idx>/delete", methods=["POST"])
@@ -3464,7 +3464,7 @@ def delete_reading_period(book_id: str, idx: int):
     db.execute("DELETE FROM periods WHERE id = ?", (idx,))
     db.commit()
     flash("Reading period deleted.", "success")
-    return redirect(url_for("book_detail", book_id=book_id))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="periods"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════

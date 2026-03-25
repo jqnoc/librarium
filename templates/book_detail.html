@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 
 <!-- ── Sessions table ────────────────────────────────────────────────── -->
-<h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
+<h2 id="sessions"><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
 {% if sessions %}
 <div class="table-wrap">
@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 
 <!-- ── Reading Periods panel ─────────────────────────────────────────── -->
-<h2><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
+<h2 id="periods"><span data-i18n="book.periods">Reading Periods</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--an-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 <p style="color: var(--an-text-light); font-size: 0.9rem; margin-top: 0;" data-i18n="book.periodsDesc">Date ranges when you read this book without detailed session tracking. Reading time is inferred from your tracked sessions' average speed.</p>
 
 {% if reading_periods %}
