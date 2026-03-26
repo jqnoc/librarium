@@ -1180,6 +1180,14 @@ def _build_index_per_reading(db, lib_id):
             "edition_count": edition_count,
             "reading_number": rnum,
         })
+
+    # Only show reading_number when a book appears more than once
+    from collections import Counter
+    bid_counts = Counter(b["id"] for b in books)
+    for b in books:
+        if bid_counts[b["id"]] <= 1:
+            b["reading_number"] = None
+
     return books
 
 
@@ -3231,15 +3239,13 @@ def book_detail(book_id: str):
             except (ValueError, TypeError):
                 pass
 
-    # Global span across all readings
-    all_dates: set[date] = set()
-    for dates in reading_active_dates.values():
-        all_dates |= dates
+    # Only include the currently selected reading in the Gantt
+    current_gantt_dates = reading_active_dates.get(current_reading_id, set())
 
     book_gantt_data = None
-    if all_dates:
-        global_start = min(all_dates)
-        global_end = max(all_dates)
+    if current_gantt_dates:
+        global_start = min(current_gantt_dates)
+        global_end = max(current_gantt_dates)
         total_span_days = (global_end - global_start).days + 1
 
         def _build_segments(sorted_active, ref_start):
@@ -3258,10 +3264,12 @@ def book_detail(book_id: str):
             segs.append({"start": (seg_s - ref_start).days, "end": (seg_e - ref_start).days})
             return segs
 
-        # Build per-reading bars, ordered by reading_number
+        # Build bar for the current reading only
         gantt_readings = []
         for rr in readings_rows:
             rid = rr["id"]
+            if rid != current_reading_id:
+                continue
             dates = reading_active_dates.get(rid, set())
             if not dates:
                 continue
