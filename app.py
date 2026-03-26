@@ -1030,6 +1030,159 @@ def _get_source_by_id(source_id: str) -> dict | None:
 # Routes – Catalog (Library)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
+def _build_index_per_reading(db, lib_id):
+    """Build one library entry per *selected reading* across ALL editions.
+
+    Selection logic per edition:
+    - 1 reading  → show it
+    - >1 readings, some finished → show each finished one
+    - >1 readings, none finished → show the one with highest priority
+      (reading > abandoned > not-started > draft)
+    """
+    book_rows = db.execute(
+        "SELECT id, name, subtitle, author, status, pages, starting_page, genre, "
+        "has_cover, cover_hash, publisher, language, publication_date, "
+        "work_id, format, total_time_seconds FROM books WHERE library_id = ?",
+        (lib_id,),
+    ).fetchall()
+    bk_map = {r["id"]: dict(r) for r in book_rows}
+    bids = list(bk_map.keys())
+    if not bids:
+        return []
+
+    ph = ",".join("?" * len(bids))
+    all_readings = db.execute(
+        f"SELECT id, book_id, reading_number, status FROM readings "
+        f"WHERE book_id IN ({ph}) ORDER BY book_id, reading_number", bids
+    ).fetchall()
+    readings_by_book: dict[str, list] = {}
+    for r in all_readings:
+        readings_by_book.setdefault(r["book_id"], []).append(dict(r))
+
+    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "draft": 3, "finished": 4}
+    selected: list[tuple] = []  # (book_id, reading_id, reading_number, status)
+    for bid in bids:
+        rlist = readings_by_book.get(bid, [])
+        if not rlist:
+            selected.append((bid, None, None, bk_map[bid]["status"]))
+            continue
+        if len(rlist) == 1:
+            r = rlist[0]
+            selected.append((bid, r["id"], r["reading_number"], r["status"]))
+        else:
+            finished = [r for r in rlist if r["status"] == "finished"]
+            if finished:
+                for r in finished:
+                    selected.append((bid, r["id"], r["reading_number"], r["status"]))
+            else:
+                best = min(rlist, key=lambda r: RPRIO.get(r["status"], 99))
+                selected.append((bid, best["id"], best["reading_number"], best["status"]))
+
+    # Bulk-fetch per-reading stats
+    rids = [s[1] for s in selected if s[1] is not None]
+    sess_map: dict[int, dict] = {}
+    per_map: dict[int, dict] = {}
+    pct_map: dict[int, float] = {}
+    if rids:
+        rph = ",".join("?" * len(rids))
+        for row in db.execute(
+            f"SELECT reading_id, SUM(pages) AS tp, SUM(duration_seconds) AS ts, "
+            f"COUNT(DISTINCT date) AS rd, MIN(date) AS d0, MAX(date) AS d1 "
+            f"FROM sessions WHERE reading_id IN ({rph}) AND date != '' "
+            f"GROUP BY reading_id", rids
+        ).fetchall():
+            sess_map[row["reading_id"]] = dict(row)
+        for row in db.execute(
+            f"SELECT reading_id, SUM(pages) AS pp, "
+            f"MIN(start_date) AS p0, MAX(end_date) AS p1 "
+            f"FROM periods WHERE reading_id IN ({rph}) "
+            f"GROUP BY reading_id", rids
+        ).fetchall():
+            per_map[row["reading_id"]] = dict(row)
+        for row in db.execute(
+            f"SELECT reading_id, MAX(pct) AS max_pct FROM ("
+            f"SELECT reading_id, MAX(progress_pct) AS pct FROM sessions "
+            f"WHERE reading_id IN ({rph}) AND progress_pct IS NOT NULL GROUP BY reading_id "
+            f"UNION ALL "
+            f"SELECT reading_id, MAX(progress_pct) AS pct FROM periods "
+            f"WHERE reading_id IN ({rph}) AND progress_pct IS NOT NULL GROUP BY reading_id"
+            f") GROUP BY reading_id", rids + rids
+        ).fetchall():
+            pct_map[row["reading_id"]] = row["max_pct"] or 0
+
+    books = []
+    for bid, rid, rnum, rstatus in selected:
+        bk = bk_map[bid]
+        sm = sess_map.get(rid, {}) if rid else {}
+        pm = per_map.get(rid, {}) if rid else {}
+
+        session_pages = sm.get("tp", 0) or 0
+        session_seconds = sm.get("ts", 0) or 0
+        reading_days = sm.get("rd", 0) or 0
+        first_date = sm.get("d0", "") or ""
+        last_date = sm.get("d1", "") or ""
+        period_pages = pm.get("pp", 0) or 0
+        first_period_start = pm.get("p0", "") or ""
+        last_period_end = pm.get("p1", "") or ""
+        max_pct = pct_map.get(rid, 0) if rid else 0
+
+        period_seconds = 0
+        if period_pages > 0 and session_pages > 0:
+            period_seconds = int(period_pages * (session_seconds / session_pages))
+        total_pages_display = session_pages + period_pages
+        total_seconds_display = session_seconds + period_seconds
+
+        starting_page = bk.get("starting_page", 0) or 0
+        total_book_pages = bk.get("pages", 0) or 0
+        effective_pages = total_book_pages - starting_page if starting_page > 0 else total_book_pages
+
+        first_candidates = [d for d in (first_date, first_period_start) if d]
+        last_candidates = [d for d in (last_date, last_period_end) if d]
+        first_activity = min(first_candidates) if first_candidates else None
+        last_activity = max(last_candidates) if last_candidates else None
+
+        ratings = _load_ratings(bid)
+
+        edition_count = 1
+        if bk["work_id"]:
+            ec_row = db.execute("SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (bk["work_id"],)).fetchone()
+            edition_count = ec_row["c"] if ec_row else 1
+
+        book_fmt = bk.get("format", "paper") or "paper"
+        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+
+        books.append({
+            "id": bid,
+            "name": bk["name"],
+            "subtitle": bk.get("subtitle", "") or "",
+            "author": bk.get("author", "") or "",
+            "status": rstatus or "reading",
+            "pages": bk.get("pages", 0) or 0,
+            "effective_pages": effective_pages,
+            "pages_read": total_pages_display,
+            "max_progress_pct": max_pct,
+            "is_pct_format": is_pct_fmt,
+            "format": book_fmt,
+            "total_time_seconds": bk.get("total_time_seconds", 0) or 0,
+            "total_time": _format_duration(total_seconds_display),
+            "total_seconds_raw": total_seconds_display,
+            "reading_days": reading_days,
+            "genre": bk.get("genre", "") or "",
+            "has_cover": bool(bk.get("has_cover")),
+            "cover_hash": bk.get("cover_hash", "") or "",
+            "first_session_date": first_activity or "0000-00-00",
+            "last_session_date": last_activity or "0000-00-00",
+            "avg_rating": _calc_avg_rating(ratings),
+            "publisher": bk.get("publisher", "") or "",
+            "language": bk.get("language", "") or "",
+            "publication_date": bk.get("publication_date", "") or "",
+            "edition_count": edition_count,
+            "reading_number": rnum,
+        })
+    return books
+
+
 @app.route("/")
 def index():
     """Main page – list all books in the current library."""
@@ -1039,8 +1192,16 @@ def index():
     sort1 = request.args.get("sort1") or request.cookies.get("ashinami_sort1", "status")
     sort2 = request.args.get("sort2") or request.cookies.get("ashinami_sort2", "last_session")
     status_filter = request.args.get("status_filter") or request.cookies.get("ashinami_status_filter", "all")
+    show_editions = request.args.get("show_editions") or request.cookies.get("ashinami_show_editions", "0")
+    show_readings = request.args.get("show_readings") or request.cookies.get("ashinami_show_readings", "0")
+    if show_editions != "1":
+        show_readings = "0"
 
-    rows = db.execute("""
+    if show_readings == "1":
+        books = _build_index_per_reading(db, lib_id)
+    else:
+        edition_filter = " AND (b.work_id IS NULL OR b.is_primary_edition = 1)" if show_editions != "1" else ""
+        rows = db.execute(f"""
         SELECT
             b.id,
             b.name,
@@ -1119,7 +1280,7 @@ def index():
                 SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
             ) GROUP BY book_id
         ) pct ON pct.book_id = b.id
-        WHERE b.library_id = ? AND (b.work_id IS NULL OR b.is_primary_edition = 1)
+        WHERE b.library_id = ?{edition_filter}
     """, (lib_id,)).fetchall()
 
     books = []
@@ -1184,6 +1345,7 @@ def index():
             "language": r["language"] or "",
             "publication_date": r["publication_date"] or "",
             "edition_count": edition_count,
+            "reading_number": None,
         })
 
     # Sorting helpers
@@ -1262,11 +1424,15 @@ def index():
         reading_count=reading_count,
         finished_count=finished_count,
         not_started_count=not_started_count,
+        show_editions=show_editions,
+        show_readings=show_readings,
     ))
     # Persist preferences in cookies (1 year expiry)
     resp.set_cookie("ashinami_sort1", sort1, max_age=365*24*3600, samesite="Lax")
     resp.set_cookie("ashinami_sort2", sort2 or "", max_age=365*24*3600, samesite="Lax")
     resp.set_cookie("ashinami_status_filter", status_filter, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("ashinami_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("ashinami_show_readings", show_readings, max_age=365*24*3600, samesite="Lax")
     return resp
 
 
@@ -1431,13 +1597,12 @@ def global_stats():
     ).fetchall():
         pages_by_year[row["yr"]] = pages_by_year.get(row["yr"], 0) + row["p"]
 
-    # Books finished by year – count finished READINGS (not books)
+    # Books finished by year – count ALL finished readings across all editions
     books_finished_by_year: dict[str, int] = {}
     finished_readings = db.execute(
         "SELECT r.id, r.book_id FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE r.status = 'finished' AND b.library_id = ? "
-        "AND (b.work_id IS NULL OR b.is_primary_edition = 1)", (lib_id,)
+        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
     ).fetchall()
     for fr in finished_readings:
         rid = fr["id"]
@@ -2095,7 +2260,7 @@ def stats_year(year: str):
 
 @app.route("/stats/year/<year>/books")
 def stats_year_books(year: str):
-    """Display all books finished in a specific year with their covers."""
+    """Display all books/readings finished in a specific year with their covers."""
     db = get_db()
     lib_id = _get_current_library_id()
     sort = request.args.get("sort", "date")
@@ -2103,16 +2268,19 @@ def stats_year_books(year: str):
         sort = "date"
 
     finished_readings = db.execute("""
-        SELECT r.id AS reading_id, r.book_id,
+        SELECT r.id AS reading_id, r.book_id, r.reading_number,
                b.name, b.subtitle, b.author, b.has_cover, b.cover_hash
         FROM readings r
         JOIN books b ON b.id = r.book_id
         WHERE r.status = 'finished' AND b.library_id = ?
-          AND (b.work_id IS NULL OR b.is_primary_edition = 1)
     """, (lib_id,)).fetchall()
 
+    # Count total readings per book to know when to show reading number
+    readings_per_book: dict[str, int] = {}
+    for fr in finished_readings:
+        readings_per_book[fr["book_id"]] = readings_per_book.get(fr["book_id"], 0) + 1
+
     books_finished = []
-    seen_book_ids: set[str] = set()
     all_finish_years: set[str] = set()
     for fr in finished_readings:
         rid = fr["reading_id"]
@@ -2133,25 +2301,26 @@ def stats_year_books(year: str):
             all_finish_years.add(finish_yr)
             if finish_yr == year:
                 book_id = fr["book_id"]
-                if book_id not in seen_book_ids:
-                    seen_book_ids.add(book_id)
-                    # Fetch ratings for this book
-                    ratings_rows = db.execute(
-                        "SELECT dimension_key, value FROM ratings WHERE book_id = ?", (book_id,)
-                    ).fetchall()
-                    ratings = {r["dimension_key"]: r["value"] for r in ratings_rows}
-                    avg_rating = _calc_avg_rating(ratings)
-                    
-                    books_finished.append({
-                        "id": book_id,
-                        "name": fr["name"],
-                        "subtitle": fr["subtitle"] or "",
-                        "author": fr["author"] or "",
-                        "has_cover": bool(fr["has_cover"]),
-                        "cover_hash": fr["cover_hash"] or "",
-                        "finish_date": finish_date,
-                        "rating": avg_rating or 0,
-                    })
+                ratings_rows = db.execute(
+                    "SELECT dimension_key, value FROM ratings WHERE book_id = ?", (book_id,)
+                ).fetchall()
+                ratings = {r["dimension_key"]: r["value"] for r in ratings_rows}
+                avg_rating = _calc_avg_rating(ratings)
+
+                rnum = fr["reading_number"]
+                show_rnum = readings_per_book.get(book_id, 1) > 1
+
+                books_finished.append({
+                    "id": book_id,
+                    "name": fr["name"],
+                    "subtitle": fr["subtitle"] or "",
+                    "author": fr["author"] or "",
+                    "has_cover": bool(fr["has_cover"]),
+                    "cover_hash": fr["cover_hash"] or "",
+                    "finish_date": finish_date,
+                    "rating": avg_rating or 0,
+                    "reading_number": rnum if show_rnum else None,
+                })
 
     if sort == "alpha":
         books_finished.sort(key=lambda b: b["name"].lower())
@@ -2467,9 +2636,11 @@ def author_detail(author_name: str):
     """Display all books by a given author, plus author metadata."""
     db = get_db()
     lib_id = _get_current_library_id()
+    show_editions = request.args.get("show_editions") or request.cookies.get("ashinami_author_show_editions", "0")
+    edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
         "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
-        "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
+        f"FROM books WHERE library_id = ?{edition_filter}", (lib_id,)
     ).fetchall()
 
     sort = request.args.get("sort", "date")  # date = original publication date
@@ -2506,8 +2677,11 @@ def author_detail(author_name: str):
         "name": author_name, "has_photo": 0, "photo_hash": "", "birth_date": "",
         "birth_place": "", "death_date": "", "death_place": "", "biography": "",
     }
-    return render_template("author_detail.html", author=author_name,
-                           books=books, author_info=author_info, sort=sort)
+    resp = make_response(render_template("author_detail.html", author=author_name,
+                           books=books, author_info=author_info, sort=sort,
+                           show_editions=show_editions))
+    resp.set_cookie("ashinami_author_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
+    return resp
 
 
 @app.route("/author_photo/<path:author_name>")

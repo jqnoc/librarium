@@ -73,6 +73,8 @@
         'index.btnCardView':   { en: 'Card view',           es: 'Vista tarjeta' },
         'index.btnCoverView':  { en: 'Cover view',          es: 'Vista portada' },
         'index.btnListView':   { en: 'List view',           es: 'Vista lista' },
+        'index.showAllEditions': { en: 'Show All Editions',  es: 'Mostrar Todas las Ediciones' },
+        'index.showAllReadings': { en: 'Show All Readings',  es: 'Mostrar Todas las Lecturas' },
 
         // ── Book detail ─────────────────────────────────────────────────
         'book.backToLibrary':   { en: '← Back to Library',   es: '← Volver a la Biblioteca' },
@@ -239,6 +241,7 @@
         'authorDetail.sortDate':      { en: 'Original Publication Date', es: 'Fecha de Publicación Original' },
         'authorDetail.sortTitle':     { en: 'Title',              es: 'Título' },
         'authorDetail.sortRating':    { en: 'Rating',             es: 'Valoración' },
+        'authorDetail.showAllEditions': { en: 'Show All Editions', es: 'Mostrar Todas las Ediciones' },
         'authorDetail.empty':         { en: 'No books found for this author.', es: 'No se encontraron libros de este autor.' },
 
         // ── Edit author ─────────────────────────────────────────────────

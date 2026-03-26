@@ -62,15 +62,22 @@
 {% if books %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
     <h2 style="margin: 0;" data-i18n="authorDetail.books">Books</h2>
-    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--an-text-light);">
-        <span data-i18n="authorDetail.sortBy">Sort by:</span>
-        <select onchange="window.location.href='{{ url_for('author_detail', author_name=author) }}?sort=' + this.value"
-                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); cursor: pointer;">
-            <option value="date"   {% if sort == 'date'   %}selected{% endif %} data-i18n="authorDetail.sortDate">Original Publication Date</option>
-            <option value="alpha"  {% if sort == 'alpha'  %}selected{% endif %} data-i18n="authorDetail.sortTitle">Title</option>
-            <option value="rating" {% if sort == 'rating' %}selected{% endif %} data-i18n="authorDetail.sortRating">Rating</option>
-        </select>
-    </label>
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <label class="col-check">
+            <input type="checkbox" id="authorShowEditions" {% if show_editions == '1' %}checked{% endif %}
+                   onchange="var url='{{ url_for('author_detail', author_name=author) }}?sort=' + document.querySelector('#authorSort').value + '&show_editions=' + (this.checked ? '1' : '0'); window.location.href=url;">
+            <span data-i18n="authorDetail.showAllEditions">Show All Editions</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--an-text-light);">
+            <span data-i18n="authorDetail.sortBy">Sort by:</span>
+            <select id="authorSort" onchange="window.location.href='{{ url_for('author_detail', author_name=author) }}?sort=' + this.value + '&show_editions={{ show_editions }}'"
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); cursor: pointer;">
+                <option value="date"   {% if sort == 'date'   %}selected{% endif %} data-i18n="authorDetail.sortDate">Original Publication Date</option>
+                <option value="alpha"  {% if sort == 'alpha'  %}selected{% endif %} data-i18n="authorDetail.sortTitle">Title</option>
+                <option value="rating" {% if sort == 'rating' %}selected{% endif %} data-i18n="authorDetail.sortRating">Rating</option>
+            </select>
+        </label>
+    </div>
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem;">
