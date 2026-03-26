@@ -29,6 +29,10 @@
         'library.rename':        { en: 'Rename',                es: 'Renombrar' },
         'library.delete':        { en: 'Delete',                es: 'Eliminar' },
 
+        // ── Database backup ──────────────────────────────────────────────────────
+        'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },
+        'backup.create':         { en: 'Create Backup Now',      es: 'Crear Copia Ahora' },
+
         // ── Index page ──────────────────────────────────────────────────
         'index.title':          { en: 'Library',            es: 'Biblioteca' },
         'index.totalBooks':     { en: 'Total Books',        es: 'Total de Libros' },

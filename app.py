@@ -146,26 +146,33 @@ def validate_and_restore_db() -> None:
 
 
 # ── Backup ───────────────────────────────────────────────────────────────
-def backup_database() -> None:
-    """Create a daily backup of the database, keeping the last MAX_BACKUPS.
+def backup_database(*, skip_if_recent: bool = True) -> str | None:
+    """Create a timestamped backup of the database, keeping the last MAX_BACKUPS.
 
     Uses SQLite's Online Backup API so the copy is always consistent,
     even when the database is in WAL mode.
-    Skips silently if the DB file does not exist yet or today's backup
-    has already been created.
+    Skips silently if the DB file does not exist yet.
+    When *skip_if_recent* is True (startup call), skips if a backup from
+    the current date already exists.  Manual calls pass False to always
+    create a new backup.
+    Returns the backup filename on success, or None if skipped.
     """
     if not DB_PATH.exists():
-        return
+        return None
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    today_file = BACKUP_DIR / f"librarium_{date.today().isoformat()}.db"
 
-    if today_file.exists():
-        return  # already backed up today
+    if skip_if_recent:
+        today_prefix = f"librarium_{date.today().isoformat()}"
+        if any(BACKUP_DIR.glob(f"{today_prefix}*.db")):
+            return None  # already backed up today
+
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    backup_file = BACKUP_DIR / f"librarium_{stamp}.db"
 
     # Use the Online Backup API for a safe, consistent copy
     src = sqlite3.connect(str(DB_PATH))
-    dst = sqlite3.connect(str(today_file))
+    dst = sqlite3.connect(str(backup_file))
     try:
         src.backup(dst)
     finally:
@@ -176,6 +183,8 @@ def backup_database() -> None:
     backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
     for old in backups[:-MAX_BACKUPS]:
         old.unlink()
+
+    return backup_file.name
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -4139,6 +4148,19 @@ def switch_library():
     resp.set_cookie("librarium_library", str(lib_id), max_age=60 * 60 * 24 * 365 * 5,
                      samesite="Lax", httponly=True)
     return resp
+
+
+# ── Manual backup ────────────────────────────────────────────────────────
+
+@app.route("/backup/create", methods=["POST"])
+def create_backup():
+    """Manually create a database backup."""
+    name = backup_database(skip_if_recent=False)
+    if name:
+        flash(f"Backup created: {name}", "success")
+    else:
+        flash("Backup failed — database not found.", "error")
+    return redirect(request.referrer or url_for("index"))
 
 
 @app.route("/library/create", methods=["POST"])

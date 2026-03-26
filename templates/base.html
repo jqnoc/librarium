@@ -132,6 +132,12 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+
+                <hr>
+                <h4 data-i18n="backup.title">Database Backup</h4>
+                <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
+                    <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>
+                </form>
             </div>
         </div>
     </div>
