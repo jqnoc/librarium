@@ -363,9 +363,13 @@ There is **no automated test suite**. After any change, verify manually:
 
 ## 10. Commit Messages
 
-After completing any implementation task, provide a suggested commit
-message inside a fenced code block (so the user can copy it as plain
-text into Tortoise Git).
+**MANDATORY — NEVER SKIP.** Every response that modifies code or files
+(feature, fix, refactor, etc.) **must** end with a suggested commit
+message inside a fenced code block. This is required regardless of the
+size of the change — a one-line bug fix needs a commit message just as
+much as a multi-file feature. If you forget, the user cannot commit
+their work. Include it in your **final** message of the task, right
+before yielding back to the user.
 
 ### Format
 

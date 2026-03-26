@@ -1283,70 +1283,70 @@ def index():
         WHERE b.library_id = ?{edition_filter}
     """, (lib_id,)).fetchall()
 
-    books = []
-    for r in rows:
-        total_pages_tracked = r["session_pages"]
-        total_seconds_tracked = r["session_seconds"]
-        period_pages = r["period_pages"]
-        period_seconds = 0
-        if period_pages > 0 and total_pages_tracked > 0:
-            period_seconds = int(period_pages * (total_seconds_tracked / total_pages_tracked))
+        books = []
+        for r in rows:
+            total_pages_tracked = r["session_pages"]
+            total_seconds_tracked = r["session_seconds"]
+            period_pages = r["period_pages"]
+            period_seconds = 0
+            if period_pages > 0 and total_pages_tracked > 0:
+                period_seconds = int(period_pages * (total_seconds_tracked / total_pages_tracked))
 
-        total_pages_display = total_pages_tracked + period_pages
-        total_seconds_display = total_seconds_tracked + period_seconds
+            total_pages_display = total_pages_tracked + period_pages
+            total_seconds_display = total_seconds_tracked + period_seconds
 
-        starting_page = r["starting_page"] or 0
-        total_book_pages = r["pages"] or 0
-        effective_pages = total_book_pages - starting_page if starting_page > 0 else total_book_pages
+            starting_page = r["starting_page"] or 0
+            total_book_pages = r["pages"] or 0
+            effective_pages = total_book_pages - starting_page if starting_page > 0 else total_book_pages
 
-        # First / last activity across sessions and periods
-        first_candidates = [d for d in (r["first_date"], r["first_period_start"]) if d]
-        # For sorting: use last activity from the LATEST reading only
-        lr_candidates = [d for d in (r["lr_last_date"], r["lr_last_period_end"]) if d]
-        first_activity = min(first_candidates) if first_candidates else None
-        last_activity = max(lr_candidates) if lr_candidates else None
+            # First / last activity across sessions and periods
+            first_candidates = [d for d in (r["first_date"], r["first_period_start"]) if d]
+            # For sorting: use last activity from the LATEST reading only
+            lr_candidates = [d for d in (r["lr_last_date"], r["lr_last_period_end"]) if d]
+            first_activity = min(first_candidates) if first_candidates else None
+            last_activity = max(lr_candidates) if lr_candidates else None
 
-        ratings = _load_ratings(r["id"])
+            ratings = _load_ratings(r["id"])
 
-        # Edition count (how many editions share this work_id)
-        edition_count = 1
-        if r["work_id"]:
-            ec_row = db.execute(
-                "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (r["work_id"],)
-            ).fetchone()
-            edition_count = ec_row["c"] if ec_row else 1
+            # Edition count (how many editions share this work_id)
+            edition_count = 1
+            if r["work_id"]:
+                ec_row = db.execute(
+                    "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (r["work_id"],)
+                ).fetchone()
+                edition_count = ec_row["c"] if ec_row else 1
 
-        book_fmt = r["format"] or "paper"
-        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+            book_fmt = r["format"] or "paper"
+            is_pct_fmt = book_fmt in ("audiobook", "ebook")
 
-        books.append({
-            "id": r["id"],
-            "name": r["name"],
-            "subtitle": r["subtitle"] or "",
-            "author": r["author"] or "",
-            "status": r["status"] or "reading",
-            "pages": r["pages"] or 0,
-            "effective_pages": effective_pages,
-            "pages_read": total_pages_display,
-            "max_progress_pct": r["max_progress_pct"],
-            "is_pct_format": is_pct_fmt,
-            "format": book_fmt,
-            "total_time_seconds": r["total_time_seconds"] or 0,
-            "total_time": _format_duration(total_seconds_display),
-            "total_seconds_raw": total_seconds_display,
-            "reading_days": r["reading_days"],
-            "genre": r["genre"] or "",
-            "has_cover": bool(r["has_cover"]),
-            "cover_hash": r["cover_hash"] or "",
-            "first_session_date": first_activity or "0000-00-00",
-            "last_session_date": last_activity or "0000-00-00",
-            "avg_rating": _calc_avg_rating(ratings),
-            "publisher": r["publisher"] or "",
-            "language": r["language"] or "",
-            "publication_date": r["publication_date"] or "",
-            "edition_count": edition_count,
-            "reading_number": None,
-        })
+            books.append({
+                "id": r["id"],
+                "name": r["name"],
+                "subtitle": r["subtitle"] or "",
+                "author": r["author"] or "",
+                "status": r["status"] or "reading",
+                "pages": r["pages"] or 0,
+                "effective_pages": effective_pages,
+                "pages_read": total_pages_display,
+                "max_progress_pct": r["max_progress_pct"],
+                "is_pct_format": is_pct_fmt,
+                "format": book_fmt,
+                "total_time_seconds": r["total_time_seconds"] or 0,
+                "total_time": _format_duration(total_seconds_display),
+                "total_seconds_raw": total_seconds_display,
+                "reading_days": r["reading_days"],
+                "genre": r["genre"] or "",
+                "has_cover": bool(r["has_cover"]),
+                "cover_hash": r["cover_hash"] or "",
+                "first_session_date": first_activity or "0000-00-00",
+                "last_session_date": last_activity or "0000-00-00",
+                "avg_rating": _calc_avg_rating(ratings),
+                "publisher": r["publisher"] or "",
+                "language": r["language"] or "",
+                "publication_date": r["publication_date"] or "",
+                "edition_count": edition_count,
+                "reading_number": None,
+            })
 
     # Sorting helpers
     class _Rev:
