@@ -15,7 +15,6 @@ data/backups/
 .env
 
 # IDE / Editor
-*.code-workspace
 .vscode/
 
 # OS files
