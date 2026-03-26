@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ year }} Reading Stats – Ashinami{% endblock %}
+{% block title %}{{ year }} Reading Stats – Librarium{% endblock %}
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
     <div style="display: flex; align-items: center; gap: 1rem;">
-        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--an-orange); font-weight: 500;" data-i18n="yearStats.backToGlobal">← Back to Global Stats</a>
-        <h1 style="margin: 0; color: var(--an-text-dark);"><span data-i18n="yearStats.title">Reading Statistics for</span> {{ year }}</h1>
+        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--lb-orange); font-weight: 500;" data-i18n="yearStats.backToGlobal">← Back to Global Stats</a>
+        <h1 style="margin: 0; color: var(--lb-text-dark);"><span data-i18n="yearStats.title">Reading Statistics for</span> {{ year }}</h1>
     </div>
     <div style="display: flex; gap: 0.5rem;">
         {% if prev_year %}
@@ -22,27 +22,27 @@
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="yearStats.totalPages">Total Pages</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ total_pages }}</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ total_pages }}</div>
         </div>
     </div>
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="yearStats.totalTime">Total Time</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ "%dh %dm" | format(total_seconds // 3600, (total_seconds % 3600) // 60) }}</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ "%dh %dm" | format(total_seconds // 3600, (total_seconds % 3600) // 60) }}</div>
         </div>
     </div>
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="yearStats.readingSessions">Reading Sessions</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ sessions | length }}</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ sessions | length }}</div>
         </div>
     </div>
     {% if period_pages > 0 %}
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="yearStats.periodPages">Period Pages</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">{{ period_pages }}</div>
-            <div style="font-size: 0.8rem; color: var(--an-text-light); margin-top: 0.5rem;" data-i18n="yearStats.inferredTime">(inferred time)</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ period_pages }}</div>
+            <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.5rem;" data-i18n="yearStats.inferredTime">(inferred time)</div>
         </div>
     </div>
     {% endif %}
@@ -52,7 +52,7 @@
 {% if gantt_data %}
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin: 0 0 1rem 0; color: var(--an-deep-orange);" data-i18n="yearStats.readingTimeline">Reading Timeline</h3>
+        <h3 style="margin: 0 0 1rem 0; color: var(--lb-deep-orange);" data-i18n="yearStats.readingTimeline">Reading Timeline</h3>
         <div style="overflow-x: auto;">
             <!-- Month labels -->
             <div style="display: flex; margin-left: 200px; margin-bottom: 0.25rem; position: relative; height: 1.2rem;">
@@ -61,14 +61,14 @@
                 {% set is_leap = (year|int % 4 == 0 and (year|int % 100 != 0 or year|int % 400 == 0)) %}
                 {% set total_days = 366 if is_leap else 365 %}
                 {% for m in months %}
-                <div style="position: absolute; left: calc({{ month_days[loop.index0] }} / {{ total_days }} * 100%); font-size: 0.7rem; color: var(--an-text-light); white-space: nowrap;">{{ m }}</div>
+                <div style="position: absolute; left: calc({{ month_days[loop.index0] }} / {{ total_days }} * 100%); font-size: 0.7rem; color: var(--lb-text-light); white-space: nowrap;">{{ m }}</div>
                 {% endfor %}
             </div>
             <!-- Book bars -->
             {% for item in gantt_data %}
             <div style="display: flex; align-items: center; margin-bottom: 0.35rem; min-width: 600px;">
-                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--an-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;{% if item.status == 'reading' %} font-style: italic;{% endif %}" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}">{{ item.name }}</div>
-                <div style="flex: 1; position: relative; height: 20px; background: var(--an-surface-alt, #f3f4f6); border-radius: 3px;">
+                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--lb-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;{% if item.status == 'reading' %} font-style: italic;{% endif %}" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}">{{ item.name }}</div>
+                <div style="flex: 1; position: relative; height: 20px; background: var(--lb-surface-alt, #f3f4f6); border-radius: 3px;">
                     {# Idle span (full extent, light colour) #}
                     {% set span_left = item.start / total_days * 100 %}
                     {% set span_width_raw = (item.end - item.start + 1) / total_days * 100 %}
@@ -94,7 +94,7 @@
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-            <h3 style="margin: 0; color: var(--an-deep-orange);" data-i18n="yearStats.readingProgress">Reading Progress</h3>
+            <h3 style="margin: 0; color: var(--lb-deep-orange);" data-i18n="yearStats.readingProgress">Reading Progress</h3>
             <div style="display: flex; gap: 1rem; font-size: 0.9rem; align-items: center;">
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="radio" name="chartMode" value="cumulative" checked> <span data-i18n="yearStats.cumulative">Cumulative</span>
@@ -122,8 +122,8 @@
 <!-- ── Per-book cumulative chart for this year ───────────────────────── -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin: 0 0 1rem 0; color: var(--an-deep-orange);">Per-book Cumulative Pages</h3>
-        <div style="margin-bottom: 0.5rem; color: var(--an-text-light); font-size: 0.9rem;">Each line shows a book's cumulative pages for {{ year }}.</div>
+        <h3 style="margin: 0 0 1rem 0; color: var(--lb-deep-orange);">Per-book Cumulative Pages</h3>
+        <div style="margin-bottom: 0.5rem; color: var(--lb-text-light); font-size: 0.9rem;">Each line shows a book's cumulative pages for {{ year }}.</div>
         <canvas id="booksPerYearCumulative" style="max-height: 500px;"></canvas>
     </div>
 </div>
@@ -182,7 +182,7 @@
                 <td>{{ period.end_date }}</td>
                 <td><a href="{{ url_for('book_detail', book_id=period.book_id) }}">{{ period.book_name }}</a></td>
                 <td>{{ period.pages }}</td>
-                <td style="color: var(--an-text-light); font-size: 0.9rem;">{{ period.note }}</td>
+                <td style="color: var(--lb-text-light); font-size: 0.9rem;">{{ period.note }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -326,13 +326,13 @@ const progressChart = new Chart(ctx, {
         datasets: [{
             label: 'Cumulative Pages Read',
             data: chartData.map(d => d.pages),
-            backgroundColor: cssVar('--an-chart-fill'),
-            borderColor: cssVar('--an-chart-line'),
+            backgroundColor: cssVar('--lb-chart-fill'),
+            borderColor: cssVar('--lb-chart-line'),
             borderWidth: 3,
             fill: true,
             tension: 0.3,
             pointRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 5),
-            pointBackgroundColor: cssVar('--an-chart-line'),
+            pointBackgroundColor: cssVar('--lb-chart-line'),
             pointBorderColor: '#fff',
             pointBorderWidth: 2,
             pointHoverRadius: chartData.map(d => (d.isInvisible || d.isGap) ? 0 : 7)
@@ -347,10 +347,10 @@ const progressChart = new Chart(ctx, {
                 display: false
             },
             tooltip: {
-                backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                titleColor: cssVar('--an-chart-tooltip-title'),
+                backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                titleColor: cssVar('--lb-chart-tooltip-title'),
                 bodyColor: '#fff',
-                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderColor: cssVar('--lb-chart-tooltip-border'),
                 borderWidth: 1,
                 padding: 12,
                 displayColors: false,

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Edit – {{ author_name }} – Ashinami{% endblock %}
+{% block title %}Edit – {{ author_name }} – Librarium{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -7,7 +7,7 @@
 </div>
 
 <h1 data-i18n="editAuthor.title">Edit Author Details</h1>
-<p style="color: var(--an-text-light); margin-bottom: 1.5rem;">{{ author_name }}</p>
+<p style="color: var(--lb-text-light); margin-bottom: 1.5rem;">{{ author_name }}</p>
 
 <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_author', author_name=author_name) }}">
     <div class="card" style="margin-bottom: 1.5rem;">
@@ -16,7 +16,7 @@
             {% if author_info.has_photo %}
             <div style="margin-bottom: 1rem;">
                 <img src="{{ url_for('author_photo', author_name=author_name, v=author_info.get('photo_hash', '')) }}" alt="{{ author_name }}"
-                     style="width: 150px; height: auto; border-radius: var(--an-radius-lg); box-shadow: var(--an-shadow);">
+                     style="width: 150px; height: auto; border-radius: var(--lb-radius-lg); box-shadow: var(--lb-shadow);">
             </div>
             <div class="form-group" style="margin-bottom: 1rem;">
                 <label>
@@ -72,7 +72,7 @@
                 <textarea id="biography" name="biography" class="form-control" rows="6"
                           placeholder="A short summary of the author's life and work…">{{ author_info.biography }}</textarea>
             </div>
-            <script>document.addEventListener('DOMContentLoaded',function(){window.ashinamiI18n.initRichTextToolbar('biography');});</script>
+            <script>document.addEventListener('DOMContentLoaded',function(){window.librariumI18n.initRichTextToolbar('biography');});</script>
         </div>
     </div>
 

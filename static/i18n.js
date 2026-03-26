@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Ashinami – Internationalisation (EN / ES)
+// Librarium – Internationalisation (EN / ES)
 // ═══════════════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
 
-    var STORAGE_KEY = 'ashinami_lang';
+    var STORAGE_KEY = 'librarium_lang';
 
     // ── Translation dictionaries ────────────────────────────────────────
     var translations = {
@@ -16,7 +16,7 @@
         'nav.activity':     { en: 'Activity',     es: 'Actividad' },
         'nav.sources':      { en: 'Sources',      es: 'Fuentes' },
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
-        'footer.copy':      { en: 'Ashinami',     es: 'Ashinami' },
+        'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
 
         // ── Library selector / management ───────────────────────────────
         'library.select':        { en: 'Select library',        es: 'Seleccionar biblioteca' },
@@ -638,5 +638,5 @@
     }
 
     // Expose for usage in inline scripts
-    window.ashinamiI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar };
+    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar };
 })();

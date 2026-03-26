@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Global Stats – Ashinami{% endblock %}
+{% block title %}Global Stats – Librarium{% endblock %}
 
 {% block content %}
 <h1 data-i18n="stats.title">Global Reading Statistics</h1>
@@ -8,7 +8,7 @@
 <!-- ── Books finished by year ────────────────────────────────────────── -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);"><span data-i18n="stats.booksFinished">Books Finished by Year</span> <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="stats.clickCovers">(click to view covers)</span></h3>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.booksFinished">Books Finished by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickCovers">(click to view covers)</span></h3>
         <canvas id="booksChart" style="max-height: 350px; cursor: pointer;"></canvas>
     </div>
 </div>
@@ -16,7 +16,7 @@
 <!-- ── Cumulative pages read by year ─────────────────────────────────── -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);"><span data-i18n="stats.pagesRead">Pages Read by Year</span> <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.pagesRead">Pages Read by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
         <canvas id="pagesChart" style="max-height: 350px; cursor: pointer;"></canvas>
     </div>
 </div>
@@ -29,12 +29,12 @@
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
-            <h3 style="margin:0; color: var(--an-deep-orange);" data-i18n="stats.statusTimeline">Books by Status Over Time</h3>
+            <h3 style="margin:0; color: var(--lb-deep-orange);" data-i18n="stats.statusTimeline">Books by Status Over Time</h3>
             <div style="display:flex; gap:1rem; align-items:center;">
-                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--an-text-light); font-size:0.9rem;">
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
                     <input type="radio" name="timelineMode" value="absolute" checked> <span data-i18n="stats.timelineAbsolute">Absolute</span>
                 </label>
-                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--an-text-light); font-size:0.9rem;">
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
                     <input type="radio" name="timelineMode" value="relative"> <span data-i18n="stats.timelineRelative">Relative (%)</span>
                 </label>
             </div>
@@ -43,7 +43,7 @@
     </div>
 </div>
 
-<h2 style="color: var(--an-deep-orange); margin-top: 2.5rem; margin-bottom: 1.5rem;" data-i18n="stats.libraryStats">Library Stats 📊</h2>
+<h2 style="color: var(--lb-deep-orange); margin-top: 2.5rem; margin-bottom: 1.5rem;" data-i18n="stats.libraryStats">Library Stats 📊</h2>
 
 <!-- Summary cards row -->
 <div class="library-records-row" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
@@ -52,7 +52,7 @@
         <div class="record-icon">⭐</div>
         <div class="record-label" data-i18n="stats.highestRated">Highest Rated Book</div>
         <div class="record-value">{{ "%.2f" | format(highest_rated_book.rating) }}</div>
-        <a href="{{ url_for('book_detail', book_id=highest_rated_book.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ highest_rated_book.name }}</a>
+        <a href="{{ url_for('book_detail', book_id=highest_rated_book.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ highest_rated_book.name }}</a>
     </div>
     {% endif %}
     {% if avg_finished_rating %}
@@ -68,7 +68,7 @@
         <div class="record-icon">📏</div>
         <div class="record-label" data-i18n="stats.longestBook">Longest Book Read</div>
         <div class="record-value">{{ "{:,}".format(longest_finished.pages) }} pp</div>
-        <a href="{{ url_for('book_detail', book_id=longest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ longest_finished.name }}</a>
+        <a href="{{ url_for('book_detail', book_id=longest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ longest_finished.name }}</a>
     </div>
     {% endif %}
     {% if shortest_finished %}
@@ -76,7 +76,7 @@
         <div class="record-icon">📐</div>
         <div class="record-label" data-i18n="stats.shortestBook">Shortest Book Read</div>
         <div class="record-value">{{ "{:,}".format(shortest_finished.pages) }} pp</div>
-        <a href="{{ url_for('book_detail', book_id=shortest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ shortest_finished.name }}</a>
+        <a href="{{ url_for('book_detail', book_id=shortest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ shortest_finished.name }}</a>
     </div>
     {% endif %}
     {% if most_reread %}
@@ -84,7 +84,7 @@
         <div class="record-icon">🔁</div>
         <div class="record-label" data-i18n="stats.mostReread">Most Re-read</div>
         <div class="record-value">{{ most_reread.count }} times</div>
-        <a href="{{ url_for('book_detail', book_id=most_reread.id) }}" class="record-date" style="text-decoration: none; color: var(--an-deep-orange);">{{ most_reread.name }}</a>
+        <a href="{{ url_for('book_detail', book_id=most_reread.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ most_reread.name }}</a>
     </div>
     {% endif %}
 </div>
@@ -94,22 +94,22 @@
     <div class="library-charts-grid">
         <div class="card">
             <div class="card-body">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byStatus">Books by Status</h3>
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byStatus">Books by Status</h3>
                 <canvas id="statusBar"></canvas>
             </div>
         </div>
         <div class="card">
             <div class="card-body">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byLanguage">Books by Language</h3>
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byLanguage">Books by Language</h3>
                 <canvas id="languageBar"></canvas>
             </div>
         </div>
     </div>
     <div class="card">
         <div class="card-body">
-            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byGenre">Books by Genre</h3>
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byGenre">Books by Genre</h3>
             <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                <label for="genreTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                <label for="genreTopN" style="margin:0; color:var(--lb-muted);">Show top</label>
                 <select id="genreTopN" style="min-width:6rem;">
                     <option value="5">5</option>
                     <option value="10">10</option>
@@ -126,9 +126,9 @@
     <div class="library-charts-grid">
         <div class="card">
             <div class="card-body">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byOrigLang">Books by Original Language</h3>
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byOrigLang">Books by Original Language</h3>
                 <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                    <label for="origLangTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                    <label for="origLangTopN" style="margin:0; color:var(--lb-muted);">Show top</label>
                     <select id="origLangTopN" style="min-width:6rem;">
                         <option value="5">5</option>
                         <option value="10">10</option>
@@ -144,7 +144,7 @@
         </div>
         <div class="card">
             <div class="card-body">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.ratingDist">Rating Distribution</h3>
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.ratingDist">Rating Distribution</h3>
                 <canvas id="ratingKDE"></canvas>
             </div>
         </div>
@@ -152,9 +152,9 @@
     </div>
     <div class="card">
         <div class="card-body">
-            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.byPublisher">Books by Publisher</h3>
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byPublisher">Books by Publisher</h3>
             <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                <label for="publisherTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+                <label for="publisherTopN" style="margin:0; color:var(--lb-muted);">Show top</label>
                 <select id="publisherTopN" style="min-width:6rem;">
                     <option value="5">5</option>
                     <option value="10">10</option>
@@ -175,9 +175,9 @@
 {% if top_authors %}
 <div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="stats.topAuthors">Top Authors by Number of Books</h3>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.topAuthors">Top Authors by Number of Books</h3>
         <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
-            <label for="topAuthorsTopN" style="margin:0; color:var(--an-muted);">Show top</label>
+            <label for="topAuthorsTopN" style="margin:0; color:var(--lb-muted);">Show top</label>
             <select id="topAuthorsTopN" style="min-width:6rem;">
                 <option value="5">5</option>
                 <option value="10">10</option>
@@ -222,8 +222,8 @@ const pagesChart = new Chart(pagesCtx, {
         datasets: [{
             label: 'Pages Read',
             data: pagesData,
-            backgroundColor: cssVar('--an-chart-bar1'),
-            borderColor: cssVar('--an-chart-line'),
+            backgroundColor: cssVar('--lb-chart-bar1'),
+            borderColor: cssVar('--lb-chart-line'),
             borderWidth: 2,
             borderRadius: 8,
             borderSkipped: false
@@ -245,10 +245,10 @@ const pagesChart = new Chart(pagesCtx, {
                 display: false
             },
             tooltip: {
-                backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                titleColor: cssVar('--an-chart-tooltip-title'),
+                backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                titleColor: cssVar('--lb-chart-tooltip-title'),
                 bodyColor: '#fff',
-                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderColor: cssVar('--lb-chart-tooltip-border'),
                 borderWidth: 1,
                 padding: 12,
                 displayColors: false,
@@ -297,8 +297,8 @@ const booksChart = new Chart(booksCtx, {
         datasets: [{
             label: 'Books Finished',
             data: booksData,
-            backgroundColor: cssVar('--an-chart-bar2'),
-            borderColor: cssVar('--an-chart-tooltip-border'),
+            backgroundColor: cssVar('--lb-chart-bar2'),
+            borderColor: cssVar('--lb-chart-tooltip-border'),
             borderWidth: 2,
             borderRadius: 8,
             borderSkipped: false
@@ -320,10 +320,10 @@ const booksChart = new Chart(booksCtx, {
                 display: false
             },
             tooltip: {
-                backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                titleColor: cssVar('--an-chart-tooltip-title'),
+                backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                titleColor: cssVar('--lb-chart-tooltip-title'),
                 bodyColor: '#fff',
-                borderColor: cssVar('--an-chart-tooltip-border'),
+                borderColor: cssVar('--lb-chart-tooltip-border'),
                 borderWidth: 1,
                 padding: 12,
                 displayColors: false,
@@ -371,17 +371,17 @@ const booksChart = new Chart(booksCtx, {
 // ═══════════════════════════════════════════════════════════════════════
 
 const STATUS_COLORS = {
-    'Reading':     cssVar('--an-reading'),
-    'Finished':    cssVar('--an-finished'),
-    'Not Started': cssVar('--an-not-started'),
-    'Abandoned':   cssVar('--an-abandoned'),
+    'Reading':     cssVar('--lb-reading'),
+    'Finished':    cssVar('--lb-finished'),
+    'Not Started': cssVar('--lb-not-started'),
+    'Abandoned':   cssVar('--lb-abandoned'),
 };
 
 const TOOLTIP_OPTS = {
-    backgroundColor: cssVar('--an-chart-tooltip-bg') || '#1f2937',
-    titleColor: cssVar('--an-chart-tooltip-title') || '#FFC300',
+    backgroundColor: cssVar('--lb-chart-tooltip-bg') || '#1f2937',
+    titleColor: cssVar('--lb-chart-tooltip-title') || '#FFC300',
     bodyColor: '#fff',
-    borderColor: cssVar('--an-chart-tooltip-border') || '#374151',
+    borderColor: cssVar('--lb-chart-tooltip-border') || '#374151',
     borderWidth: 1,
     padding: 12,
     displayColors: false,
@@ -402,7 +402,7 @@ function makeHBar(canvasId, dataMap, colorMap, sorted, aspectRatio) {
     if (sorted !== false) entries.sort((a, b) => b[1] - a[1]);
     const labels = entries.map(e => e[0]);
     const data   = entries.map(e => e[1]);
-    const defaultColor = cssVar('--an-chart-bar1') || 'rgba(255,95,0,0.8)';
+    const defaultColor = cssVar('--lb-chart-bar1') || 'rgba(255,95,0,0.8)';
     const colors = labels.map(l => (colorMap && colorMap[l]) ? colorMap[l] : defaultColor);
     const ctx = canvas.getContext('2d');
     // Destroy any existing Chart.js instance on this canvas to force redraw
@@ -479,8 +479,8 @@ function makeHBar(canvasId, dataMap, colorMap, sorted, aspectRatio) {
         });
         ys.push(density / rawRatings.length);
     }
-    const lineColor = cssVar('--an-deep-orange') || '#FF5F00';
-    const fillColor = (cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.8)').replace(/[\d.]+\)$/, '0.25)');
+    const lineColor = cssVar('--lb-deep-orange') || '#FF5F00';
+    const fillColor = (cssVar('--lb-chart-bar2') || 'rgba(255,140,0,0.8)').replace(/[\d.]+\)$/, '0.25)');
     new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
@@ -520,7 +520,7 @@ makeHBar('statusBar', statusData, STATUS_COLORS, true, 2);
 // Genre bar (dynamic top-N)
 const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
 (function(){
-    const STORAGE_KEY = 'ashinami_genre_top_n';
+    const STORAGE_KEY = 'librarium_genre_top_n';
     const select = document.getElementById('genreTopN');
 
     function renderFor(value) {
@@ -550,7 +550,7 @@ makeHBar('languageBar', langData, null, true, 2);
 // Original language bar (dynamic top-N)
 const FULL_ORIG_LANG_COUNTS = {{ orig_lang_counts | tojson }};
 (function(){
-    const STORAGE_KEY = 'ashinami_orig_lang_top_n';
+    const STORAGE_KEY = 'librarium_orig_lang_top_n';
     const select = document.getElementById('origLangTopN');
 
     function renderFor(value) {
@@ -576,7 +576,7 @@ const FULL_ORIG_LANG_COUNTS = {{ orig_lang_counts | tojson }};
 // Publisher bar (dynamic top-N controlled by user; changes saved in localStorage)
 const FULL_PUB_COUNTS = {{ publisher_counts | tojson }};
 (function(){
-    const STORAGE_KEY = 'ashinami_publisher_top_n';
+    const STORAGE_KEY = 'librarium_publisher_top_n';
     const select = document.getElementById('publisherTopN');
 
     function renderFor(value) {
@@ -604,7 +604,7 @@ const FULL_PUB_COUNTS = {{ publisher_counts | tojson }};
 {% if top_authors %}
 const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
 (function(){
-    const STORAGE_KEY = 'ashinami_top_authors_n';
+    const STORAGE_KEY = 'librarium_top_authors_n';
     const select = document.getElementById('topAuthorsTopN');
 
     function renderFor(value) {
@@ -662,15 +662,15 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
                             type: 'bar',
                             label: 'Daily pages',
                             data: daily,
-                            backgroundColor: cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.6)',
+                            backgroundColor: cssVar('--lb-chart-bar2') || 'rgba(255,140,0,0.6)',
                             borderRadius: 3,
                         },
                         {
                             type: 'line',
                             label: 'Cumulative pages',
                             data: cumulative,
-                            borderColor: cssVar('--an-deep-orange') || '#FF5F00',
-                            backgroundColor: (cssVar('--an-chart-bar2') || 'rgba(255,140,0,0.6)').replace(/\)$/, ',0.12)'),
+                            borderColor: cssVar('--lb-deep-orange') || '#FF5F00',
+                            backgroundColor: (cssVar('--lb-chart-bar2') || 'rgba(255,140,0,0.6)').replace(/\)$/, ',0.12)'),
                             fill: true,
                             tension: 0.35,
                             pointRadius: 0,
@@ -726,16 +726,16 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
         if (!res.ok) return;
         const data = await res.json();
         if (!data.dates || data.dates.length === 0) {
-            canvas.parentElement.innerHTML = '<p style="color:var(--an-muted);text-align:center;">Not enough data yet.</p>';
+            canvas.parentElement.innerHTML = '<p style="color:var(--lb-muted);text-align:center;">Not enough data yet.</p>';
             return;
         }
 
         const STATUS_CFG = [
-            { key: 'finished',    label: 'Finished',    color: cssVar('--an-finished')    || '#10B981' },
-            { key: 'reading',     label: 'Reading',     color: cssVar('--an-reading')     || '#3B82F6' },
-            { key: 'not-started', label: 'Not Started', color: cssVar('--an-not-started') || '#8B5CF6' },
-            { key: 'draft',       label: 'Draft',       color: cssVar('--an-draft')       || '#6B7280' },
-            { key: 'abandoned',   label: 'Abandoned',   color: cssVar('--an-abandoned')   || '#DC2626' },
+            { key: 'finished',    label: 'Finished',    color: cssVar('--lb-finished')    || '#10B981' },
+            { key: 'reading',     label: 'Reading',     color: cssVar('--lb-reading')     || '#3B82F6' },
+            { key: 'not-started', label: 'Not Started', color: cssVar('--lb-not-started') || '#8B5CF6' },
+            { key: 'draft',       label: 'Draft',       color: cssVar('--lb-draft')       || '#6B7280' },
+            { key: 'abandoned',   label: 'Abandoned',   color: cssVar('--lb-abandoned')   || '#DC2626' },
         ];
 
         // Pre-compute totals per date index

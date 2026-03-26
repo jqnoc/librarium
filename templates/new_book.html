@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Add New Book – Ashinami{% endblock %}
+{% block title %}Add New Book – Librarium{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -9,11 +9,11 @@
 <h1 data-i18n="bookForm.addNewBook">Add New Book</h1>
 
 {% if parent_work_id %}
-<div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--an-deep-orange);">
+<div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--lb-deep-orange);">
     <div class="card-body" style="padding: 0.75rem 1rem;">
         <strong data-i18n="bookForm.addingEditionOf">Adding new edition of:</strong>
-        <span style="color: var(--an-deep-orange); font-weight: 600;">{{ parent_book_name }}</span>
-        <div style="font-size: 0.85rem; color: var(--an-text-light); margin-top: 0.25rem;" data-i18n="bookForm.editionHint">Work-level fields (author, original work info, genre) are pre-filled. Edition-level fields (language, publisher, pages, cover) are for this specific edition.</div>
+        <span style="color: var(--lb-deep-orange); font-weight: 600;">{{ parent_book_name }}</span>
+        <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.25rem;" data-i18n="bookForm.editionHint">Work-level fields (author, original work info, genre) are pre-filled. Edition-level fields (language, publisher, pages, cover) are for this specific edition.</div>
     </div>
 </div>
 {% endif %}
@@ -264,7 +264,7 @@
             <div class="form-group">
                 <textarea id="summary" name="summary" class="form-control" rows="5">{{ prefill.get('summary', '') }}</textarea>
             </div>
-            <script>document.addEventListener('DOMContentLoaded',function(){window.ashinamiI18n.initRichTextToolbar('summary');});</script>
+            <script>document.addEventListener('DOMContentLoaded',function(){window.librariumI18n.initRichTextToolbar('summary');});</script>
         </div>
     </div>
 
@@ -405,7 +405,7 @@ function toggleSourceFields() {
 function toggleGiftFields() {
     const isGift = document.getElementById('is_gift').checked;
     // Toggle labels (i18n-aware)
-    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
     var dateLbl = document.getElementById('label_purchase_date');
     var placeLbl = document.getElementById('label_source_id_owned');
     dateLbl.textContent = isGift ? t('bookForm.dateReceived') : t('bookForm.purchaseDate');
@@ -430,7 +430,7 @@ document.getElementById('add-series-btn').addEventListener('click', function() {
     var tmpl = document.getElementById('series-row-template');
     var clone = tmpl.content.cloneNode(true);
     document.getElementById('series-entries').appendChild(clone);
-    if (window.ashinamiI18n) window.ashinamiI18n.apply();
+    if (window.librariumI18n) window.librariumI18n.apply();
 });
 </script>
 {% endblock %}

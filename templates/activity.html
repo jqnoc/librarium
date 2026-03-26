@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Activity – Ashinami{% endblock %}
+{% block title %}Activity – Librarium{% endblock %}
 
 {% block content %}
 <h1 data-i18n="activity.title">Activity</h1>
@@ -23,7 +23,7 @@
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-            <h3 style="margin: 0; color: var(--an-deep-orange);" data-i18n="activity.dailyActivity">Daily Activity</h3>
+            <h3 style="margin: 0; color: var(--lb-deep-orange);" data-i18n="activity.dailyActivity">Daily Activity</h3>
             <div style="display: flex; gap: 1rem; font-size: 0.9rem; align-items: center;">
                 <label style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="radio" name="dailyMode" value="pages" checked> <span data-i18n="activity.pages">Pages</span>
@@ -40,9 +40,9 @@
 <!-- Activity Heatmap -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);">
             <span data-i18n="activity.heatmap">Reading Heatmap</span>
-            <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="activity.last52">(last 52 weeks)</span>
+            <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="activity.last52">(last 52 weeks)</span>
         </h3>
         <div class="heatmap-wrapper">
             <div class="heatmap-day-labels">
@@ -69,15 +69,15 @@
 <div class="activity-two-col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
     <div class="card">
         <div class="card-body">
-            <h3 style="margin-top: 0; color: var(--an-deep-orange);" data-i18n="activity.dayOfWeek">Reading by Day of Week</h3>
+            <h3 style="margin-top: 0; color: var(--lb-deep-orange);" data-i18n="activity.dayOfWeek">Reading by Day of Week</h3>
             <canvas id="weekdayChart" style="max-height: 280px;"></canvas>
         </div>
     </div>
     <div class="card">
         <div class="card-body">
-            <h3 style="margin-top: 0; color: var(--an-deep-orange);">
+            <h3 style="margin-top: 0; color: var(--lb-deep-orange);">
                 <span data-i18n="activity.paceTrend">Reading Pace Trend</span>
-                <span style="font-size: 0.8rem; color: var(--an-text-light);" data-i18n="activity.rollingAvg">(7-day rolling avg)</span>
+                <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="activity.rollingAvg">(7-day rolling avg)</span>
             </h3>
             <canvas id="paceChart" style="max-height: 280px;"></canvas>
         </div>
@@ -87,7 +87,7 @@
 <!-- Books Active in This Period -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="activity.booksActive">Books Active in This Period</h3>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="activity.booksActive">Books Active in This Period</h3>
         <div id="activeBooksRow" class="active-books-row"></div>
     </div>
 </div>
@@ -96,8 +96,8 @@
 {% if reading_books %}
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="activity.estFinishDates">Estimated Finish Dates</h3>
-        <p style="font-size: 0.82rem; color: var(--an-text-light); margin-bottom: 1rem;" data-i18n="activity.estFinishDesc">Based on your reading pace over the last 30 days.</p>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="activity.estFinishDates">Estimated Finish Dates</h3>
+        <p style="font-size: 0.82rem; color: var(--lb-text-light); margin-bottom: 1rem;" data-i18n="activity.estFinishDesc">Based on your reading pace over the last 30 days.</p>
         <div id="finishEstimates" class="finish-estimates-grid"></div>
     </div>
 </div>
@@ -106,7 +106,7 @@
 <!-- Personal Records -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--an-deep-orange);" data-i18n="activity.personalRecords">Personal Records 🏆</h3>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="activity.personalRecords">Personal Records 🏆</h3>
         <div id="personalRecords" class="records-grid"></div>
     </div>
 </div>
@@ -355,7 +355,7 @@ function computeExtendedRecords() {
 // Render: Summary ribbon
 // ═══════════════════════════════════════════════════════════════════════════
 function renderSummary(days) {
-    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
     const data = getFilteredData(days);
     const totalPages   = data.reduce((s,d) => s + d.pages, 0);
     const totalSeconds = data.reduce((s,d) => s + d.seconds, 0);
@@ -366,27 +366,27 @@ function renderSummary(days) {
         <div class="card" style="flex:1; min-width:140px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">📄 ${t('activity.totalPages')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${totalPages.toLocaleString()}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${totalPages.toLocaleString()}</div>
             </div>
         </div>
         <div class="card" style="flex:1; min-width:140px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">⏱️ ${t('activity.totalTime2')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${formatDuration(totalSeconds)}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${formatDuration(totalSeconds)}</div>
             </div>
         </div>
         <div class="card" style="flex:1; min-width:140px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">📅 ${t('activity.activeDays')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${daysRead}</div>
-                <div style="font-size:0.75rem; color:var(--an-text-light);">/ ${days}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${daysRead}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">/ ${days}</div>
             </div>
         </div>
         <div class="card" style="flex:1; min-width:140px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">📊 ${t('activity.avgPagesDay')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${avgPerDay}</div>
-                <div style="font-size:0.75rem; color:var(--an-text-light);">${t('activity.pagesLabel')}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${avgPerDay}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${t('activity.pagesLabel')}</div>
             </div>
         </div>`;
 }
@@ -395,7 +395,7 @@ function renderSummary(days) {
 // Render: Streaks & Consistency
 // ═══════════════════════════════════════════════════════════════════════════
 function renderStreaks(days) {
-    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
     const streaks = computeStreaks();
     const con = computeConsistency(days);
 
@@ -403,22 +403,22 @@ function renderStreaks(days) {
         <div class="card" style="flex:1; min-width:160px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">🔥 ${t('activity.currentStreak')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${streaks.current}</div>
-                <div style="font-size:0.75rem; color:var(--an-text-light);">${streaks.current !== 1 ? t('activity.days') : t('activity.day')}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${streaks.current}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${streaks.current !== 1 ? t('activity.days') : t('activity.day')}</div>
             </div>
         </div>
         <div class="card" style="flex:1; min-width:160px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">🏆 ${t('activity.longestStreak')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${streaks.longest}</div>
-                <div style="font-size:0.75rem; color:var(--an-text-light);">${streaks.longest !== 1 ? t('activity.days') : t('activity.day')}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${streaks.longest}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${streaks.longest !== 1 ? t('activity.days') : t('activity.day')}</div>
             </div>
         </div>
         <div class="card" style="flex:1; min-width:160px;">
             <div class="card-body" style="text-align:center;">
                 <div class="meta-label">📈 ${t('activity.consistency')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--an-deep-orange);">${con.pct.toFixed(1)}%</div>
-                <div style="font-size:0.75rem; color:var(--an-text-light);">${con.daysRead} / ${con.totalDays} ${t('activity.days')}</div>
+                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${con.pct.toFixed(1)}%</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${con.daysRead} / ${con.totalDays} ${t('activity.days')}</div>
             </div>
         </div>`;
 }
@@ -427,7 +427,7 @@ function renderStreaks(days) {
 // Render: Heatmap (always last 52 weeks)
 // ═══════════════════════════════════════════════════════════════════════════
 function getHeatmapColors() {
-    const hex = cssVar('--an-chart-line');
+    const hex = cssVar('--lb-chart-line');
     let r = 255, g = 95, b = 0;
     if (hex && hex.startsWith('#') && hex.length >= 7) {
         r = parseInt(hex.slice(1,3), 16);
@@ -551,8 +551,8 @@ function createDailyChart(days) {
             datasets: [{
                 label: isPages ? 'Pages Read' : 'Minutes Read',
                 data: values,
-                backgroundColor: useLineChart ? cssVar('--an-chart-fill') : cssVar('--an-chart-bar1'),
-                borderColor: cssVar('--an-chart-line'),
+                backgroundColor: useLineChart ? cssVar('--lb-chart-fill') : cssVar('--lb-chart-bar1'),
+                borderColor: cssVar('--lb-chart-line'),
                 borderWidth: useLineChart ? 2 : 1,
                 borderRadius: useLineChart ? 0 : 4,
                 borderSkipped: false,
@@ -568,10 +568,10 @@ function createDailyChart(days) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                    titleColor: cssVar('--an-chart-tooltip-title'),
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
                     bodyColor: '#fff',
-                    borderColor: cssVar('--an-chart-tooltip-border'),
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -645,8 +645,8 @@ function createWeekdayChart(days) {
             datasets: [{
                 label: 'Avg Pages',
                 data: avgByDay,
-                backgroundColor: cssVar('--an-chart-bar1'),
-                borderColor: cssVar('--an-chart-line'),
+                backgroundColor: cssVar('--lb-chart-bar1'),
+                borderColor: cssVar('--lb-chart-line'),
                 borderWidth: 2,
                 borderRadius: 6,
                 borderSkipped: false,
@@ -659,10 +659,10 @@ function createWeekdayChart(days) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                    titleColor: cssVar('--an-chart-tooltip-title'),
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
                     bodyColor: '#fff',
-                    borderColor: cssVar('--an-chart-tooltip-border'),
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
                     borderWidth: 1, padding: 12, displayColors: false,
                     callbacks: {
                         label: function(ctx) { return ctx.parsed.x + ' pages avg'; }
@@ -714,13 +714,13 @@ function createPaceChart(days) {
             datasets: [{
                 label: '7-Day Avg',
                 data: values,
-                borderColor: cssVar('--an-chart-line'),
-                backgroundColor: cssVar('--an-chart-fill'),
+                borderColor: cssVar('--lb-chart-line'),
+                backgroundColor: cssVar('--lb-chart-fill'),
                 borderWidth: 2,
                 fill: true,
                 tension: 0.3,
                 pointRadius: days <= 30 ? 3 : 0,
-                pointBackgroundColor: cssVar('--an-chart-line'),
+                pointBackgroundColor: cssVar('--lb-chart-line'),
                 pointBorderColor: '#fff',
                 pointBorderWidth: 1,
             }]
@@ -731,10 +731,10 @@ function createPaceChart(days) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: cssVar('--an-chart-tooltip-bg'),
-                    titleColor: cssVar('--an-chart-tooltip-title'),
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
                     bodyColor: '#fff',
-                    borderColor: cssVar('--an-chart-tooltip-border'),
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
                     borderWidth: 1, padding: 12, displayColors: false,
                     callbacks: {
                         label: function(ctx) { return ctx.parsed.y.toFixed(1) + ' pages/day avg'; }
@@ -767,7 +767,7 @@ function renderActiveBooks(days) {
 
     const container = document.getElementById('activeBooksRow');
     if (activeIds.size === 0) {
-        container.innerHTML = '<p style="color:var(--an-text-light); margin:0;">No books active in this period.</p>';
+        container.innerHTML = '<p style="color:var(--lb-text-light); margin:0;">No books active in this period.</p>';
         return;
     }
 
@@ -825,7 +825,7 @@ function renderFinishEstimates() {
 
         const cover = book.has_cover
             ? '<img src="/cover/' + book.id + '?v=' + (book.cover_hash || '') + '" alt="' + esc(book.name) + '">'
-            : '<div class="cover-placeholder" style="width:100%;height:100%;background:var(--an-gradient);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📖</div>';
+            : '<div class="cover-placeholder" style="width:100%;height:100%;background:var(--lb-gradient);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📖</div>';
 
         html += `
             <div class="finish-card">
@@ -833,32 +833,32 @@ function renderFinishEstimates() {
                 <div class="finish-info">
                     <a href="/book/${book.id}" class="finish-title">${esc(book.name)}</a>
                     <div class="progress-bar-wrap"><div class="progress-bar" style="width:${book.progress_pct}%"></div></div>
-                    <div style="font-size:0.82rem; color:var(--an-text-light);">
+                    <div style="font-size:0.82rem; color:var(--lb-text-light);">
                         ${book.pages_read} / ${book.effective_pages} pages (${book.progress_pct}%)
                     </div>
                     <div style="font-size:0.82rem; margin-top:0.35rem;">
-                        <span style="color:var(--an-text-light);">${pace > 0 ? pace.toFixed(1) + ' pg/day' : '—'}</span>
-                        <span style="color:var(--an-deep-orange); font-weight:600; margin-left:0.5rem;">${estStr}</span>
-                        ${estDate ? '<span style="color:var(--an-text-light);"> · ' + estDate + '</span>' : ''}
+                        <span style="color:var(--lb-text-light);">${pace > 0 ? pace.toFixed(1) + ' pg/day' : '—'}</span>
+                        <span style="color:var(--lb-deep-orange); font-weight:600; margin-left:0.5rem;">${estStr}</span>
+                        ${estDate ? '<span style="color:var(--lb-text-light);"> · ' + estDate + '</span>' : ''}
                     </div>
                 </div>
             </div>`;
     });
 
-    container.innerHTML = html || '<p style="color:var(--an-text-light); margin:0;">No books currently being read.</p>';
+    container.innerHTML = html || '<p style="color:var(--lb-text-light); margin:0;">No books currently being read.</p>';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Render: Personal Records
 // ═══════════════════════════════════════════════════════════════════════════
 function renderRecords() {
-    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
     const r = computeRecords();
     const ext = computeExtendedRecords();
     const container = document.getElementById('personalRecords');
 
     if (!r.bestDay) {
-        container.innerHTML = '<p style="color:var(--an-text-light); margin:0;">Not enough data yet.</p>';
+        container.innerHTML = '<p style="color:var(--lb-text-light); margin:0;">Not enough data yet.</p>';
         return;
     }
 
@@ -883,21 +883,21 @@ function renderRecords() {
             <div class="record-icon">📄</div>
             <div class="record-label">${t('activity.mostPagesDay')}</div>
             <div class="record-value">${r.bestDay.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestDay.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--an-text-light);">' + formatDuration(r.bestDay.seconds) + '</div>' : ''}
+            ${r.bestDay.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestDay.seconds) + '</div>' : ''}
             <div class="record-date">${fmtDateNice(r.bestDay.date)}</div>
         </div>
         <div class="record-card">
             <div class="record-icon">⏱️</div>
             <div class="record-label">${t('activity.mostTimeDay')}</div>
             <div class="record-value">${formatDuration(ext.longestDay.seconds)}</div>
-            <div style="font-size:0.82rem; color:var(--an-text-light);">${ext.longestDay.pages} ${t('activity.pagesLabel')}</div>
+            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.longestDay.pages} ${t('activity.pagesLabel')}</div>
             <div class="record-date">${fmtDateNice(ext.longestDay.date)}</div>
         </div>
         <div class="record-card">
             <div class="record-icon">🔖</div>
             <div class="record-label">${t('activity.longestSession')}</div>
             <div class="record-value">${formatDuration(ext.longestSession.seconds)}</div>
-            <div style="font-size:0.82rem; color:var(--an-text-light);">${ext.longestSession.pages} ${t('activity.pagesLabel')}</div>
+            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.longestSession.pages} ${t('activity.pagesLabel')}</div>
             ${lsBook ? '<div class="record-date">' + esc(lsBook) + '</div>' : ''}
             <div class="record-date">${fmtDateNice(ext.longestSession.date)}</div>
         </div>
@@ -906,21 +906,21 @@ function renderRecords() {
             <div class="record-icon">⚡</div>
             <div class="record-label">${t('activity.fastestDay')}</div>
             <div class="record-value">${ext.fastestDay.pph.toFixed(1)} pg/h</div>
-            <div style="font-size:0.82rem; color:var(--an-text-light);">${ext.fastestDay.pages} ${t('activity.pagesLabel')} · ${formatDuration(ext.fastestDay.seconds)}</div>
+            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.fastestDay.pages} ${t('activity.pagesLabel')} · ${formatDuration(ext.fastestDay.seconds)}</div>
             <div class="record-date">${fmtDateNice(ext.fastestDay.date)}</div>
         </div>` : ''}
         <div class="record-card">
             <div class="record-icon">📆</div>
             <div class="record-label">${t('activity.bestWeek')}</div>
             <div class="record-value">${r.bestWeek.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestWeek.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--an-text-light);">' + formatDuration(r.bestWeek.seconds) + '</div>' : ''}
+            ${r.bestWeek.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestWeek.seconds) + '</div>' : ''}
             <div class="record-date">${fmtDateNice(r.bestWeek.start)} – ${fmtDateNice(r.bestWeek.end)}</div>
         </div>
         <div class="record-card">
             <div class="record-icon">🗓️</div>
             <div class="record-label">${t('activity.bestMonth')}</div>
             <div class="record-value">${r.bestMonth.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestMonth.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--an-text-light);">' + formatDuration(r.bestMonth.seconds) + '</div>' : ''}
+            ${r.bestMonth.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestMonth.seconds) + '</div>' : ''}
             <div class="record-date">${fmtDateNice(r.bestMonth.start)} – ${fmtDateNice(r.bestMonth.end)}</div>
         </div>
         ${mostParallel.count > 1 ? `
@@ -928,7 +928,7 @@ function renderRecords() {
             <div class="record-icon">📚</div>
             <div class="record-label">${t('activity.mostBooksParallel')}</div>
             <div class="record-value">${mostParallel.count} ${t('activity.books')}</div>
-            <div style="font-size:0.78rem; color:var(--an-text-light); line-height:1.3;">${parallelNames}</div>
+            <div style="font-size:0.78rem; color:var(--lb-text-light); line-height:1.3;">${parallelNames}</div>
             <div class="record-date">${fmtDateNice(mostParallel.date)}</div>
         </div>` : ''}
         <div class="record-card">
@@ -951,14 +951,14 @@ function renderRecords() {
             <div class="record-icon">📏</div>
             <div class="record-label">${t('activity.longestBookRead')}</div>
             <div class="record-value">${longestFinishedBook.pages.toLocaleString()} ${t('activity.pagesSuffix')}</div>
-            <a href="/book/${longestFinishedBook.id}" style="font-size:0.78rem; color:var(--an-deep-orange); text-decoration:none;">${esc(longestFinishedBook.name)}</a>
+            <a href="/book/${longestFinishedBook.id}" style="font-size:0.78rem; color:var(--lb-deep-orange); text-decoration:none;">${esc(longestFinishedBook.name)}</a>
         </div>` : ''}
         ${mostRereadBook ? `
         <div class="record-card">
             <div class="record-icon">🔁</div>
             <div class="record-label">${t('activity.mostRereadBook')}</div>
             <div class="record-value">${mostRereadBook.count} ${t('activity.readTimes')}</div>
-            <a href="/book/${mostRereadBook.id}" style="font-size:0.78rem; color:var(--an-deep-orange); text-decoration:none;">${esc(mostRereadBook.name)}</a>
+            <a href="/book/${mostRereadBook.id}" style="font-size:0.78rem; color:var(--lb-deep-orange); text-decoration:none;">${esc(mostRereadBook.name)}</a>
         </div>` : ''}`;
 }
 

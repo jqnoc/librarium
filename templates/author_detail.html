@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ author }} – Ashinami{% endblock %}
+{% block title %}{{ author }} – Librarium{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -68,10 +68,10 @@
                    onchange="var url='{{ url_for('author_detail', author_name=author) }}?sort=' + document.querySelector('#authorSort').value + '&show_editions=' + (this.checked ? '1' : '0'); window.location.href=url;">
             <span data-i18n="authorDetail.showAllEditions">Show All Editions</span>
         </label>
-        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--an-text-light);">
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
             <span data-i18n="authorDetail.sortBy">Sort by:</span>
             <select id="authorSort" onchange="window.location.href='{{ url_for('author_detail', author_name=author) }}?sort=' + this.value + '&show_editions={{ show_editions }}'"
-                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); cursor: pointer;">
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
                 <option value="date"   {% if sort == 'date'   %}selected{% endif %} data-i18n="authorDetail.sortDate">Original Publication Date</option>
                 <option value="alpha"  {% if sort == 'alpha'  %}selected{% endif %} data-i18n="authorDetail.sortTitle">Title</option>
                 <option value="rating" {% if sort == 'rating' %}selected{% endif %} data-i18n="authorDetail.sortRating">Rating</option>
@@ -95,10 +95,10 @@
                 <div class="book-title" style="font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0;">{{ book.name }}</div>
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
                 {% if book.original_publication_date %}
-                <div style="font-size: 0.8rem; color: var(--an-text-light); margin-top: 0.25rem;">{{ book.original_publication_date }}</div>
+                <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.25rem;">{{ book.original_publication_date }}</div>
                 {% endif %}
                 {% if book.rating > 0 %}
-                <div style="font-size: 0.8rem; color: var(--an-deep-orange); margin-top: 0.25rem; font-weight: 500;">⭐ {{ "%.2f" | format(book.rating) }} / 5</div>
+                <div style="font-size: 0.8rem; color: var(--lb-deep-orange); margin-top: 0.25rem; font-weight: 500;">⭐ {{ "%.2f" | format(book.rating) }} / 5</div>
                 {% endif %}
             </div>
         </div>

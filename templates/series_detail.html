@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ series.name }} – Series – Ashinami{% endblock %}
+{% block title %}{{ series.name }} – Series – Librarium{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -8,14 +8,14 @@
 
 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
-        <h1 style="margin: 0 0 0.25rem 0; color: var(--an-text-dark);">{{ series.name }}</h1>
-        <span style="color: var(--an-text-light); font-size: 0.95rem;">{{ books | length }} book{{ 's' if books | length != 1 else '' }}</span>
+        <h1 style="margin: 0 0 0.25rem 0; color: var(--lb-text-dark);">{{ series.name }}</h1>
+        <span style="color: var(--lb-text-light); font-size: 0.95rem;">{{ books | length }} book{{ 's' if books | length != 1 else '' }}</span>
     </div>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
         <!-- Rename -->
         <form method="POST" action="{{ url_for('rename_series', series_id=series.id) }}" style="display: flex; gap: 0.3rem; align-items: center;">
             <input type="text" name="name" value="{{ series.name }}" required
-                   style="font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid var(--an-border); border-radius: 4px; background: var(--an-bg); color: var(--an-text-dark); width: 160px;">
+                   style="font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); width: 160px;">
             <button type="submit" class="btn btn-secondary btn-sm" data-i18n="series.rename">Rename</button>
         </form>
         <!-- Delete -->
@@ -33,7 +33,7 @@
         <div class="card" style="transition: box-shadow 0.15s;">
             <div class="card-body" style="display: flex; align-items: flex-start; gap: 1rem;">
                 <!-- Cover thumbnail -->
-                <div style="flex-shrink: 0; width: 52px; height: 75px; overflow: hidden; border-radius: 4px; background: var(--an-surface-alt, #f3f4f6);">
+                <div style="flex-shrink: 0; width: 52px; height: 75px; overflow: hidden; border-radius: 4px; background: var(--lb-surface-alt, #f3f4f6);">
                     {% if book.has_cover %}
                     <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt=""
                          style="width: 100%; height: 100%; object-fit: cover;">
@@ -44,17 +44,17 @@
                 <div style="flex: 1; min-width: 0;">
                     <div style="display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
                         {% if book.series_index %}
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--an-deep-orange);">#{{ book.series_index }}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--lb-deep-orange);">#{{ book.series_index }}</span>
                         {% endif %}
-                        <span style="font-weight: 600; font-size: 1rem; line-height: 1.3; color: var(--an-text-dark);">{{ book.name }}</span>
+                        <span style="font-weight: 600; font-size: 1rem; line-height: 1.3; color: var(--lb-text-dark);">{{ book.name }}</span>
                     </div>
                     {% if book.subtitle %}
-                    <div style="font-size: 0.85rem; color: var(--an-text-light); margin-top: 0.1rem;">{{ book.subtitle }}</div>
+                    <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.1rem;">{{ book.subtitle }}</div>
                     {% endif %}
-                    <div style="font-size: 0.85rem; color: var(--an-text-light); margin-top: 0.3rem;">
+                    <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.3rem;">
                         {{ book.author }}
                     </div>
-                    <div style="display: flex; gap: 0.75rem; margin-top: 0.3rem; font-size: 0.8rem; color: var(--an-text-light);">
+                    <div style="display: flex; gap: 0.75rem; margin-top: 0.3rem; font-size: 0.8rem; color: var(--lb-text-light);">
                         <span class="badge status-{{ book.status }}" style="font-size: 0.75rem;">{{ book.status | format_status }}</span>
                         {% if book.rating %}
                         <span>★ {{ "%.2f" | format(book.rating) }}</span>

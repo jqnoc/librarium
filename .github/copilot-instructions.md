@@ -1,6 +1,6 @@
-# Ashinami — Agent Directives
+# Librarium — Agent Directives
 
-These directives apply whenever working on the Ashinami project.
+These directives apply whenever working on the Librarium project.
 They ensure consistency, prevent regressions, and keep the
 single-file architecture maintainable.
 
@@ -8,7 +8,7 @@ single-file architecture maintainable.
 
 ## 1. Project Overview
 
-Ashinami is a **local Flask web application** for tracking personal
+Librarium is a **local Flask web application** for tracking personal
 book reading statistics. It is a monolithic single-file app (`app.py`,
 ~4 500+ lines) with raw SQLite queries, Jinja2 templates, vanilla JS,
 and Chart.js for charts. There is **no test suite** — all verification
@@ -19,11 +19,11 @@ is manual.
 | Aspect | Value |
 |--------|-------|
 | Entry point | `app.py` |
-| Database | SQLite at `data/ashinami.db` (WAL mode) |
+| Database | SQLite at `data/librarium.db` (WAL mode) |
 | Python | 3.12+ |
 | Dependencies | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
 | Port | 5000 (localhost only) |
-| Startup | `python app.py` or `run-ashinami.bat` |
+| Startup | `python app.py` or `run-librarium.bat` |
 
 ---
 
@@ -91,11 +91,11 @@ Five book statuses:
 
 | Status | CSS class | Colour variable |
 |--------|-----------|-----------------|
-| `reading` | `.badge.status-reading` | `--an-reading` (#3B82F6) |
-| `finished` | `.badge.status-finished` | `--an-finished` (#10B981) |
-| `not-started` | `.badge.status-not-started` | `--an-not-started` (#8B5CF6) |
-| `abandoned` | `.badge.status-abandoned` | `--an-abandoned` (#DC2626) |
-| `draft` | `.badge.status-draft` | `--an-draft` (#6B7280) |
+| `reading` | `.badge.status-reading` | `--lb-reading` (#3B82F6) |
+| `finished` | `.badge.status-finished` | `--lb-finished` (#10B981) |
+| `not-started` | `.badge.status-not-started` | `--lb-not-started` (#8B5CF6) |
+| `abandoned` | `.badge.status-abandoned` | `--lb-abandoned` (#DC2626) |
+| `draft` | `.badge.status-draft` | `--lb-draft` (#6B7280) |
 
 Canonical sort order is defined in `STATUS_ORDER` (line ~1132).
 
@@ -141,8 +141,8 @@ Six color palettes, selected via `data-palette` attribute on `<html>`:
 | `umi` | Umi | — |
 | `hinode` | Hinode | — |
 
-Each palette overrides CSS custom properties (prefixed `--an-`).
-Chart colours are also palette-aware (`--an-chart-*` variables).
+Each palette overrides CSS custom properties (prefixed `--lb-`).
+Chart colours are also palette-aware (`--lb-chart-*` variables).
 
 ### 3.2 Internationalisation (i18n)
 
@@ -340,7 +340,7 @@ There is **no automated test suite**. After any change, verify manually:
 |------|---------|
 | `app.py` | Entire Flask application |
 | `requirements.txt` | Python dependencies |
-| `run-ashinami.bat` | Windows launcher (starts app + opens browser) |
+| `run-librarium.bat` | Windows launcher (starts app + opens browser) |
 | `static/style.css` | Stylesheet (palettes, layout, components) |
 | `static/i18n.js` | EN/ES translations |
 | `templates/base.html` | Base layout (navbar, palette switcher, Chart.js CDN) |
@@ -356,7 +356,7 @@ There is **no automated test suite**. After any change, verify manually:
 | `templates/author_detail.html` | Author detail |
 | `templates/edit_author.html` | Edit author form |
 | `templates/sources.html` | Source management |
-| `data/ashinami.db` | SQLite database (gitignored) |
+| `data/librarium.db` | SQLite database (gitignored) |
 | `data/backups/` | Automatic daily backups |
 
 ---
@@ -410,7 +410,7 @@ feat(stats): add status timeline stacked area chart
 - **Monolithic `app.py`**: ~4 500+ lines in a single file. No plans to
   refactor, but be aware of line-number drift when making changes.
 - **No automated tests**: All verification is manual.
-- **`app.secret_key`**: Hardcoded as `"ashinami-local-dev-key"` — acceptable
+- **`app.secret_key`**: Hardcoded as `"librarium-local-dev-key"` — acceptable
   for a localhost-only personal app but not production-safe.
 - **Cover extraction**: `cover_color` and `cover_palette` are computed on
   upload; changing the algorithm does not retroactively update existing books.

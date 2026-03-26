@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Edit – {{ info.get('name', 'Book') }} – Ashinami{% endblock %}
+{% block title %}Edit – {{ info.get('name', 'Book') }} – Librarium{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -144,7 +144,7 @@
                     <input type="file" id="cover" name="cover" class="form-control" accept="image/*">
                     {% if cover_palette %}
                     <div style="margin-top: 0.5rem;">
-                        <label style="font-size: 0.85rem; color: var(--an-text-light); display: block; margin-bottom: 0.3rem;">Gantt bar colour:</label>
+                        <label style="font-size: 0.85rem; color: var(--lb-text-light); display: block; margin-bottom: 0.3rem;">Gantt bar colour:</label>
                         <div style="display: flex; gap: 0.4rem; align-items: center;">
                             {% for color in cover_palette %}
                             <label style="cursor: pointer; display: inline-block;">
@@ -159,8 +159,8 @@
                     </div>
                     <style>
                         input[name="cover_color"]:checked + .palette-swatch {
-                            border-color: var(--an-deep-orange) !important;
-                            box-shadow: 0 0 0 1px var(--an-deep-orange);
+                            border-color: var(--lb-deep-orange) !important;
+                            box-shadow: 0 0 0 1px var(--lb-deep-orange);
                         }
                     </style>
                     {% endif %}
@@ -291,7 +291,7 @@
             <div class="form-group">
                 <textarea id="summary" name="summary" class="form-control" rows="5">{{ info.get('summary', '') }}</textarea>
             </div>
-            <script>document.addEventListener('DOMContentLoaded',function(){window.ashinamiI18n.initRichTextToolbar('summary');});</script>
+            <script>document.addEventListener('DOMContentLoaded',function(){window.librariumI18n.initRichTextToolbar('summary');});</script>
         </div>
     </div>
 
@@ -432,7 +432,7 @@ function toggleSourceFields() {
 function toggleGiftFields() {
     const isGift = document.getElementById('is_gift').checked;
     // Toggle labels (i18n-aware)
-    var t = window.ashinamiI18n ? window.ashinamiI18n.t : function(k) { return k; };
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
     var dateLbl = document.getElementById('label_purchase_date');
     var placeLbl = document.getElementById('label_source_id_owned');
     dateLbl.textContent = isGift ? t('bookForm.dateReceived') : t('bookForm.purchaseDate');
@@ -457,7 +457,7 @@ document.getElementById('add-series-btn').addEventListener('click', function() {
     var tmpl = document.getElementById('series-row-template');
     var clone = tmpl.content.cloneNode(true);
     document.getElementById('series-entries').appendChild(clone);
-    if (window.ashinamiI18n) window.ashinamiI18n.apply();
+    if (window.librariumI18n) window.librariumI18n.apply();
 });
 </script>
 {% endblock %}

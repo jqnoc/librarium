@@ -1,7 +1,7 @@
-"""Ashinami – a local Flask app for tracking reading statistics.
+"""Librarium – a local Flask app for tracking reading statistics.
 
 All data (including cover images) is stored in a SQLite database
-at data/ashinami.db.
+at data/librarium.db.
 """
 
 import hashlib
@@ -40,12 +40,12 @@ from flask import (
 # ── Paths ────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "ashinami.db"
+DB_PATH = DATA_DIR / "librarium.db"
 BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUPS = 5
 
 app = Flask(__name__)
-app.secret_key = "ashinami-local-dev-key"
+app.secret_key = "librarium-local-dev-key"
 
 
 # ── HTML sanitiser (allowlist-based) ───────────────────────────────────
@@ -123,7 +123,7 @@ def validate_and_restore_db() -> None:
 
     # Database is corrupted; restore from latest backup
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    backups = sorted(BACKUP_DIR.glob("ashinami_*.db"))
+    backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
     
     if not backups:
         print("⚠️  Database is corrupted but no backups available.")
@@ -158,7 +158,7 @@ def backup_database() -> None:
         return
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    today_file = BACKUP_DIR / f"ashinami_{date.today().isoformat()}.db"
+    today_file = BACKUP_DIR / f"librarium_{date.today().isoformat()}.db"
 
     if today_file.exists():
         return  # already backed up today
@@ -173,7 +173,7 @@ def backup_database() -> None:
         src.close()
 
     # Prune old backups – keep only the most recent MAX_BACKUPS files
-    backups = sorted(BACKUP_DIR.glob("ashinami_*.db"))
+    backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
     for old in backups[:-MAX_BACKUPS]:
         old.unlink()
 
@@ -687,7 +687,7 @@ def close_db(exc):
 # ── Library helpers ──────────────────────────────────────────────────────
 def _get_current_library_id() -> int:
     """Return the active library ID from cookie, falling back to the first library."""
-    raw = request.cookies.get("ashinami_library", "")
+    raw = request.cookies.get("librarium_library", "")
     if raw:
         try:
             lib_id = int(raw)
@@ -1197,11 +1197,11 @@ def index():
     db = get_db()
     lib_id = _get_current_library_id()
     # Use query params if present, otherwise fall back to cookie, then default
-    sort1 = request.args.get("sort1") or request.cookies.get("ashinami_sort1", "status")
-    sort2 = request.args.get("sort2") or request.cookies.get("ashinami_sort2", "last_session")
-    status_filter = request.args.get("status_filter") or request.cookies.get("ashinami_status_filter", "all")
-    show_editions = request.args.get("show_editions") or request.cookies.get("ashinami_show_editions", "0")
-    show_readings = request.args.get("show_readings") or request.cookies.get("ashinami_show_readings", "0")
+    sort1 = request.args.get("sort1") or request.cookies.get("librarium_sort1", "status")
+    sort2 = request.args.get("sort2") or request.cookies.get("librarium_sort2", "last_session")
+    status_filter = request.args.get("status_filter") or request.cookies.get("librarium_status_filter", "all")
+    show_editions = request.args.get("show_editions") or request.cookies.get("librarium_show_editions", "0")
+    show_readings = request.args.get("show_readings") or request.cookies.get("librarium_show_readings", "0")
     if show_editions != "1":
         show_readings = "0"
 
@@ -1436,11 +1436,11 @@ def index():
         show_readings=show_readings,
     ))
     # Persist preferences in cookies (1 year expiry)
-    resp.set_cookie("ashinami_sort1", sort1, max_age=365*24*3600, samesite="Lax")
-    resp.set_cookie("ashinami_sort2", sort2 or "", max_age=365*24*3600, samesite="Lax")
-    resp.set_cookie("ashinami_status_filter", status_filter, max_age=365*24*3600, samesite="Lax")
-    resp.set_cookie("ashinami_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
-    resp.set_cookie("ashinami_show_readings", show_readings, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_sort1", sort1, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_sort2", sort2 or "", max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_status_filter", status_filter, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_show_readings", show_readings, max_age=365*24*3600, samesite="Lax")
     return resp
 
 
@@ -2644,7 +2644,7 @@ def author_detail(author_name: str):
     """Display all books by a given author, plus author metadata."""
     db = get_db()
     lib_id = _get_current_library_id()
-    show_editions = request.args.get("show_editions") or request.cookies.get("ashinami_author_show_editions", "0")
+    show_editions = request.args.get("show_editions") or request.cookies.get("librarium_author_show_editions", "0")
     edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
         "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
@@ -2688,7 +2688,7 @@ def author_detail(author_name: str):
     resp = make_response(render_template("author_detail.html", author=author_name,
                            books=books, author_info=author_info, sort=sort,
                            show_editions=show_editions))
-    resp.set_cookie("ashinami_author_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
+    resp.set_cookie("librarium_author_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
     return resp
 
 
@@ -4136,7 +4136,7 @@ def switch_library():
     if not row:
         abort(400)
     resp = make_response(redirect(request.referrer or url_for("index")))
-    resp.set_cookie("ashinami_library", str(lib_id), max_age=60 * 60 * 24 * 365 * 5,
+    resp.set_cookie("librarium_library", str(lib_id), max_age=60 * 60 * 24 * 365 * 5,
                      samesite="Lax", httponly=True)
     return resp
 
@@ -4158,7 +4158,7 @@ def create_library():
     db.commit()
     new_lib = db.execute("SELECT id FROM libraries WHERE slug = ?", (slug,)).fetchone()
     resp = make_response(redirect(request.referrer or url_for("index")))
-    resp.set_cookie("ashinami_library", str(new_lib["id"]), max_age=60 * 60 * 24 * 365 * 5,
+    resp.set_cookie("librarium_library", str(new_lib["id"]), max_age=60 * 60 * 24 * 365 * 5,
                      samesite="Lax", httponly=True)
     flash(f"Library '{name}' created.", "success")
     return resp
@@ -4212,11 +4212,11 @@ def delete_library(lib_id: int):
     db.execute("DELETE FROM libraries WHERE id = ?", (lib_id,))
     db.commit()
     # If the deleted library was the active one, reset cookie
-    current = request.cookies.get("ashinami_library", "")
+    current = request.cookies.get("librarium_library", "")
     if current == str(lib_id):
         first = db.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()
         resp = make_response(redirect(url_for("index")))
-        resp.set_cookie("ashinami_library", str(first["id"]), max_age=60 * 60 * 24 * 365 * 5,
+        resp.set_cookie("librarium_library", str(first["id"]), max_age=60 * 60 * 24 * 365 * 5,
                          samesite="Lax", httponly=True)
         flash(f"Library '{lib_name}' deleted.", "success")
         return resp

@@ -1,8 +1,8 @@
 @echo off
 cd /d "%~dp0"
 
-echo Starting Ashinami...
-start "Ashinami" python app.py
+echo Starting Librarium...
+start "Librarium" python app.py
 
 :: Wait a moment for Flask to start, then open the browser
 timeout /t 2 /nobreak >nul

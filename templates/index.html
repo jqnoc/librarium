@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Ashinami – Library{% endblock %}
+{% block title %}Librarium – Library{% endblock %}
 
 {% block content %}
 <h1 data-i18n="index.title">Library</h1>
@@ -46,15 +46,15 @@
 <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
     <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
         <!-- View switcher -->
-        <span style="color: var(--an-text-light); font-size: 0.9rem;" data-i18n="index.view">View:</span>
+        <span style="color: var(--lb-text-light); font-size: 0.9rem;" data-i18n="index.view">View:</span>
         <div class="view-switcher">
             <button class="view-btn active" data-view="card" data-i18n-title="index.btnCardView" title="Card view">🃏</button>
             <button class="view-btn" data-view="cover" data-i18n-title="index.btnCoverView" title="Cover view">🖼️</button>
             <button class="view-btn" data-view="list" data-i18n-title="index.btnListView" title="List view">📋</button>
         </div>
 
-        <span style="color: var(--an-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.filter">Filter:</span>
-        <select id="statusFilter" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.filter">Filter:</span>
+        <select id="statusFilter" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="all" {{ 'selected' if status_filter == 'all' else '' }} data-i18n="index.filterAll">All</option>
             <option value="reading" {{ 'selected' if status_filter == 'reading' else '' }} data-i18n="index.filterReading">Reading</option>
             <option value="finished" {{ 'selected' if status_filter == 'finished' else '' }} data-i18n="index.filterFinished">Finished</option>
@@ -71,8 +71,8 @@
             <input type="checkbox" id="showReadings" onchange="updateSort()" {{ 'checked' if show_readings == '1' else '' }} {{ '' if show_editions == '1' else 'disabled' }}>
             <span data-i18n="index.showAllReadings">Show All Readings</span>
         </label>
-        <span style="color: var(--an-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.sortBy">Sort by:</span>
-        <select id="sort1" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.sortBy">Sort by:</span>
+        <select id="sort1" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="name" {{ 'selected' if sort1 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
             <option value="author" {{ 'selected' if sort1 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
             <option value="last_session" {{ 'selected' if sort1 == 'last_session' else '' }} data-i18n="index.sortLastSession">Last Reading Session/Period</option>
@@ -80,8 +80,8 @@
             <option value="status" {{ 'selected' if sort1 == 'status' else '' }} data-i18n="index.sortStatus">Status</option>
             <option value="time_read" {{ 'selected' if sort1 == 'time_read' else '' }} data-i18n="index.sortTimeRead">Time Read</option>
         </select>
-        <span style="color: var(--an-text-light); font-size: 0.9rem;" data-i18n="index.thenBy">then by:</span>
-        <select id="sort2" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--an-border); background: white; cursor: pointer;">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem;" data-i18n="index.thenBy">then by:</span>
+        <select id="sort2" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="" {{ 'selected' if sort2 == '' else '' }} data-i18n="index.sortNone">— None —</option>
             <option value="name" {{ 'selected' if sort2 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
             <option value="author" {{ 'selected' if sort2 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
@@ -96,7 +96,7 @@
 <script>
 // Load saved view preference
 window.addEventListener('DOMContentLoaded', function() {
-    const savedView = localStorage.getItem('ashinami_view') || 'card';
+    const savedView = localStorage.getItem('librarium_view') || 'card';
     switchView(savedView);
 });
 
@@ -124,7 +124,7 @@ function updateSort() {
 
 function switchView(view) {
     // Remove the preload style injected before page paint (if still present)
-    var preload = document.getElementById('ashinami-view-preload');
+    var preload = document.getElementById('librarium-view-preload');
     if (preload) preload.parentNode.removeChild(preload);
     document.querySelectorAll('.library-view').forEach(el => el.style.display = 'none');
     const target = document.getElementById('view-' + view);
@@ -132,7 +132,7 @@ function switchView(view) {
     document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
     const activeBtn = document.querySelector(`.view-btn[data-view="${view}"]`);
     if (activeBtn) activeBtn.classList.add('active');
-    localStorage.setItem('ashinami_view', view);
+    localStorage.setItem('librarium_view', view);
 }
 
 document.addEventListener('click', function(e) {
@@ -146,7 +146,7 @@ function toggleColumns() {
     const boxes = document.querySelectorAll('#columnCheckboxes input[type="checkbox"]');
     const visible = {};
     boxes.forEach(cb => { visible[cb.value] = cb.checked; });
-    localStorage.setItem('ashinami_list_cols', JSON.stringify(visible));
+    localStorage.setItem('librarium_list_cols', JSON.stringify(visible));
     applyColumnVisibility(visible);
 }
 
@@ -161,7 +161,7 @@ function applyColumnVisibility(visible) {
 }
 
 function restoreColumns() {
-    const saved = localStorage.getItem('ashinami_list_cols');
+    const saved = localStorage.getItem('librarium_list_cols');
     if (saved) {
         try {
             const visible = JSON.parse(saved);
@@ -190,9 +190,9 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
 <!-- Blocking preload: hide all views before paint, show only the saved one -->
 <script>
 (function() {
-    var v = localStorage.getItem('ashinami_view') || 'card';
+    var v = localStorage.getItem('librarium_view') || 'card';
     var s = document.createElement('style');
-    s.id = 'ashinami-view-preload';
+    s.id = 'librarium-view-preload';
     s.textContent = '.library-view { display: none !important; } #view-' + v + ' { display: block !important; }';
     document.head.appendChild(s);
     // Buttons are already in the DOM at this point — update active state immediately
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
             <div class="card-body">
                 <div class="book-title">{{ book.name }}</div>
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
-                {% if book.reading_number %}<div style="font-size: 0.8rem; color: var(--an-deep-orange); font-weight: 500;">#{{ book.reading_number }}</div>{% endif %}
+                {% if book.reading_number %}<div style="font-size: 0.8rem; color: var(--lb-deep-orange); font-weight: 500;">#{{ book.reading_number }}</div>{% endif %}
                 <div class="book-author">{{ book.author | format_authors }}</div>
                 <div class="book-stats">
                     <span class="badge status-{{ book.status }}">{{ book.status | format_status }}</span>
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                     <span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>
                     {% endif %}
                     {% if book.edition_count > 1 %}
-                    <span class="badge" style="background: var(--an-deep-orange); color: white;" data-i18n="index.editionsBadge" data-i18n-options='{"count": {{ book.edition_count }}}'>{{ book.edition_count }} editions</span>
+                    <span class="badge" style="background: var(--lb-deep-orange); color: white;" data-i18n="index.editionsBadge" data-i18n-options='{"count": {{ book.edition_count }}}'>{{ book.edition_count }} editions</span>
                     {% endif %}
                 </div>
             </div>
@@ -255,10 +255,10 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
             <div class="cover-grid-info">
                 <div class="book-title" style="font-size:1rem; font-weight:600; line-height:1.3;">{{ book.name }}</div>
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
-                {% if book.reading_number %}<div style="font-size: 0.8rem; color: var(--an-deep-orange); font-weight: 500;">#{{ book.reading_number }}</div>{% endif %}
-                <div class="book-author" style="font-size:0.9rem; color:var(--an-text-light); margin-top:0.25rem;">{{ book.author | format_authors }}</div>
+                {% if book.reading_number %}<div style="font-size: 0.8rem; color: var(--lb-deep-orange); font-weight: 500;">#{{ book.reading_number }}</div>{% endif %}
+                <div class="book-author" style="font-size:0.9rem; color:var(--lb-text-light); margin-top:0.25rem;">{{ book.author | format_authors }}</div>
                 {% if book.avg_rating %}
-                <div style="font-size:0.8rem; color:var(--an-deep-orange); margin-top:0.25rem; font-weight:500;">⭐ {{ "%.2f" | format(book.avg_rating) }} / 5</div>
+                <div style="font-size:0.8rem; color:var(--lb-deep-orange); margin-top:0.25rem; font-weight:500;">⭐ {{ "%.2f" | format(book.avg_rating) }} / 5</div>
                 {% endif %}
             </div>
         </a>
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
 <!-- ── List View ──────────────────────────────────────────────────────── -->
 <div id="view-list" class="library-view" style="display:none;">
     <div class="list-column-selector" style="margin-bottom: 0.75rem;">
-        <label style="color: var(--an-text-light); font-size: 0.9rem; margin-right: 0.5rem;" data-i18n="index.columns">Columns:</label>
+        <label style="color: var(--lb-text-light); font-size: 0.9rem; margin-right: 0.5rem;" data-i18n="index.columns">Columns:</label>
         <div class="column-checkboxes" id="columnCheckboxes">
             <label class="col-check"><input type="checkbox" value="cover" checked onchange="toggleColumns()"> <span data-i18n="index.colCover">Cover</span></label>
             <label class="col-check"><input type="checkbox" value="title" checked onchange="toggleColumns()" disabled> <span data-i18n="index.colTitle">Title</span></label>

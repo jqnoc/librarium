@@ -1,4 +1,4 @@
-# Ashinami
+# Librarium
 
 A Flask-based personal book reading tracker and statistics application.
 Track books, sessions, ratings, series, authors, and reading habits —
@@ -23,7 +23,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Or on Windows, double-click `run-ashinami.bat` to start the server and
+Or on Windows, double-click `run-librarium.bat` to start the server and
 open the browser automatically.
 
 The application runs at **http://127.0.0.1:5000** (localhost only).
@@ -127,7 +127,7 @@ Six colour palettes, switchable from the navbar:
 | `umi` | Umi |
 | `hinode` | Hinode |
 
-Palettes override CSS custom properties (prefixed `--an-`). Chart
+Palettes override CSS custom properties (prefixed `--lb-`). Chart
 colours update automatically.
 
 ### Internationalisation
@@ -146,15 +146,15 @@ colours update automatically.
 ## Data Storage
 
 All data — including cover images and author photos — lives in a single
-SQLite file at `data/ashinami.db`. No external database server required.
+SQLite file at `data/librarium.db`. No external database server required.
 
 ## Project Structure
 
 ```
-Ashinami/
+Librarium/
 ├── app.py                    # Entire Flask application (~4 500+ lines)
 ├── requirements.txt          # Python dependencies
-├── run-ashinami.bat          # Windows launcher
+├── run-librarium.bat          # Windows launcher
 ├── README.md
 ├── .github/
 │   └── copilot-instructions.md
@@ -177,7 +177,7 @@ Ashinami/
 │   ├── sources.html          # Source management
 │   └── series pages          # (rendered via series list/detail routes)
 └── data/
-    ├── ashinami.db           # SQLite database (gitignored)
+    ├── librarium.db           # SQLite database (gitignored)
     └── backups/              # Automatic daily backups
 ```
 
