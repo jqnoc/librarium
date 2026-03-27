@@ -603,6 +603,23 @@ def migrate_add_total_time() -> None:
     print("✅ Migration complete – total_time_seconds / progress_pct added.")
 
 
+def migrate_add_period_duration() -> None:
+    """Add duration_seconds to periods for audiobook/ebook time tracking."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    per_cols = [r[1] for r in db.execute("PRAGMA table_info(periods)").fetchall()]
+    if "duration_seconds" in per_cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding duration_seconds to periods …")
+    db.execute("ALTER TABLE periods ADD COLUMN duration_seconds INTEGER DEFAULT NULL")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – duration_seconds added to periods.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
@@ -1393,13 +1410,12 @@ def index():
 
     # ── Library ribbon stats (computed from primary editions + standalone books) ──
     all_rows = db.execute(
-        "SELECT author, pages, status FROM books "
+        "SELECT author, pages, starting_page, status, source_type, work_id FROM books "
         "WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
     ).fetchall()
     unique_authors: set[str] = set()
     total_library_pages = 0
     reading_count = 0
-    finished_count = 0
     not_started_count = 0
     for br in all_rows:
         if br["author"]:
@@ -1407,14 +1423,26 @@ def index():
                 a = a.strip()
                 if a:
                     unique_authors.add(a)
-        total_library_pages += br["pages"] or 0
+        bp = br["pages"] or 0
+        sp = br["starting_page"] or 0
+        total_library_pages += (bp - sp) if sp > 0 else bp
         if br["status"] == "reading":
             reading_count += 1
-        elif br["status"] == "finished":
-            finished_count += 1
         elif br["status"] == "not-started":
             not_started_count += 1
     total_books_count = len(all_rows)
+
+    # Finished = distinct works with at least one edition having a finished reading
+    finished_count = db.execute(
+        "SELECT COUNT(DISTINCT COALESCE(b.work_id, b.id)) FROM books b "
+        "JOIN readings r ON r.book_id = b.id "
+        "WHERE b.library_id = ? AND r.status = 'finished'", (lib_id,)
+    ).fetchone()[0]
+
+    # Books Owned = distinct editions (not works) with source_type = 'owned'
+    owned_count = db.execute(
+        "SELECT COUNT(*) FROM books WHERE library_id = ? AND source_type = 'owned'", (lib_id,)
+    ).fetchone()[0]
 
     # Total time read across all books (sessions + estimated period time)
     total_library_seconds = sum(b["total_seconds_raw"] for b in books)
@@ -1441,6 +1469,7 @@ def index():
         reading_count=reading_count,
         finished_count=finished_count,
         not_started_count=not_started_count,
+        owned_count=owned_count,
         show_editions=show_editions,
         show_readings=show_readings,
     ))
@@ -1638,9 +1667,25 @@ def global_stats():
             finish_year = max(candidates)[:4]
             books_finished_by_year[finish_year] = books_finished_by_year.get(finish_year, 0) + 1
 
-    all_years = sorted(set(pages_by_year.keys()) | set(books_finished_by_year.keys()))
+    # Time read by year: sessions + periods (duration_seconds)
+    time_by_year: dict[str, int] = {}
+    for row in db.execute(
+        "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.duration_seconds) AS t "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        "WHERE s.date != '' AND s.duration_seconds > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
+    ).fetchall():
+        time_by_year[row["yr"]] = row["t"]
+    for row in db.execute(
+        "SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.duration_seconds) AS t "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        "WHERE p.end_date != '' AND p.duration_seconds > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
+    ).fetchall():
+        time_by_year[row["yr"]] = time_by_year.get(row["yr"], 0) + row["t"]
+
+    all_years = sorted(set(pages_by_year.keys()) | set(books_finished_by_year.keys()) | set(time_by_year.keys()))
     pages_data = [pages_by_year.get(y, 0) for y in all_years]
     books_data = [books_finished_by_year.get(y, 0) for y in all_years]
+    time_data = [time_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
@@ -1768,6 +1813,7 @@ def global_stats():
         years=all_years,
         pages_data=pages_data,
         books_data=books_data,
+        time_data=time_data,
         status_chart=status_chart_clean,
         genre_counts=genre_counts_clean,
         language_counts=language_counts_clean,
@@ -3073,7 +3119,7 @@ def book_detail(book_id: str):
 
     # ── Load ALL periods (with reading_id) ──
     periods_rows = db.execute(
-        "SELECT id, start_date, end_date, pages, note, reading_id, progress_pct "
+        "SELECT id, start_date, end_date, pages, note, reading_id, progress_pct, duration_seconds "
         "FROM periods WHERE book_id = ? ORDER BY id",
         (book_id,),
     ).fetchall()
@@ -3780,9 +3826,16 @@ def add_reading_period(book_id: str):
         except ValueError:
             pct_val = 0.0
         pct_val = max(0.0, min(pct_val, 100.0))
+        try:
+            hours_val = int(request.form.get("hours", "0").strip() or 0)
+            minutes_val = int(request.form.get("minutes", "0").strip() or 0)
+            seconds_val = int(request.form.get("seconds", "0").strip() or 0)
+        except ValueError:
+            hours_val = minutes_val = seconds_val = 0
+        dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
         db.execute(
-            "INSERT INTO periods (book_id, start_date, end_date, pages, note, reading_id, progress_pct) VALUES (?,?,?,0,?,?,?)",
-            (book_id, start_date, end_date, note, reading_id, pct_val),
+            "INSERT INTO periods (book_id, start_date, end_date, pages, note, reading_id, progress_pct, duration_seconds) VALUES (?,?,?,0,?,?,?,?)",
+            (book_id, start_date, end_date, note, reading_id, pct_val, dur_seconds or None),
         )
     else:
         pages = request.form.get("pages", "0").strip()
@@ -3820,9 +3873,16 @@ def edit_reading_period(book_id: str, idx: int):
         except ValueError:
             pct_val = 0.0
         pct_val = max(0.0, min(pct_val, 100.0))
+        try:
+            hours_val = int(request.form.get("hours", "0").strip() or 0)
+            minutes_val = int(request.form.get("minutes", "0").strip() or 0)
+            seconds_val = int(request.form.get("seconds", "0").strip() or 0)
+        except ValueError:
+            hours_val = minutes_val = seconds_val = 0
+        dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
         db.execute(
-            "UPDATE periods SET start_date=?, end_date=?, pages=0, note=?, progress_pct=? WHERE id=?",
-            (start_date, end_date, note, pct_val, idx),
+            "UPDATE periods SET start_date=?, end_date=?, pages=0, note=?, progress_pct=?, duration_seconds=? WHERE id=?",
+            (start_date, end_date, note, pct_val, dur_seconds or None, idx),
         )
     else:
         pages = request.form.get("pages", "0").strip()
@@ -4510,6 +4570,7 @@ if __name__ == "__main__":
     migrate_add_editions()      # Add work_id / is_primary_edition columns
     migrate_add_format()        # Add format / binding / audio_format columns
     migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
+    migrate_add_period_duration()  # Add duration_seconds to periods
     app.run(
         debug=True,
         port=5000,

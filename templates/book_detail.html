@@ -606,6 +606,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th data-i18n="book.colStartDate">Start Date</th>
                 <th data-i18n="book.colEndDate">End Date</th>
                 <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
+                {% if is_pct_format %}<th data-i18n="book.colTime">Time</th>{% endif %}
                 <th data-i18n="book.colNote">Note</th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
@@ -617,6 +618,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td>{{ p.start_date | date_ddmmyyyy or '—' }}</td>
                 <td>{{ p.end_date | date_ddmmyyyy or '—' }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(p.progress_pct or 0) }}%{% else %}{{ p.pages }}{% endif %}</td>
+                {% if is_pct_format %}<td>{% if p.duration_seconds %}{% set ph = p.duration_seconds // 3600 %}{% set pm = (p.duration_seconds % 3600) // 60 %}{% set ps = p.duration_seconds % 60 %}{{ ph }}h {{ pm }}m {{ ps }}s{% else %}—{% endif %}</td>{% endif %}
                 <td>{{ p.note or '—' }}</td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="togglePeriodEdit({{ p.id }})">✏️</button>
@@ -627,7 +629,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </td>
             </tr>
             <tr class="session-edit-row" id="period-edit-{{ p.id }}">
-                <td colspan="6">
+                <td colspan="{% if is_pct_format %}7{% else %}6{% endif %}">
                     <form method="POST" action="{{ url_for('edit_reading_period', book_id=book_id, idx=p.id) }}" class="inline-form">
                         <label>Start</label>
                         <input type="text" name="start_date" value="{{ p.start_date or '' }}" class="date-input" style="width:150px;">
@@ -636,6 +638,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                         {% if is_pct_format %}
                         <label data-i18n="form.progressPct">Progress (%)</label>
                         <input type="number" name="progress_pct" value="{{ "%.1f" | format(p.progress_pct or 0) }}" min="0" max="100" step="0.1" required style="width:80px;">
+                        <label>H</label>
+                        <input type="number" name="hours" value="{{ (p.duration_seconds or 0) // 3600 }}" min="0" style="width:55px;">
+                        <label>M</label>
+                        <input type="number" name="minutes" value="{{ ((p.duration_seconds or 0) % 3600) // 60 }}" min="0" max="59" style="width:55px;">
+                        <label>S</label>
+                        <input type="number" name="seconds" value="{{ (p.duration_seconds or 0) % 60 }}" min="0" max="59" style="width:55px;">
                         {% else %}
                         <label>Pages</label>
                         <input type="number" name="pages" value="{{ p.pages }}" min="1" required style="width:80px;">
@@ -672,6 +680,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="form-group">
             <label data-i18n="form.progressPct">Progress (%)</label>
             <input type="number" name="progress_pct" class="form-control" min="0" max="100" step="0.1" required style="width:80px;">
+        </div>
+        <div class="form-group">
+            <label>H</label>
+            <input type="number" name="hours" class="form-control" min="0" value="0" style="width:55px;">
+        </div>
+        <div class="form-group">
+            <label>M</label>
+            <input type="number" name="minutes" class="form-control" min="0" max="59" value="0" style="width:55px;">
+        </div>
+        <div class="form-group">
+            <label>S</label>
+            <input type="number" name="seconds" class="form-control" min="0" max="59" value="0" style="width:55px;">
         </div>
         {% else %}
         <div class="form-group">

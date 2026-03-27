@@ -41,6 +41,11 @@
         <div class="library-stat-value">{{ not_started_count }}</div>
         <div class="library-stat-label" data-i18n="index.notStarted">Not Started</div>
     </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">🏠</div>
+        <div class="library-stat-value">{{ owned_count }}</div>
+        <div class="library-stat-label" data-i18n="index.booksOwned">Books Owned</div>
+    </div>
 </div>
 
 <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -174,7 +179,7 @@ function restoreColumns() {
         } catch(e) {}
     } else {
         // Default: hide the extra columns
-        const defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:false, pages:false, language:false};
+        const defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:true, pages:false, language:false};
         document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(cb => {
             if (cb.value === 'title') return;
             if (defaults[cb.value] !== undefined) cb.checked = defaults[cb.value];
@@ -324,7 +329,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                     <td class="col-pub_date">{{ book.publication_date or '—' }}</td>
                     <td class="col-publisher">{{ book.publisher or '—' }}</td>
                     <td class="col-rating">{% if book.avg_rating %}<span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>{% else %}—{% endif %}</td>
-                    <td class="col-pages">{% if book.format == 'audiobook' and book.total_time_seconds %}{% set tt = book.total_time_seconds %}{{ tt // 3600 }}h {{ (tt % 3600) // 60 }}m{% elif book.pages %}{{ book.pages }}{% else %}—{% endif %}</td>
+                    <td class="col-pages">{% if book.format == 'audiobook' and book.total_time_seconds %}{% set tt = book.total_time_seconds %}{{ tt // 3600 }}h {{ (tt % 3600) // 60 }}m{% elif book.effective_pages %}{{ book.effective_pages }}{% else %}—{% endif %}</td>
                     <td class="col-language">{{ book.language or '—' }}</td>
                 </tr>
                 {% endfor %}

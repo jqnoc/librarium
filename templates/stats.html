@@ -21,6 +21,16 @@
     </div>
 </div>
 
+<!-- ── Time read by year ─────────────────────────────────────────────── -->
+{% if time_data and time_data|sum > 0 %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.timeReadByYear">Time Read by Year</h3>
+        <canvas id="timeChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+{% endif %}
+
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Stats                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -364,6 +374,74 @@ const booksChart = new Chart(booksCtx, {
         }
     }
 });
+
+// ── Time Read by Year Chart ───────────────────────────────────────────
+const timeData = {{ time_data | tojson }};
+if (timeData.some(v => v > 0)) {
+    function formatDuration(totalSec) {
+        const d = Math.floor(totalSec / 86400);
+        const h = Math.floor((totalSec % 86400) / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (d > 0) return `${d}d ${h}h ${m}m`;
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+    }
+    const timeCtx = document.getElementById('timeChart').getContext('2d');
+    new Chart(timeCtx, {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Time Read',
+                data: timeData.map(v => v / 3600),
+                backgroundColor: cssVar('--lb-chart-bar1'),
+                borderColor: cssVar('--lb-chart-line'),
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
+                    bodyColor: '#fff',
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return formatDuration(timeData[context.dataIndex]);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Hours', color: '#6B7280' },
+                    ticks: {
+                        color: '#6B7280',
+                        callback: function(value) { return value.toLocaleString() + 'h'; }
+                    },
+                    grid: { color: 'rgba(229, 231, 235, 0.5)' }
+                },
+                x: {
+                    ticks: { color: '#6B7280', font: { size: 14, weight: 600 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
 {% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════
