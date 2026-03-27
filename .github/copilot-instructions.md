@@ -429,7 +429,47 @@ feat(stats): add status timeline stacked area chart
 
 ---
 
-## 11. Known Issues & Technical Debt
+## 11. Versioning & Changelog
+
+The project follows **date-gated semantic versioning**: each calendar
+day that produces at least one commit gets exactly one version bump.
+
+### Rules
+
+| Scenario | Action |
+|----------|--------|
+| Day contains at least one **feat** commit | Bump **minor** (`0.X.0`), reset patch to 0 |
+| Day contains only **fix** / **refactor** / **chore** / **docs** commits (no feat) | Bump **patch** (`0.x.Y`) |
+| **Major** version (`X.0.0`) | Never changed automatically — the user bumps it manually for milestone releases |
+
+### Procedure (MANDATORY)
+
+Every response that adds a feature or fixes a bug **must**:
+
+1. **Determine the new version** — check the current `APP_VERSION` in
+   `app.py`. If today already has a version entry in `CHANGELOG.md`,
+   merge the new items into that entry (do **not** create a second
+   entry for the same day). If this is the first commit of a new day,
+   bump minor or patch per the rules above.
+2. **Update `APP_VERSION`** in `app.py` to the new version string.
+3. **Update `version`** in `package.json` to the same string.
+4. **Update `CHANGELOG.md`** — add or extend the entry for today's
+   date, using the Keep a Changelog format (`Added`, `Fixed`, `Changed`,
+   `Removed` sections as needed).
+
+### Version locations
+
+| File | Field |
+|------|-------|
+| `app.py` | `APP_VERSION = "x.y.z"` |
+| `package.json` | `"version": "x.y.z"` |
+| `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` |
+
+All three **must** stay in sync at all times.
+
+---
+
+## 12. Known Issues & Technical Debt
 
 - **Monolithic `app.py`**: ~4 500+ lines in a single file. No plans to
   refactor, but be aware of line-number drift when making changes.
