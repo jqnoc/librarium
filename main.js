@@ -53,6 +53,7 @@ function startFlask(port) {
     ...process.env,
     LIBRARIUM_PORT: String(port),
     LIBRARIUM_ELECTRON: "1",
+    PYTHONIOENCODING: "utf-8",
   };
 
   const pythonCmd = process.platform === "win32" ? "python" : "python3";
