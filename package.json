@@ -1,0 +1,43 @@
+{
+  "name": "librarium",
+  "version": "0.1.0",
+  "description": "A local application for tracking personal book reading statistics",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "private": true,
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.librarium.app",
+    "productName": "Librarium",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".",
+        "to": "app",
+        "filter": [
+          "app.py",
+          "requirements.txt",
+          "static/**/*",
+          "templates/**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "static/favicon.ico"
+    }
+  }
+}

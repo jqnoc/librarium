@@ -833,6 +833,10 @@ select.form-control { cursor: pointer; }
     font-size: .82rem;
     margin-top: auto;
 }
+.footer-version {
+    margin-left: .5rem;
+    opacity: .55;
+}
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

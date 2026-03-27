@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import re
 import shutil
 import sqlite3
@@ -43,6 +44,8 @@ DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "librarium.db"
 BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUPS = 5
+
+APP_VERSION = "0.1.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -742,11 +745,13 @@ def inject_library_context():
         return {
             "current_library": dict(current_lib) if current_lib else {"id": 1, "name": "Books", "slug": "books"},
             "all_libraries": [dict(l) for l in all_libs],
+            "app_version": APP_VERSION,
         }
     except Exception:
         return {
             "current_library": {"id": 1, "name": "Books", "slug": "books"},
             "all_libraries": [],
+            "app_version": APP_VERSION,
         }
 
 
@@ -4571,9 +4576,12 @@ if __name__ == "__main__":
     migrate_add_format()        # Add format / binding / audio_format columns
     migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
     migrate_add_period_duration()  # Add duration_seconds to periods
+    port = int(os.environ.get("LIBRARIUM_PORT", 5000))
+    is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
+
     app.run(
-        debug=True,
-        port=5000,
+        debug=not is_electron,
+        port=port,
         extra_files=None,
         exclude_patterns=["*/site-packages/*"],
     )

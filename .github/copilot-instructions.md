@@ -8,34 +8,52 @@ single-file architecture maintainable.
 
 ## 1. Project Overview
 
-Librarium is a **local Flask web application** for tracking personal
-book reading statistics. It is a monolithic single-file app (`app.py`,
-~4 500+ lines) with raw SQLite queries, Jinja2 templates, vanilla JS,
-and Chart.js for charts. There is **no test suite** — all verification
-is manual.
+Librarium is a **self-contained Electron desktop application** for tracking
+personal book reading statistics. The backend is a monolithic single-file
+Flask app (`app.py`, ~4 500+ lines) with raw SQLite queries, Jinja2
+templates, vanilla JS, and Chart.js for charts. Electron spawns the Flask
+server as a child process and displays it in a native window. There is
+**no test suite** — all verification is manual.
 
 ### Key facts
 
 | Aspect | Value |
 |--------|-------|
-| Entry point | `app.py` |
+| Entry point (Electron) | `main.js` |
+| Entry point (Backend) | `app.py` |
+| Version | Defined in `APP_VERSION` (`app.py`) and `package.json` |
 | Database | SQLite at `data/librarium.db` (WAL mode) |
 | Python | 3.12+ |
-| Dependencies | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
-| Port | 5000 (localhost only) |
-| Startup | `python app.py` or `run-librarium.bat` |
+| Node.js | 18+ |
+| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
+| Port | Dynamic (free port at startup) |
+| Startup | `npm start` or `run-librarium.bat` |
 
 ---
 
 ## 2. Architecture
 
-### 2.1 Monolithic structure
+### 2.1 Electron shell
+
+`main.js` is the Electron main process. It:
+
+1. Finds a free TCP port (`findFreePort()` via `net.createServer`).
+2. Spawns `python app.py` with `LIBRARIUM_PORT` and `LIBRARIUM_ELECTRON=1`
+   environment variables.
+3. Polls the port until Flask accepts connections.
+4. Opens a `BrowserWindow` pointing at `http://127.0.0.1:<port>`.
+5. Kills the Flask child process on quit.
+
+`preload.js` exposes `window.librarium.isElectron` to the renderer
+(sandboxed, `contextIsolation: true`).
+
+### 2.2 Monolithic Flask backend
 
 Everything lives in `app.py`: database helpers, migrations, template
 filters, route handlers, business logic, and the startup block. There
 are no blueprints, no ORM, and no separate model files.
 
-### 2.2 Database
+### 2.3 Database
 
 - **11 tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
   `authors`, `series`, `book_series`, `sources`, `libraries`
@@ -46,7 +64,7 @@ are no blueprints, no ORM, and no separate model files.
 - Primary keys: `books.id` uses UUID strings; most other tables use
   INTEGER autoincrement.
 
-### 2.3 Migrations
+### 2.4 Migrations
 
 Migrations are plain functions (`migrate_add_*()`) called sequentially
 in the `if __name__ == "__main__"` block. Each migration is idempotent
@@ -74,7 +92,7 @@ When adding a new migration:
   all existing migrations
 - [ ] Test on a fresh DB *and* an already-migrated DB
 
-### 2.4 Template filters
+### 2.5 Template filters
 
 Four Jinja2 template filters are registered:
 
@@ -85,7 +103,7 @@ Four Jinja2 template filters are registered:
 | `date_ddmmyyyy` | ISO date → dd/mm/yyyy |
 | `source_type_label` | Source type key → display label |
 
-### 2.5 Status system
+### 2.6 Status system
 
 Five book statuses:
 
@@ -108,7 +126,7 @@ When adding a new status:
   filter dropdown in `index.html`
 - [ ] Add translations in `static/i18n.js` (both EN and ES)
 
-### 2.6 Rating system
+### 2.7 Rating system
 
 39 dimensions across 7 groups defined in `RATING_DIMENSIONS`:
 
@@ -314,11 +332,13 @@ Key helper patterns in `app.py`:
 There is **no automated test suite**. After any change, verify manually:
 
 ```
-1. python app.py                       # App starts without errors
-2. Open http://127.0.0.1:5000          # Library page loads
-3. Click through the affected feature  # Verify behaviour
-4. Check browser console for JS errors # No console errors
+1. npm start                           # App starts in Electron window
+2. Click through the affected feature  # Verify behaviour
+3. Check DevTools console for errors   # No console errors
 ```
+
+Alternatively, for backend-only changes you can still run Flask
+directly: `python app.py` → open `http://127.0.0.1:5000`.
 
 ### Subsystem-specific checks
 
@@ -338,9 +358,13 @@ There is **no automated test suite**. After any change, verify manually:
 
 | Path | Purpose |
 |------|---------|
+| `main.js` | Electron main process (spawns Flask, manages window) |
+| `preload.js` | Electron preload script (sandboxed renderer bridge) |
+| `package.json` | Node.js manifest (Electron dep, version, build config) |
 | `app.py` | Entire Flask application |
 | `requirements.txt` | Python dependencies |
-| `run-librarium.bat` | Windows launcher (starts app + opens browser) |
+| `run-librarium.bat` | Windows launcher (`npm start`) |
+| `CHANGELOG.md` | Version history (Keep a Changelog format) |
 | `static/style.css` | Stylesheet (palettes, layout, components) |
 | `static/i18n.js` | EN/ES translations |
 | `templates/base.html` | Base layout (navbar, palette switcher, Chart.js CDN) |
