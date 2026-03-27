@@ -3055,7 +3055,7 @@ def book_detail(book_id: str):
 
     # ── Load ALL sessions (with reading_id) ──
     sessions_rows = db.execute(
-        "SELECT id, date, pages, duration_seconds, reading_id "
+        "SELECT id, date, pages, duration_seconds, reading_id, progress_pct "
         "FROM sessions WHERE book_id = ? ORDER BY id",
         (book_id,),
     ).fetchall()
@@ -3068,11 +3068,12 @@ def book_detail(book_id: str):
             "duration_seconds": sr["duration_seconds"],
             "duration_display": _format_duration(sr["duration_seconds"]),
             "reading_id": sr["reading_id"],
+            "progress_pct": sr["progress_pct"],
         })
 
     # ── Load ALL periods (with reading_id) ──
     periods_rows = db.execute(
-        "SELECT id, start_date, end_date, pages, note, reading_id "
+        "SELECT id, start_date, end_date, pages, note, reading_id, progress_pct "
         "FROM periods WHERE book_id = ? ORDER BY id",
         (book_id,),
     ).fetchall()
@@ -3706,7 +3707,8 @@ def edit_session(book_id: str, idx: int):
     if not row:
         abort(404)
 
-    book_fmt = (db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone() or {}).get("format", "paper") or "paper"
+    book_row = db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone()
+    book_fmt = (book_row["format"] if book_row else "paper") or "paper"
     date = _normalize_input_date(request.form.get("date", ""))
     try:
         hours_val = int(request.form.get("hours", "0").strip() or 0)
@@ -3806,7 +3808,8 @@ def edit_reading_period(book_id: str, idx: int):
     if not row:
         abort(404)
 
-    book_fmt = (db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone() or {}).get("format", "paper") or "paper"
+    book_row = db.execute("SELECT format FROM books WHERE id = ?", (book_id,)).fetchone()
+    book_fmt = (book_row["format"] if book_row else "paper") or "paper"
     start_date = _normalize_input_date(request.form.get("start_date", ""))
     end_date = _normalize_input_date(request.form.get("end_date", ""))
     note = request.form.get("note", "").strip()
