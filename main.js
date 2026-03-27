@@ -12,6 +12,7 @@ const net = require("net");
 
 // ── State ────────────────────────────────────────────────────────────────
 let mainWindow = null;
+let splashWindow = null;
 let flaskProcess = null;
 let flaskPort = 0;
 
@@ -122,12 +123,33 @@ function waitForFlask(port, retries = 60, interval = 250) {
 
 // ── Window creation ─────────────────────────────────────────────────────
 async function createWindow() {
+  // Show splash screen immediately
+  splashWindow = new BrowserWindow({
+    width: 340,
+    height: 360,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    title: "Librarium",
+    icon: path.join(appRoot, "static", "favicon.ico"),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  splashWindow.loadFile(path.join(appRoot, "static", "splash.html"));
+  splashWindow.once("ready-to-show", () => splashWindow.show());
+
   try {
     flaskPort = await findFreePort();
     startFlask(flaskPort);
     await waitForFlask(flaskPort);
   } catch (err) {
     console.error(err.message);
+    if (splashWindow) splashWindow.close();
     app.quit();
     return;
   }
@@ -156,6 +178,10 @@ async function createWindow() {
   // Show window once the page has finished loading (avoids white flash)
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+    if (splashWindow) {
+      splashWindow.close();
+      splashWindow = null;
+    }
   });
 
   // Open external links in the default browser, not inside the app

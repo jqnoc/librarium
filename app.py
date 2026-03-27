@@ -45,7 +45,7 @@ DB_PATH = DATA_DIR / "librarium.db"
 BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUPS = 5
 
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.6.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -623,7 +623,51 @@ def migrate_add_period_duration() -> None:
     print("✅ Migration complete – duration_seconds added to periods.")
 
 
+def migrate_add_cover_thumb() -> None:
+    """Add cover_thumb column to books for thumbnail images."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "cover_thumb" in cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding cover_thumb to books …")
+    db.execute("ALTER TABLE books ADD COLUMN cover_thumb BLOB DEFAULT NULL")
+    # Backfill thumbnails for existing covers
+    rows = db.execute("SELECT id, cover FROM books WHERE has_cover = 1 AND cover IS NOT NULL").fetchall()
+    for row in rows:
+        thumb = _generate_thumbnail(row["cover"])
+        if thumb:
+            db.execute("UPDATE books SET cover_thumb = ? WHERE id = ?", (thumb, row["id"]))
+    db.commit()
+    db.close()
+    print(f"✅ Migration complete – cover_thumb added ({len(rows)} thumbnails generated).")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
+THUMB_MAX_WIDTH = 300
+
+
+def _generate_thumbnail(cover_blob: bytes | None) -> bytes | None:
+    """Resize a cover image to a JPEG thumbnail (max 300 px wide)."""
+    if not cover_blob:
+        return None
+    try:
+        img = Image.open(io.BytesIO(cover_blob)).convert("RGB")
+        if img.width <= THUMB_MAX_WIDTH:
+            return cover_blob  # already small enough
+        ratio = THUMB_MAX_WIDTH / img.width
+        new_h = int(img.height * ratio)
+        img = img.resize((THUMB_MAX_WIDTH, new_h), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=80)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
 def _extract_cover_palette(cover_blob: bytes | None, n: int = 10) -> list[str]:
     """Return up to *n* diverse dominant colours from a cover image.
 
@@ -3490,6 +3534,40 @@ def book_cover(book_id: str):
     return resp
 
 
+@app.route("/cover_thumb/<book_id>")
+def book_cover_thumb(book_id: str):
+    """Serve a thumbnail version of a book cover (300 px wide)."""
+    db = get_db()
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client:
+        hash_row = db.execute(
+            "SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)
+        ).fetchone()
+        if hash_row and hash_row["cover_hash"] and ("t-" + hash_row["cover_hash"]) == etag_from_client:
+            resp = make_response("", 304)
+            resp.headers["ETag"] = f'"t-{hash_row["cover_hash"]}"'
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return resp
+
+    row = db.execute(
+        "SELECT cover_thumb, cover, cover_hash FROM books WHERE id = ? AND has_cover = 1",
+        (book_id,),
+    ).fetchone()
+    if not row:
+        abort(404)
+
+    blob = row["cover_thumb"] or row["cover"]
+    if not blob:
+        abort(404)
+    cover_hash = row["cover_hash"] or ""
+    resp = make_response(blob)
+    resp.headers["Content-Type"] = "image/jpeg"
+    resp.headers["ETag"] = f'"t-{cover_hash}"'
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
 @app.route("/book/<book_id>/ratings", methods=["POST"])
 def save_ratings(book_id: str):
     db = get_db()
@@ -3649,9 +3727,10 @@ def edit_metadata(book_id: str):
             palette = _extract_cover_palette(cover_blob)
             cover_color = palette[0] if palette else "#888888"
             cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
+            cover_thumb = _generate_thumbnail(cover_blob)
             db.execute(
-                "UPDATE books SET cover = ?, has_cover = 1, cover_color = ?, cover_palette = ?, cover_hash = ? WHERE id = ?",
-                (cover_blob, cover_color, json.dumps(palette), cover_hash, book_id),
+                "UPDATE books SET cover = ?, has_cover = 1, cover_color = ?, cover_palette = ?, cover_hash = ?, cover_thumb = ? WHERE id = ?",
+                (cover_blob, cover_color, json.dumps(palette), cover_hash, cover_thumb, book_id),
             )
             db.commit()
         else:
@@ -3994,6 +4073,7 @@ def new_book():
         cover_color = ""
         cover_palette_json = "[]"
         cover_hash = ""
+        cover_thumb = None
         cover_file = request.files.get("cover")
         if cover_file and cover_file.filename:
             cover_blob = cover_file.read()
@@ -4002,6 +4082,7 @@ def new_book():
             cover_color = palette[0] if palette else "#888888"
             cover_palette_json = json.dumps(palette)
             cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
+            cover_thumb = _generate_thumbnail(cover_blob)
 
         # Handle series (many-to-many)
         series_names = request.form.getlist("series_name[]")
@@ -4028,9 +4109,9 @@ def new_book():
              publisher, genre, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-             library_id, work_id, is_primary_edition,
+             cover_thumb, library_id, work_id, is_primary_edition,
              format, binding, audio_format, total_time_seconds)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -4045,7 +4126,7 @@ def new_book():
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
-            lib_id, link_work_id or None, is_primary,
+            cover_thumb, lib_id, link_work_id or None, is_primary,
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
@@ -4583,6 +4664,7 @@ if __name__ == "__main__":
     migrate_add_format()        # Add format / binding / audio_format columns
     migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
     migrate_add_period_duration()  # Add duration_seconds to periods
+    migrate_add_cover_thumb()      # Add cover_thumb column to books
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
 

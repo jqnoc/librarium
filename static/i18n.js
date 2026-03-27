@@ -33,6 +33,7 @@
         // ── Database backup ──────────────────────────────────────────────────────
         'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },
         'backup.create':         { en: 'Create Backup Now',      es: 'Crear Copia Ahora' },
+        'backup.shuttingDown':   { en: 'Backing up & closing\u2026', es: 'Guardando copia y cerrando\u2026' },
 
         // ── Index page ──────────────────────────────────────────────────
         'index.title':          { en: 'Library',            es: 'Biblioteca' },
@@ -82,6 +83,7 @@
         'index.btnListView':   { en: 'List view',           es: 'Vista lista' },
         'index.showAllEditions': { en: 'Show All Editions',  es: 'Mostrar Todas las Ediciones' },
         'index.showAllReadings': { en: 'Show All Readings',  es: 'Mostrar Todas las Lecturas' },
+        'index.searchPlaceholder': { en: 'Search...',        es: 'Buscar...' },
 
         // ── Book detail ─────────────────────────────────────────────────
         'book.backToLibrary':   { en: '← Back to Library',   es: '← Volver a la Biblioteca' },

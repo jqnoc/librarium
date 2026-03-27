@@ -5,6 +5,32 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-03-28
+
+### Added
+- Loading splash screen with logo and spinner shown while the Flask
+  backend starts up; closes automatically when the main window is ready.
+- Shutdown overlay with spinner displayed when the close button is
+  clicked, while the database backup runs before quitting.
+- Dynamic search filter on the library index — filters card, cover, and
+  list views by title, subtitle, or author in real time.
+- Image thumbnail system: a 300 px-wide JPEG thumbnail is generated on
+  cover upload and stored in the new `cover_thumb` column; library
+  listing views, author detail, series detail, edition cards, and yearly
+  stats now serve the lightweight thumbnail instead of the full-size
+  cover.
+- `/cover_thumb/<book_id>` route to serve thumbnails with ETag caching.
+- `migrate_add_cover_thumb()` migration (idempotent) that adds the
+  column and backfills thumbnails for existing covers.
+- Edition cards in the book detail page now display cover images in a
+  side-by-side layout with larger card dimensions.
+- i18n keys: `index.searchPlaceholder`, `backup.shuttingDown`.
+
+### Fixed
+- "Most Books Read at Once" tooltip on the activity page no longer
+  clipped by the parent card's `overflow: hidden` (uses `:has()` to
+  allow overflow on the records-grid container).
+
 ## [0.5.0] — 2026-03-27
 
 ### Added

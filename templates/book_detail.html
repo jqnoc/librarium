@@ -717,37 +717,46 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
     {% for ed in editions %}
-    <div class="card" style="flex: 0 0 auto; min-width: 180px; max-width: 260px; {{ 'border: 2px solid var(--lb-deep-orange);' if ed.id == book_id else 'opacity: 0.85;' }}">
-        <div class="card-body" style="padding: 0.75rem;">
-            {% if ed.id == book_id %}
-            <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--lb-deep-orange); font-weight: 700; margin-bottom: 0.25rem;" data-i18n="book.currentEdition">Current</div>
-            {% endif %}
-            <div style="font-weight: 600; margin-bottom: 0.25rem;">
-                {% if ed.id != book_id %}<a href="{{ url_for('book_detail', book_id=ed.id) }}" style="color: var(--lb-orange); text-decoration: none;">{% endif %}
-                {{ ed.name }}
-                {% if ed.id != book_id %}</a>{% endif %}
-            </div>
-            <div style="font-size: 0.85rem; color: var(--lb-text-light);">
-                {% if ed.language %}{{ ed.language }}{% endif %}
-                {% if ed.publisher %} · {{ ed.publisher }}{% endif %}
-                {% if ed.pages %} · {{ ed.pages }}p{% endif %}
-            </div>
-            {% if ed.is_primary_edition and editions | length > 1 %}
-            <span class="badge" style="background: var(--lb-deep-orange); color: white; font-size: 0.7rem; margin-top: 0.35rem;" data-i18n="book.primaryEdition">Primary</span>
-            {% endif %}
-            {% if ed.id != book_id %}
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.25rem; flex-wrap: wrap;">
-                {% if not ed.is_primary_edition %}
-                <form method="POST" action="{{ url_for('set_primary_edition', book_id=ed.id) }}" style="display:inline;">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.setPrimary">Set Primary</button>
-                </form>
+    <div class="card edition-card {{ 'edition-card-current' if ed.id == book_id else 'edition-card-other' }}">
+        <div class="edition-card-inner">
+            <div class="edition-card-cover">
+                {% if ed.has_cover %}
+                <img src="{{ url_for('book_cover_thumb', book_id=ed.id, v=ed.cover_hash) }}" alt="{{ ed.name }}">
+                {% else %}
+                <span class="cover-placeholder">📖</span>
                 {% endif %}
-                <form method="POST" action="{{ url_for('unlink_edition', book_id=ed.id) }}" style="display:inline;"
-                      onsubmit="return confirm('Remove this edition from the group?');">
-                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.unlinkEdition">Unlink</button>
-                </form>
             </div>
-            {% endif %}
+            <div class="edition-card-info">
+                {% if ed.id == book_id %}
+                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--lb-deep-orange); font-weight: 700; margin-bottom: 0.25rem;" data-i18n="book.currentEdition">Current</div>
+                {% endif %}
+                <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                    {% if ed.id != book_id %}<a href="{{ url_for('book_detail', book_id=ed.id) }}" style="color: var(--lb-orange); text-decoration: none;">{% endif %}
+                    {{ ed.name }}
+                    {% if ed.id != book_id %}</a>{% endif %}
+                </div>
+                <div style="font-size: 0.85rem; color: var(--lb-text-light);">
+                    {% if ed.language %}{{ ed.language }}{% endif %}
+                    {% if ed.publisher %} · {{ ed.publisher }}{% endif %}
+                    {% if ed.pages %} · {{ ed.pages }}p{% endif %}
+                </div>
+                {% if ed.is_primary_edition and editions | length > 1 %}
+                <span class="badge" style="background: var(--lb-deep-orange); color: white; font-size: 0.7rem; margin-top: 0.35rem;" data-i18n="book.primaryEdition">Primary</span>
+                {% endif %}
+                {% if ed.id != book_id %}
+                <div style="margin-top: 0.5rem; display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                    {% if not ed.is_primary_edition %}
+                    <form method="POST" action="{{ url_for('set_primary_edition', book_id=ed.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.setPrimary">Set Primary</button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('unlink_edition', book_id=ed.id) }}" style="display:inline;"
+                          onsubmit="return confirm('Remove this edition from the group?');">
+                        <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;" data-i18n="book.unlinkEdition">Unlink</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
     {% endfor %}

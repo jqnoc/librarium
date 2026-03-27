@@ -83,6 +83,8 @@
         }
 
         function librariumQuit() {
+            var overlay = document.getElementById('shutdownOverlay');
+            if (overlay) overlay.style.display = 'flex';
             fetch('{{ url_for("shutdown_backup") }}', { method: 'POST' })
                 .finally(function() {
                     if (window.librarium && window.librarium.quit) {
@@ -110,6 +112,15 @@
         <span data-i18n="footer.copy">Librarium</span> &copy; {{ now.year if now is defined else 2026 }}
         <span class="footer-version">v{{ app_version }}</span>
     </footer>
+
+    <!-- ── Shutdown overlay ──────────────────────────────────────────── -->
+    <div id="shutdownOverlay" class="shutdown-overlay">
+        <div class="shutdown-content">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" style="width: 72px; height: 72px; margin-bottom: 1.2rem;">
+            <div class="shutdown-spinner"></div>
+            <div style="margin-top: 1rem; font-size: 1rem; color: #ccc;" data-i18n="backup.shuttingDown">Backing up &amp; closing…</div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='i18n.js') }}"></script>
     {% block scripts %}{% endblock %}

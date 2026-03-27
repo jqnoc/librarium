@@ -35,7 +35,7 @@
                 <!-- Cover thumbnail -->
                 <div style="flex-shrink: 0; width: 52px; height: 75px; overflow: hidden; border-radius: 4px; background: var(--lb-surface-alt, #f3f4f6);">
                     {% if book.has_cover %}
-                    <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt=""
+                    <img src="{{ url_for('book_cover_thumb', book_id=book.id, v=book.cover_hash) }}" alt=""
                          style="width: 100%; height: 100%; object-fit: cover;">
                     {% else %}
                     <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">📖</div>

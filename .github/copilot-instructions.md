@@ -83,6 +83,8 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 11. `migrate_add_editions` — work_id / is_primary_edition columns
 12. `migrate_add_format` — format, binding, audio_format columns on books
 13. `migrate_add_total_time` — total_time_seconds on books, progress_pct on sessions and periods
+14. `migrate_add_period_duration` — duration_seconds on periods
+15. `migrate_add_cover_thumb` — cover_thumb BLOB on books (with backfill)
 
 When adding a new migration:
 
@@ -236,6 +238,7 @@ and **list** — toggled by the user and stored in a cookie.
 | `/library/<id>/rename` | POST | Rename a library |
 | `/library/<id>/delete` | POST | Delete a library |
 | `/cover/<id>` | GET | Serve book cover image from DB |
+| `/cover_thumb/<id>` | GET | Serve book cover thumbnail from DB |
 
 ### API endpoints
 
@@ -254,8 +257,9 @@ books       (id TEXT PK, title, subtitle, author, status, pages, isbn,
              publisher, pub_year, language, original_language, source_id,
              date_added, date_started, date_finished, genres, notes,
              cover_blob, cover_mime, cover_color, cover_palette,
-             cover_hash, library_id, work_id, is_primary_edition,
-             format, binding, audio_format, total_time_seconds)
+             cover_hash, cover_thumb, library_id, work_id,
+             is_primary_edition, format, binding, audio_format,
+             total_time_seconds)
 
 readings    (id INTEGER PK, book_id FK, reading_number, status,
              date_started, date_finished)
