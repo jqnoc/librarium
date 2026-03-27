@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Electron shell wrapping the Flask backend — the app now opens in its
   own window instead of requiring a browser.
 - Dynamic port allocation via `findFreePort()`, eliminating port conflicts.
-- Custom application menu with Reload, Quit, Edit operations, and zoom controls.
 - External links open in the default browser instead of inside the app.
 - `main.js` (Electron main process), `preload.js` (sandboxed renderer bridge),
   and `package.json` with Electron dependency and build config.
@@ -20,16 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CHANGELOG.md` (this file).
 - "Books Owned" stat tile on the library index page.
 - "Time Read by Year" bar chart on the global statistics page.
+- Frameless fullscreen Electron window (no OS title bar or menu bar).
+- In-app close button (✕) next to the EN|ES toggle; creates a database
+  backup before quitting.
+- `Librarium.vbs` launcher — opens Electron without a visible console window.
+- Latin epigraph on the Library page header.
+- Hover tooltip on the "Most Books Read at Once" activity card showing
+  the list of books.
 
 ### Fixed
 - `progress_pct` now included in session and period queries on book detail.
 - `sqlite3.Row` `.get()` `AttributeError` in `edit_session` and
   `edit_reading_period` replaced with bracket notation.
+- GUI settings (view mode, column selection, etc.) now persist across
+  Electron restarts by using a deterministic preferred port.
 
 ### Changed
 - `app.py` startup block reads `LIBRARIUM_PORT` and `LIBRARIUM_ELECTRON`
   environment variables; debug mode disabled under Electron.
-- `run-librarium.bat` simplified to `npm start`.
+- `run-librarium.bat` delegates to `Librarium.vbs` for silent launch.
 
 ## [0.4.0] — 2026-03-26
 

@@ -16,6 +16,7 @@
         'nav.activity':     { en: 'Activity',     es: 'Actividad' },
         'nav.sources':      { en: 'Sources',      es: 'Fuentes' },
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
+        'nav.close':        { en: 'Close Librarium', es: 'Cerrar Librarium' },
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
 
         // ── Library selector / management ───────────────────────────────
@@ -35,6 +36,7 @@
 
         // ── Index page ──────────────────────────────────────────────────
         'index.title':          { en: 'Library',            es: 'Biblioteca' },
+        'index.epigraph':       { en: '\u201CDomus sine librario, sicut castrum sine armamentario.\u201D', es: '\u201CDomus sine librario, sicut castrum sine armamentario.\u201D' },
         'index.totalBooks':     { en: 'Total Books',        es: 'Total de Libros' },
         'index.totalPages':     { en: 'Total Pages',        es: 'Total de Páginas' },
         'index.totalTimeRead':  { en: 'Total Time Read',    es: 'Tiempo Total de Lectura' },

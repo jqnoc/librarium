@@ -868,14 +868,15 @@ function renderRecords() {
 
     // Book names for most parallel
     let parallelNames = '';
+    let parallelTooltip = '';
     if (mostParallel.count > 0 && mostParallel.date) {
         const bids = allSessions
             .filter(s => s.date === mostParallel.date)
             .map(s => s.book_id);
         const unique = [...new Set(bids)];
-        parallelNames = unique
-            .map(bid => allBooks[bid] ? esc(allBooks[bid].name) : '?')
-            .join(', ');
+        const names = unique.map(bid => allBooks[bid] ? esc(allBooks[bid].name) : '?');
+        parallelTooltip = '<ul style="margin:0;padding:0 0 0 1.1em;text-align:left">' +
+            names.map(n => '<li>' + n + '</li>').join('') + '</ul>';
     }
 
     container.innerHTML = `
@@ -924,12 +925,12 @@ function renderRecords() {
             <div class="record-date">${fmtDateNice(r.bestMonth.start)} – ${fmtDateNice(r.bestMonth.end)}</div>
         </div>
         ${mostParallel.count > 1 ? `
-        <div class="record-card">
+        <div class="record-card record-card-tooltip-wrap">
             <div class="record-icon">📚</div>
             <div class="record-label">${t('activity.mostBooksParallel')}</div>
             <div class="record-value">${mostParallel.count} ${t('activity.books')}</div>
-            <div style="font-size:0.78rem; color:var(--lb-text-light); line-height:1.3;">${parallelNames}</div>
             <div class="record-date">${fmtDateNice(mostParallel.date)}</div>
+            ${parallelTooltip ? '<div class="record-tooltip">' + parallelTooltip + '</div>' : ''}
         </div>` : ''}
         <div class="record-card">
             <div class="record-icon">✅</div>

@@ -5,8 +5,9 @@
  * Exposes only what the renderer strictly needs via contextBridge.
  */
 
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("librarium", {
   isElectron: true,
+  quit: () => ipcRenderer.send("app-quit"),
 });

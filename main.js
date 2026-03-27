@@ -2,10 +2,10 @@
  * Librarium — Electron main process
  *
  * Spawns the Flask backend as a child process, waits for it to become
- * ready, then opens the app in a frameless-style BrowserWindow.
+ * ready, then opens the app in a frameless fullscreen BrowserWindow.
  */
 
-const { app, BrowserWindow, Menu, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const net = require("net");
@@ -22,14 +22,27 @@ const appRoot = isPackaged
   : __dirname;
 
 // ── Port discovery ──────────────────────────────────────────────────────
+const PREFERRED_PORT = 48721;
+
+/**
+ * Try to bind to PREFERRED_PORT first (keeps localStorage across restarts).
+ * If it is already taken, fall back to an OS-assigned free port.
+ */
 function findFreePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
+    server.listen(PREFERRED_PORT, "127.0.0.1", () => {
+      server.close(() => resolve(PREFERRED_PORT));
     });
-    server.on("error", reject);
+    server.on("error", () => {
+      // Preferred port taken — ask OS for any free port
+      const fallback = net.createServer();
+      fallback.listen(0, "127.0.0.1", () => {
+        const port = fallback.address().port;
+        fallback.close(() => resolve(port));
+      });
+      fallback.on("error", reject);
+    });
   });
 }
 
@@ -107,51 +120,6 @@ function waitForFlask(port, retries = 60, interval = 250) {
   });
 }
 
-// ── Application menu ────────────────────────────────────────────────────
-function buildMenu() {
-  const template = [
-    {
-      label: "Librarium",
-      submenu: [
-        {
-          label: "Reload",
-          accelerator: "CmdOrCtrl+R",
-          click: () => mainWindow && mainWindow.reload(),
-        },
-        { type: "separator" },
-        {
-          label: "Quit",
-          accelerator: "CmdOrCtrl+Q",
-          click: () => app.quit(),
-        },
-      ],
-    },
-    {
-      label: "Edit",
-      submenu: [
-        { role: "undo" },
-        { role: "redo" },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "selectAll" },
-      ],
-    },
-    {
-      label: "View",
-      submenu: [
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { role: "resetZoom" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-  ];
-  return Menu.buildFromTemplate(template);
-}
-
 // ── Window creation ─────────────────────────────────────────────────────
 async function createWindow() {
   try {
@@ -173,6 +141,8 @@ async function createWindow() {
     icon: path.join(appRoot, "static", "favicon.ico"),
     backgroundColor: "#1a1a2e",
     show: false,
+    frame: false,
+    fullscreen: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -180,8 +150,6 @@ async function createWindow() {
       sandbox: true,
     },
   });
-
-  Menu.setApplicationMenu(buildMenu());
 
   mainWindow.loadURL(`http://127.0.0.1:${flaskPort}`);
 
@@ -203,6 +171,11 @@ async function createWindow() {
     mainWindow = null;
   });
 }
+
+// ── IPC handlers ────────────────────────────────────────────────────────
+ipcMain.on("app-quit", () => {
+  app.quit();
+});
 
 // ── App lifecycle ───────────────────────────────────────────────────────
 app.whenReady().then(createWindow);

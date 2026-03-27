@@ -415,6 +415,26 @@ img { max-width: 100%; height: auto; }
     user-select: none;
 }
 
+/* ── Close button ──────────────────────────────────────────────────────── */
+.app-close-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.25);
+    color: rgba(255,255,255,.6);
+    font-size: 1rem;
+    line-height: 1;
+    padding: .2rem .55rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: .5rem;
+    transition: all .15s;
+    font-family: inherit;
+}
+.app-close-btn:hover {
+    background: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+
 /* ── Main content ──────────────────────────────────────────────────────── */
 .main-content {
     padding: 2rem;
@@ -1302,6 +1322,39 @@ select.form-control { cursor: pointer; }
     margin: 0.25rem 0;
 }
 .record-date  { font-size: 0.78rem; color: var(--lb-text-light); }
+.record-card-tooltip-wrap { position: relative; cursor: default; }
+.record-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + .4rem);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    box-shadow: var(--lb-shadow-lg);
+    padding: .6rem .8rem;
+    font-size: .8rem;
+    white-space: nowrap;
+    z-index: 50;
+    color: var(--lb-text);
+}
+.record-card-tooltip-wrap:hover .record-tooltip { display: block; }
+
+/* ── Library header with epigraph ───────────────────────────────────────── */
+.library-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+}
+.library-epigraph {
+    font-style: italic;
+    font-size: .92rem;
+    color: var(--lb-text-light);
+    letter-spacing: .01em;
+}
 
 /* ── Library Stat Ribbon (index page) ──────────────────────────────────── */
 .library-stat-ribbon {

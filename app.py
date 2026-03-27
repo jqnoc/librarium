@@ -4231,6 +4231,13 @@ def create_backup():
     return redirect(request.referrer or url_for("index"))
 
 
+@app.route("/api/shutdown-backup", methods=["POST"])
+def shutdown_backup():
+    """Create a backup before the Electron shell quits."""
+    name = backup_database(skip_if_recent=False)
+    return jsonify({"ok": True, "backup": name})
+
+
 @app.route("/library/create", methods=["POST"])
 def create_library():
     """Create a new library."""
