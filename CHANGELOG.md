@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Column toggle checkboxes (Publication Date, Publisher, Rating, Pages,
   Language) no longer flash as checked then unchecked on Library page
   load.
+- Book detail, author detail, and series detail pages now use full-size
+  cover images instead of thumbnails (thumbnails are kept only for list
+  pages).
+- Library search now splits the query into individual words and requires
+  all words to be present, so "Stephen King" correctly matches books
+  whose author is stored as "King, Stephen".
+- ISBN field in the Add Book form now preserves the original value with
+  dashes (e.g. `978-3-16-148410-0`) as typed or returned by the lookup,
+  rather than stripping formatting characters.
 
 ## [0.6.0] — 2026-03-28
 

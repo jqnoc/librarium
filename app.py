@@ -4073,7 +4073,8 @@ def delete_reading_period(book_id: str, idx: int):
 @app.route("/api/isbn_lookup")
 def isbn_lookup():
     """Look up book data by ISBN using the Open Library API."""
-    isbn = re.sub(r"[^0-9Xx]", "", request.args.get("isbn", ""))
+    original_isbn = request.args.get("isbn", "").strip()
+    isbn = re.sub(r"[^0-9Xx]", "", original_isbn)
     if not isbn:
         return jsonify({"error": "No ISBN provided"}), 400
 
@@ -4108,7 +4109,7 @@ def isbn_lookup():
         "author": authors,
         "publisher": publishers,
         "pages": pages,
-        "isbn": isbn,
+        "isbn": original_isbn,
         "publication_date": pub_date,
         "genre": subjects,
         "cover_url": cover_url,

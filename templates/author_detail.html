@@ -86,7 +86,7 @@
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             <div class="book-cover-large">
                 {% if book.has_cover %}
-                <img src="{{ url_for('book_cover_thumb', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}" style="width: 100%; height: auto; display: block;">
+                <img src="{{ url_for('book_cover', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}" style="width: 100%; height: auto; display: block;">
                 {% else %}
                 <div class="cover-placeholder">📖</div>
                 {% endif %}

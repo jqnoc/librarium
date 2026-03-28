@@ -163,17 +163,23 @@ document.addEventListener('click', function(e) {
     });
     function filterLibrary() {
         var query = searchInput.value.toLowerCase().trim();
+        var words = query ? query.split(/\s+/).filter(Boolean) : [];
+        function matches(el) {
+            if (!words.length) return true;
+            var s = el.dataset.search;
+            return words.every(function(w) { return s.indexOf(w) !== -1; });
+        }
         // Card view
         document.querySelectorAll('#view-card .book-card').forEach(function(el) {
-            el.style.display = !query || el.dataset.search.indexOf(query) !== -1 ? '' : 'none';
+            el.style.display = matches(el) ? '' : 'none';
         });
         // Cover view
         document.querySelectorAll('#view-cover .cover-grid-item').forEach(function(el) {
-            el.style.display = !query || el.dataset.search.indexOf(query) !== -1 ? '' : 'none';
+            el.style.display = matches(el) ? '' : 'none';
         });
         // List view
         document.querySelectorAll('#view-list tbody tr').forEach(function(el) {
-            el.style.display = !query || el.dataset.search.indexOf(query) !== -1 ? '' : 'none';
+            el.style.display = matches(el) ? '' : 'none';
         });
     }
 })();

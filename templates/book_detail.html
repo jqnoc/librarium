@@ -721,7 +721,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="edition-card-inner">
             <div class="edition-card-cover">
                 {% if ed.has_cover %}
-                <img src="{{ url_for('book_cover_thumb', book_id=ed.id, v=ed.cover_hash) }}" alt="{{ ed.name }}">
+                <img src="{{ url_for('book_cover', book_id=ed.id, v=ed.cover_hash) }}" alt="{{ ed.name }}">
                 {% else %}
                 <span class="cover-placeholder">📖</span>
                 {% endif %}

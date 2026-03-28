@@ -435,31 +435,37 @@ feat(stats): add status timeline stacked area chart
 
 ## 11. Versioning & Changelog
 
-The project follows **date-gated semantic versioning**: each calendar
-day that produces at least one commit gets exactly one version bump.
+The project uses semantic versioning applied per change: every
+code-modifying request or commit that changes the project **must**
+include a version bump and a changelog update. Do **not** aggregate
+multiple requests into a single daily version — each user-requested
+change that modifies the repository gets its own version entry.
 
 ### Rules
 
 | Scenario | Action |
 |----------|--------|
-| Day contains at least one **feat** commit | Bump **minor** (`0.X.0`), reset patch to 0 |
-| Day contains only **fix** / **refactor** / **chore** / **docs** commits (no feat) | Bump **patch** (`0.x.Y`) |
-| **Major** version (`X.0.0`) | Never changed automatically — the user bumps it manually for milestone releases |
+| Commit includes a **feat** change | Bump **minor** (increment middle number), reset patch to 0 |
+| Commit includes only **fix** / **refactor** / **chore** / **docs** changes (no feat) | Bump **patch** (increment last number) |
+| **Major** version (`X.0.0`) | Never changed automatically — bump manually for milestone releases |
 
 ### Procedure (MANDATORY)
 
-Every response that adds a feature or fixes a bug **must**:
+Every response that modifies code (feature, fix, refactor, chore, docs,
+etc.) **must** perform the following steps before finishing the task:
 
 1. **Determine the new version** — check the current `APP_VERSION` in
-   `app.py`. If today already has a version entry in `CHANGELOG.md`,
-   merge the new items into that entry (do **not** create a second
-   entry for the same day). If this is the first commit of a new day,
-   bump minor or patch per the rules above.
+  `app.py`. Decide whether the change is a `feat` (minor bump) or a
+  smaller change (patch bump). Do not wait for the end of the day; the
+  version increments on each change.
 2. **Update `APP_VERSION`** in `app.py` to the new version string.
 3. **Update `version`** in `package.json` to the same string.
-4. **Update `CHANGELOG.md`** — add or extend the entry for today's
-   date, using the Keep a Changelog format (`Added`, `Fixed`, `Changed`,
-   `Removed` sections as needed).
+4. **Update `CHANGELOG.md`** — add a new entry for the new version
+  using the Keep a Changelog format (`Added`, `Fixed`, `Changed`,
+  `Removed` sections as needed). Each change must have its own version
+  entry; if multiple small edits were part of the same user-requested
+  change, group them under that single version entry.
+5. Ensure the three version locations are consistent and in sync.
 
 ### Version locations
 
