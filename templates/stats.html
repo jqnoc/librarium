@@ -207,7 +207,7 @@
 <div class="empty-state">
     <div class="icon">📊</div>
     <p data-i18n="stats.empty">No reading data yet. Start tracking your reading to see statistics!</p>
-    <a href="{{ url_for('new_book') }}" class="btn btn-primary">+ Add Book</a>
+    <a href="#" onclick="event.preventDefault();document.getElementById('addBookModal').style.display='flex'" class="btn btn-primary">+ Add Book</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -5,6 +5,48 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-03-28
+
+### Added
+- "Add Book" modal dialog with two options: "Add Manually" and "Add
+  From ISBN"; replaces the old direct link in navbar and empty states.
+- ISBN lookup via Open Library API (`/api/isbn_lookup`): fetches title,
+  author, publisher, pages, genre, cover image, and pre-populates the
+  new book form.
+- Cover image auto-download from ISBN lookup URL when no file is
+  uploaded manually.
+- Author photo thumbnail system: `photo_thumb` column on authors,
+  `migrate_add_photo_thumb()` migration with backfill, and
+  `/author_photo_thumb/<name>` route with ETag caching.
+- `_format_duration_hms()` helper for displaying time in hours, minutes,
+  and seconds without day rounding.
+- Tooltip on the "Total Time Read" stat tile showing the full H:M:S
+  breakdown.
+- i18n keys: `addBook.title`, `addBook.manually`, `addBook.fromIsbn`,
+  `addBook.isbnPlaceholder`, `addBook.search`, `bookForm.coverFromIsbn`.
+
+### Changed
+- Consolidated all colour palettes into a single "Librarium" theme
+  (formerly Hone); removed Orange, Mori, Kawara, Umi, Hinode, and Sora
+  palette definitions from CSS and all palette-switching code from
+  `base.html`.
+- Authors list page now uses thumbnail photos (`author_photo_thumb`)
+  and thumbnail book covers (`book_cover_thumb`) with `loading="lazy"`.
+- Series list page now uses `book_cover_thumb` for collage images with
+  `loading="lazy"`.
+- Electron `BrowserWindow` uses `backgroundThrottling: false` to
+  prevent the window going blank on Alt+Tab focus return.
+- Taskbar icon upgraded from low-resolution `favicon.ico` (879 B) to
+  high-resolution `logo.png` (192 KB) for crisp display.
+- Library list-view column checkboxes now render with their saved state
+  immediately (inline script before paint), eliminating the flash of
+  all-checked → restored state.
+
+### Fixed
+- Column toggle checkboxes (Publication Date, Publisher, Rating, Pages,
+  Language) no longer flash as checked then unchecked on Library page
+  load.
+
 ## [0.6.0] — 2026-03-28
 
 ### Added

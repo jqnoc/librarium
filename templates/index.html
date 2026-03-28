@@ -19,7 +19,7 @@
         <div class="library-stat-value">{{ "{:,}".format(total_library_pages) }}</div>
         <div class="library-stat-label" data-i18n="index.totalPages">Total Pages</div>
     </div>
-    <div class="library-stat-tile">
+    <div class="library-stat-tile" title="{{ total_library_time_hms }}">
         <div class="library-stat-icon">⏱️</div>
         <div class="library-stat-value">{{ total_library_time }}</div>
         <div class="library-stat-label" data-i18n="index.totalTimeRead">Total Time Read</div>
@@ -198,26 +198,15 @@ function applyColumnVisibility(visible) {
 }
 
 function restoreColumns() {
+    // Remove the blocking preload style now that JS can manage visibility normally
+    var preload = document.getElementById('librarium-col-preload');
+    if (preload) preload.remove();
+
     const saved = localStorage.getItem('librarium_list_cols');
-    if (saved) {
-        try {
-            const visible = JSON.parse(saved);
-            // Restore checkboxes
-            document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(cb => {
-                if (cb.value === 'title') return; // always on
-                if (visible[cb.value] !== undefined) cb.checked = visible[cb.value];
-            });
-            applyColumnVisibility(visible);
-        } catch(e) {}
-    } else {
-        // Default: hide the extra columns
-        const defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:true, pages:false, language:false};
-        document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(cb => {
-            if (cb.value === 'title') return;
-            if (defaults[cb.value] !== undefined) cb.checked = defaults[cb.value];
-        });
-        applyColumnVisibility(defaults);
-    }
+    const defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:true, pages:false, language:false};
+    let visible = defaults;
+    if (saved) { try { visible = JSON.parse(saved); } catch(e) {} }
+    applyColumnVisibility(visible);
 }
 document.addEventListener('DOMContentLoaded', restoreColumns);
 </script>
@@ -308,19 +297,43 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
     <div class="list-column-selector" style="margin-bottom: 0.75rem;">
         <label style="color: var(--lb-text-light); font-size: 0.9rem; margin-right: 0.5rem;" data-i18n="index.columns">Columns:</label>
         <div class="column-checkboxes" id="columnCheckboxes">
-            <label class="col-check"><input type="checkbox" value="cover" checked onchange="toggleColumns()"> <span data-i18n="index.colCover">Cover</span></label>
+            <label class="col-check"><input type="checkbox" value="cover" onchange="toggleColumns()"> <span data-i18n="index.colCover">Cover</span></label>
             <label class="col-check"><input type="checkbox" value="title" checked onchange="toggleColumns()" disabled> <span data-i18n="index.colTitle">Title</span></label>
-            <label class="col-check"><input type="checkbox" value="author" checked onchange="toggleColumns()"> <span data-i18n="index.colAuthor">Author</span></label>
-            <label class="col-check"><input type="checkbox" value="status" checked onchange="toggleColumns()"> <span data-i18n="index.colStatus">Status</span></label>
-            <label class="col-check"><input type="checkbox" value="first_session" checked onchange="toggleColumns()"> <span data-i18n="index.colStartDate">Start Date</span></label>
-            <label class="col-check"><input type="checkbox" value="last_session" checked onchange="toggleColumns()"> <span data-i18n="index.colLatestDate">Latest Date</span></label>
-            <label class="col-check"><input type="checkbox" value="time_read" checked onchange="toggleColumns()"> <span data-i18n="index.colTimeRead">Time Read</span></label>
+            <label class="col-check"><input type="checkbox" value="author" onchange="toggleColumns()"> <span data-i18n="index.colAuthor">Author</span></label>
+            <label class="col-check"><input type="checkbox" value="status" onchange="toggleColumns()"> <span data-i18n="index.colStatus">Status</span></label>
+            <label class="col-check"><input type="checkbox" value="first_session" onchange="toggleColumns()"> <span data-i18n="index.colStartDate">Start Date</span></label>
+            <label class="col-check"><input type="checkbox" value="last_session" onchange="toggleColumns()"> <span data-i18n="index.colLatestDate">Latest Date</span></label>
+            <label class="col-check"><input type="checkbox" value="time_read" onchange="toggleColumns()"> <span data-i18n="index.colTimeRead">Time Read</span></label>
             <label class="col-check"><input type="checkbox" value="pub_date" onchange="toggleColumns()"> <span data-i18n="index.colPubDate">Publication Date</span></label>
             <label class="col-check"><input type="checkbox" value="publisher" onchange="toggleColumns()"> <span data-i18n="index.colPublisher">Publisher</span></label>
             <label class="col-check"><input type="checkbox" value="rating" onchange="toggleColumns()"> <span data-i18n="index.colRating">Rating</span></label>
             <label class="col-check"><input type="checkbox" value="pages" onchange="toggleColumns()"> <span data-i18n="index.colPages">Pages</span></label>
             <label class="col-check"><input type="checkbox" value="language" onchange="toggleColumns()"> <span data-i18n="index.colLanguage">Language</span></label>
         </div>
+        <script>
+        // Immediately restore checkbox state and column visibility before paint
+        (function() {
+            var defaults = {cover:true, title:true, author:true, status:true, first_session:true, last_session:true, time_read:true, pub_date:false, publisher:false, rating:true, pages:false, language:false};
+            var saved = localStorage.getItem('librarium_list_cols');
+            var visible = saved ? (function() { try { return JSON.parse(saved); } catch(e) { return null; } })() : null;
+            if (!visible) visible = defaults;
+            document.querySelectorAll('#columnCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                if (cb.value === 'title') return;
+                cb.checked = visible[cb.value] !== undefined ? visible[cb.value] : (defaults[cb.value] !== false);
+            });
+            var allCols = ['cover','title','author','status','first_session','last_session','time_read','pub_date','publisher','rating','pages','language'];
+            var css = '';
+            allCols.forEach(function(col) {
+                if (visible[col] === false) css += '.col-' + col + '{display:none !important}';
+            });
+            if (css) {
+                var s = document.createElement('style');
+                s.id = 'librarium-col-preload';
+                s.textContent = css;
+                document.head.appendChild(s);
+            }
+        })();
+        </script>
     </div>
     <div class="table-wrap">
         <table class="library-list-table">
@@ -381,7 +394,7 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
 <div class="empty-state">
     <div class="icon">📚</div>
     <p data-i18n="index.emptyLibrary">Your library is empty. Add your first book to get started!</p>
-    <a href="{{ url_for('new_book') }}" class="btn btn-primary" data-i18n="nav.addBook">+ Add Book</a>
+    <a href="#" onclick="event.preventDefault();document.getElementById('addBookModal').style.display='flex'" class="btn btn-primary" data-i18n="nav.addBook">+ Add Book</a>
 </div>
 {% endif %}
 {% endif %}

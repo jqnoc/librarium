@@ -115,7 +115,7 @@
 <div class="empty-state">
     <div class="icon">📈</div>
     <p data-i18n="activity.empty">No reading activity yet. Start tracking your reading sessions to see your activity!</p>
-    <a href="{{ url_for('new_book') }}" class="btn btn-primary">+ Add Book</a>
+    <a href="#" onclick="event.preventDefault();document.getElementById('addBookModal').style.display='flex'" class="btn btn-primary">+ Add Book</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -134,7 +134,7 @@ async function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: false,
     title: "Librarium",
-    icon: path.join(appRoot, "static", "favicon.ico"),
+    icon: path.join(appRoot, "static", "logo.png"),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -161,8 +161,8 @@ async function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: "Librarium",
-    icon: path.join(appRoot, "static", "favicon.ico"),
-    backgroundColor: "#1a1a2e",
+    icon: path.join(appRoot, "static", "logo.png"),
+    backgroundColor: "#2a4a5a",
     show: false,
     frame: false,
     fullscreen: true,
@@ -171,6 +171,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
 

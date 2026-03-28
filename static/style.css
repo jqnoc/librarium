@@ -1,22 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Librarium – Stylesheet
-   Aesthetic: Material / SciY Gears manual
-   Palette:  https://colorhunt.co/palette/ffd400ffc300ff8c00ff5f00
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Palette variables ─────────────────────────────────────────────────── */
+/* ── Palette variables (Librarium theme) ───────────────────────────────── */
 :root {
-    --lb-gold:          #FFD400;
-    --lb-amber:         #FFC300;
-    --lb-orange:        #FF8C00;
-    --lb-deep-orange:   #FF5F00;
+    --lb-gold:          #EC8F8D;
+    --lb-amber:         #EC8F8D;
+    --lb-orange:        #44A194;
+    --lb-deep-orange:   #537D96;
 
-    --lb-dark:          #1A1A2E;
-    --lb-dark-mid:      #2D2D44;
+    --lb-dark:          #2a4a5a;
+    --lb-dark-mid:      #3a5f72;
     --lb-text:          #2D2D44;
     --lb-text-light:    #6B7280;
     --lb-white:         #FFFFFF;
-    --lb-light-bg:      #FAFAF8;
+    --lb-light-bg:      #F4F0E4;
     --lb-card-bg:       #FFFFFF;
     --lb-border:        #E5E7EB;
     --lb-success:       #10B981;
@@ -27,8 +25,8 @@
     --lb-abandoned:     #DC2626;
     --lb-draft:          #6B7280;
 
-    --lb-gradient:      linear-gradient(135deg, var(--lb-deep-orange) 0%, var(--lb-orange) 50%, var(--lb-amber) 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #1A1A2E 0%, var(--lb-deep-orange) 100%);
+    --lb-gradient:      linear-gradient(135deg, #537D96 0%, #44A194 50%, #EC8F8D 100%);
+    --lb-gradient-dark: linear-gradient(135deg, #2a4a5a 0%, #537D96 100%);
 
     --lb-shadow:        0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
     --lb-shadow-lg:     0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
@@ -36,61 +34,6 @@
     --lb-radius-lg:     12px;
 
     /* Chart colours – read by JS via getComputedStyle */
-    --lb-chart-line:           #FF5F00;
-    --lb-chart-fill:           rgba(255, 140, 0, 0.1);
-    --lb-chart-bar1:           rgba(255, 95, 0, 0.8);
-    --lb-chart-bar2:           rgba(255, 140, 0, 0.8);
-    --lb-chart-tooltip-bg:     rgba(26, 26, 46, 0.95);
-    --lb-chart-tooltip-title:  #FFD400;
-    --lb-chart-tooltip-border: #FF8C00;
-
-    /* Accent tints used in CSS rules */
-    --lb-accent-faint:  rgba(255, 140, 0, 0.06);
-    --lb-accent-glow:   rgba(255, 140, 0, 0.15);
-
-    --lb-table-header:  var(--lb-deep-orange);
-}
-
-/* ── Mori palette (https://colorhunt.co/palette/25671e48a111f2b50bf7f0f0) ── */
-html[data-palette="green"] {
-    --lb-gold:          #F2B50B;
-    --lb-amber:         #F2B50B;
-    --lb-orange:        #48A111;
-    --lb-deep-orange:   #25671E;
-
-    --lb-dark:          #1b3c10;
-    --lb-dark-mid:      #2d5c1a;
-    --lb-light-bg:      #F7F0F0;
-
-    --lb-gradient:      linear-gradient(135deg, #25671E 0%, #48A111 50%, #F2B50B 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #1b3c10 0%, #25671E 100%);
-
-    --lb-chart-line:           #25671E;
-    --lb-chart-fill:           rgba(72, 161, 17, 0.1);
-    --lb-chart-bar1:           rgba(37, 103, 30, 0.8);
-    --lb-chart-bar2:           rgba(72, 161, 17, 0.8);
-    --lb-chart-tooltip-bg:     rgba(27, 60, 16, 0.95);
-    --lb-chart-tooltip-title:  #F2B50B;
-    --lb-chart-tooltip-border: #48A111;
-    --lb-accent-faint:         rgba(72, 161, 17, 0.06);
-    --lb-accent-glow:          rgba(72, 161, 17, 0.15);
-    --lb-table-header:         var(--lb-dark-mid);
-}
-
-/* ── Hone palette (https://colorhunt.co/palette/f4f0e444a194537d96ec8f8d) ── */
-html[data-palette="hone"] {
-    --lb-gold:          #EC8F8D;
-    --lb-amber:         #EC8F8D;
-    --lb-orange:        #44A194;
-    --lb-deep-orange:   #537D96;
-
-    --lb-dark:          #2a4a5a;
-    --lb-dark-mid:      #3a5f72;
-    --lb-light-bg:      #F4F0E4;
-
-    --lb-gradient:      linear-gradient(135deg, #537D96 0%, #44A194 50%, #EC8F8D 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #2a4a5a 0%, #537D96 100%);
-
     --lb-chart-line:           #537D96;
     --lb-chart-fill:           rgba(68, 161, 148, 0.1);
     --lb-chart-bar1:           rgba(83, 125, 150, 0.8);
@@ -98,113 +41,12 @@ html[data-palette="hone"] {
     --lb-chart-tooltip-bg:     rgba(42, 74, 90, 0.95);
     --lb-chart-tooltip-title:  #EC8F8D;
     --lb-chart-tooltip-border: #44A194;
-    --lb-accent-faint:         rgba(68, 161, 148, 0.06);
-    --lb-accent-glow:          rgba(68, 161, 148, 0.15);
-    --lb-table-header:         var(--lb-dark-mid);
-}
 
-/* ── Kawara palette (https://colorhunt.co/palette/bf4646eddcc6fff4ea7eacb5) ── */
-html[data-palette="kawara"] {
-    --lb-gold:          #BF4646;
-    --lb-amber:         #BF4646;
-    --lb-orange:        #7EACB5;
-    --lb-deep-orange:   #BF4646;
+    /* Accent tints used in CSS rules */
+    --lb-accent-faint:  rgba(68, 161, 148, 0.06);
+    --lb-accent-glow:   rgba(68, 161, 148, 0.15);
 
-    --lb-dark:          #6b1f1f;
-    --lb-dark-mid:      #8a2c2c;
-    --lb-light-bg:      #FFF4EA;
-
-    --lb-gradient:      linear-gradient(135deg, #BF4646 0%, #7EACB5 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #6b1f1f 0%, #BF4646 100%);
-
-    --lb-chart-line:           #BF4646;
-    --lb-chart-fill:           rgba(191, 70, 70, 0.1);
-    --lb-chart-bar1:           rgba(191, 70, 70, 0.8);
-    --lb-chart-bar2:           rgba(126, 172, 181, 0.8);
-    --lb-chart-tooltip-bg:     rgba(107, 31, 31, 0.95);
-    --lb-chart-tooltip-title:  #EDDCC6;
-    --lb-chart-tooltip-border: #BF4646;
-    --lb-accent-faint:         rgba(191, 70, 70, 0.06);
-    --lb-accent-glow:          rgba(191, 70, 70, 0.15);
-    --lb-table-header:         var(--lb-dark-mid);
-}
-
-/* ── Umi palette (https://colorhunt.co/palette/0d1a631a2ca32845d6f68048) ── */
-html[data-palette="umi"] {
-    --lb-gold:          #F68048;
-    --lb-amber:         #F68048;
-    --lb-orange:        #2845D6;
-    --lb-deep-orange:   #1A2CA3;
-
-    --lb-dark:          #0D1A63;
-    --lb-dark-mid:      #1A2CA3;
-    --lb-light-bg:      #f0f2ff;
-
-    --lb-gradient:      linear-gradient(135deg, #0D1A63 0%, #2845D6 70%, #F68048 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #0D1A63 0%, #1A2CA3 100%);
-
-    --lb-chart-line:           #2845D6;
-    --lb-chart-fill:           rgba(40, 69, 214, 0.1);
-    --lb-chart-bar1:           rgba(26, 44, 163, 0.8);
-    --lb-chart-bar2:           rgba(40, 69, 214, 0.8);
-    --lb-chart-tooltip-bg:     rgba(13, 26, 99, 0.95);
-    --lb-chart-tooltip-title:  #F68048;
-    --lb-chart-tooltip-border: #2845D6;
-    --lb-accent-faint:         rgba(40, 69, 214, 0.06);
-    --lb-accent-glow:          rgba(40, 69, 214, 0.15);
-    --lb-table-header:         var(--lb-dark-mid);
-}
-
-/* ── Hinode palette (https://colorhunt.co/palette/280905740a03c3110ce6501b) ── */
-html[data-palette="hinode"] {
-    --lb-gold:          #E6501B;
-    --lb-amber:         #E6501B;
-    --lb-orange:        #C3110C;
-    --lb-deep-orange:   #C3110C;
-
-    --lb-dark:          #280905;
-    --lb-dark-mid:      #740A03;
-    --lb-light-bg:      #fff8f5;
-
-    --lb-gradient:      linear-gradient(135deg, #280905 0%, #C3110C 60%, #E6501B 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #280905 0%, #740A03 100%);
-
-    --lb-chart-line:           #C3110C;
-    --lb-chart-fill:           rgba(195, 17, 12, 0.1);
-    --lb-chart-bar1:           rgba(195, 17, 12, 0.8);
-    --lb-chart-bar2:           rgba(230, 80, 27, 0.8);
-    --lb-chart-tooltip-bg:     rgba(40, 9, 5, 0.95);
-    --lb-chart-tooltip-title:  #E6501B;
-    --lb-chart-tooltip-border: #C3110C;
-    --lb-accent-faint:         rgba(195, 17, 12, 0.06);
-    --lb-accent-glow:          rgba(195, 17, 12, 0.15);
-    --lb-table-header:         var(--lb-dark-mid);
-}
-
-/* ── Sora palette (https://colorhunt.co/palette/30364facbac4e1d9bcf0f0db) ── */
-html[data-palette="sora"] {
-    --lb-gold:          #E1D9BC;
-    --lb-amber:         #E1D9BC;
-    --lb-orange:        #ACBAC4;
-    --lb-deep-orange:   #30364F;
-
-    --lb-dark:          #1d2235;
-    --lb-dark-mid:      #30364F;
-    --lb-light-bg:      #F0F0DB;
-
-    --lb-gradient:      linear-gradient(135deg, #30364F 0%, #ACBAC4 70%, #E1D9BC 100%);
-    --lb-gradient-dark: linear-gradient(135deg, #1d2235 0%, #30364F 100%);
-
-    --lb-chart-line:           #30364F;
-    --lb-chart-fill:           rgba(48, 54, 79, 0.1);
-    --lb-chart-bar1:           rgba(48, 54, 79, 0.8);
-    --lb-chart-bar2:           rgba(172, 186, 196, 0.8);
-    --lb-chart-tooltip-bg:     rgba(29, 34, 53, 0.95);
-    --lb-chart-tooltip-title:  #E1D9BC;
-    --lb-chart-tooltip-border: #ACBAC4;
-    --lb-accent-faint:         rgba(48, 54, 79, 0.06);
-    --lb-accent-glow:          rgba(172, 186, 196, 0.25);
-    --lb-table-header:         var(--lb-dark-mid);
+    --lb-table-header:  var(--lb-dark-mid);
 }
 
 /* ── Reset & Base ──────────────────────────────────────────────────────── */

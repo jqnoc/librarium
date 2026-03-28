@@ -28,11 +28,11 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="name" data-i18n="bookForm.titleReq">Title *</label>
-                    <input type="text" id="name" name="name" class="form-control" required>
+                    <input type="text" id="name" name="name" class="form-control" required value="{{ prefill.get('name', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="subtitle" data-i18n="bookForm.subtitle">Subtitle</label>
-                    <input type="text" id="subtitle" name="subtitle" class="form-control">
+                    <input type="text" id="subtitle" name="subtitle" class="form-control" value="{{ prefill.get('subtitle', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="author" data-i18n="bookForm.authorReq">Author(s) *</label>
@@ -112,7 +112,7 @@
             <div class="form-row" id="pages-row">
                 <div class="form-group">
                     <label for="pages" data-i18n="bookForm.pages">Pages</label>
-                    <input type="number" id="pages" name="pages" class="form-control" min="1">
+                    <input type="number" id="pages" name="pages" class="form-control" min="1" value="{{ prefill.get('pages', '') }}">
                 </div>
                 <div class="form-group" id="frontmatter-group">
                     <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
@@ -136,24 +136,31 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="publisher" data-i18n="bookForm.publisher">Publisher</label>
-                    <input type="text" id="publisher" name="publisher" class="form-control" list="publisher-list">
+                    <input type="text" id="publisher" name="publisher" class="form-control" list="publisher-list" value="{{ prefill.get('publisher', '') }}">
                     <datalist id="publisher-list">
                         {% for v in suggestions.publisher %}<option value="{{ v }}">{% endfor %}
                     </datalist>
                 </div>
                 <div class="form-group">
                     <label for="publication_date" data-i18n="bookForm.pubDate">Publication Date</label>
-                    <input type="text" id="publication_date" name="publication_date" class="form-control" placeholder="e.g. 2021, 2021-04, or 2021-04-30" pattern="\d{4}(-\d{2}(-\d{2})?)?">
+                    <input type="text" id="publication_date" name="publication_date" class="form-control" placeholder="e.g. 2021, 2021-04, or 2021-04-30" pattern="\d{4}(-\d{2}(-\d{2})?)?" value="{{ prefill.get('publication_date', '') }}">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="isbn" data-i18n="bookForm.isbn">ISBN</label>
-                    <input type="text" id="isbn" name="isbn" class="form-control">
+                    <input type="text" id="isbn" name="isbn" class="form-control" value="{{ prefill.get('isbn', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="cover" data-i18n="bookForm.coverImage">Cover Image</label>
                     <input type="file" id="cover" name="cover" class="form-control" accept="image/*">
+                    {% if prefill.get('cover_url') %}
+                    <input type="hidden" name="cover_url" value="{{ prefill.get('cover_url', '') }}">
+                    <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--lb-text-light);">
+                        <img src="{{ prefill.get('cover_url') }}" alt="Cover preview" style="max-height: 80px; border-radius: 4px; vertical-align: middle; margin-right: 0.5rem;">
+                        <span data-i18n="bookForm.coverFromIsbn">Cover from ISBN lookup (will be used if no file is uploaded)</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

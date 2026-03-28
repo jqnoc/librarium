@@ -12,6 +12,8 @@ import os
 import re
 import shutil
 import sqlite3
+import urllib.error
+import urllib.request
 import uuid as uuid_module
 from collections import Counter
 from datetime import datetime, date
@@ -45,7 +47,7 @@ DB_PATH = DATA_DIR / "librarium.db"
 BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUPS = 5
 
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.7.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -646,6 +648,28 @@ def migrate_add_cover_thumb() -> None:
     print(f"✅ Migration complete – cover_thumb added ({len(rows)} thumbnails generated).")
 
 
+def migrate_add_photo_thumb() -> None:
+    """Add photo_thumb column to authors for thumbnail images."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
+    if "photo_thumb" in cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding photo_thumb to authors …")
+    db.execute("ALTER TABLE authors ADD COLUMN photo_thumb BLOB DEFAULT NULL")
+    rows = db.execute("SELECT name, photo FROM authors WHERE has_photo = 1 AND photo IS NOT NULL").fetchall()
+    for row in rows:
+        thumb = _generate_thumbnail(row["photo"])
+        if thumb:
+            db.execute("UPDATE authors SET photo_thumb = ? WHERE name = ?", (thumb, row["name"]))
+    db.commit()
+    db.close()
+    print(f"✅ Migration complete – photo_thumb added ({len(rows)} thumbnails generated).")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 THUMB_MAX_WIDTH = 300
 
@@ -1001,6 +1025,14 @@ def _format_duration_long(seconds: int) -> str:
         return f"{minutes}m {secs}s"
     else:
         return f"{secs}s"
+
+
+def _format_duration_hms(seconds: int) -> str:
+    """Convert seconds to Hours, Minutes, Seconds (no day rounding)."""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours}h {minutes}m {secs}s"
 
 
 def _normalize_input_date(value: str) -> str:
@@ -1496,6 +1528,7 @@ def index():
     # Total time read across all books (sessions + estimated period time)
     total_library_seconds = sum(b["total_seconds_raw"] for b in books)
     total_library_time = _format_duration_long(total_library_seconds)
+    total_library_time_hms = _format_duration_hms(total_library_seconds)
 
     if status_filter and status_filter != "all":
         books = [b for b in books if b["status"] == status_filter]
@@ -1514,6 +1547,7 @@ def index():
         total_books=total_books_count,
         total_library_pages=total_library_pages,
         total_library_time=total_library_time,
+        total_library_time_hms=total_library_time_hms,
         unique_authors=len(unique_authors),
         reading_count=reading_count,
         finished_count=finished_count,
@@ -2828,6 +2862,40 @@ def author_photo(author_name: str):
     return resp
 
 
+@app.route("/author_photo_thumb/<path:author_name>")
+def author_photo_thumb(author_name: str):
+    """Serve a thumbnail of the author's photo from the database."""
+    db = get_db()
+    lib_id = _get_current_library_id()
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client:
+        hash_row = db.execute(
+            "SELECT photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
+            (author_name, lib_id)
+        ).fetchone()
+        if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
+            resp = make_response("", 304)
+            resp.headers["ETag"] = f'"{ hash_row["photo_hash"] }"'
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return resp
+
+    row = db.execute(
+        "SELECT photo_thumb, photo, photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
+        (author_name, lib_id)
+    ).fetchone()
+    if not row or (not row["photo_thumb"] and not row["photo"]):
+        abort(404)
+
+    blob = row["photo_thumb"] or row["photo"]
+    photo_hash = row["photo_hash"] or hashlib.md5(row["photo"]).hexdigest()[:12]
+    resp = make_response(blob)
+    resp.headers["Content-Type"] = "image/jpeg"
+    resp.headers["ETag"] = f'"{photo_hash}"'
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
 @app.route("/authors/<path:author_name>/edit", methods=["GET", "POST"])
 def edit_author(author_name: str):
     """Edit author metadata (photo, dates, places, biography)."""
@@ -2867,13 +2935,14 @@ def edit_author(author_name: str):
         if photo_file and photo_file.filename:
             photo_blob = photo_file.read()
             photo_hash = hashlib.md5(photo_blob).hexdigest()[:12]
-            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ? WHERE name = ? AND library_id = ?",
-                       (photo_blob, photo_hash, author_name, lib_id))
+            photo_thumb = _generate_thumbnail(photo_blob)
+            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ?, photo_thumb = ? WHERE name = ? AND library_id = ?",
+                       (photo_blob, photo_hash, photo_thumb, author_name, lib_id))
             db.commit()
 
         # Handle photo removal
         if request.form.get("remove_photo") == "1":
-            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '' WHERE name = ? AND library_id = ?",
+            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '', photo_thumb = NULL WHERE name = ? AND library_id = ?",
                        (author_name, lib_id))
             db.commit()
 
@@ -3998,6 +4067,56 @@ def delete_reading_period(book_id: str, idx: int):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Routes – ISBN lookup
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/isbn_lookup")
+def isbn_lookup():
+    """Look up book data by ISBN using the Open Library API."""
+    isbn = re.sub(r"[^0-9Xx]", "", request.args.get("isbn", ""))
+    if not isbn:
+        return jsonify({"error": "No ISBN provided"}), 400
+
+    # Try Open Library Books API
+    ol_url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data"
+    try:
+        req = urllib.request.Request(ol_url, headers={"User-Agent": "Librarium/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError, OSError):
+        return jsonify({"error": "Failed to reach Open Library"}), 502
+
+    key = f"ISBN:{isbn}"
+    if key not in data:
+        return jsonify({"error": "ISBN not found"}), 404
+
+    book = data[key]
+    authors = "; ".join(a.get("name", "") for a in book.get("authors", []))
+    publishers = ", ".join(p.get("name", "") for p in book.get("publishers", []))
+    subjects = ", ".join(s.get("name", "") for s in book.get("subjects", [])[:5])
+    pages = book.get("number_of_pages", 0)
+    pub_date = book.get("publish_date", "")
+
+    # Try to get cover image URL (large → medium → small)
+    cover_url = ""
+    cover = book.get("cover", {})
+    cover_url = cover.get("large") or cover.get("medium") or cover.get("small") or ""
+
+    result = {
+        "title": book.get("title", ""),
+        "subtitle": book.get("subtitle", ""),
+        "author": authors,
+        "publisher": publishers,
+        "pages": pages,
+        "isbn": isbn,
+        "publication_date": pub_date,
+        "genre": subjects,
+        "cover_url": cover_url,
+    }
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Routes – Add new book
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -4083,6 +4202,24 @@ def new_book():
             cover_palette_json = json.dumps(palette)
             cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
             cover_thumb = _generate_thumbnail(cover_blob)
+        elif request.form.get("cover_url"):
+            # Download cover from URL (ISBN lookup)
+            try:
+                cover_req = urllib.request.Request(
+                    request.form["cover_url"],
+                    headers={"User-Agent": "Librarium/1.0"},
+                )
+                with urllib.request.urlopen(cover_req, timeout=15) as cresp:
+                    cover_blob = cresp.read()
+                if cover_blob:
+                    has_cover = 1
+                    palette = _extract_cover_palette(cover_blob)
+                    cover_color = palette[0] if palette else "#888888"
+                    cover_palette_json = json.dumps(palette)
+                    cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
+                    cover_thumb = _generate_thumbnail(cover_blob)
+            except (urllib.error.URLError, OSError):
+                pass  # Cover download failed — continue without cover
 
         # Handle series (many-to-many)
         series_names = request.form.getlist("series_name[]")
@@ -4195,6 +4332,13 @@ def new_book():
                       "original_publication_date", "genre", "summary",
                       "illustrator", "editor", "prologue_author"):
                 prefill[f] = primary.get(f, "")
+
+    # Pre-fill from ISBN lookup (query params)
+    for key in ("name", "subtitle", "author", "publisher", "isbn",
+                "publication_date", "genre", "pages", "cover_url"):
+        val = request.args.get(key, "").strip()
+        if val and key not in prefill:
+            prefill[key] = val
 
     return render_template("new_book.html",
                            purchase_sources=purchase_sources, borrow_sources=borrow_sources,
@@ -4665,6 +4809,7 @@ if __name__ == "__main__":
     migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
     migrate_add_period_duration()  # Add duration_seconds to periods
     migrate_add_cover_thumb()      # Add cover_thumb column to books
+    migrate_add_photo_thumb()      # Add photo_thumb column to authors
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
 

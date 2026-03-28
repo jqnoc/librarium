@@ -35,6 +35,14 @@
         'backup.create':         { en: 'Create Backup Now',      es: 'Crear Copia Ahora' },
         'backup.shuttingDown':   { en: 'Backing up & closing\u2026', es: 'Guardando copia y cerrando\u2026' },
 
+        // ── Add Book dialog ─────────────────────────────────────────────
+        'addBook.title':         { en: 'Add Book',              es: 'Añadir Libro' },
+        'addBook.manually':      { en: 'Add Manually',          es: 'Añadir Manualmente' },
+        'addBook.fromIsbn':      { en: 'Add From ISBN',         es: 'Añadir Desde ISBN' },
+        'addBook.isbnPlaceholder': { en: '978-0-123456-78-9',   es: '978-0-123456-78-9' },
+        'addBook.search':        { en: 'Search',                es: 'Buscar' },
+        'bookForm.coverFromIsbn': { en: 'Cover from ISBN lookup (will be used if no file is uploaded)', es: 'Portada del ISBN (se usará si no se sube un archivo)' },
+
         // ── Index page ──────────────────────────────────────────────────
         'index.title':          { en: 'Library',            es: 'Biblioteca' },
         'index.epigraph':       { en: '\u201CDomus sine librario, sicut castrum sine armamentario.\u201D', es: '\u201CDomus sine librario, sicut castrum sine armamentario.\u201D' },
