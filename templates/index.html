@@ -182,6 +182,21 @@ document.addEventListener('click', function(e) {
             el.style.display = matches(el) ? '' : 'none';
         });
     }
+
+    // Focus library search when user presses Ctrl/Cmd+F and no editable is focused
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'f') {
+            var active = document.activeElement;
+            var tag = active && active.tagName ? active.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea' && !active.isContentEditable) {
+                e.preventDefault();
+                try {
+                    searchInput.focus();
+                    if (typeof searchInput.select === 'function') searchInput.select();
+                } catch (err) {}
+            }
+        }
+    });
 })();
 
 // ── List column visibility ──────────────────────────────────────────

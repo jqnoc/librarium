@@ -47,7 +47,7 @@ DB_PATH = DATA_DIR / "librarium.db"
 BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUPS = 5
 
-APP_VERSION = "0.7.0"
+APP_VERSION = "0.8.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
