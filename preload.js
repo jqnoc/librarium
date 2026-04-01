@@ -10,4 +10,5 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("librarium", {
   isElectron: true,
   quit: () => ipcRenderer.send("app-quit"),
+  minimize: () => ipcRenderer.send("app-minimize"),
 });

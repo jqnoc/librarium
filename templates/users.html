@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librarium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="user-select-page">
+    <div class="user-select-container">
+        <div class="user-select-header">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" class="user-select-logo">
+            <h1>Librarium</h1>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message | safe }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% if users %}
+        <!-- ── Existing users ──────────────────────────────────────── -->
+        <div class="user-select-section">
+            <h2 data-i18n="users.selectUser">Select User</h2>
+            <div class="user-list">
+                {% for u in users %}
+                <form method="POST" action="{{ url_for('user_switch') }}">
+                    <input type="hidden" name="name" value="{{ u.name }}">
+                    <button type="submit" class="user-card">
+                        <span class="user-card-avatar">{{ u.name[0] | upper }}</span>
+                        <span class="user-card-name">{{ u.name }}</span>
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+        <hr class="user-select-divider">
+        {% endif %}
+
+        <!-- ── Create new user ─────────────────────────────────────── -->
+        <div class="user-select-section">
+            <h2 data-i18n="users.createUser">Create New User</h2>
+            <form method="POST" action="{{ url_for('user_create') }}" enctype="multipart/form-data" class="user-create-form">
+                <div class="user-create-field">
+                    <label for="userName" data-i18n="users.name">Name</label>
+                    <input type="text" id="userName" name="name" required placeholder="Your name" data-i18n-placeholder="users.namePlaceholder" autocomplete="off">
+                </div>
+
+                <div class="user-create-field">
+                    <label data-i18n="users.database">Database</label>
+                    <div class="user-db-options">
+                        <label class="user-radio-label">
+                            <input type="radio" name="db_option" value="new" checked onchange="document.getElementById('importDbFile').disabled=true">
+                            <span data-i18n="users.newDatabase">Create new database</span>
+                        </label>
+                        {% if legacy_exists %}
+                        <label class="user-radio-label">
+                            <input type="radio" name="db_option" value="legacy" onchange="document.getElementById('importDbFile').disabled=true">
+                            <span data-i18n="users.importLegacy">Import existing librarium.db</span>
+                            <input type="hidden" name="import_legacy" value="0" id="importLegacyHidden">
+                        </label>
+                        {% endif %}
+                        <label class="user-radio-label">
+                            <input type="radio" name="db_option" value="import" onchange="document.getElementById('importDbFile').disabled=false">
+                            <span data-i18n="users.importFile">Import from file</span>
+                        </label>
+                        <input type="file" id="importDbFile" name="import_db" accept=".db" disabled class="user-file-input">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary user-create-btn" data-i18n="users.create">Create</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+    <script>
+    // Set import_legacy hidden field when legacy radio is selected
+    document.querySelectorAll('input[name="db_option"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            var hidden = document.getElementById('importLegacyHidden');
+            if (hidden) hidden.value = this.value === 'legacy' ? '1' : '0';
+        });
+    });
+    </script>
+</body>
+</html>

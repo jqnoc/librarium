@@ -389,10 +389,10 @@ document.addEventListener('DOMContentLoaded', restoreColumns);
                     <td class="col-title" style="font-weight:600;">{{ book.name }}{% if book.reading_number %} <span class="reading-number">#{{ book.reading_number }}</span>{% endif %}{% if book.subtitle %}<span class="book-subtitle" style="display:block;">{{ book.subtitle }}</span>{% endif %}</td>
                     <td class="col-author">{{ book.author | format_authors }}</td>
                     <td class="col-status"><span class="badge status-{{ book.status }}">{{ book.status | format_status }}</span></td>
-                    <td class="col-first_session">{{ book.first_session_date if book.first_session_date != '0000-00-00' else '—' }}</td>
-                    <td class="col-last_session">{{ book.last_session_date if book.last_session_date != '0000-00-00' else '—' }}</td>
+                    <td class="col-first_session">{% if book.first_session_date and book.first_session_date != '0000-00-00' %}{{ book.first_session_date | display_date }}{% else %}—{% endif %}</td>
+                    <td class="col-last_session">{% if book.last_session_date and book.last_session_date != '0000-00-00' %}{{ book.last_session_date | display_date }}{% else %}—{% endif %}</td>
                     <td class="col-time_read">{{ book.total_time if book.total_seconds_raw > 0 else '—' }}</td>
-                    <td class="col-pub_date">{{ book.publication_date or '—' }}</td>
+                    <td class="col-pub_date">{% if book.publication_date %}{{ book.publication_date | display_date }}{% else %}—{% endif %}</td>
                     <td class="col-publisher">{{ book.publisher or '—' }}</td>
                     <td class="col-rating">{% if book.avg_rating %}<span class="rating-badge">⭐ {{ "%.2f" | format(book.avg_rating) }}</span>{% else %}—{% endif %}</td>
                     <td class="col-pages">{% if book.format == 'audiobook' and book.total_time_seconds %}{% set tt = book.total_time_seconds %}{{ tt // 3600 }}h {{ (tt % 3600) // 60 }}m{% elif book.effective_pages %}{{ book.effective_pages }}{% else %}—{% endif %}</td>

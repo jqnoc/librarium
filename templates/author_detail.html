@@ -23,7 +23,7 @@
             {% if author_info.birth_date %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="authorDetail.born">Born</div>
-                <div class="meta-value">{{ author_info.birth_date }}{% if author_info.birth_place %}, {{ author_info.birth_place }}{% endif %}</div>
+                <div class="meta-value">{{ author_info.birth_date | display_date }}{% if author_info.birth_place %}, {{ author_info.birth_place }}{% endif %}</div>
             </div>
             {% elif author_info.birth_place %}
             <div class="meta-item">
@@ -34,7 +34,7 @@
             {% if author_info.death_date %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="authorDetail.died">Died</div>
-                <div class="meta-value">{{ author_info.death_date }}{% if author_info.death_place %}, {{ author_info.death_place }}{% endif %}</div>
+                <div class="meta-value">{{ author_info.death_date | display_date }}{% if author_info.death_place %}, {{ author_info.death_place }}{% endif %}</div>
             </div>
             {% elif author_info.death_place %}
             <div class="meta-item">
@@ -95,7 +95,7 @@
                 <div class="book-title" style="font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0;">{{ book.name }}</div>
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
                 {% if book.original_publication_date %}
-                <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.25rem;">{{ book.original_publication_date }}</div>
+                <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.25rem;">{{ book.original_publication_date | display_date }}</div>
                 {% endif %}
                 {% if book.rating > 0 %}
                 <div style="font-size: 0.8rem; color: var(--lb-deep-orange); margin-top: 0.25rem; font-weight: 500;">⭐ {{ "%.2f" | format(book.rating) }} / 5</div>

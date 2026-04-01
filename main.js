@@ -205,6 +205,10 @@ ipcMain.on("app-quit", () => {
   app.quit();
 });
 
+ipcMain.on("app-minimize", () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
 // ── App lifecycle ───────────────────────────────────────────────────────
 app.whenReady().then(createWindow);
 

@@ -99,7 +99,7 @@
             </div>
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.pubDate">Publication Date</div>
-                <div class="meta-value">{{ info.get('publication_date', '—') }}</div>
+                <div class="meta-value">{% if info.get('publication_date') %}{{ info.get('publication_date') | display_date }}{% else %}—{% endif %}</div>
             </div>
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.isbn">ISBN</div>
@@ -121,7 +121,7 @@
             {% if info.get('original_publication_date') %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.originalDate">Original Date</div>
-                <div class="meta-value">{{ info.get('original_publication_date') }}</div>
+                <div class="meta-value">{{ info.get('original_publication_date') | display_date }}</div>
             </div>
             {% endif %}
             <!-- ── Contributors ── -->
@@ -164,7 +164,7 @@
             {% if info.get('purchase_date') %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="{{ 'book.dateReceived' if info.get('is_gift') else 'book.purchaseDate' }}">{{ 'Date Received' if info.get('is_gift') else 'Purchase Date' }}</div>
-                <div class="meta-value">{{ info.get('purchase_date') }}</div>
+                <div class="meta-value">{{ info.get('purchase_date') | display_date }}</div>
             </div>
             {% endif %}
             {% if info.get('purchase_price') and not info.get('is_gift') %}
@@ -287,12 +287,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </div>
             {% if rd.date_started %}
             <div style="font-size: 0.85rem; color: var(--lb-text-light);">
-                Started: {{ rd.date_started }}
+                <span data-i18n="book.started">Started:</span> {{ rd.date_started | display_date }}
             </div>
             {% endif %}
             {% if rd.date_finished %}
             <div style="font-size: 0.85rem; color: var(--lb-text-light);">
-                Finished: {{ rd.date_finished }}
+                <span data-i18n="book.finishedLabel">Finished:</span> {{ rd.date_finished | display_date }}
             </div>
             {% endif %}
             <div style="font-size: 0.85rem; margin-top: 0.25rem;">
@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.dateStarted">Date Started</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ date_started }}</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ date_started | display_date }}</div>
         </div>
     </div>
     {% endif %}
@@ -327,7 +327,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="card" style="flex:1; min-width:150px;">
         <div class="card-body" style="text-align:center;">
             <div class="meta-label" data-i18n="book.dateFinished">Date Finished</div>
-            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ date_finished }}</div>
+            <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">{{ date_finished | display_date }}</div>
         </div>
     </div>
     {% endif %}    {% if reading_days > 0 %}
@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% for s in sessions %}
             <tr id="session-row-{{ s.id }}">
                 <td>{{ loop.index }}</td>
-                <td>{{ s.date | date_ddmmyyyy }}</td>
+                <td>{{ s.date | display_date }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
                 <td>
@@ -615,8 +615,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% for p in reading_periods %}
             <tr id="period-row-{{ p.id }}">
                 <td>{{ loop.index }}</td>
-                <td>{{ p.start_date | date_ddmmyyyy or '—' }}</td>
-                <td>{{ p.end_date | date_ddmmyyyy or '—' }}</td>
+                <td>{{ p.start_date | display_date or '—' }}</td>
+                <td>{{ p.end_date | display_date or '—' }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(p.progress_pct or 0) }}%{% else %}{{ p.pages }}{% endif %}</td>
                 {% if is_pct_format %}<td>{% if p.duration_seconds %}{% set ph = p.duration_seconds // 3600 %}{% set pm = (p.duration_seconds % 3600) // 60 %}{% set ps = p.duration_seconds % 60 %}{{ ph }}h {{ pm }}m {{ ps }}s{% else %}—{% endif %}</td>{% endif %}
                 <td>{{ p.note or '—' }}</td>

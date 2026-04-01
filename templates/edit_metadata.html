@@ -131,7 +131,7 @@
                 </div>
                 <div class="form-group">
                     <label for="publication_date" data-i18n="bookForm.pubDate">Publication Date</label>
-                    <input type="text" id="publication_date" name="publication_date" class="form-control" value="{{ info.get('publication_date', '') }}" placeholder="e.g. 2021, 2021-04, or 2021-04-30" pattern="\d{4}(-\d{2}(-\d{2})?)?">
+                    <input type="text" id="publication_date" name="publication_date" class="form-control" value="{{ info.get('publication_date', '') }}" placeholder="e.g. 2021, 2021-04-30, 1912-1915, ca. 1450, 4th Century B.C.">
                 </div>
             </div>
             <div class="form-row">
@@ -185,7 +185,7 @@
             <div class="form-group">
                 <label for="original_publication_date" data-i18n="bookForm.origPubDate">Original Publication Date</label>
                 <input type="text" id="original_publication_date" name="original_publication_date" class="form-control"
-                       value="{{ info.get('original_publication_date', '') }}" placeholder="e.g. 1835 or 1835-01-15">
+                       value="{{ info.get('original_publication_date', '') }}" placeholder="e.g. 1835, 1835-01-15, 1912-1915, ca. 1450">
             </div>
         </div>
     </div>

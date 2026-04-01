@@ -5,6 +5,18 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] — 2026-04-01
+
+### Fixed
+- define missing `_run_all_migrations()` function that was called but never implemented, crashing user creation and switching
+- create `users.html` template for the user selection / creation screen that was missing despite backend routes being in place
+- make startup migration block user-aware: iterate over all registered users' databases instead of assuming a single `librarium.db`
+
+### Added
+- current user name displayed in the navbar header
+- CSS styles for the user selection page and navbar user badge
+- i18n keys for user management UI (EN and ES)
+
 ## [0.8.0] — 2026-03-28
 
 ### Added

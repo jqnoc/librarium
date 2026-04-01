@@ -118,6 +118,14 @@ img { max-width: 100%; height: auto; }
     color: #fff;
     cursor: pointer;
 }
+.library-selector-form select option {
+    background: var(--lb-dark);
+    color: #fff;
+}
+.library-selector-form select option {
+    background: var(--lb-dark);
+    color: #fff;
+}
 .library-manage-btn {
     background: none;
     border: none;
@@ -257,7 +265,8 @@ img { max-width: 100%; height: auto; }
     user-select: none;
 }
 
-/* ── Close button ──────────────────────────────────────────────────────── */
+/* ── Close & Minimize buttons ──────────────────────────────────────────── */
+.app-minimize-btn,
 .app-close-btn {
     background: transparent;
     border: 1px solid rgba(255,255,255,.25);
@@ -271,10 +280,166 @@ img { max-width: 100%; height: auto; }
     transition: all .15s;
     font-family: inherit;
 }
+.app-minimize-btn:hover {
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border-color: rgba(255,255,255,.5);
+}
 .app-close-btn:hover {
     background: #dc3545;
     color: #fff;
     border-color: #dc3545;
+}
+
+/* ── User select page ──────────────────────────────────────────────────── */
+.user-select-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--lb-bg);
+}
+.user-select-container {
+    background: var(--lb-white);
+    border-radius: var(--lb-radius-lg);
+    box-shadow: var(--lb-shadow-lg);
+    padding: 2.5rem 2.5rem 2rem;
+    max-width: 480px;
+    width: 90%;
+}
+.user-select-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+.user-select-logo {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 0.5rem;
+}
+.user-select-header h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    color: var(--lb-text);
+}
+.user-select-section h2 {
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
+    color: var(--lb-text);
+}
+.user-select-divider {
+    border: none;
+    border-top: 1px solid var(--lb-border);
+    margin: 1.25rem 0;
+}
+.user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: var(--lb-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--lb-text);
+    transition: border-color 0.15s, background 0.15s;
+}
+.user-card:hover {
+    border-color: var(--lb-accent);
+    background: var(--lb-bg-hover, var(--lb-bg));
+}
+.user-card-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--lb-accent);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+.user-card-name {
+    font-weight: 500;
+}
+.user-create-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.user-create-field label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    color: var(--lb-text);
+}
+.user-create-field input[type="text"] {
+    width: 100%;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+.user-db-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.2rem;
+}
+.user-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: var(--lb-text);
+}
+.user-file-input {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+}
+.user-create-btn {
+    margin-top: 0.5rem;
+    align-self: flex-start;
+}
+
+/* ── Current user badge (navbar) ───────────────────────────────────────── */
+.current-user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    color: rgba(255,255,255,.85);
+    font-size: 0.85rem;
+}
+.current-user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.current-user-name {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ── Shutdown overlay ──────────────────────────────────────────────────── */

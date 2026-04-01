@@ -35,6 +35,17 @@
         'backup.create':         { en: 'Create Backup Now',      es: 'Crear Copia Ahora' },
         'backup.shuttingDown':   { en: 'Backing up & closing\u2026', es: 'Guardando copia y cerrando\u2026' },
 
+        // ── User management ─────────────────────────────────────────────
+        'users.selectUser':      { en: 'Select User',           es: 'Seleccionar Usuario' },
+        'users.createUser':      { en: 'Create New User',       es: 'Crear Nuevo Usuario' },
+        'users.name':            { en: 'Name',                  es: 'Nombre' },
+        'users.namePlaceholder': { en: 'Your name',             es: 'Tu nombre' },
+        'users.database':        { en: 'Database',              es: 'Base de Datos' },
+        'users.newDatabase':     { en: 'Create new database',   es: 'Crear nueva base de datos' },
+        'users.importLegacy':    { en: 'Import existing librarium.db', es: 'Importar librarium.db existente' },
+        'users.importFile':      { en: 'Import from file',      es: 'Importar desde archivo' },
+        'users.create':          { en: 'Create',                es: 'Crear' },
+
         // ── Add Book dialog ─────────────────────────────────────────────
         'addBook.title':         { en: 'Add Book',              es: 'Añadir Libro' },
         'addBook.manually':      { en: 'Add Manually',          es: 'Añadir Manualmente' },
@@ -520,6 +531,7 @@
     function setLang(lang) {
         localStorage.setItem(STORAGE_KEY, lang);
         applyTranslations(lang);
+        formatDates(lang);
         updateToggleButtons(lang);
     }
 
@@ -563,10 +575,136 @@
         });
     }
 
+    // ── Date formatting ────────────────────────────────────────────────
+    var MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var MONTHS_EN_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    var ORDINALS_EN = ['','1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th','11th','12th','13th','14th','15th','16th','17th','18th','19th','20th','21st'];
+    var CENTURY_EN = ['','1st','2nd','3rd','4th','5th','6th','7th','8th','9th','10th','11th','12th','13th','14th','15th','16th','17th','18th','19th','20th','21st'];
+
+    /**
+     * Format a flexible date string for display based on language.
+     * Supports: YYYY-MM-DD, YYYY-MM, YYYY, intervals (1912-1915),
+     * approximate (ca. 1450), centuries (4th Century), B.C. dates.
+     */
+    function formatDisplayDate(raw, lang) {
+        if (!raw || !raw.trim()) return '';
+        raw = raw.trim();
+        lang = lang || getLang();
+
+        // Handle "ca. YEAR" approximate dates
+        var caMatch = raw.match(/^ca\.?\s*(\d+)\s*(b\.?\s*c\.?)?$/i);
+        if (caMatch) {
+            var yr = caMatch[1];
+            var bc = caMatch[2] ? (lang === 'es' ? ' a. C.' : ' B.C.') : '';
+            return 'ca. ' + yr + bc;
+        }
+
+        // Handle century: "4th Century", "4th Century B.C.", "siglo IV"
+        var cenMatch = raw.match(/^(\d+)(?:st|nd|rd|th)?\s*century\s*(b\.?\s*c\.?)?$/i);
+        if (cenMatch) {
+            var num = parseInt(cenMatch[1], 10);
+            var bcSuffix = cenMatch[2] ? (lang === 'es' ? ' a. C.' : ' B.C.') : '';
+            if (lang === 'es') {
+                // Roman numeral for Spanish
+                var roman = toRoman(num);
+                return 'Siglo ' + roman + bcSuffix;
+            }
+            var ordinal = num <= 20 ? CENTURY_EN[num] : num + 'th';
+            return ordinal + ' Century' + bcSuffix;
+        }
+
+        // Handle Spanish century input: "siglo IV"
+        var sigloMatch = raw.match(/^siglo\s+([IVXLCDM]+)\s*(a\.?\s*c\.?)?$/i);
+        if (sigloMatch) {
+            var romanNum = fromRoman(sigloMatch[1].toUpperCase());
+            var bcS = sigloMatch[2] ? (lang === 'es' ? ' a. C.' : ' B.C.') : '';
+            if (lang === 'es') {
+                return 'Siglo ' + sigloMatch[1].toUpperCase() + bcS;
+            }
+            var ord = romanNum <= 20 ? CENTURY_EN[romanNum] : romanNum + 'th';
+            return ord + ' Century' + bcS;
+        }
+
+        // Handle year intervals: "1912-1915" (two 4-digit years)
+        var intervalMatch = raw.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+        if (intervalMatch) {
+            return intervalMatch[1] + '–' + intervalMatch[2];
+        }
+
+        // Handle B.C. year: "450 B.C." or "450 b.c."
+        var bcYearMatch = raw.match(/^(\d+)\s*b\.?\s*c\.?$/i);
+        if (bcYearMatch) {
+            return bcYearMatch[1] + (lang === 'es' ? ' a. C.' : ' B.C.');
+        }
+
+        // Handle standard ISO dates
+        // Full date: YYYY-MM-DD
+        var fullMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (fullMatch) {
+            var y = parseInt(fullMatch[1], 10);
+            var m = parseInt(fullMatch[2], 10) - 1;
+            var d = parseInt(fullMatch[3], 10);
+            if (lang === 'es') {
+                return d + ' de ' + MONTHS_ES[m] + ' de ' + fullMatch[1];
+            }
+            return MONTHS_EN[m] + ' ' + d + ', ' + fullMatch[1];
+        }
+
+        // Partial date: YYYY-MM
+        var partialMatch = raw.match(/^(\d{4})-(\d{2})$/);
+        if (partialMatch) {
+            var mo = parseInt(partialMatch[2], 10) - 1;
+            if (lang === 'es') {
+                return MONTHS_ES[mo].charAt(0).toUpperCase() + MONTHS_ES[mo].slice(1) + ' de ' + partialMatch[1];
+            }
+            return MONTHS_EN_FULL[mo] + ' ' + partialMatch[1];
+        }
+
+        // Year only: YYYY
+        var yearMatch = raw.match(/^(\d{4})$/);
+        if (yearMatch) {
+            return yearMatch[1];
+        }
+
+        // Fallback: return as-is
+        return raw;
+    }
+
+    function toRoman(num) {
+        var lookup = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+        var result = '';
+        for (var i = 0; i < lookup.length; i++) {
+            while (num >= lookup[i][0]) { result += lookup[i][1]; num -= lookup[i][0]; }
+        }
+        return result;
+    }
+
+    function fromRoman(s) {
+        var map = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+        var result = 0;
+        for (var i = 0; i < s.length; i++) {
+            var cur = map[s[i]] || 0;
+            var next = map[s[i+1]] || 0;
+            if (cur < next) { result -= cur; } else { result += cur; }
+        }
+        return result;
+    }
+
+    /** Format all elements with data-date attribute */
+    function formatDates(lang) {
+        lang = lang || getLang();
+        document.querySelectorAll('[data-date]').forEach(function (el) {
+            var raw = el.getAttribute('data-date');
+            el.textContent = formatDisplayDate(raw, lang);
+        });
+    }
+
     // ── Initialise on DOM ready ─────────────────────────────────────────
     function init() {
         var lang = getLang();
         applyTranslations(lang);
+        formatDates(lang);
         updateToggleButtons(lang);
 
         // Bind click handlers on language buttons (event delegation)
@@ -656,5 +794,5 @@
     }
 
     // Expose for usage in inline scripts
-    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar };
+    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar, formatDisplayDate: formatDisplayDate, formatDates: formatDates };
 })();

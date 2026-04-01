@@ -28,6 +28,12 @@
                     </select>
                 </form>
                 <button type="button" class="library-manage-btn" onclick="document.getElementById('libraryModal').style.display='flex'" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
+                {% if current_user %}
+                <span class="current-user-badge" title="{{ current_user }}">
+                    <span class="current-user-avatar">{{ current_user[0] | upper }}</span>
+                    <span class="current-user-name">{{ current_user }}</span>
+                </span>
+                {% endif %}
             </div>
             <nav class="header-nav">
                 <a href="{{ url_for('index') }}" data-i18n="nav.library">Library</a>
@@ -38,6 +44,10 @@
                 <a href="{{ url_for('sources_list') }}" data-i18n="nav.sources">Sources</a>
                 <a href="#" onclick="event.preventDefault();document.getElementById('addBookModal').style.display='flex'" data-i18n="nav.addBook">+ Add Book</a>
                 <span class="lang-toggle"><button class="lang-btn" data-lang="en">EN</button><span class="lang-sep">|</span><button class="lang-btn" data-lang="es">ES</button></span>
+                <script>
+                (function(){var l=localStorage.getItem('librarium_lang')||'en';document.querySelectorAll('.lang-btn').forEach(function(b){b.classList.toggle('active',b.dataset.lang===l);});})();
+                </script>
+                <button type="button" class="app-minimize-btn" onclick="librariumMinimize()" title="Minimize Librarium" data-i18n-title="nav.minimize">─</button>
                 <button type="button" class="app-close-btn" onclick="librariumQuit()" title="Close Librarium" data-i18n-title="nav.close">✕</button>
             </nav>
         </div>
@@ -50,6 +60,12 @@
             form.action = '{{ url_for("undo_delete_book") }}';
             document.body.appendChild(form);
             form.submit();
+        }
+
+        function librariumMinimize() {
+            if (window.librarium && window.librarium.minimize) {
+                window.librarium.minimize();
+            }
         }
 
         function librariumQuit() {

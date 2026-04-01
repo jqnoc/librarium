@@ -41,13 +41,32 @@ from flask import (
 )
 
 # ── Paths ────────────────────────────────────────────────────────────────
+import platform as _platform
+
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "librarium.db"
+
+def _get_app_data_dir() -> Path:
+    """Return the platform-appropriate application data directory."""
+    system = _platform.system()
+    if system == "Windows":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif system == "Darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "Librarium"
+
+# In development (not packaged), use ./data for backward compatibility
+_is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
+DATA_DIR = _get_app_data_dir() if _is_electron else BASE_DIR / "data"
 BACKUP_DIR = DATA_DIR / "backups"
+USERS_FILE = DATA_DIR / "users.json"
 MAX_BACKUPS = 5
 
-APP_VERSION = "0.8.0"
+# DB_PATH is set dynamically per-user; default used for migrations at startup
+DB_PATH = DATA_DIR / "librarium.db"
+
+APP_VERSION = "0.8.1"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -190,6 +209,91 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
         old.unlink()
 
     return backup_file.name
+
+
+# ── User management ──────────────────────────────────────────────────────
+def _sanitize_username(name: str) -> str:
+    """Convert a display name to a safe filename component (lowercase, alnum only)."""
+    return re.sub(r"[^a-z0-9]", "", name.lower().strip())
+
+
+def _load_users() -> dict:
+    """Load users.json or return default structure."""
+    if USERS_FILE.exists():
+        try:
+            data = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "users" in data:
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"users": [], "last_user": ""}
+
+
+def _save_users(data: dict) -> None:
+    """Save users.json."""
+    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    USERS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _get_user_db_path(username: str) -> Path:
+    """Return the DB file path for a given user display name."""
+    slug = _sanitize_username(username)
+    if not slug:
+        slug = "default"
+    return DATA_DIR / f"{slug}.db"
+
+
+def _get_user_backup_dir(username: str) -> Path:
+    """Return the backup directory for a user (may be overridden in users.json)."""
+    users_data = _load_users()
+    for u in users_data["users"]:
+        if u["name"] == username and u.get("backup_dir"):
+            custom = Path(u["backup_dir"])
+            if custom.is_absolute():
+                return custom
+    return BACKUP_DIR
+
+
+def _set_active_user_db(username: str) -> None:
+    """Set the global DB_PATH and BACKUP_DIR for the given user."""
+    global DB_PATH, BACKUP_DIR
+    DB_PATH = _get_user_db_path(username)
+    BACKUP_DIR = _get_user_backup_dir(username)
+
+
+def _migrate_legacy_db() -> None:
+    """If a legacy librarium.db exists in DATA_DIR and no users exist yet,
+    offer it as the default user's database."""
+    legacy = DATA_DIR / "librarium.db"
+    if not legacy.exists():
+        return
+    users_data = _load_users()
+    if users_data["users"]:
+        return  # already have users
+    # Will be handled by the first-time user creation UI
+
+
+def _run_all_migrations() -> None:
+    """Run every migration in order. Used when creating / switching users."""
+    if not DB_PATH.exists():
+        return
+    validate_and_restore_db()
+    migrate_add_readings()
+    migrate_add_authors()
+    migrate_add_cover_color()
+    migrate_add_cover_palette()
+    migrate_add_cover_hash()
+    migrate_add_photo_hash()
+    migrate_add_subtitle()
+    migrate_add_libraries()
+    migrate_add_series()
+    migrate_book_series_m2m()
+    migrate_add_editions()
+    migrate_add_format()
+    migrate_add_total_time()
+    migrate_add_period_duration()
+    migrate_add_cover_thumb()
+    migrate_add_photo_thumb()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -767,7 +871,13 @@ def _extract_dominant_color(cover_blob: bytes | None) -> str:
 def get_db() -> sqlite3.Connection:
     """Return a per-request database connection (cached on ``g``)."""
     if "db" not in g:
-        g.db = sqlite3.connect(str(DB_PATH))
+        # Determine the DB path for the current user
+        current_user = request.cookies.get("librarium_user", "")
+        if current_user:
+            db_path = _get_user_db_path(current_user)
+        else:
+            db_path = DB_PATH
+        g.db = sqlite3.connect(str(db_path))
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA journal_mode=WAL")
         g.db.execute("PRAGMA foreign_keys=ON")
@@ -810,16 +920,19 @@ def inject_library_context():
         all_libs = db.execute(
             "SELECT * FROM libraries ORDER BY id"
         ).fetchall()
+        current_user = request.cookies.get("librarium_user", "")
         return {
             "current_library": dict(current_lib) if current_lib else {"id": 1, "name": "Books", "slug": "books"},
             "all_libraries": [dict(l) for l in all_libs],
             "app_version": APP_VERSION,
+            "current_user": current_user,
         }
     except Exception:
         return {
             "current_library": {"id": 1, "name": "Books", "slug": "books"},
             "all_libraries": [],
             "app_version": APP_VERSION,
+            "current_user": request.cookies.get("librarium_user", "") if request else "",
         }
 
 
@@ -988,6 +1101,17 @@ def date_ddmmyyyy_filter(value: str) -> str:
         except ValueError:
             pass
     return raw
+
+
+@app.template_filter('display_date')
+def display_date_filter(value: str) -> str:
+    """Wrap a date value in a span with data-date for client-side i18n formatting."""
+    from markupsafe import Markup
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    escaped = raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    return Markup(f'<span data-date="{escaped}">{escaped}</span>')
 
 
 # ── Utility helpers ──────────────────────────────────────────────────────
@@ -4548,6 +4672,140 @@ def delete_library(lib_id: int):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Routes – User management
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/users")
+def user_select():
+    """Show user selection / creation page."""
+    users_data = _load_users()
+    legacy_exists = (DATA_DIR / "librarium.db").exists() and not users_data["users"]
+    return render_template("users.html", users=users_data["users"], legacy_exists=legacy_exists)
+
+
+@app.route("/users/create", methods=["POST"])
+def user_create():
+    """Create a new user profile."""
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Please enter a name.", "error")
+        return redirect(url_for("user_select"))
+
+    slug = _sanitize_username(name)
+    if not slug:
+        flash("Name must contain at least one letter or number.", "error")
+        return redirect(url_for("user_select"))
+
+    users_data = _load_users()
+    # Check for duplicate
+    for u in users_data["users"]:
+        if _sanitize_username(u["name"]) == slug:
+            flash(f"A user with a similar name already exists.", "error")
+            return redirect(url_for("user_select"))
+
+    # Handle import of existing DB
+    import_file = request.files.get("import_db")
+    db_path = _get_user_db_path(name)
+
+    if import_file and import_file.filename:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        import_file.save(str(db_path))
+    elif request.form.get("import_legacy") == "1":
+        legacy = DATA_DIR / "librarium.db"
+        if legacy.exists():
+            shutil.copy2(str(legacy), str(db_path))
+
+    users_data["users"].append({"name": name, "db_file": f"{slug}.db", "backup_dir": ""})
+    users_data["last_user"] = name
+    _save_users(users_data)
+
+    # Set the user cookie and run migrations for their DB
+    _set_active_user_db(name)
+    _run_all_migrations()
+
+    resp = make_response(redirect(url_for("index")))
+    resp.set_cookie("librarium_user", name, max_age=60 * 60 * 24 * 365 * 5,
+                     samesite="Lax")
+    return resp
+
+
+@app.route("/users/switch", methods=["POST"])
+def user_switch():
+    """Switch to a different user."""
+    name = request.form.get("name", "").strip()
+    users_data = _load_users()
+
+    found = False
+    for u in users_data["users"]:
+        if u["name"] == name:
+            found = True
+            break
+
+    if not found:
+        flash("User not found.", "error")
+        return redirect(url_for("user_select"))
+
+    users_data["last_user"] = name
+    _save_users(users_data)
+    _set_active_user_db(name)
+    _run_all_migrations()
+
+    resp = make_response(redirect(url_for("index")))
+    resp.set_cookie("librarium_user", name, max_age=60 * 60 * 24 * 365 * 5,
+                     samesite="Lax")
+    return resp
+
+
+@app.route("/users/update-backup-dir", methods=["POST"])
+def user_update_backup_dir():
+    """Update the backup directory for the current user."""
+    current_user = request.cookies.get("librarium_user", "")
+    if not current_user:
+        abort(400)
+    new_dir = request.form.get("backup_dir", "").strip()
+    users_data = _load_users()
+    for u in users_data["users"]:
+        if u["name"] == current_user:
+            u["backup_dir"] = new_dir
+            break
+    _save_users(users_data)
+    global BACKUP_DIR
+    BACKUP_DIR = _get_user_backup_dir(current_user)
+    flash("Backup directory updated.", "success")
+    return redirect(request.referrer or url_for("index"))
+
+
+@app.before_request
+def check_user_selected():
+    """Redirect to user selection if no user is set (except for user routes and static)."""
+    exempt = ("/users", "/static")
+    if any(request.path.startswith(p) for p in exempt):
+        return
+    users_data = _load_users()
+    if not users_data["users"]:
+        return redirect(url_for("user_select"))
+    current_user = request.cookies.get("librarium_user", "")
+    if not current_user:
+        # Auto-select last user if available
+        last = users_data.get("last_user", "")
+        if last and any(u["name"] == last for u in users_data["users"]):
+            _set_active_user_db(last)
+            g._pending_user_cookie = last
+        else:
+            return redirect(url_for("user_select"))
+
+
+@app.after_request
+def set_pending_user_cookie(response):
+    """Set user cookie if auto-selected."""
+    pending = getattr(g, "_pending_user_cookie", None)
+    if pending:
+        response.set_cookie("librarium_user", pending, max_age=60 * 60 * 24 * 365 * 5,
+                             samesite="Lax")
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Routes – Re-read
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -4793,24 +5051,41 @@ def undo_delete_book():
 
 if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
-    validate_and_restore_db()  # Check & recover if corrupted
-    backup_database()           # Create a backup (only if healthy)
-    migrate_add_readings()      # Add readings table if needed
-    migrate_add_authors()       # Add authors table if needed
-    migrate_add_cover_color()   # Add cover_color column if needed
-    migrate_add_cover_palette() # Add cover_palette column if needed
-    migrate_add_cover_hash()    # Add cover_hash column if needed
-    migrate_add_photo_hash()    # Add photo_hash column to authors if needed
-    migrate_add_subtitle()      # Add subtitle column to books if needed
-    migrate_add_libraries()     # Add libraries table and library_id columns
-    migrate_add_series()        # Add series table and series columns
-    migrate_book_series_m2m()   # Add book_series junction table (many-to-many)
-    migrate_add_editions()      # Add work_id / is_primary_edition columns
-    migrate_add_format()        # Add format / binding / audio_format columns
-    migrate_add_total_time()    # Add total_time_seconds / progress_pct columns
-    migrate_add_period_duration()  # Add duration_seconds to periods
-    migrate_add_cover_thumb()      # Add cover_thumb column to books
-    migrate_add_photo_thumb()      # Add photo_thumb column to authors
+
+    # Run migrations for every existing user's DB
+    users_data = _load_users()
+    if users_data["users"]:
+        for _u in users_data["users"]:
+            _set_active_user_db(_u["name"])
+            _run_all_migrations()
+            backup_database()
+        # Restore active user to last_user (or first)
+        _last = users_data.get("last_user", "")
+        if _last and any(u["name"] == _last for u in users_data["users"]):
+            _set_active_user_db(_last)
+        else:
+            _set_active_user_db(users_data["users"][0]["name"])
+    elif DB_PATH.exists():
+        # Legacy single-DB mode: run migrations on default DB
+        validate_and_restore_db()
+        backup_database()
+        migrate_add_readings()
+        migrate_add_authors()
+        migrate_add_cover_color()
+        migrate_add_cover_palette()
+        migrate_add_cover_hash()
+        migrate_add_photo_hash()
+        migrate_add_subtitle()
+        migrate_add_libraries()
+        migrate_add_series()
+        migrate_book_series_m2m()
+        migrate_add_editions()
+        migrate_add_format()
+        migrate_add_total_time()
+        migrate_add_period_duration()
+        migrate_add_cover_thumb()
+        migrate_add_photo_thumb()
+
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
 
