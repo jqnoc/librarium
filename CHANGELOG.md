@@ -5,6 +5,14 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] — 2026-04-01
+
+### Fixed
+- add `init_schema()` function that creates all base tables (`books`, `sessions`, `periods`, `readings`, `ratings`, `sources`, `libraries`, `series`, `authors`, `book_series`) and the default "Books" library for brand-new user databases; new users no longer get an empty database with no tables
+- remove `if not DB_PATH.exists(): return` guard from `_run_all_migrations()` and call `init_schema()` first so creating a fresh user database correctly initialises all tables before running (now-idempotent) migrations
+- replace unreliable native `<datalist>` click behaviour with a custom autocomplete dropdown (`autocomplete.js`) that opens on a single click, filters as you type, and re-opens after typing "; " for multi-value fields (Author, Genre, Language, Publisher, etc.)
+- remove duplicated and non-functional datalist JS from `edit_metadata.html` and `new_book.html` script blocks
+
 ## [0.9.0] — 2026-04-01
 
 ### Added

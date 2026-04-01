@@ -26,3 +26,5 @@ Desktop.ini
 node_modules/
 dist/
 package-lock.json
+/Librarium.lnk
+/_next.txt

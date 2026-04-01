@@ -66,7 +66,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.9.0"
+APP_VERSION = "0.9.1"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -273,11 +273,156 @@ def _migrate_legacy_db() -> None:
     # Will be handled by the first-time user creation UI
 
 
+def init_schema() -> None:
+    """Create all tables with full schema (idempotent). Used for new user databases.
+
+    All CREATE TABLE statements use IF NOT EXISTS, so this is safe to call on an
+    already-migrated database — it becomes a no-op in that case.
+    """
+    db = sqlite3.connect(str(DB_PATH))
+    db.execute("PRAGMA foreign_keys=OFF")
+    db.execute("PRAGMA journal_mode=WAL")
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS libraries (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE
+        );
+
+        CREATE TABLE IF NOT EXISTS sources (
+            id          TEXT    PRIMARY KEY,
+            type        TEXT    NOT NULL DEFAULT '',
+            name        TEXT    NOT NULL DEFAULT '',
+            short_name  TEXT    NOT NULL DEFAULT '',
+            location    TEXT    NOT NULL DEFAULT '',
+            url         TEXT    NOT NULL DEFAULT '',
+            notes       TEXT    NOT NULL DEFAULT '',
+            library_id  INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS series (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            name       TEXT    NOT NULL,
+            library_id INTEGER NOT NULL REFERENCES libraries(id),
+            UNIQUE(name, library_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS books (
+            id                        TEXT    PRIMARY KEY,
+            name                      TEXT    NOT NULL DEFAULT '',
+            author                    TEXT    NOT NULL DEFAULT '',
+            slug                      TEXT    NOT NULL DEFAULT '',
+            language                  TEXT    NOT NULL DEFAULT '',
+            original_title            TEXT    NOT NULL DEFAULT '',
+            original_language         TEXT    NOT NULL DEFAULT '',
+            original_publication_date TEXT    NOT NULL DEFAULT '',
+            publication_date           TEXT    NOT NULL DEFAULT '',
+            isbn                      TEXT    NOT NULL DEFAULT '',
+            pages                     INTEGER NOT NULL DEFAULT 0,
+            starting_page             INTEGER NOT NULL DEFAULT 0,
+            publisher                 TEXT    NOT NULL DEFAULT '',
+            genre                     TEXT    NOT NULL DEFAULT '',
+            summary                   TEXT    NOT NULL DEFAULT '',
+            translator                TEXT    NOT NULL DEFAULT '',
+            illustrator               TEXT    NOT NULL DEFAULT '',
+            editor                    TEXT    NOT NULL DEFAULT '',
+            prologue_author           TEXT    NOT NULL DEFAULT '',
+            status                    TEXT    NOT NULL DEFAULT 'reading',
+            source_type               TEXT    NOT NULL DEFAULT '',
+            source_id                 TEXT    NOT NULL DEFAULT '',
+            purchase_date             TEXT    NOT NULL DEFAULT '',
+            purchase_price            TEXT    NOT NULL DEFAULT '',
+            borrowed_start            TEXT    NOT NULL DEFAULT '',
+            borrowed_end              TEXT    NOT NULL DEFAULT '',
+            has_cover                 INTEGER NOT NULL DEFAULT 0,
+            cover                     BLOB    DEFAULT NULL,
+            is_gift                   INTEGER NOT NULL DEFAULT 0,
+            cover_color               TEXT    NOT NULL DEFAULT '',
+            cover_palette             TEXT    NOT NULL DEFAULT '[]',
+            cover_hash                TEXT    NOT NULL DEFAULT '',
+            library_id                INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id),
+            subtitle                  TEXT    NOT NULL DEFAULT '',
+            series_id                 INTEGER REFERENCES series(id) ON DELETE SET NULL,
+            series_index              TEXT    NOT NULL DEFAULT '',
+            work_id                   TEXT    DEFAULT NULL,
+            is_primary_edition        INTEGER NOT NULL DEFAULT 1,
+            format                    TEXT    DEFAULT 'paper',
+            binding                   TEXT    DEFAULT NULL,
+            audio_format              TEXT    DEFAULT NULL,
+            total_time_seconds        INTEGER DEFAULT NULL,
+            cover_thumb               BLOB    DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS authors (
+            name        TEXT    NOT NULL,
+            library_id  INTEGER NOT NULL REFERENCES libraries(id),
+            photo       BLOB,
+            has_photo   INTEGER NOT NULL DEFAULT 0,
+            birth_date  TEXT    NOT NULL DEFAULT '',
+            birth_place TEXT    NOT NULL DEFAULT '',
+            death_date  TEXT    NOT NULL DEFAULT '',
+            death_place TEXT    NOT NULL DEFAULT '',
+            biography   TEXT    NOT NULL DEFAULT '',
+            photo_hash  TEXT    NOT NULL DEFAULT '',
+            photo_thumb BLOB    DEFAULT NULL,
+            PRIMARY KEY (name, library_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS readings (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id        TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            reading_number INTEGER NOT NULL DEFAULT 1,
+            status         TEXT    NOT NULL DEFAULT 'reading',
+            notes          TEXT    NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id          TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            date             TEXT    NOT NULL DEFAULT '',
+            pages            INTEGER NOT NULL DEFAULT 0,
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            reading_id       INTEGER REFERENCES readings(id) ON DELETE SET NULL,
+            progress_pct     REAL    DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS periods (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id          TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            start_date       TEXT    NOT NULL DEFAULT '',
+            end_date         TEXT    NOT NULL DEFAULT '',
+            pages            INTEGER NOT NULL DEFAULT 0,
+            note             TEXT    NOT NULL DEFAULT '',
+            reading_id       INTEGER REFERENCES readings(id) ON DELETE SET NULL,
+            progress_pct     REAL    DEFAULT NULL,
+            duration_seconds INTEGER DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ratings (
+            book_id       TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            dimension_key TEXT    NOT NULL,
+            value         INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (book_id, dimension_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS book_series (
+            book_id      TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            series_id    INTEGER NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+            series_index TEXT    NOT NULL DEFAULT '',
+            PRIMARY KEY (book_id, series_id)
+        );
+    """)
+    # Insert the default "Books" library for fresh databases
+    if db.execute("SELECT COUNT(*) FROM libraries").fetchone()[0] == 0:
+        db.execute("INSERT INTO libraries (name, slug) VALUES ('Books', 'books')")
+    db.commit()
+    db.execute("PRAGMA foreign_keys=ON")
+    db.close()
+
+
 def _run_all_migrations() -> None:
     """Run every migration in order. Used when creating / switching users."""
-    if not DB_PATH.exists():
-        return
-    validate_and_restore_db()
+    init_schema()   # idempotent — creates tables if not present on new DBs
     migrate_add_readings()
     migrate_add_authors()
     migrate_add_cover_color()
