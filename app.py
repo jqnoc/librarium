@@ -66,7 +66,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.8.1"
+APP_VERSION = "0.9.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -921,11 +921,13 @@ def inject_library_context():
             "SELECT * FROM libraries ORDER BY id"
         ).fetchall()
         current_user = request.cookies.get("librarium_user", "")
+        backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
         return {
             "current_library": dict(current_lib) if current_lib else {"id": 1, "name": "Books", "slug": "books"},
             "all_libraries": [dict(l) for l in all_libs],
             "app_version": APP_VERSION,
             "current_user": current_user,
+            "backup_dir": backup_dir,
         }
     except Exception:
         return {
@@ -933,6 +935,7 @@ def inject_library_context():
             "all_libraries": [],
             "app_version": APP_VERSION,
             "current_user": request.cookies.get("librarium_user", "") if request else "",
+            "backup_dir": str(BACKUP_DIR),
         }
 
 

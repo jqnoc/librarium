@@ -5,6 +5,18 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-04-01
+
+### Added
+- backup directory picker in the library management modal with input field and save button
+- i18n keys for backup directory UI (`backup.directory`, `backup.dirDefault`, `backup.saveDir`, `backup.dirHint`) in EN and ES
+- datalist dropdowns open on single click (Author, Genre, Language, Publisher, etc.)
+- datalist dropdowns reopen automatically after typing "; " for multi-value entry
+
+### Changed
+- simplify navbar user badge to show only the name without the avatar circle
+- expose `backup_dir` in template context via `inject_library_context()`
+
 ## [0.8.1] — 2026-04-01
 
 ### Fixed

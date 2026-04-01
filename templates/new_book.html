@@ -439,5 +439,28 @@ document.getElementById('add-series-btn').addEventListener('click', function() {
     document.getElementById('series-entries').appendChild(clone);
     if (window.librariumI18n) window.librariumI18n.apply();
 });
+
+/* ── Datalist: open on single click & reopen after "; " ─────────────── */
+(function() {
+    var inputs = document.querySelectorAll('input[list]');
+    function showDatalist(input) {
+        var val = input.value;
+        input.value = '';
+        input.value = val;
+        input.setSelectionRange(val.length, val.length);
+    }
+    inputs.forEach(function(input) {
+        input.addEventListener('click', function() {
+            showDatalist(this);
+        });
+        input.addEventListener('input', function() {
+            var v = this.value;
+            if (v.length >= 2 && v.slice(-2) === '; ') {
+                var self = this;
+                setTimeout(function() { showDatalist(self); }, 0);
+            }
+        });
+    });
+})();
 </script>
 {% endblock %}

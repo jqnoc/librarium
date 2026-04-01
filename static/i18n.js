@@ -34,6 +34,10 @@
         'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },
         'backup.create':         { en: 'Create Backup Now',      es: 'Crear Copia Ahora' },
         'backup.shuttingDown':   { en: 'Backing up & closing\u2026', es: 'Guardando copia y cerrando\u2026' },
+        'backup.directory':      { en: 'Backup Directory',       es: 'Directorio de Copias' },
+        'backup.dirDefault':     { en: 'Default',                es: 'Por defecto' },
+        'backup.saveDir':        { en: 'Save',                   es: 'Guardar' },
+        'backup.dirHint':        { en: 'Leave empty to use the default location.', es: 'Dejar vacío para usar la ubicación por defecto.' },
 
         // ── User management ─────────────────────────────────────────────
         'users.selectUser':      { en: 'Select User',           es: 'Seleccionar Usuario' },

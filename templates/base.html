@@ -30,7 +30,6 @@
                 <button type="button" class="library-manage-btn" onclick="document.getElementById('libraryModal').style.display='flex'" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
                 {% if current_user %}
                 <span class="current-user-badge" title="{{ current_user }}">
-                    <span class="current-user-avatar">{{ current_user[0] | upper }}</span>
                     <span class="current-user-name">{{ current_user }}</span>
                 </span>
                 {% endif %}
@@ -146,6 +145,14 @@
                 <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
                     <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>
                 </form>
+                <div style="margin-top: 0.75rem;">
+                    <label style="font-size: 0.9rem; color: var(--lb-text-light);" data-i18n="backup.directory">Backup Directory</label>
+                    <form method="POST" action="{{ url_for('user_update_backup_dir') }}" class="library-create-form" style="margin-top: 0.3rem;">
+                        <input type="text" name="backup_dir" value="{{ backup_dir }}" placeholder="Default" style="flex: 1; min-width: 0;" data-i18n-placeholder="backup.dirDefault">
+                        <button type="submit" class="btn-small" data-i18n="backup.saveDir">Save</button>
+                    </form>
+                    <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dirHint">Leave empty to use the default location.</small>
+                </div>
             </div>
         </div>
     </div>
