@@ -125,34 +125,9 @@
             </div>
         </div>
     </div>
-    <div class="card">
-        <div class="card-body">
-            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.byGenre">Books by Genre</h3>
-            <div style="margin-bottom: 0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                <label for="genreTopN" style="margin:0; color:var(--lb-muted);">Show top</label>
-                <select id="genreTopN" style="min-width:6rem;">
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15" selected>15</option>
-                    <option value="20">20</option>
-                    <option value="30">30</option>
-                    <option value="50">50</option>
-                    <option value="all">All</option>
-                </select>
-            </div>
-            <canvas id="genreBar" style="max-height: 400px;"></canvas>
-        </div>
-    </div>
-    <!-- Genre word cloud -->
-    <div class="card" style="margin-top: 1rem;">
-        <div class="card-body">
-            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.genreCloud">Genre Cloud</h3>
-            <div id="genreCloud" class="word-cloud"></div>
-        </div>
-    </div>
     <!-- Tags word cloud -->
     {% if tag_counts %}
-    <div class="card" style="margin-top: 1rem;">
+    <div class="card">
         <div class="card-body">
             <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.tagCloud">Tag Cloud</h3>
             <div id="tagCloud" class="word-cloud"></div>
@@ -621,32 +596,6 @@ function makeHBar(canvasId, dataMap, colorMap, sorted, aspectRatio) {
 const statusData = {{ status_chart | tojson }};
 makeHBar('statusBar', statusData, STATUS_COLORS, true, 2);
 
-// Genre bar (dynamic top-N)
-const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
-(function(){
-    const STORAGE_KEY = 'librarium_genre_top_n';
-    const select = document.getElementById('genreTopN');
-
-    function renderFor(value) {
-        const val = value === undefined ? (localStorage.getItem(STORAGE_KEY) || '15') : value;
-        const topN = (val === 'all') ? null : parseInt(val, 10);
-        let entries = Object.entries(FULL_GENRE_COUNTS).sort((a,b) => b[1] - a[1]);
-        if (Number.isInteger(topN)) entries = entries.slice(0, topN);
-        makeHBar('genreBar', Object.fromEntries(entries));
-    }
-
-    if (select) {
-        const stored = localStorage.getItem(STORAGE_KEY) || '15';
-        select.value = stored;
-        select.addEventListener('change', function(e){
-            const v = e.target.value;
-            try { localStorage.setItem(STORAGE_KEY, v); } catch (e) {}
-            renderFor(v);
-        });
-    }
-    renderFor();
-})();
-
 // Word cloud renderer
 function renderWordCloud(containerId, countsObj) {
     const container = document.getElementById(containerId);
@@ -677,7 +626,6 @@ function renderWordCloud(containerId, countsObj) {
     });
 }
 
-renderWordCloud('genreCloud', FULL_GENRE_COUNTS);
 {% if tag_counts %}
 const FULL_TAG_COUNTS = {{ tag_counts | tojson }};
 renderWordCloud('tagCloud', FULL_TAG_COUNTS);

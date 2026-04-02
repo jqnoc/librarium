@@ -5,6 +5,34 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-04-02
+
+### Added
+- Genre→Tags merge: all existing genre values are migrated into the tags
+  field (deduplicated, case-insensitive). The genre field is no longer
+  used in the UI — only tags remain.
+- ISBN lookup now populates the tags field instead of genre.
+- New edition prefill copies tags from the primary edition.
+
+### Fixed
+- Status timeline chart ("Books by Status Over Time") now correctly
+  aggregates readings from all editions of a work, not just the primary
+  edition. This fixes undercounting for books read as secondary editions.
+- Status timeline same-date transition sort bug: when a reading starts
+  and finishes on the same date, the "reading" event now correctly
+  precedes the "finished" event instead of being sorted alphabetically.
+- Snap-to-actual-status correction at the present date ensures the
+  timeline matches the current database status for edge cases.
+
+### Changed
+- Removed genre input from new-book and edit-metadata forms (replaced by
+  tags field).
+- Removed genre display from book detail page (replaced by tags).
+- Removed "Books by Genre" bar chart and "Genre Cloud" from global
+  statistics page; only the "Tag Cloud" remains.
+- Removed genre-related i18n keys (`book.genre`, `bookForm.genre`,
+  `stats.byGenre`, `stats.genreCloud`).
+
 ## [0.10.0] — 2026-04-02
 
 ### Added

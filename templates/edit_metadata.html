@@ -31,13 +31,6 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="genre" data-i18n="bookForm.genre">Genre</label>
-                    <input type="text" id="genre" name="genre" class="form-control" list="genre-list" value="{{ info.get('genre', '') }}">
-                    <datalist id="genre-list">
-                        {% for v in suggestions.genre %}<option value="{{ v }}">{% endfor %}
-                    </datalist>
-                </div>
-                <div class="form-group">
                     <label for="tags" data-i18n="bookForm.tags">Tags</label>
                     <input type="text" id="tags" name="tags" class="form-control" list="tags-list" value="{{ info.get('tags', '') }}">
                     <datalist id="tags-list">

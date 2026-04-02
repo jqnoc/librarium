@@ -66,7 +66,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.10.0"
+APP_VERSION = "0.11.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -443,6 +443,7 @@ def _run_all_migrations() -> None:
     migrate_add_author_gender()
     migrate_add_tags()
     migrate_normalize_genres()
+    migrate_merge_genres_into_tags()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1116,6 +1117,46 @@ def migrate_normalize_genres() -> None:
     db.close()
 
 
+# ── Migration: Merge genres into tags ────────────────────────────────────
+def migrate_merge_genres_into_tags() -> None:
+    """Move all genre values into the tags field and clear genre."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+
+    # Only run if any book still has a non-empty genre
+    rows = db.execute("SELECT id, genre, tags FROM books WHERE genre != ''").fetchall()
+    if not rows:
+        db.close()
+        return
+
+    print(">> Migrating: merging genres into tags ...")
+    for row in rows:
+        genre_val = row["genre"]
+        tags_val = row["tags"] or ""
+        # Collect unique values from both fields, preserving order
+        seen: set[str] = set()
+        merged: list[str] = []
+        for part in genre_val.split(";"):
+            part = part.strip()
+            low = part.lower()
+            if part and low not in seen:
+                seen.add(low)
+                merged.append(part)
+        for part in tags_val.split(";"):
+            part = part.strip()
+            low = part.lower()
+            if part and low not in seen:
+                seen.add(low)
+                merged.append(part)
+        new_tags = "; ".join(merged)
+        db.execute("UPDATE books SET tags = ?, genre = '' WHERE id = ?", (new_tags, row["id"]))
+    db.commit()
+    db.close()
+    print(f">> Migration complete - genres merged into tags for {len(rows)} books.")
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 THUMB_MAX_WIDTH = 300
 
@@ -1617,7 +1658,7 @@ def _build_index_per_reading(db, lib_id):
       (reading > abandoned > not-started > draft)
     """
     book_rows = db.execute(
-        "SELECT id, name, subtitle, author, status, pages, starting_page, genre, "
+        "SELECT id, name, subtitle, author, status, pages, starting_page, "
         "has_cover, cover_hash, publisher, language, publication_date, "
         "work_id, format, total_time_seconds FROM books WHERE library_id = ?",
         (lib_id,),
@@ -1744,7 +1785,6 @@ def _build_index_per_reading(db, lib_id):
             "total_time": _format_duration(total_seconds_display),
             "total_seconds_raw": total_seconds_display,
             "reading_days": reading_days,
-            "genre": bk.get("genre", "") or "",
             "has_cover": bool(bk.get("has_cover")),
             "cover_hash": bk.get("cover_hash", "") or "",
             "first_session_date": first_activity or "0000-00-00",
@@ -1794,7 +1834,6 @@ def index():
             b.status,
             b.pages,
             b.starting_page,
-            b.genre,
             b.has_cover,
             b.cover_hash,
             b.publisher,
@@ -1919,7 +1958,6 @@ def index():
                 "total_time": _format_duration(total_seconds_display),
                 "total_seconds_raw": total_seconds_display,
                 "reading_days": r["reading_days"],
-                "genre": r["genre"] or "",
                 "has_cover": bool(r["has_cover"]),
                 "cover_hash": r["cover_hash"] or "",
                 "first_session_date": first_activity or "0000-00-00",
@@ -2040,22 +2078,31 @@ def index():
 
 
 def _compute_status_timeline(db, lib_id):
-    """Compute edition-status counts over time for a library.
+    """Compute book-status counts over time for a library.
 
     Returns ``{"dates": [...], "series": {"reading": [...], ...}}``.
-    Each edition (row in *books*) is counted independently.  The status of
-    each edition on a given date is derived from its readings' dated
-    sessions / periods.  Books with no date information appear from today.
+    Each *work* (group of editions sharing a ``work_id``) or standalone
+    book is counted once.  The representative row is the primary edition
+    (or the standalone book itself), but readings from **all** editions
+    of a work contribute date information so that reading data on
+    secondary editions is not lost.
+
+    Transitions on the same date are ordered so that "reading" is always
+    processed before terminal statuses ("finished" / "abandoned"),
+    preventing alphabetical sort from leaving a book stuck as "reading"
+    when a single session covers both start and end.
     """
     from datetime import date as _date, timedelta
 
     today = _date.today()
     today_s = today.isoformat()
     STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
+    # Sort key: lower = processed first on the same date
+    _STATUS_ORDER = {"not-started": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
 
-    # ── 1. All editions in the library ───────────────────────────────────
+    # ── 1. Representative books (primary or standalone) ──────────────────
     books = db.execute(
-        "SELECT id, status, purchase_date, borrowed_start "
+        "SELECT id, status, purchase_date, borrowed_start, work_id "
         "FROM books WHERE library_id = ? "
         "AND (work_id IS NULL OR is_primary_edition = 1)",
         (lib_id,),
@@ -2064,21 +2111,54 @@ def _compute_status_timeline(db, lib_id):
         return {"dates": [], "series": {s: [] for s in STATUSES}}
 
     book_map = {b["id"]: dict(b) for b in books}
-    bids = list(book_map.keys())
-    ph = ",".join("?" * len(bids))
 
-    # ── 2. Readings by book ──────────────────────────────────────────────
-    readings_by_book: dict[str, list[dict]] = {}
-    for r in db.execute(
-        f"SELECT id, book_id, reading_number, status FROM readings "
-        f"WHERE book_id IN ({ph}) ORDER BY book_id, reading_number",
-        bids,
-    ).fetchall():
-        readings_by_book.setdefault(r["book_id"], []).append(dict(r))
+    # ── 2. For works, find ALL edition IDs (including secondary) ─────────
+    work_ids = [b["work_id"] for b in books if b["work_id"]]
+    # Map: representative_bid → list of all edition book_ids
+    editions_map: dict[str, list[str]] = {}
+    if work_ids:
+        wph = ",".join("?" * len(work_ids))
+        for row in db.execute(
+            f"SELECT id, work_id FROM books WHERE work_id IN ({wph})",
+            work_ids,
+        ).fetchall():
+            # Find the representative (primary) for this work
+            for bid, bk in book_map.items():
+                if bk.get("work_id") == row["work_id"]:
+                    editions_map.setdefault(bid, []).append(row["id"])
+                    break
+    # Standalone books map to themselves
+    for bid in book_map:
+        if bid not in editions_map:
+            editions_map[bid] = [bid]
 
-    all_rids = [r["id"] for rlist in readings_by_book.values() for r in rlist]
+    # All book IDs we need readings for (including secondary editions)
+    all_edition_ids = []
+    for elist in editions_map.values():
+        all_edition_ids.extend(elist)
+    all_edition_ids = list(set(all_edition_ids))
+    aph = ",".join("?" * len(all_edition_ids))
 
-    # ── 3. Session / period date ranges per reading ──────────────────────
+    # ── 3. Readings grouped by representative book ───────────────────────
+    readings_by_rep: dict[str, list[dict]] = {}
+    if all_edition_ids:
+        raw_readings = db.execute(
+            f"SELECT id, book_id, reading_number, status FROM readings "
+            f"WHERE book_id IN ({aph}) ORDER BY book_id, reading_number",
+            all_edition_ids,
+        ).fetchall()
+        # Build reverse map: edition_id → representative_id
+        edition_to_rep: dict[str, str] = {}
+        for rep_bid, elist in editions_map.items():
+            for eid in elist:
+                edition_to_rep[eid] = rep_bid
+        for r in raw_readings:
+            rep = edition_to_rep.get(r["book_id"], r["book_id"])
+            readings_by_rep.setdefault(rep, []).append(dict(r))
+
+    all_rids = [r["id"] for rlist in readings_by_rep.values() for r in rlist]
+
+    # ── 4. Session / period date ranges per reading ──────────────────────
     sess_range: dict[int, tuple[str, str]] = {}
     per_range: dict[int, tuple[str, str]] = {}
     if all_rids:
@@ -2100,14 +2180,16 @@ def _compute_status_timeline(db, lib_id):
         ).fetchall():
             per_range[row["reading_id"]] = (row["d0"], row["d1"])
 
-    # ── 4. Build status-change events per edition ────────────────────────
-    events: list[tuple[str, str, str]] = []  # (date, book_id, new_status)
+    # ── 5. Build status-change events per representative book ────────────
+    # Events are (date, sort_key, book_id, new_status) so that on the
+    # same date "reading" (key 1) is processed before "finished" (key 2).
+    events: list[tuple[str, int, str, str]] = []
 
     for bid, bk in book_map.items():
-        rlist = readings_by_book.get(bid, [])
+        rlist = readings_by_rep.get(bid, [])
         entry = bk["purchase_date"] or bk["borrowed_start"] or ""
 
-        transitions: list[tuple[str, str]] = []
+        transitions: list[tuple[str, int, str]] = []  # (date, order, status)
         first_start: str | None = None
 
         for r in rlist:
@@ -2118,31 +2200,39 @@ def _compute_status_timeline(db, lib_id):
             start, end = min(ds), max(ds)
             if first_start is None or start < first_start:
                 first_start = start
-            transitions.append((start, "reading"))
+            transitions.append((start, _STATUS_ORDER.get("reading", 1), "reading"))
             if r["status"] in ("finished", "abandoned"):
-                transitions.append((end, r["status"]))
+                transitions.append((end, _STATUS_ORDER.get(r["status"], 2), r["status"]))
 
         if not transitions:
-            # No dated readings → edition sits in its current status from entry (or today)
-            transitions.append((entry or today_s, bk["status"] or "not-started"))
+            st = bk["status"] or "not-started"
+            transitions.append((entry or today_s, _STATUS_ORDER.get(st, 0), st))
         elif entry and first_start and entry < first_start:
             initial = "draft" if bk["status"] == "draft" else "not-started"
-            transitions.insert(0, (entry, initial))
+            transitions.insert(0, (entry, _STATUS_ORDER.get(initial, 0), initial))
 
         transitions.sort()
-        for d, s in transitions:
-            events.append((d, bid, s))
+        for d, _ord, s in transitions:
+            events.append((d, _ord, bid, s))
+
+        # Ensure the final state matches the book's actual current status.
+        # Reading data from secondary editions can leave the timeline in a
+        # state that doesn't match the primary edition's status field.
+        actual_st = bk["status"] or "not-started"
+        last_st = transitions[-1][2] if transitions else actual_st
+        if last_st != actual_st:
+            events.append((today_s, _STATUS_ORDER.get(actual_st, 0), bid, actual_st))
 
     events.sort()
     if not events:
         return {"dates": [], "series": {s: [] for s in STATUSES}}
 
-    # ── 5. Walk the timeline, emitting sampled data points ───────────────
+    # ── 6. Walk the timeline, emitting sampled data points ───────────────
     start_date = _date.fromisoformat(events[0][0])
     total_days = (today - start_date).days + 1
-    interval = max(1, total_days // 500)  # ≈ 500 data points
+    interval = max(1, total_days // 500)  # approx 500 data points
 
-    current: dict[str, str] = {}  # bid → status
+    current: dict[str, str] = {}  # bid -> status
     counts = {s: 0 for s in STATUSES}
 
     result_dates: list[str] = []
@@ -2154,7 +2244,7 @@ def _compute_status_timeline(db, lib_id):
     while d <= today:
         ds = d.isoformat()
         while ei < len(events) and events[ei][0] <= ds:
-            _, bid, new_st = events[ei]
+            _, _ord, bid, new_st = events[ei]
             old_st = current.get(bid)
             if old_st != new_st:
                 if old_st and old_st in counts:
@@ -2241,12 +2331,11 @@ def global_stats():
 
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
-        "SELECT id, name, status, genre, tags, language, original_language, pages, publisher, has_cover, cover_hash "
+        "SELECT id, name, status, tags, language, original_language, pages, publisher, has_cover, cover_hash "
         "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
     ).fetchall()
 
     status_counts: dict[str, int] = Counter()
-    genre_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
@@ -2264,13 +2353,6 @@ def global_stats():
 
     for bk in all_lib_books:
         status_counts[bk["status"] or "unknown"] += 1
-        if bk["genre"]:
-            for g in bk["genre"].split(";"):
-                g = g.strip()
-                if g:
-                    genre_counts[g] += 1
-        else:
-            genre_counts["Unknown"] += 1
         if bk["tags"]:
             for t in bk["tags"].split(";"):
                 t = t.strip()
@@ -2352,7 +2434,6 @@ def global_stats():
     def _remove_unknown(d: dict) -> dict:
         return {k: v for k, v in d.items() if str(k).strip().lower() != 'unknown' and str(k).strip() != ''}
 
-    genre_counts_clean = _remove_unknown(dict(genre_counts))
     language_counts_clean = _remove_unknown(dict(language_counts))
     orig_lang_counts_clean = _remove_unknown(dict(orig_lang_counts))
     publisher_counts_clean = _remove_unknown(dict(publisher_counts))
@@ -2378,7 +2459,6 @@ def global_stats():
         books_data=books_data,
         time_data=time_data,
         status_chart=status_chart_clean,
-        genre_counts=genre_counts_clean,
         tag_counts=tag_counts_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
@@ -4154,7 +4234,7 @@ def edit_metadata(book_id: str):
         text_fields = (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genre", "tags",
+            "publication_date", "isbn", "publisher", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -4238,7 +4318,7 @@ def edit_metadata(book_id: str):
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
-                publisher=?, genre=?, tags=?, summary=?, translator=?, illustrator=?,
+                publisher=?, tags=?, summary=?, translator=?, illustrator=?,
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
@@ -4250,7 +4330,7 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genre"], info["tags"], info["summary"],
+            info["publisher"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["prologue_author"], info["status"],
             info["source_type"], info["source_id"],
@@ -4300,7 +4380,7 @@ def edit_metadata(book_id: str):
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genre", "tags", "publisher",
+        "author", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     # Parse cover palette for the color picker
@@ -4591,7 +4671,7 @@ def isbn_lookup():
         "pages": pages,
         "isbn": original_isbn,
         "publication_date": pub_date,
-        "genre": subjects,
+        "tags": subjects,
         "cover_url": cover_url,
     }
     return jsonify(result)
@@ -4618,7 +4698,7 @@ def new_book():
         for field in (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genre", "tags",
+            "publication_date", "isbn", "publisher", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -4724,19 +4804,19 @@ def new_book():
             INSERT INTO books
             (id, name, subtitle, author, slug, language, original_title, original_language,
              original_publication_date, publication_date, isbn, pages, starting_page,
-             publisher, genre, tags, summary, translator, illustrator, editor, prologue_author,
+             publisher, tags, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
              cover_thumb, library_id, work_id, is_primary_edition,
              format, binding, audio_format, total_time_seconds)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genre"], info["tags"], info["summary"],
+            info["publisher"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["prologue_author"], info["status"],
             info["source_type"], info["source_id"],
@@ -4789,7 +4869,7 @@ def new_book():
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genre", "tags", "publisher",
+        "author", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     all_series = [dict(r) for r in db.execute(
@@ -4810,13 +4890,13 @@ def new_book():
         if primary:
             parent_book_name = primary.get("name", "")
             for f in ("author", "original_title", "original_language",
-                      "original_publication_date", "genre", "summary",
+                      "original_publication_date", "tags", "summary",
                       "illustrator", "editor", "prologue_author"):
                 prefill[f] = primary.get(f, "")
 
     # Pre-fill from ISBN lookup (query params)
     for key in ("name", "subtitle", "author", "publisher", "isbn",
-                "publication_date", "genre", "pages", "cover_url"):
+                "publication_date", "tags", "pages", "cover_url"):
         val = request.args.get(key, "").strip()
         if val and key not in prefill:
             prefill[key] = val
@@ -5441,6 +5521,7 @@ if __name__ == "__main__":
         migrate_add_author_gender()
         migrate_add_tags()
         migrate_normalize_genres()
+        migrate_merge_genres_into_tags()
 
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"

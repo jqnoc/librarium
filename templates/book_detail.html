@@ -45,15 +45,9 @@
                 </div>
             </div>
             <div class="meta-item">
-                <div class="meta-label" data-i18n="book.genre">Genre</div>
-                <div class="meta-value">{{ info.get('genre', '—') }}</div>
-            </div>
-            {% if info.get('tags') %}
-            <div class="meta-item">
                 <div class="meta-label" data-i18n="book.tags">Tags</div>
-                <div class="meta-value">{{ info.get('tags') }}</div>
+                <div class="meta-value">{{ info.get('tags', '—') or '—' }}</div>
             </div>
-            {% endif %}
             {% if series_list_book %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.series">Series</div>

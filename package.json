@@ -1,6 +1,6 @@
 {
   "name": "librarium",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A local application for tracking personal book reading statistics",
   "main": "main.js",
   "scripts": {
