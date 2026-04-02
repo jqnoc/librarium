@@ -42,6 +42,12 @@
                 <div class="meta-value">{{ author_info.death_place }}</div>
             </div>
             {% endif %}
+            {% if author_info.gender and author_info.gender != 'unknown' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="authorDetail.gender">Gender</div>
+                <div class="meta-value" data-i18n="gender.{{ author_info.gender }}">{{ author_info.gender | capitalize }}</div>
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="authorDetail.booksInLibrary">Books in Library</div>
                 <div class="meta-value">{{ books | length }}</div>

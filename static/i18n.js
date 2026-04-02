@@ -115,6 +115,7 @@
         'book.status':          { en: 'Status',              es: 'Estado' },
         'book.pages':           { en: 'Pages',               es: 'Páginas' },
         'book.genre':           { en: 'Genre',               es: 'Género' },
+        'book.tags':            { en: 'Tags',                es: 'Etiquetas' },
         'book.language':        { en: 'Language',             es: 'Idioma' },
         'book.publisher':       { en: 'Publisher',            es: 'Editorial' },
         'book.pubDate':         { en: 'Publication Date',     es: 'Fecha de Publicación' },
@@ -274,6 +275,7 @@
         'authorDetail.sortTitle':     { en: 'Title',              es: 'Título' },
         'authorDetail.sortRating':    { en: 'Rating',             es: 'Valoración' },
         'authorDetail.showAllEditions': { en: 'Show All Editions', es: 'Mostrar Todas las Ediciones' },
+        'authorDetail.gender':        { en: 'Gender',              es: 'Género' },
         'authorDetail.empty':         { en: 'No books found for this author.', es: 'No se encontraron libros de este autor.' },
 
         // ── Edit author ─────────────────────────────────────────────────
@@ -290,6 +292,7 @@
         'editAuthor.deathPlace':    { en: 'Place of Death',       es: 'Lugar de Fallecimiento' },
         'editAuthor.biography':     { en: 'Biography',            es: 'Biografía' },
         'editAuthor.saveChanges':   { en: '💾 Save Changes',      es: '💾 Guardar Cambios' },
+        'editAuthor.gender':        { en: 'Gender',               es: 'Género' },
 
         // ── Rich-text toolbar ───────────────────────────────────────────
         'rt.bold':          { en: 'Bold',           es: 'Negrita' },
@@ -314,6 +317,8 @@
         'bookForm.authorReq':       { en: 'Author(s) *',        es: 'Autor(es) *' },
         'bookForm.authorLabel':     { en: 'Author(s)',           es: 'Autor(es)' },
         'bookForm.genre':           { en: 'Genre',               es: 'Género' },
+        'bookForm.tags':            { en: 'Tags',                es: 'Etiquetas' },
+        'bookForm.tagsPlaceholder': { en: 'e.g. cozy; dark; slow-burn', es: 'ej. acogedor; oscuro; lento' },
         'bookForm.status':          { en: 'Status',              es: 'Estado' },
         'bookForm.statusReading':   { en: 'Reading',             es: 'Leyendo' },
         'bookForm.statusFinished':  { en: 'Finished',            es: 'Terminado' },
@@ -425,6 +430,11 @@
         'stats.timelineRelative':   { en: 'Relative (%)',                  es: 'Relativo (%)' },
         'stats.empty':              { en: 'No reading data yet. Start tracking your reading to see statistics!', es: '¡Aún no hay datos. Empieza a registrar tu lectura para ver estadísticas!' },
         'stats.times':              { en: 'times',                     es: 'veces' },
+        'stats.timelineAll':        { en: 'All Time',                  es: 'Todo' },
+        'stats.timeline5y':         { en: 'Last 5 Years',              es: 'Últimos 5 Años' },
+        'stats.timeline1y':         { en: 'Last Year',                 es: 'Último Año' },
+        'stats.genreCloud':         { en: 'Genre Cloud',               es: 'Nube de Géneros' },
+        'stats.tagCloud':           { en: 'Tag Cloud',                 es: 'Nube de Etiquetas' },
 
         // ── Year stats ──────────────────────────────────────────────────
         'yearStats.backToGlobal':   { en: '← Back to Global Stats',    es: '← Volver a Estadísticas Globales' },
@@ -525,6 +535,11 @@
         'activity.books':            { en: 'books',                    es: 'libros' },
         'activity.pagesSuffix':      { en: 'pp',                      es: 'pp' },
         'activity.readTimes':        { en: 'read(s)',                  es: 'lectura(s)' },
+
+        // ── Gender values ───────────────────────────────────────────────
+        'gender.male':              { en: 'Male',                  es: 'Masculino' },
+        'gender.female':            { en: 'Female',                es: 'Femenino' },
+        'gender.unknown':           { en: 'Unknown',               es: 'Desconocido' },
     };
 
     // ── Public API ──────────────────────────────────────────────────────

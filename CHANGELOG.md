@@ -5,42 +5,89 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-04-02
+
+### Added
+- Shared authors across libraries: authors are now global entities no
+  longer scoped to a single library. Duplicate author records are merged
+  automatically, keeping the richest data (longest bio, photo, dates).
+- Shared sources across libraries: sources are now global, with duplicate
+  records merged by name during migration.
+- Author gender field (`male`, `female`, `unknown`) with dropdown in the
+  edit-author form and display on the author detail page.
+- Tags per book (semicolon-separated free text) with datalist
+  autocomplete on the new-book and edit-metadata forms.
+- Tag word cloud on the global statistics page, rendered alongside a
+  genre cloud using CSS-based proportional sizing.
+- Status timeline chart now has time-range radio buttons: All Time, Last
+  5 Years, and Last Year, with localStorage persistence.
+
+### Changed
+- Genre counting in global statistics now correctly splits multi-genre
+  fields by semicolons instead of treating the whole field as one value.
+
+### Fixed
+- Genre values are normalised to title case via a database migration,
+  preventing duplicate entries caused by inconsistent capitalisation.
+- Changelog entries for versions 0.8.0 through 0.9.1 reformatted to
+  match the established capitalised, multi-line style of earlier entries.
+
 ## [0.9.1] — 2026-04-01
 
 ### Fixed
-- add `init_schema()` function that creates all base tables (`books`, `sessions`, `periods`, `readings`, `ratings`, `sources`, `libraries`, `series`, `authors`, `book_series`) and the default "Books" library for brand-new user databases; new users no longer get an empty database with no tables
-- remove `if not DB_PATH.exists(): return` guard from `_run_all_migrations()` and call `init_schema()` first so creating a fresh user database correctly initialises all tables before running (now-idempotent) migrations
-- replace unreliable native `<datalist>` click behaviour with a custom autocomplete dropdown (`autocomplete.js`) that opens on a single click, filters as you type, and re-opens after typing "; " for multi-value fields (Author, Genre, Language, Publisher, etc.)
-- remove duplicated and non-functional datalist JS from `edit_metadata.html` and `new_book.html` script blocks
+- Add `init_schema()` function that creates all base tables (`books`,
+  `sessions`, `periods`, `readings`, `ratings`, `sources`, `libraries`,
+  `series`, `authors`, `book_series`) and the default "Books" library for
+  brand-new user databases; new users no longer get an empty database with
+  no tables.
+- Remove `if not DB_PATH.exists(): return` guard from
+  `_run_all_migrations()` and call `init_schema()` first so creating a
+  fresh user database correctly initialises all tables before running
+  (now-idempotent) migrations.
+- Replace unreliable native `<datalist>` click behaviour with a custom
+  autocomplete dropdown (`autocomplete.js`) that opens on a single click,
+  filters as you type, and re-opens after typing "; " for multi-value
+  fields (Author, Genre, Language, Publisher, etc.).
+- Remove duplicated and non-functional datalist JS from
+  `edit_metadata.html` and `new_book.html` script blocks.
 
 ## [0.9.0] — 2026-04-01
 
 ### Added
-- backup directory picker in the library management modal with input field and save button
-- i18n keys for backup directory UI (`backup.directory`, `backup.dirDefault`, `backup.saveDir`, `backup.dirHint`) in EN and ES
-- datalist dropdowns open on single click (Author, Genre, Language, Publisher, etc.)
-- datalist dropdowns reopen automatically after typing "; " for multi-value entry
+- Backup directory picker in the library management modal with input field
+  and save button.
+- i18n keys for backup directory UI (`backup.directory`, `backup.dirDefault`,
+  `backup.saveDir`, `backup.dirHint`) in EN and ES.
+- Datalist dropdowns open on single click (Author, Genre, Language,
+  Publisher, etc.).
+- Datalist dropdowns reopen automatically after typing "; " for multi-value
+  entry.
 
 ### Changed
-- simplify navbar user badge to show only the name without the avatar circle
-- expose `backup_dir` in template context via `inject_library_context()`
+- Simplify navbar user badge to show only the name without the avatar
+  circle.
+- Expose `backup_dir` in template context via `inject_library_context()`.
 
 ## [0.8.1] — 2026-04-01
 
 ### Fixed
-- define missing `_run_all_migrations()` function that was called but never implemented, crashing user creation and switching
-- create `users.html` template for the user selection / creation screen that was missing despite backend routes being in place
-- make startup migration block user-aware: iterate over all registered users' databases instead of assuming a single `librarium.db`
+- Define missing `_run_all_migrations()` function that was called but
+  never implemented, crashing user creation and switching.
+- Create `users.html` template for the user selection / creation screen
+  that was missing despite backend routes being in place.
+- Make startup migration block user-aware: iterate over all registered
+  users' databases instead of assuming a single `librarium.db`.
 
 ### Added
-- current user name displayed in the navbar header
-- CSS styles for the user selection page and navbar user badge
-- i18n keys for user management UI (EN and ES)
+- Current user name displayed in the navbar header.
+- CSS styles for the user selection page and navbar user badge.
+- i18n keys for user management UI (EN and ES).
 
 ## [0.8.0] — 2026-03-28
 
 ### Added
-- focus `librarySearch` when pressing Ctrl/Cmd+F on the Library page (focuses and selects existing text; prevent default browser find)
+- Focus `librarySearch` when pressing Ctrl/Cmd+F on the Library page
+  (focuses and selects existing text; prevents default browser find).
 
 ## [0.7.1] — 2026-03-28
 

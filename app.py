@@ -66,7 +66,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.9.1"
+APP_VERSION = "0.10.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -296,8 +296,7 @@ def init_schema() -> None:
             short_name  TEXT    NOT NULL DEFAULT '',
             location    TEXT    NOT NULL DEFAULT '',
             url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT '',
-            library_id  INTEGER NOT NULL DEFAULT 1 REFERENCES libraries(id)
+            notes       TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS series (
@@ -350,12 +349,12 @@ def init_schema() -> None:
             binding                   TEXT    DEFAULT NULL,
             audio_format              TEXT    DEFAULT NULL,
             total_time_seconds        INTEGER DEFAULT NULL,
-            cover_thumb               BLOB    DEFAULT NULL
+            cover_thumb               BLOB    DEFAULT NULL,
+            tags                      TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS authors (
-            name        TEXT    NOT NULL,
-            library_id  INTEGER NOT NULL REFERENCES libraries(id),
+            name        TEXT    PRIMARY KEY,
             photo       BLOB,
             has_photo   INTEGER NOT NULL DEFAULT 0,
             birth_date  TEXT    NOT NULL DEFAULT '',
@@ -365,7 +364,7 @@ def init_schema() -> None:
             biography   TEXT    NOT NULL DEFAULT '',
             photo_hash  TEXT    NOT NULL DEFAULT '',
             photo_thumb BLOB    DEFAULT NULL,
-            PRIMARY KEY (name, library_id)
+            gender      TEXT    NOT NULL DEFAULT 'unknown'
         );
 
         CREATE TABLE IF NOT EXISTS readings (
@@ -439,6 +438,11 @@ def _run_all_migrations() -> None:
     migrate_add_period_duration()
     migrate_add_cover_thumb()
     migrate_add_photo_thumb()
+    migrate_shared_authors()
+    migrate_shared_sources()
+    migrate_add_author_gender()
+    migrate_add_tags()
+    migrate_normalize_genres()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -917,6 +921,199 @@ def migrate_add_photo_thumb() -> None:
     db.commit()
     db.close()
     print(f"✅ Migration complete – photo_thumb added ({len(rows)} thumbnails generated).")
+
+
+# ── Migration: Make authors shared across libraries ─────────────────────
+def migrate_shared_authors() -> None:
+    """Remove library_id from authors PK, merging duplicate entries."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=OFF")
+
+    # Check if authors table still has library_id in its PK
+    cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
+    if "library_id" not in cols:
+        db.close()
+        return
+
+    print(">> Migrating: making authors shared across libraries ...")
+
+    # Collect all authors grouped by name, keeping the richest entry
+    all_authors = db.execute("SELECT * FROM authors ORDER BY name").fetchall()
+    merged: dict[str, dict] = {}
+    for row in all_authors:
+        name = row["name"]
+        d = dict(row)
+        if name not in merged:
+            merged[name] = d
+        else:
+            # Keep whichever has more data (photo, bio, dates)
+            existing = merged[name]
+            if not existing.get("has_photo") and d.get("has_photo"):
+                merged[name] = d
+            elif not existing.get("biography") and d.get("biography"):
+                merged[name]["biography"] = d["biography"]
+            if not existing.get("birth_date") and d.get("birth_date"):
+                merged[name]["birth_date"] = d["birth_date"]
+            if not existing.get("birth_place") and d.get("birth_place"):
+                merged[name]["birth_place"] = d["birth_place"]
+            if not existing.get("death_date") and d.get("death_date"):
+                merged[name]["death_date"] = d["death_date"]
+            if not existing.get("death_place") and d.get("death_place"):
+                merged[name]["death_place"] = d["death_place"]
+
+    db.execute("DROP TABLE IF EXISTS authors")
+    db.execute("""
+        CREATE TABLE authors (
+            name        TEXT PRIMARY KEY,
+            photo       BLOB,
+            has_photo   INTEGER NOT NULL DEFAULT 0,
+            birth_date  TEXT NOT NULL DEFAULT '',
+            birth_place TEXT NOT NULL DEFAULT '',
+            death_date  TEXT NOT NULL DEFAULT '',
+            death_place TEXT NOT NULL DEFAULT '',
+            biography   TEXT NOT NULL DEFAULT '',
+            photo_hash  TEXT NOT NULL DEFAULT '',
+            photo_thumb BLOB DEFAULT NULL
+        )
+    """)
+
+    for name, d in merged.items():
+        db.execute(
+            "INSERT INTO authors (name, photo, has_photo, birth_date, birth_place, "
+            "death_date, death_place, biography, photo_hash, photo_thumb) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (name, d.get("photo"), d.get("has_photo", 0),
+             d.get("birth_date", ""), d.get("birth_place", ""),
+             d.get("death_date", ""), d.get("death_place", ""),
+             d.get("biography", ""), d.get("photo_hash", ""),
+             d.get("photo_thumb")),
+        )
+
+    db.commit()
+    db.close()
+    print(f">> Migration complete - authors shared ({len(merged)} unique authors).")
+
+
+# ── Migration: Make sources shared across libraries ─────────────────────
+def migrate_shared_sources() -> None:
+    """Remove library_id column from sources table."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=OFF")
+
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    if "library_id" not in cols:
+        db.close()
+        return
+
+    print(">> Migrating: making sources shared across libraries ...")
+
+    # Recreate sources without library_id, deduplicating by name
+    all_sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
+    seen_names: dict[str, dict] = {}
+    unique_sources: list[dict] = []
+    for row in all_sources:
+        d = dict(row)
+        key = d["name"].strip().lower()
+        if key not in seen_names:
+            seen_names[key] = d
+            unique_sources.append(d)
+
+    db.execute("DROP TABLE IF EXISTS sources")
+    db.execute("""
+        CREATE TABLE sources (
+            id          TEXT    PRIMARY KEY,
+            type        TEXT    NOT NULL DEFAULT '',
+            name        TEXT    NOT NULL DEFAULT '',
+            short_name  TEXT    NOT NULL DEFAULT '',
+            location    TEXT    NOT NULL DEFAULT '',
+            url         TEXT    NOT NULL DEFAULT '',
+            notes       TEXT    NOT NULL DEFAULT ''
+        )
+    """)
+
+    for s in unique_sources:
+        db.execute(
+            "INSERT INTO sources (id, type, name, short_name, location, url, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (s["id"], s.get("type", ""), s.get("name", ""), s.get("short_name", ""),
+             s.get("location", ""), s.get("url", ""), s.get("notes", "")),
+        )
+
+    db.commit()
+    db.close()
+    print(f">> Migration complete - sources shared ({len(unique_sources)} unique sources).")
+
+
+# ── Migration: Add gender column to authors ─────────────────────────────
+def migrate_add_author_gender() -> None:
+    """Add gender column to authors table."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
+    if "gender" in cols:
+        db.close()
+        return
+    print(">> Migrating: adding gender column to authors ...")
+    db.execute("ALTER TABLE authors ADD COLUMN gender TEXT NOT NULL DEFAULT 'unknown'")
+    db.commit()
+    db.close()
+    print(">> Migration complete - gender column added to authors.")
+
+
+# ── Migration: Add tags column to books ─────────────────────────────────
+def migrate_add_tags() -> None:
+    """Add tags column to books (semicolon-separated, like genre)."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "tags" in cols:
+        db.close()
+        return
+    print(">> Migrating: adding tags column to books ...")
+    db.execute("ALTER TABLE books ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+    db.commit()
+    db.close()
+    print(">> Migration complete - tags column added to books.")
+
+
+# ── Migration: Normalize genre capitalization ───────────────────────────
+def _title_case_genre(genre: str) -> str:
+    """Capitalize a genre string using title case (each word capitalized)."""
+    return " ".join(w.capitalize() for w in genre.strip().split())
+
+
+def migrate_normalize_genres() -> None:
+    """Normalize all genre values to title case."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+
+    # Check if we've already run this (use a simple sentinel via PRAGMA)
+    rows = db.execute("SELECT id, genre FROM books WHERE genre != ''").fetchall()
+    any_changed = False
+    for row in rows:
+        old = row["genre"]
+        parts = [_title_case_genre(p) for p in old.split(";")]
+        new = "; ".join(parts)
+        if old != new:
+            db.execute("UPDATE books SET genre = ? WHERE id = ?", (new, row["id"]))
+            any_changed = True
+    if any_changed:
+        print(">> Normalizing genre capitalization ...")
+        db.commit()
+        print(">> Genre capitalization normalized.")
+    db.close()
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -2044,12 +2241,13 @@ def global_stats():
 
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
-        "SELECT id, name, status, genre, language, original_language, pages, publisher, has_cover, cover_hash "
+        "SELECT id, name, status, genre, tags, language, original_language, pages, publisher, has_cover, cover_hash "
         "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
     ).fetchall()
 
     status_counts: dict[str, int] = Counter()
     genre_counts: dict[str, int] = Counter()
+    tag_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
     publisher_counts: dict[str, int] = Counter()
@@ -2067,9 +2265,17 @@ def global_stats():
     for bk in all_lib_books:
         status_counts[bk["status"] or "unknown"] += 1
         if bk["genre"]:
-            genre_counts[bk["genre"]] += 1
+            for g in bk["genre"].split(";"):
+                g = g.strip()
+                if g:
+                    genre_counts[g] += 1
         else:
             genre_counts["Unknown"] += 1
+        if bk["tags"]:
+            for t in bk["tags"].split(";"):
+                t = t.strip()
+                if t:
+                    tag_counts[t] += 1
         if bk["language"]:
             language_counts[bk["language"]] += 1
         else:
@@ -2153,6 +2359,8 @@ def global_stats():
     author_counts_clean = _remove_unknown(dict(author_counts))
     status_chart_clean = {k: v for k, v in status_chart.items() if str(k).strip().lower() != 'unknown'}
 
+    tag_counts_clean = _remove_unknown(dict(tag_counts))
+
     # Prepare publisher chart data: show top N publishers and aggregate the rest as "Other" (computed from cleaned counts)
     TOP_PUBLISHERS_FOR_CHART = 20
     from collections import Counter as _Counter
@@ -2171,6 +2379,7 @@ def global_stats():
         time_data=time_data,
         status_chart=status_chart_clean,
         genre_counts=genre_counts_clean,
+        tag_counts=tag_counts_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
         publisher_counts=publisher_counts_clean,
@@ -3014,7 +3223,7 @@ def authors_list():
 
     # Build a map of author names that have photos → photo_hash
     author_photo_info: dict[str, str] = {}
-    for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1 AND library_id = ?", (lib_id,)).fetchall():
+    for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall():
         author_photo_info[ar["name"]] = ar["photo_hash"] or ""
 
     author_map: dict[str, list[dict]] = {}
@@ -3090,10 +3299,11 @@ def author_detail(author_name: str):
         books.sort(key=lambda b: (b["original_publication_date"] or "9999", b["name"].lower()))
 
     # Load author metadata (if exists)
-    author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
+    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
     author_info = dict(author_row) if author_row else {
         "name": author_name, "has_photo": 0, "photo_hash": "", "birth_date": "",
         "birth_place": "", "death_date": "", "death_place": "", "biography": "",
+        "gender": "unknown",
     }
     resp = make_response(render_template("author_detail.html", author=author_name,
                            books=books, author_info=author_info, sort=sort,
@@ -3106,14 +3316,13 @@ def author_detail(author_name: str):
 def author_photo(author_name: str):
     """Serve the author's photo from the database."""
     db = get_db()
-    lib_id = _get_current_library_id()
 
     # Lightweight hash-only check for conditional requests
     etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
     if etag_from_client:
         hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
-            (author_name, lib_id)
+            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+            (author_name,)
         ).fetchone()
         if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
             resp = make_response("", 304)
@@ -3121,8 +3330,8 @@ def author_photo(author_name: str):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             return resp
 
-    row = db.execute("SELECT photo, photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
-                     (author_name, lib_id)).fetchone()
+    row = db.execute("SELECT photo, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+                     (author_name,)).fetchone()
     if not row or not row["photo"]:
         abort(404)
 
@@ -3138,13 +3347,12 @@ def author_photo(author_name: str):
 def author_photo_thumb(author_name: str):
     """Serve a thumbnail of the author's photo from the database."""
     db = get_db()
-    lib_id = _get_current_library_id()
 
     etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
     if etag_from_client:
         hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
-            (author_name, lib_id)
+            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+            (author_name,)
         ).fetchone()
         if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
             resp = make_response("", 304)
@@ -3153,8 +3361,8 @@ def author_photo_thumb(author_name: str):
             return resp
 
     row = db.execute(
-        "SELECT photo_thumb, photo, photo_hash FROM authors WHERE name = ? AND library_id = ? AND has_photo = 1",
-        (author_name, lib_id)
+        "SELECT photo_thumb, photo, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+        (author_name,)
     ).fetchone()
     if not row or (not row["photo_thumb"] and not row["photo"]):
         abort(404)
@@ -3172,15 +3380,14 @@ def author_photo_thumb(author_name: str):
 def edit_author(author_name: str):
     """Edit author metadata (photo, dates, places, biography)."""
     db = get_db()
-    lib_id = _get_current_library_id()
 
     # Ensure author row exists
-    author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
+    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
     if not author_row:
         # Auto-create a skeleton row
-        db.execute("INSERT INTO authors (name, library_id) VALUES (?, ?)", (author_name, lib_id))
+        db.execute("INSERT INTO authors (name) VALUES (?)", (author_name,))
         db.commit()
-        author_row = db.execute("SELECT * FROM authors WHERE name = ? AND library_id = ?", (author_name, lib_id)).fetchone()
+        author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
 
     author_info = dict(author_row)
 
@@ -3190,15 +3397,16 @@ def edit_author(author_name: str):
         author_info["death_date"] = request.form.get("death_date", "").strip()
         author_info["death_place"] = request.form.get("death_place", "").strip()
         author_info["biography"] = sanitize_html(request.form.get("biography", "").strip())
+        author_info["gender"] = request.form.get("gender", "unknown").strip()
 
         db.execute("""
             UPDATE authors SET
-                birth_date=?, birth_place=?, death_date=?, death_place=?, biography=?
-            WHERE name=? AND library_id=?
+                birth_date=?, birth_place=?, death_date=?, death_place=?, biography=?, gender=?
+            WHERE name=?
         """, (
             author_info["birth_date"], author_info["birth_place"],
             author_info["death_date"], author_info["death_place"],
-            author_info["biography"], author_name, lib_id,
+            author_info["biography"], author_info["gender"], author_name,
         ))
         db.commit()
 
@@ -3208,14 +3416,14 @@ def edit_author(author_name: str):
             photo_blob = photo_file.read()
             photo_hash = hashlib.md5(photo_blob).hexdigest()[:12]
             photo_thumb = _generate_thumbnail(photo_blob)
-            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ?, photo_thumb = ? WHERE name = ? AND library_id = ?",
-                       (photo_blob, photo_hash, photo_thumb, author_name, lib_id))
+            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ?, photo_thumb = ? WHERE name = ?",
+                       (photo_blob, photo_hash, photo_thumb, author_name))
             db.commit()
 
         # Handle photo removal
         if request.form.get("remove_photo") == "1":
-            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '', photo_thumb = NULL WHERE name = ? AND library_id = ?",
-                       (author_name, lib_id))
+            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '', photo_thumb = NULL WHERE name = ?",
+                       (author_name,))
             db.commit()
 
         flash("Author details updated.", "success")
@@ -3946,7 +4154,7 @@ def edit_metadata(book_id: str):
         text_fields = (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genre",
+            "publication_date", "isbn", "publisher", "genre", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -4030,7 +4238,7 @@ def edit_metadata(book_id: str):
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
-                publisher=?, genre=?, summary=?, translator=?, illustrator=?,
+                publisher=?, genre=?, tags=?, summary=?, translator=?, illustrator=?,
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
@@ -4042,7 +4250,7 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genre"], info["summary"],
+            info["publisher"], info["genre"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["prologue_author"], info["status"],
             info["source_type"], info["source_id"],
@@ -4085,14 +4293,14 @@ def edit_metadata(book_id: str):
         flash("Book metadata updated.", "success")
         return redirect(url_for("book_detail", book_id=book_id))
 
-    sources = db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()
+    sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
     sources = [dict(s) for s in sources]
     purchase_sources = [s for s in sources if s["type"] in PURCHASE_SOURCE_TYPES]
     borrow_sources = [s for s in sources if s["type"] in BORROW_SOURCE_TYPES]
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genre", "publisher",
+        "author", "genre", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     # Parse cover palette for the color picker
@@ -4410,7 +4618,7 @@ def new_book():
         for field in (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genre",
+            "publication_date", "isbn", "publisher", "genre", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -4516,19 +4724,19 @@ def new_book():
             INSERT INTO books
             (id, name, subtitle, author, slug, language, original_title, original_language,
              original_publication_date, publication_date, isbn, pages, starting_page,
-             publisher, genre, summary, translator, illustrator, editor, prologue_author,
+             publisher, genre, tags, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
              cover_thumb, library_id, work_id, is_primary_edition,
              format, binding, audio_format, total_time_seconds)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genre"], info["summary"],
+            info["publisher"], info["genre"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["prologue_author"], info["status"],
             info["source_type"], info["source_id"],
@@ -4574,14 +4782,14 @@ def new_book():
         flash(f"Book '{name}' added.", "success")
         return redirect(url_for("book_detail", book_id=book_id))
 
-    sources = db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()
+    sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
     sources = [dict(s) for s in sources]
     purchase_sources = [s for s in sources if s["type"] in PURCHASE_SOURCE_TYPES]
     borrow_sources = [s for s in sources if s["type"] in BORROW_SOURCE_TYPES]
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genre", "publisher",
+        "author", "genre", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     all_series = [dict(r) for r in db.execute(
@@ -4631,15 +4839,13 @@ def new_book():
 def sources_list():
     """Sources management page."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    sources = [dict(r) for r in db.execute("SELECT * FROM sources WHERE library_id = ? ORDER BY name", (lib_id,)).fetchall()]
+    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name").fetchall()]
     return render_template("sources.html", sources=sources, source_types=SOURCE_TYPES)
 
 
 @app.route("/sources/add", methods=["POST"])
 def add_source():
     db = get_db()
-    lib_id = _get_current_library_id()
     name = request.form.get("name", "").strip()
     short_name = request.form.get("short_name", "").strip()
     if not name:
@@ -4647,7 +4853,7 @@ def add_source():
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, short_name, location, url, notes, library_id) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, short_name, location, url, notes) VALUES (?,?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
             request.form.get("source_type", "").strip(),
@@ -4656,7 +4862,6 @@ def add_source():
             request.form.get("location", "").strip(),
             request.form.get("url", "").strip(),
             request.form.get("notes", "").strip(),
-            lib_id,
         ),
     )
     db.commit()
@@ -4802,8 +5007,6 @@ def delete_library(lib_id: int):
         db.execute("DELETE FROM ratings WHERE book_id = ?", (bid,))
         db.execute("DELETE FROM readings WHERE book_id = ?", (bid,))
     db.execute("DELETE FROM books WHERE library_id = ?", (lib_id,))
-    db.execute("DELETE FROM sources WHERE library_id = ?", (lib_id,))
-    db.execute("DELETE FROM authors WHERE library_id = ?", (lib_id,))
     db.execute("DELETE FROM libraries WHERE id = ?", (lib_id,))
     db.commit()
     # If the deleted library was the active one, reset cookie
@@ -5233,6 +5436,11 @@ if __name__ == "__main__":
         migrate_add_period_duration()
         migrate_add_cover_thumb()
         migrate_add_photo_thumb()
+        migrate_shared_authors()
+        migrate_shared_sources()
+        migrate_add_author_gender()
+        migrate_add_tags()
+        migrate_normalize_genres()
 
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"

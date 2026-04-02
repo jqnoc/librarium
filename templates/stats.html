@@ -42,6 +42,16 @@
             <h3 style="margin:0; color: var(--lb-deep-orange);" data-i18n="stats.statusTimeline">Books by Status Over Time</h3>
             <div style="display:flex; gap:1rem; align-items:center;">
                 <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
+                    <input type="radio" name="timelineRange" value="all" checked> <span data-i18n="stats.timelineAll">All Time</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
+                    <input type="radio" name="timelineRange" value="5y"> <span data-i18n="stats.timeline5y">Last 5 Years</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
+                    <input type="radio" name="timelineRange" value="1y"> <span data-i18n="stats.timeline1y">Last Year</span>
+                </label>
+                <span style="color:var(--lb-text-light); font-size:1.1rem;">|</span>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
                     <input type="radio" name="timelineMode" value="absolute" checked> <span data-i18n="stats.timelineAbsolute">Absolute</span>
                 </label>
                 <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; color:var(--lb-text-light); font-size:0.9rem;">
@@ -133,6 +143,22 @@
             <canvas id="genreBar" style="max-height: 400px;"></canvas>
         </div>
     </div>
+    <!-- Genre word cloud -->
+    <div class="card" style="margin-top: 1rem;">
+        <div class="card-body">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.genreCloud">Genre Cloud</h3>
+            <div id="genreCloud" class="word-cloud"></div>
+        </div>
+    </div>
+    <!-- Tags word cloud -->
+    {% if tag_counts %}
+    <div class="card" style="margin-top: 1rem;">
+        <div class="card-body">
+            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.tagCloud">Tag Cloud</h3>
+            <div id="tagCloud" class="word-cloud"></div>
+        </div>
+    </div>
+    {% endif %}
     <div class="library-charts-grid">
         <div class="card">
             <div class="card-body">
@@ -621,6 +647,42 @@ const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
     renderFor();
 })();
 
+// Word cloud renderer
+function renderWordCloud(containerId, countsObj) {
+    const container = document.getElementById(containerId);
+    if (!container || !countsObj) return;
+    const entries = Object.entries(countsObj).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="color:var(--lb-muted);text-align:center;">No data.</p>';
+        return;
+    }
+    const maxCount = entries[0][1];
+    const minCount = entries[entries.length - 1][1];
+    const minFontSize = 0.75;
+    const maxFontSize = 2.8;
+    const accentColor = cssVar('--lb-deep-orange') || '#FF5F00';
+    const textColor = cssVar('--lb-text') || '#374151';
+    container.innerHTML = '';
+    entries.forEach(([word, count]) => {
+        const span = document.createElement('span');
+        span.textContent = word;
+        const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
+        const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
+        const opacity = 0.5 + ratio * 0.5;
+        span.style.fontSize = fontSize + 'rem';
+        span.style.color = ratio > 0.6 ? accentColor : textColor;
+        span.style.opacity = opacity;
+        span.title = `${word}: ${count}`;
+        container.appendChild(span);
+    });
+}
+
+renderWordCloud('genreCloud', FULL_GENRE_COUNTS);
+{% if tag_counts %}
+const FULL_TAG_COUNTS = {{ tag_counts | tojson }};
+renderWordCloud('tagCloud', FULL_TAG_COUNTS);
+{% endif %}
+
 // Language bar
 const langData = {{ language_counts | tojson }};
 makeHBar('languageBar', langData, null, true, 2);
@@ -816,17 +878,50 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
             { key: 'abandoned',   label: 'Abandoned',   color: cssVar('--lb-abandoned')   || '#DC2626' },
         ];
 
-        // Pre-compute totals per date index
-        const totals = data.dates.map((_, i) =>
-            STATUS_CFG.reduce((s, cfg) => s + ((data.series[cfg.key] || [])[i] || 0), 0)
-        );
+        let isRelative = false;
+        let currentRange = localStorage.getItem('librarium_timeline_range') || 'all';
 
-        function makeDatasets(relative) {
+        // Restore persisted range selection
+        const rangeRadio = document.querySelector(`input[name="timelineRange"][value="${currentRange}"]`);
+        if (rangeRadio) rangeRadio.checked = true;
+
+        function filterByRange(dates, series, range) {
+            if (range === 'all') return { dates, series };
+            const now = new Date();
+            let cutoff;
+            if (range === '5y') {
+                cutoff = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+            } else {
+                cutoff = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            }
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            const filteredDates = [];
+            const filteredSeries = {};
+            for (const key of Object.keys(series)) filteredSeries[key] = [];
+            for (let i = 0; i < dates.length; i++) {
+                if (dates[i] >= cutoffStr) {
+                    filteredDates.push(dates[i]);
+                    for (const key of Object.keys(series)) {
+                        filteredSeries[key].push((series[key] || [])[i] || 0);
+                    }
+                }
+            }
+            return { dates: filteredDates, series: filteredSeries };
+        }
+
+        function computeTotals(filtered) {
+            return filtered.dates.map((_, i) =>
+                STATUS_CFG.reduce((s, cfg) => s + ((filtered.series[cfg.key] || [])[i] || 0), 0)
+            );
+        }
+
+        function makeDatasets(relative, filtered) {
+            const fTotals = computeTotals(filtered);
             return STATUS_CFG.map(cfg => ({
                 label: cfg.label,
-                data: data.dates.map((d, i) => {
-                    const raw = (data.series[cfg.key] || [])[i] || 0;
-                    return { x: d, y: relative ? (totals[i] > 0 ? raw / totals[i] * 100 : 0) : raw };
+                data: filtered.dates.map((d, i) => {
+                    const raw = (filtered.series[cfg.key] || [])[i] || 0;
+                    return { x: d, y: relative ? (fTotals[i] > 0 ? raw / fTotals[i] * 100 : 0) : raw };
                 }),
                 borderColor: cfg.color,
                 backgroundColor: cfg.color + '55',
@@ -838,11 +933,10 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
             }));
         }
 
-        let isRelative = false;
-
+        const initFiltered = filterByRange(data.dates, data.series, currentRange);
         const chart = new Chart(canvas.getContext('2d'), {
             type: 'line',
-            data: { datasets: makeDatasets(false) },
+            data: { datasets: makeDatasets(false, initFiltered) },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
@@ -899,13 +993,26 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
             }
         });
 
+        function updateChart() {
+            const filtered = filterByRange(data.dates, data.series, currentRange);
+            chart.data.datasets = makeDatasets(isRelative, filtered);
+            chart.options.scales.y.max = isRelative ? 100 : undefined;
+            chart.options.scales.y.ticks.stepSize = isRelative ? 10 : 1;
+            chart.update();
+        }
+
         document.querySelectorAll('input[name="timelineMode"]').forEach(radio => {
             radio.addEventListener('change', function() {
                 isRelative = this.value === 'relative';
-                chart.data.datasets = makeDatasets(isRelative);
-                chart.options.scales.y.max = isRelative ? 100 : undefined;
-                chart.options.scales.y.ticks.stepSize = isRelative ? 10 : 1;
-                chart.update();
+                updateChart();
+            });
+        });
+
+        document.querySelectorAll('input[name="timelineRange"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                currentRange = this.value;
+                try { localStorage.setItem('librarium_timeline_range', currentRange); } catch (e) {}
+                updateChart();
             });
         });
     } catch (e) {
