@@ -41,24 +41,8 @@ from flask import (
 )
 
 # ── Paths ────────────────────────────────────────────────────────────────
-import platform as _platform
-
 BASE_DIR = Path(__file__).resolve().parent
-
-def _get_app_data_dir() -> Path:
-    """Return the platform-appropriate application data directory."""
-    system = _platform.system()
-    if system == "Windows":
-        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    elif system == "Darwin":
-        base = Path.home() / "Library" / "Application Support"
-    else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    return base / "Librarium"
-
-# In development (not packaged), use ./data for backward compatibility
-_is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
-DATA_DIR = _get_app_data_dir() if _is_electron else BASE_DIR / "data"
+DATA_DIR = BASE_DIR / "data"
 BACKUP_DIR = DATA_DIR / "backups"
 USERS_FILE = DATA_DIR / "users.json"
 MAX_BACKUPS = 5
@@ -66,7 +50,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.11.0"
+APP_VERSION = "0.12.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -1311,6 +1295,7 @@ def inject_library_context():
             "app_version": APP_VERSION,
             "current_user": current_user,
             "backup_dir": backup_dir,
+            "db_path": str(DB_PATH),
         }
     except Exception:
         return {
@@ -1319,6 +1304,7 @@ def inject_library_context():
             "app_version": APP_VERSION,
             "current_user": request.cookies.get("librarium_user", "") if request else "",
             "backup_dir": str(BACKUP_DIR),
+            "db_path": str(DB_PATH),
         }
 
 
@@ -1660,7 +1646,7 @@ def _build_index_per_reading(db, lib_id):
     book_rows = db.execute(
         "SELECT id, name, subtitle, author, status, pages, starting_page, "
         "has_cover, cover_hash, publisher, language, publication_date, "
-        "work_id, format, total_time_seconds FROM books WHERE library_id = ?",
+        "work_id, format, total_time_seconds, tags FROM books WHERE library_id = ?",
         (lib_id,),
     ).fetchall()
     bk_map = {r["id"]: dict(r) for r in book_rows}
@@ -1795,6 +1781,7 @@ def _build_index_per_reading(db, lib_id):
             "publication_date": bk.get("publication_date", "") or "",
             "edition_count": edition_count,
             "reading_number": rnum,
+            "tags": bk.get("tags", "") or "",
         })
 
     # Only show reading_number when a book appears more than once
@@ -1818,6 +1805,7 @@ def index():
     status_filter = request.args.get("status_filter") or request.cookies.get("librarium_status_filter", "all")
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_show_editions", "0")
     show_readings = request.args.get("show_readings") or request.cookies.get("librarium_show_readings", "0")
+    tag_filter = request.args.get("tag", "").strip()
     if show_editions != "1":
         show_readings = "0"
 
@@ -1842,6 +1830,7 @@ def index():
             b.work_id,
             b.format,
             b.total_time_seconds,
+            b.tags,
             COALESCE(sess.total_pages, 0)   AS session_pages,
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
@@ -1968,6 +1957,7 @@ def index():
                 "publication_date": r["publication_date"] or "",
                 "edition_count": edition_count,
                 "reading_number": None,
+                "tags": r["tags"] or "",
             })
 
     # Sorting helpers
@@ -2040,6 +2030,10 @@ def index():
     if status_filter and status_filter != "all":
         books = [b for b in books if b["status"] == status_filter]
 
+    if tag_filter:
+        tag_lower = tag_filter.lower()
+        books = [b for b in books if tag_lower in [t.strip().lower() for t in b.get("tags", "").split(";") if t.strip()]]
+
     if sort2 and sort2 != sort1:
         books.sort(key=lambda b: _sort_key_for(sort1, b) + _sort_key_for(sort2, b))
     else:
@@ -2062,6 +2056,7 @@ def index():
         owned_count=owned_count,
         show_editions=show_editions,
         show_readings=show_readings,
+        tag_filter=tag_filter,
     ))
     # Persist preferences in cookies (1 year expiry)
     resp.set_cookie("librarium_sort1", sort1, max_age=365*24*3600, samesite="Lax")
@@ -3322,6 +3317,8 @@ def authors_list():
             "status": r["status"],
         }
         for author in individual_authors:
+            if author.lower() == "anonymous":
+                continue
             author_map.setdefault(author, []).append(book_entry)
 
     sort = request.args.get("sort", "name")

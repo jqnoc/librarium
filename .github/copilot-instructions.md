@@ -22,7 +22,7 @@ server as a child process and displays it in a native window. There is
 | Entry point (Electron) | `main.js` |
 | Entry point (Backend) | `app.py` |
 | Version | Defined in `APP_VERSION` (`app.py`) and `package.json` |
-| Database | SQLite at `data/librarium.db` (WAL mode) |
+| Database | SQLite per-user DBs in `data/` folder (WAL mode) |
 | Python | 3.12+ |
 | Node.js | 18+ |
 | Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
@@ -384,7 +384,8 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/author_detail.html` | Author detail |
 | `templates/edit_author.html` | Edit author form |
 | `templates/sources.html` | Source management |
-| `data/librarium.db` | SQLite database (gitignored) |
+| `data/*.db` | Per-user SQLite databases (gitignored) |
+| `data/users.json` | User accounts and preferences (gitignored) |
 | `data/backups/` | Automatic daily backups |
 
 ---

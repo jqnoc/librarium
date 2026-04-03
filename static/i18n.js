@@ -29,6 +29,7 @@
         'library.existing':      { en: 'Existing Libraries',    es: 'Bibliotecas Existentes' },
         'library.rename':        { en: 'Rename',                es: 'Renombrar' },
         'library.delete':        { en: 'Delete',                es: 'Eliminar' },
+        'library.databasePath':  { en: 'Database Path',          es: 'Ruta de la Base de Datos' },
 
         // ── Database backup ──────────────────────────────────────────────────────
         'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },
@@ -79,6 +80,8 @@
         'index.filterNotStarted':{ en: 'Not Started',       es: 'Sin Empezar' },
         'index.filterAbandoned':{ en: 'Abandoned',          es: 'Abandonados' },
         'index.filterDraft':    { en: 'Draft',              es: 'Borradores' },
+        'index.filteringByTag': { en: 'Filtering by tag:',  es: 'Filtrando por etiqueta:' },
+        'index.clearTagFilter': { en: '✕ Clear',            es: '✕ Quitar' },
         'index.sortAlpha':     { en: 'Alphabetically',      es: 'Alfabéticamente' },
         'index.sortAuthor':    { en: 'Author',              es: 'Autor' },
         'index.sortLastSession':{ en: 'Last Reading Session/Period', es: 'Última Sesión/Periodo' },
@@ -115,6 +118,7 @@
         'book.status':          { en: 'Status',              es: 'Estado' },
         'book.pages':           { en: 'Pages',               es: 'Páginas' },
         'book.tags':            { en: 'Tags',                es: 'Etiquetas' },
+        'book.tagsSection':     { en: 'Tags',                es: 'Etiquetas' },
         'book.language':        { en: 'Language',             es: 'Idioma' },
         'book.publisher':       { en: 'Publisher',            es: 'Editorial' },
         'book.pubDate':         { en: 'Publication Date',     es: 'Fecha de Publicación' },

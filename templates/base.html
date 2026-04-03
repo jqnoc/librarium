@@ -142,6 +142,12 @@
                 {% endfor %}
 
                 <hr>
+                <h4 data-i18n="library.databasePath">Database Path</h4>
+                <div style="margin-top: 0.3rem;">
+                    <span style="font-size: 0.82rem; color: var(--lb-text-light); word-break: break-all;" title="{{ db_path }}">{{ db_path }}</span>
+                </div>
+
+                <hr>
                 <h4 data-i18n="backup.title">Database Backup</h4>
                 <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
                     <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>

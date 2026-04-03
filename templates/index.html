@@ -104,6 +104,14 @@
     </div>
 </div>
 
+{% if tag_filter %}
+<div style="margin: 0.75rem 0; padding: 0.5rem 1rem; background: var(--lb-accent-glow); border-radius: var(--lb-radius); display: inline-flex; align-items: center; gap: 0.5rem;">
+    <span data-i18n="index.filteringByTag">Filtering by tag:</span>
+    <span class="tag-bubble" style="cursor: default;">{{ tag_filter }}</span>
+    <a href="{{ url_for('index') }}" style="color: var(--lb-deep-orange); font-weight: 600; text-decoration: none;" data-i18n="index.clearTagFilter">✕ Clear</a>
+</div>
+{% endif %}
+
 <script>
 // Load saved view preference
 window.addEventListener('DOMContentLoaded', function() {
@@ -129,6 +137,11 @@ function updateSort() {
     let url = `/?sort1=${sort1}&status_filter=${statusFilter}&show_editions=${showEditions}&show_readings=${showReadings}`;
     if (sort2) {
         url += `&sort2=${sort2}`;
+    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const tagParam = urlParams.get('tag');
+    if (tagParam) {
+        url += `&tag=${encodeURIComponent(tagParam)}`;
     }
     window.location.href = url;
 }

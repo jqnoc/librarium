@@ -1064,6 +1064,30 @@ select.form-control { cursor: pointer; }
     border: 1px solid #FFE082;
 }
 
+/* ── Tag bubbles ───────────────────────────────────────────────────────── */
+.tag-bubbles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1.5rem;
+}
+.tag-bubble {
+    display: inline-block;
+    padding: .3rem .85rem;
+    border-radius: 100px;
+    background: var(--lb-deep-orange);
+    color: var(--lb-white);
+    font-size: .85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background .15s, transform .1s;
+}
+.tag-bubble:hover {
+    background: var(--lb-orange);
+    color: var(--lb-white);
+    transform: translateY(-1px);
+}
+
 /* ── View switcher ─────────────────────────────────────────────────────── */
 .view-switcher {
     display: inline-flex;

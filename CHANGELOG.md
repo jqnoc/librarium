@@ -5,6 +5,24 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-04-03
+
+### Added
+- Database path is now always `data/` inside the project folder, both in
+  Electron and development mode (`_get_app_data_dir()` removed).
+- Database path is displayed as a non-editable label in the Manage
+  Libraries dialog.
+- Tags section on book detail page: tags are shown as clickable bubbles
+  after the Ratings section, sorted alphabetically. Clicking a tag
+  filters the library index to books sharing that tag.
+- Tag filter banner on the library index page with a clear button.
+
+### Changed
+- "Anonymous" authors are no longer rendered as hyperlinks in book detail
+  metadata and are excluded from the Authors listing page.
+- Copilot instructions updated to reflect `data/` as the canonical
+  database location.
+
 ## [0.11.0] — 2026-04-02
 
 ### Added
