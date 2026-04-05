@@ -50,7 +50,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.14.0"
+APP_VERSION = "0.14.1"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -3415,7 +3415,7 @@ def author_detail(author_name: str):
     edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
         "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
-        f"FROM books WHERE {lf}{edition_filter}f", lp
+        f"FROM books WHERE {lf}{edition_filter}", lp
     ).fetchall()
 
     sort = request.args.get("sort", "date")  # date = original publication date
@@ -3642,7 +3642,7 @@ def series_detail(series_id: int):
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     series_row = db.execute(
-        f"SELECT * FROM series WHERE id = ? AND {lf}", (series_id) + lp
+        f"SELECT * FROM series WHERE id = ? AND {lf}", (series_id,) + lp
     ).fetchone()
     if not series_row:
         abort(404)
@@ -3655,7 +3655,7 @@ def series_detail(series_id: int):
         JOIN book_series bs ON bs.book_id = b.id
         WHERE bs.series_id = ? AND {lf_b}
               AND (b.work_id IS NULL OR b.is_primary_edition = 1)
-    """, (series_id) + lp_b).fetchall()
+    """, (series_id,) + lp_b).fetchall()
 
     books = []
     for r in rows:
@@ -3719,8 +3719,8 @@ def delete_series(series_id: int):
         DELETE FROM book_series WHERE series_id = ? AND book_id IN (
             SELECT id FROM books WHERE {lf}
         )
-    """, (series_id) + lp)
-    db.execute(f"DELETE FROM series WHERE id = ? AND {lf}", (series_id) + lp)
+    """, (series_id,) + lp)
+    db.execute(f"DELETE FROM series WHERE id = ? AND {lf}", (series_id,) + lp)
     db.commit()
     flash("Series deleted.", "success")
     return redirect(url_for("series_list"))
@@ -4166,7 +4166,7 @@ def book_detail(book_id: str):
     exclude_ids = [e["id"] for e in editions] if editions else [book_id]
     ph = ",".join("?" * len(exclude_ids))
     all_linkable_books = db.execute(
-        f"SELECT id, name, language FROM books WHERE {lf} AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASEf",
+        f"SELECT id, name, language FROM books WHERE library_id = ? AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASE",
         [info["library_id"]] + exclude_ids,
     ).fetchall()
 
