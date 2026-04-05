@@ -125,15 +125,6 @@
             </div>
         </div>
     </div>
-    <!-- Tags word cloud -->
-    {% if tag_counts %}
-    <div class="card">
-        <div class="card-body">
-            <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.tagCloud">Tag Cloud</h3>
-            <div id="tagCloud" class="word-cloud"></div>
-        </div>
-    </div>
-    {% endif %}
     <div class="library-charts-grid">
         <div class="card">
             <div class="card-body">
@@ -200,6 +191,16 @@
             </select>
         </div>
         <canvas id="topAuthorsChart" style="max-height: 350px;"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tags word cloud -->
+{% if tag_counts %}
+<div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.tagCloud">Tag Cloud</h3>
+        <div id="tagCloud" class="word-cloud"></div>
     </div>
 </div>
 {% endif %}

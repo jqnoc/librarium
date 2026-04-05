@@ -50,7 +50,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.12.0"
+APP_VERSION = "0.13.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -1260,11 +1260,13 @@ def close_db(exc):
 
 # ── Library helpers ──────────────────────────────────────────────────────
 def _get_current_library_id() -> int:
-    """Return the active library ID from cookie, falling back to the first library."""
+    """Return the active library ID from cookie (0 = All), falling back to the first library."""
     raw = request.cookies.get("librarium_library", "")
     if raw:
         try:
             lib_id = int(raw)
+            if lib_id == 0:
+                return 0  # "All libraries" pseudo-selection
             db = get_db()
             if db.execute("SELECT 1 FROM libraries WHERE id = ?", (lib_id,)).fetchone():
                 return lib_id
@@ -1275,22 +1277,40 @@ def _get_current_library_id() -> int:
     return row["id"] if row else 1
 
 
+def _lib_filter(lib_id: int, col: str = "library_id") -> tuple[str, tuple]:
+    """Return (sql_condition, params) for optional library filtering.
+
+    When *lib_id* is 0 ("All libraries"), the condition is always true.
+    Otherwise it restricts to the given library.
+    """
+    if lib_id == 0:
+        return ("1=1", ())
+    return (f"{col} = ?", (lib_id,))
+
+
 @app.context_processor
 def inject_library_context():
     """Make current_library and all_libraries available in every template."""
     try:
         db = get_db()
         lib_id = _get_current_library_id()
-        current_lib = db.execute(
-            "SELECT * FROM libraries WHERE id = ?", (lib_id,)
-        ).fetchone()
+        if lib_id == 0:
+            current_lib = None
+        else:
+            current_lib = db.execute(
+                "SELECT * FROM libraries WHERE id = ?", (lib_id,)
+            ).fetchone()
         all_libs = db.execute(
             "SELECT * FROM libraries ORDER BY id"
         ).fetchall()
         current_user = request.cookies.get("librarium_user", "")
         backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
+        cur_lib_dict = dict(current_lib) if current_lib else (
+            {"id": 0, "name": "All", "slug": "all"} if lib_id == 0
+            else {"id": 1, "name": "Books", "slug": "books"}
+        )
         return {
-            "current_library": dict(current_lib) if current_lib else {"id": 1, "name": "Books", "slug": "books"},
+            "current_library": cur_lib_dict,
             "all_libraries": [dict(l) for l in all_libs],
             "app_version": APP_VERSION,
             "current_user": current_user,
@@ -1548,8 +1568,9 @@ def _collect_languages() -> list[str]:
     """Return a sorted list of unique languages used in the current library."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
     langs: set[str] = set()
-    for row in db.execute("SELECT language, original_language FROM books WHERE library_id = ?", (lib_id,)).fetchall():
+    for row in db.execute(f"SELECT language, original_language FROM books WHERE {lf}", lp).fetchall():
         for val in (row["language"], row["original_language"]):
             if val and val.strip():
                 langs.add(val.strip())
@@ -1560,12 +1581,15 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     """Scan books in the current library and return unique values per field."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     # Only query the columns we need
     safe_fields = [f for f in fields if re.match(r'^[a-z_]+$', f)]
     if not safe_fields:
         return {}
     cols = ", ".join(safe_fields)
-    rows = db.execute(f"SELECT {cols} FROM books WHERE library_id = ?", (lib_id,)).fetchall()
+    lf, lp = _lib_filter(lib_id)
+    rows = db.execute(f"SELECT {cols} FROM books WHERE {lf}", lp).fetchall()
     buckets: dict[str, set[str]] = {f: set() for f in safe_fields}
     for row in rows:
         for f in safe_fields:
@@ -1643,11 +1667,12 @@ def _build_index_per_reading(db, lib_id):
     - >1 readings, none finished → show the one with highest priority
       (reading > abandoned > not-started > draft)
     """
+    lf, lp = _lib_filter(lib_id)
     book_rows = db.execute(
-        "SELECT id, name, subtitle, author, status, pages, starting_page, "
-        "has_cover, cover_hash, publisher, language, publication_date, "
-        "work_id, format, total_time_seconds, tags FROM books WHERE library_id = ?",
-        (lib_id,),
+        f"SELECT id, name, subtitle, author, status, pages, starting_page, "
+        f"has_cover, cover_hash, publisher, language, publication_date, "
+        f"work_id, format, total_time_seconds, tags FROM books WHERE {lf}",
+        lp,
     ).fetchall()
     bk_map = {r["id"]: dict(r) for r in book_rows}
     bids = list(bk_map.keys())
@@ -1799,6 +1824,8 @@ def index():
     """Main page – list all books in the current library."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     # Use query params if present, otherwise fall back to cookie, then default
     sort1 = request.args.get("sort1") or request.cookies.get("librarium_sort1", "status")
     sort2 = request.args.get("sort2") or request.cookies.get("librarium_sort2", "last_session")
@@ -1812,6 +1839,7 @@ def index():
     if show_readings == "1":
         books = _build_index_per_reading(db, lib_id)
     else:
+        lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
         edition_filter = " AND (b.work_id IS NULL OR b.is_primary_edition = 1)" if show_editions != "1" else ""
         rows = db.execute(f"""
         SELECT
@@ -1892,8 +1920,8 @@ def index():
                 SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
             ) GROUP BY book_id
         ) pct ON pct.book_id = b.id
-        WHERE b.library_id = ?{edition_filter}
-    """, (lib_id,)).fetchall()
+        WHERE {lf_b}{edition_filter}
+    """, lp_b).fetchall()
 
         books = []
         for r in rows:
@@ -1989,7 +2017,7 @@ def index():
     # ── Library ribbon stats (computed from primary editions + standalone books) ──
     all_rows = db.execute(
         "SELECT author, pages, starting_page, status, source_type, work_id FROM books "
-        "WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
+        f"WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
     ).fetchall()
     unique_authors: set[str] = set()
     total_library_pages = 0
@@ -2014,12 +2042,12 @@ def index():
     finished_count = db.execute(
         "SELECT COUNT(DISTINCT COALESCE(b.work_id, b.id)) FROM books b "
         "JOIN readings r ON r.book_id = b.id "
-        "WHERE b.library_id = ? AND r.status = 'finished'", (lib_id,)
+        f"WHERE {lf_b} AND r.status = 'finished'", lp_b
     ).fetchone()[0]
 
     # Books Owned = distinct editions (not works) with source_type = 'owned'
     owned_count = db.execute(
-        "SELECT COUNT(*) FROM books WHERE library_id = ? AND source_type = 'owned'", (lib_id,)
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND source_type = 'owned'", lp
     ).fetchone()[0]
 
     # Total time read across all books (sessions + estimated period time)
@@ -2091,6 +2119,7 @@ def _compute_status_timeline(db, lib_id):
 
     today = _date.today()
     today_s = today.isoformat()
+    lf, lp = _lib_filter(lib_id)
     STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
     # Sort key: lower = processed first on the same date
     _STATUS_ORDER = {"not-started": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
@@ -2098,9 +2127,9 @@ def _compute_status_timeline(db, lib_id):
     # ── 1. Representative books (primary or standalone) ──────────────────
     books = db.execute(
         "SELECT id, status, purchase_date, borrowed_start, work_id "
-        "FROM books WHERE library_id = ? "
+        f"FROM books WHERE {lf} "
         "AND (work_id IS NULL OR is_primary_edition = 1)",
-        (lib_id,),
+        lp,
     ).fetchall()
     if not books:
         return {"dates": [], "series": {s: [] for s in STATUSES}}
@@ -2264,19 +2293,21 @@ def global_stats():
     """Global statistics page – aggregate reading stats for the current library."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
 
     # Pages by year: sessions + periods
     pages_by_year: dict[str, int] = {}
     for row in db.execute(
         "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.pages) AS p "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        "WHERE s.date != '' AND b.library_id = ? GROUP BY yr", (lib_id,)
+        f"WHERE s.date != '' AND {lf_b} GROUP BY yr", lp_b
     ).fetchall():
         pages_by_year[row["yr"]] = row["p"]
     for row in db.execute(
-        "SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.pages) AS p "
-        "FROM periods p JOIN books b ON b.id = p.book_id "
-        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
+        f"SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.pages) AS p "
+        f"FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY yr", lp_b
     ).fetchall():
         pages_by_year[row["yr"]] = pages_by_year.get(row["yr"], 0) + row["p"]
 
@@ -2285,7 +2316,7 @@ def global_stats():
     finished_readings = db.execute(
         "SELECT r.id, r.book_id FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
+        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
     ).fetchall()
     for fr in finished_readings:
         rid = fr["id"]
@@ -2309,13 +2340,13 @@ def global_stats():
     for row in db.execute(
         "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.duration_seconds) AS t "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        "WHERE s.date != '' AND s.duration_seconds > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
+        f"WHERE s.date != '' AND s.duration_seconds > 0 AND {lf_b} GROUP BY yr", lp_b
     ).fetchall():
         time_by_year[row["yr"]] = row["t"]
     for row in db.execute(
-        "SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.duration_seconds) AS t "
-        "FROM periods p JOIN books b ON b.id = p.book_id "
-        "WHERE p.end_date != '' AND p.duration_seconds > 0 AND b.library_id = ? GROUP BY yr", (lib_id,)
+        f"SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.duration_seconds) AS t "
+        f"FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.end_date != '' AND p.duration_seconds > 0 AND {lf_b} GROUP BY yr", lp_b
     ).fetchall():
         time_by_year[row["yr"]] = time_by_year.get(row["yr"], 0) + row["t"]
 
@@ -2327,7 +2358,7 @@ def global_stats():
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = db.execute(
         "SELECT id, name, status, tags, language, original_language, pages, publisher, has_cover, cover_hash "
-        "FROM books WHERE library_id = ? AND (work_id IS NULL OR is_primary_edition = 1)", (lib_id,)
+        f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
     ).fetchall()
 
     status_counts: dict[str, int] = Counter()
@@ -2402,8 +2433,8 @@ def global_stats():
     reread_row = db.execute(
         "SELECT COALESCE(b.work_id, r.book_id) AS wid, COUNT(*) AS cnt FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE b.library_id = ? GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
-        (lib_id,)
+        f"WHERE {lf_b} GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        lp_b
     ).fetchone()
     most_reread = None
     if reread_row:
@@ -2482,6 +2513,8 @@ def api_cumulative_pages():
     """
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     book_id = request.args.get('book_id')
     year = request.args.get('year')
 
@@ -2497,12 +2530,12 @@ def api_cumulative_pages():
     else:
         q = (
             "SELECT d AS date, SUM(p) AS pages FROM ("
-            "SELECT s.date AS d, SUM(s.pages) AS p FROM sessions s JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ? GROUP BY s.date "
+            f"SELECT s.date AS d, SUM(s.pages) AS p FROM sessions s JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b} GROUP BY s.date "
             "UNION ALL "
-            "SELECT p.end_date AS d, SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY p.end_date"
+            f"SELECT p.end_date AS d, SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date"
             ") GROUP BY d ORDER BY d"
         )
-        params = (lib_id, lib_id)
+        params = (lib_id) + lp_b
 
     rows = db.execute(q, params).fetchall()
 
@@ -2526,6 +2559,8 @@ def api_status_timeline():
     """Return status-count timeseries for the stacked area chart."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     return jsonify(_compute_status_timeline(db, lib_id))
 
 
@@ -2540,6 +2575,8 @@ def api_cumulative_pages_per_book():
     """
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     year = request.args.get('year')
     if not year:
         return jsonify({"error": "year query parameter required"}), 400
@@ -2547,13 +2584,13 @@ def api_cumulative_pages_per_book():
     q = (
         "SELECT s.book_id, d AS date, SUM(p) AS pages FROM ("
         "SELECT s.book_id, s.date AS d, s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
-        "WHERE s.date != '' AND SUBSTR(s.date,1,4) = ? AND b.library_id = ? "
+        f"WHERE s.date != '' AND SUBSTR(s.date,1,4) = ? AND {lf_b} "
         "UNION ALL "
         "SELECT p.book_id, p.end_date AS d, p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
-        "WHERE p.end_date != '' AND p.pages > 0 AND SUBSTR(p.end_date,1,4) = ? AND b.library_id = ? "
+        f"WHERE p.end_date != '' AND p.pages > 0 AND SUBSTR(p.end_date,1,4) = ? AND {lf_b} "
         ") s GROUP BY s.book_id, d ORDER BY s.book_id, d"
     )
-    rows = db.execute(q, (year, lib_id, year, lib_id)).fetchall()
+    rows = db.execute(q, (year, lib_id, year) + lp_b).fetchall()
 
     book_map: dict[str, dict] = {}
     all_dates: set[str] = set()
@@ -2581,13 +2618,13 @@ def api_cumulative_pages_per_book():
         carry_q = (
             "SELECT COALESCE(SUM(p), 0) AS total FROM ("
             "SELECT s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
-            "WHERE s.book_id = ? AND s.date != '' AND s.date < ? AND b.library_id = ? "
+            f"WHERE s.book_id = ? AND s.date != '' AND s.date < ? AND {lf_b} "
             "UNION ALL "
             "SELECT p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
-            "WHERE p.book_id = ? AND p.end_date != '' AND p.pages > 0 AND p.end_date < ? AND b.library_id = ? "
+            f"WHERE p.book_id = ? AND p.end_date != '' AND p.pages > 0 AND p.end_date < ? AND {lf_b} "
             ") s"
         )
-        carry = db.execute(carry_q, (bid, year_start, lib_id, bid, year_start, lib_id)).fetchone()
+        carry = db.execute(carry_q, (bid, year_start, lib_id, bid, year_start) + lp_b).fetchone()
         book_map[bid]['carry_over'] = int(carry['total']) if carry else 0
 
     # Build per-book anchor points so the chart shows a step pattern:
@@ -2678,27 +2715,29 @@ def stats_year(year: str):
     """Yearly statistics page."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
 
     year_sessions = []
-    for row in db.execute("""
+    for row in db.execute(f"""
         SELECT s.date, s.pages, s.duration_seconds, b.name AS book_name
         FROM sessions s
         JOIN books b ON b.id = s.book_id
-        WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
+        WHERE SUBSTR(s.date, 1, 4) = ? AND {lf_b}
         ORDER BY s.date
-    """, (year, lib_id)).fetchall():
+    """, (year,) + lp_b).fetchall():
         year_sessions.append(dict(row))
 
     year_periods = []
     total_period_pages = 0
-    for row in db.execute("""
+    for row in db.execute(f"""
         SELECT p.start_date, p.end_date, p.pages, p.note,
                b.name AS book_name, p.book_id
         FROM periods p
         JOIN books b ON b.id = p.book_id
-        WHERE SUBSTR(p.end_date, 1, 4) = ? AND b.library_id = ?
+        WHERE SUBSTR(p.end_date, 1, 4) = ? AND {lf_b}
         ORDER BY p.end_date
-    """, (year, lib_id)).fetchall():
+    """, (year,) + lp_b).fetchall():
         d = dict(row)
         d["book_id"] = row["book_id"]
         year_periods.append(d)
@@ -2747,14 +2786,14 @@ def stats_year(year: str):
             book_reading_counts[bid].add(rid)
 
     # Sessions in the current year → active dates (per reading)
-    for row in db.execute("""
+    for row in db.execute(f"""
         SELECT s.date, s.book_id, s.reading_id, b.name, b.subtitle, b.cover_color, b.status,
                r.reading_number
         FROM sessions s
         JOIN books b ON b.id = s.book_id
         LEFT JOIN readings r ON r.id = s.reading_id
-        WHERE SUBSTR(s.date, 1, 4) = ? AND b.library_id = ?
-    """, (year, lib_id)).fetchall():
+        WHERE SUBSTR(s.date, 1, 4) = ? AND {lf_b}
+    """, (year,) + lp_b).fetchall():
         bid = row["book_id"]
         rid = row["reading_id"] or "__none__"
         _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
@@ -2764,14 +2803,14 @@ def stats_year(year: str):
             pass
 
     # Periods overlapping the current year → expand into active dates (per reading)
-    for row in db.execute("""
+    for row in db.execute(f"""
         SELECT p.start_date, p.end_date, p.book_id, p.reading_id, b.name, b.subtitle, b.cover_color, b.status,
                r.reading_number
         FROM periods p
         JOIN books b ON b.id = p.book_id
         LEFT JOIN readings r ON r.id = p.reading_id
-        WHERE p.end_date >= ? AND p.start_date <= ? AND b.library_id = ?
-    """, (f"{year}-01-01", f"{year}-12-31", lib_id)).fetchall():
+        WHERE p.end_date >= ? AND p.start_date <= ? AND {lf_b}
+    """, (f"{year}-01-01", f"{year}-12-31") + lp_b).fetchall():
         bid = row["book_id"]
         rid = row["reading_id"] or "__none__"
         _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
@@ -2928,12 +2967,12 @@ def stats_year(year: str):
     data_years = set()
     for row in db.execute(
         "SELECT DISTINCT SUBSTR(s.date, 1, 4) AS yr FROM sessions s "
-        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
+        f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
     ).fetchall():
         data_years.add(row["yr"])
     for row in db.execute(
         "SELECT DISTINCT SUBSTR(p.end_date, 1, 4) AS yr FROM periods p "
-        "JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND b.library_id = ?", (lib_id,)
+        f"JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND {lf_b}", lp_b
     ).fetchall():
         data_years.add(row["yr"])
     sorted_years = sorted(data_years)
@@ -2965,17 +3004,19 @@ def stats_year_books(year: str):
     """Display all books/readings finished in a specific year with their covers."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     sort = request.args.get("sort", "date")
     if sort not in ("alpha", "author", "date", "rating"):
         sort = "date"
 
-    finished_readings = db.execute("""
+    finished_readings = db.execute(f"""
         SELECT r.id AS reading_id, r.book_id, r.reading_number,
                b.name, b.subtitle, b.author, b.has_cover, b.cover_hash
         FROM readings r
         JOIN books b ON b.id = r.book_id
-        WHERE r.status = 'finished' AND b.library_id = ?
-    """, (lib_id,)).fetchall()
+        WHERE r.status = 'finished' AND {lf_b}
+    """, lp_b).fetchall()
 
     # Count total readings per book to know when to show reading number
     readings_per_book: dict[str, int] = {}
@@ -3056,13 +3097,15 @@ def activity():
     """Activity dashboard – reading habits, trends, and streaks."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
 
     # 1. Daily session aggregates (all time)
     daily_sessions: dict[str, dict] = {}
     for row in db.execute(
         "SELECT s.date, SUM(s.pages) AS pages, SUM(s.duration_seconds) AS seconds "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        "WHERE s.date != '' AND b.library_id = ? GROUP BY s.date", (lib_id,)
+        f"WHERE s.date != '' AND {lf_b} GROUP BY s.date", lp_b
     ).fetchall():
         daily_sessions[row["date"]] = {"pages": row["pages"], "seconds": row["seconds"]}
 
@@ -3071,7 +3114,7 @@ def activity():
     for row in db.execute(
         "SELECT p.end_date, SUM(p.pages) AS pages "
         "FROM periods p JOIN books b ON b.id = p.book_id "
-        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ? GROUP BY p.end_date", (lib_id,)
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date", lp_b
     ).fetchall():
         daily_periods[row["end_date"]] = row["pages"]
 
@@ -3097,24 +3140,24 @@ def activity():
     session_book_dates: list[dict] = []
     for row in db.execute(
         "SELECT DISTINCT s.date, s.book_id FROM sessions s "
-        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
+        f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
     ).fetchall():
         session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
     for row in db.execute(
         "SELECT DISTINCT p.end_date AS date, p.book_id "
         "FROM periods p JOIN books b ON b.id = p.book_id "
-        "WHERE p.end_date != '' AND p.pages > 0 AND b.library_id = ?", (lib_id,)
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b}", lp_b
     ).fetchall():
         session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
 
     # 4. Book lookup (id → {name, has_cover})
     all_books: dict[str, dict] = {}
-    for row in db.execute("SELECT id, name, has_cover, cover_hash FROM books WHERE library_id = ?", (lib_id,)).fetchall():
+    for row in db.execute(f"SELECT id, name, has_cover, cover_hash FROM books WHERE {lf}", lp).fetchall():
         all_books[row["id"]] = {"name": row["name"], "has_cover": bool(row["has_cover"]), "cover_hash": row["cover_hash"] or ""}
 
     # 5. Books currently being read (for estimated finish dates)
     reading_books: list[dict] = []
-    for row in db.execute("""
+    for row in db.execute(f"""
         SELECT b.id, b.name, b.pages, b.starting_page, b.has_cover, b.cover_hash,
                b.format,
                COALESCE(s.tp, 0) AS session_pages,
@@ -3137,8 +3180,8 @@ def activity():
                 SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
             ) GROUP BY book_id
         ) pct ON pct.book_id = b.id
-        WHERE b.status = 'reading' AND b.library_id = ?
-    """, (lib_id,)).fetchall():
+        WHERE b.status = 'reading' AND {lf_b}
+    """, lp_b).fetchall():
         sp = row["starting_page"] or 0
         tp = row["pages"] or 0
         eff = tp - sp if sp > 0 else tp
@@ -3187,7 +3230,7 @@ def activity():
     for row in db.execute(
         "SELECT s.date, s.pages, s.duration_seconds, s.book_id "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        "WHERE s.date != '' AND b.library_id = ? ORDER BY s.date", (lib_id,)
+        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date", lp_b
     ).fetchall():
         all_sessions.append({
             "date": row["date"],
@@ -3199,13 +3242,13 @@ def activity():
     # 8. Aggregate totals for records
     row = db.execute(
         "SELECT COALESCE(SUM(s.pages),0) AS p, COALESCE(SUM(s.duration_seconds),0) AS s "
-        "FROM sessions s JOIN books b ON b.id = s.book_id WHERE b.library_id = ?", (lib_id,)
+        f"FROM sessions s JOIN books b ON b.id = s.book_id WHERE {lf_b}", lp_b
     ).fetchone()
     total_all_session_pages = row["p"]
     total_all_session_seconds = row["s"]
     row = db.execute(
         "SELECT COALESCE(SUM(p.pages),0) AS p FROM periods p "
-        "JOIN books b ON b.id = p.book_id WHERE b.library_id = ?", (lib_id,)
+        f"JOIN books b ON b.id = p.book_id WHERE {lf_b}", lp_b
     ).fetchone()
     total_all_period_pages = row["p"]
     total_all_pages = total_all_session_pages + total_all_period_pages
@@ -3214,14 +3257,14 @@ def activity():
     books_finished_count = db.execute(
         "SELECT COUNT(DISTINCT COALESCE(b.work_id, b.id)) AS c FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE r.status = 'finished' AND b.library_id = ?", (lib_id,)
+        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
     ).fetchone()["c"]
 
     # Books active per day (for most-books-in-parallel record)
     books_per_day: dict[str, set] = {}
     for row in db.execute(
         "SELECT DISTINCT s.date, s.book_id FROM sessions s "
-        "JOIN books b ON b.id = s.book_id WHERE s.date != '' AND b.library_id = ?", (lib_id,)
+        f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
     ).fetchall():
         books_per_day.setdefault(row["date"], set()).add(row["book_id"])
     most_parallel = {"count": 0, "date": ""}
@@ -3231,15 +3274,15 @@ def activity():
 
     # 9. Longest finished book & most re-read book (for personal records)
     longest_finished_book = None
-    finished_books = db.execute("""
+    finished_books = db.execute(f"""
         SELECT DISTINCT b.id, b.name, b.pages, b.has_cover
         FROM books b
         JOIN readings r ON r.book_id = b.id
-        WHERE r.status = 'finished' AND b.pages > 0 AND b.library_id = ?
+        WHERE r.status = 'finished' AND b.pages > 0 AND {lf_b}
           AND (b.work_id IS NULL OR b.is_primary_edition = 1)
         ORDER BY b.pages DESC
         LIMIT 1
-    """, (lib_id,)).fetchone()
+    """, lp_b).fetchone()
     if finished_books:
         longest_finished_book = {
             "name": finished_books["name"],
@@ -3251,8 +3294,8 @@ def activity():
     reread_row = db.execute(
         "SELECT COALESCE(b.work_id, r.book_id) AS wid, COUNT(*) AS cnt FROM readings r "
         "JOIN books b ON b.id = r.book_id "
-        "WHERE b.library_id = ? GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
-        (lib_id,)
+        f"WHERE {lf_b} GROUP BY wid HAVING cnt > 1 ORDER BY cnt DESC LIMIT 1",
+        lp_b
     ).fetchone()
     if reread_row:
         rbk = db.execute(
@@ -3294,7 +3337,9 @@ def authors_list():
     """Display a list of all authors with their book counts."""
     db = get_db()
     lib_id = _get_current_library_id()
-    rows = db.execute("SELECT id, name, author, has_cover, cover_hash, status FROM books WHERE library_id = ?", (lib_id,)).fetchall()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    rows = db.execute(f"SELECT id, name, author, has_cover, cover_hash, status FROM books WHERE {lf}", lp).fetchall()
 
     # Build a map of author names that have photos → photo_hash
     author_photo_info: dict[str, str] = {}
@@ -3340,11 +3385,13 @@ def author_detail(author_name: str):
     """Display all books by a given author, plus author metadata."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_author_show_editions", "0")
     edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
         "SELECT id, name, subtitle, author, has_cover, cover_hash, status, original_publication_date "
-        f"FROM books WHERE library_id = ?{edition_filter}", (lib_id,)
+        f"FROM books WHERE {lf}{edition_filter}f", lp
     ).fetchall()
 
     sort = request.args.get("sort", "date")  # date = original publication date
@@ -3519,17 +3566,20 @@ def series_list():
     """Display all series in the current library."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lf_s, lp_s = _lib_filter(lib_id, "s.library_id")
 
-    rows = db.execute("""
+    rows = db.execute(f"""
         SELECT s.id, s.name,
                COUNT(CASE WHEN b.work_id IS NULL OR b.is_primary_edition = 1 THEN 1 END) AS book_count
         FROM series s
         LEFT JOIN book_series bs ON bs.series_id = s.id
         LEFT JOIN books b ON b.id = bs.book_id
-        WHERE s.library_id = ?
+        WHERE {lf_s}
         GROUP BY s.id
         ORDER BY s.name COLLATE NOCASE
-    """, (lib_id,)).fetchall()
+    """, lp_s).fetchall()
 
     series = []
     for r in rows:
@@ -3564,22 +3614,24 @@ def series_detail(series_id: int):
     """Display all books in a series, ordered by series index."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
 
     series_row = db.execute(
-        "SELECT * FROM series WHERE id = ? AND library_id = ?", (series_id, lib_id)
+        f"SELECT * FROM series WHERE id = ? AND {lf}", (series_id) + lp
     ).fetchone()
     if not series_row:
         abort(404)
     series_info = dict(series_row)
 
-    rows = db.execute("""
+    rows = db.execute(f"""
         SELECT b.id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, b.status,
                b.original_publication_date, bs.series_index
         FROM books b
         JOIN book_series bs ON bs.book_id = b.id
-        WHERE bs.series_id = ? AND b.library_id = ?
+        WHERE bs.series_id = ? AND {lf_b}
               AND (b.work_id IS NULL OR b.is_primary_edition = 1)
-    """, (series_id, lib_id)).fetchall()
+    """, (series_id) + lp_b).fetchall()
 
     books = []
     for r in rows:
@@ -3619,12 +3671,14 @@ def rename_series(series_id: int):
     """Rename a series."""
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     new_name = request.form.get("name", "").strip()
     if not new_name:
         flash("Series name cannot be empty.", "error")
         return redirect(url_for("series_detail", series_id=series_id))
-    db.execute("UPDATE series SET name = ? WHERE id = ? AND library_id = ?",
-               (new_name, series_id, lib_id))
+    db.execute(f"UPDATE series SET name = ? WHERE id = ? AND {lf}",
+               (new_name, series_id) + lp)
     db.commit()
     flash("Series renamed.", "success")
     return redirect(url_for("series_detail", series_id=series_id))
@@ -3635,12 +3689,14 @@ def delete_series(series_id: int):
     """Delete a series (unlinks books but doesn't delete them)."""
     db = get_db()
     lib_id = _get_current_library_id()
-    db.execute("""
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    db.execute(f"""
         DELETE FROM book_series WHERE series_id = ? AND book_id IN (
-            SELECT id FROM books WHERE library_id = ?
+            SELECT id FROM books WHERE {lf}
         )
-    """, (series_id, lib_id))
-    db.execute("DELETE FROM series WHERE id = ? AND library_id = ?", (series_id, lib_id))
+    """, (series_id) + lp)
+    db.execute(f"DELETE FROM series WHERE id = ? AND {lf}", (series_id) + lp)
     db.commit()
     flash("Series deleted.", "success")
     return redirect(url_for("series_list"))
@@ -4086,7 +4142,7 @@ def book_detail(book_id: str):
     exclude_ids = [e["id"] for e in editions] if editions else [book_id]
     ph = ",".join("?" * len(exclude_ids))
     all_linkable_books = db.execute(
-        f"SELECT id, name, language FROM books WHERE library_id = ? AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASE",
+        f"SELECT id, name, language FROM books WHERE {lf} AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASEf",
         [info["library_id"]] + exclude_ids,
     ).fetchall()
 
@@ -4222,6 +4278,8 @@ def save_ratings(book_id: str):
 def edit_metadata(book_id: str):
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
@@ -4243,6 +4301,10 @@ def edit_metadata(book_id: str):
             info["binding"] = ""
         if info["format"] != "audiobook":
             info["audio_format"] = ""
+        # Library move
+        new_lib_id = request.form.get("library_id", "").strip()
+        if new_lib_id and new_lib_id.isdigit():
+            info["library_id"] = int(new_lib_id)
         pages_str = request.form.get("pages", "0").strip()
         info["pages"] = int(pages_str) if pages_str.isdigit() else 0
         starting_page_str = request.form.get("starting_page", "0").strip()
@@ -4295,14 +4357,14 @@ def edit_metadata(book_id: str):
             if not s_name:
                 continue
             existing = db.execute(
-                "SELECT id FROM series WHERE name = ? AND library_id = ?",
-                (s_name, lib_id)
+                f"SELECT id FROM series WHERE name = ? AND {lf}",
+                (s_name,) + lp
             ).fetchone()
             if existing:
                 sid = existing["id"]
             else:
                 db.execute("INSERT INTO series (name, library_id) VALUES (?, ?)",
-                           (s_name, lib_id))
+                           (s_name, info["library_id"]))
                 db.commit()
                 sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
             db.execute(
@@ -4319,7 +4381,8 @@ def edit_metadata(book_id: str):
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
-                format=?, binding=?, audio_format=?, total_time_seconds=?
+                format=?, binding=?, audio_format=?, total_time_seconds=?,
+                library_id=?
             WHERE id=?
         """, (
             info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
@@ -4336,6 +4399,7 @@ def edit_metadata(book_id: str):
             info["is_gift"],
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
+            info["library_id"],
             book_id,
         ))
         db.commit()
@@ -4389,7 +4453,7 @@ def edit_metadata(book_id: str):
 
     # Fetch all series for autocomplete and current book's series
     all_series = [dict(r) for r in db.execute(
-        "SELECT id, name FROM series WHERE library_id = ? ORDER BY name COLLATE NOCASE", (lib_id,)
+        f"SELECT id, name FROM series WHERE {lf} ORDER BY name COLLATE NOCASE", lp
     ).fetchall()]
     book_series_entries = [dict(r) for r in db.execute("""
         SELECT s.name, bs.series_index
@@ -4682,6 +4746,8 @@ def isbn_lookup():
 def new_book():
     db = get_db()
     lib_id = _get_current_library_id()
+    lf, lp = _lib_filter(lib_id)
+    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         author = request.form.get("author", "").strip()
@@ -4833,14 +4899,14 @@ def new_book():
             if not s_name:
                 continue
             existing = db.execute(
-                "SELECT id FROM series WHERE name = ? AND library_id = ?",
-                (s_name, lib_id)
+                f"SELECT id FROM series WHERE name = ? AND {lf}",
+                (s_name,) + lp
             ).fetchone()
             if existing:
                 sid = existing["id"]
             else:
                 db.execute("INSERT INTO series (name, library_id) VALUES (?, ?)",
-                           (s_name, lib_id))
+                           (s_name, lib_id if lib_id else 1))
                 db.commit()
                 sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
             db.execute(
@@ -4870,7 +4936,7 @@ def new_book():
         "translator", "illustrator", "editor", "prologue_author",
     )
     all_series = [dict(r) for r in db.execute(
-        "SELECT id, name FROM series WHERE library_id = ? ORDER BY name COLLATE NOCASE", (lib_id,)
+        f"SELECT id, name FROM series WHERE {lf} ORDER BY name COLLATE NOCASE", lp
     ).fetchall()]
 
     # Pre-fill for "new edition" flow
@@ -4986,8 +5052,14 @@ def delete_source(source_id: str):
 
 @app.route("/library/switch", methods=["POST"])
 def switch_library():
-    """Switch the active library (stores choice in a cookie)."""
+    """Switch the active library (stores choice in a cookie). 0 = All."""
     lib_id = request.form.get("library_id", "")
+    if lib_id == "0":
+        # "All libraries" pseudo-selection
+        resp = make_response(redirect(request.referrer or url_for("index")))
+        resp.set_cookie("librarium_library", "0", max_age=60 * 60 * 24 * 365 * 5,
+                         samesite="Lax", httponly=True)
+        return resp
     db = get_db()
     row = db.execute("SELECT id FROM libraries WHERE id = ?", (lib_id,)).fetchone()
     if not row:

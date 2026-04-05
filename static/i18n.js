@@ -21,6 +21,7 @@
 
         // ── Library selector / management ───────────────────────────────
         'library.select':        { en: 'Select library',        es: 'Seleccionar biblioteca' },
+        'library.all':           { en: 'All',                   es: 'Todo' },
         'library.manage':        { en: 'Manage libraries',      es: 'Gestionar bibliotecas' },
         'library.manageTitle':   { en: 'Manage Libraries',      es: 'Gestionar Bibliotecas' },
         'library.createNew':     { en: 'Create New Library',    es: 'Crear Nueva Biblioteca' },
@@ -330,6 +331,7 @@
         'bookForm.pages':           { en: 'Pages',               es: 'Páginas' },
         'bookForm.frontmatter':     { en: 'Frontmatter Pages',   es: 'Páginas Preliminares' },
         'bookForm.language':        { en: 'Language',             es: 'Idioma' },
+        'bookForm.library':         { en: 'Library',              es: 'Biblioteca' },
         'bookForm.pubDetails':      { en: 'Publication Details', es: 'Detalles de Publicación' },
         'bookForm.format':          { en: 'Format',             es: 'Formato' },
         'bookForm.formatPaper':     { en: 'Paper Book',         es: 'Libro Físico' },

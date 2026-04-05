@@ -22,6 +22,7 @@
                 <a href="{{ url_for('index') }}">Librarium</a>
                 <form method="POST" action="{{ url_for('switch_library') }}" id="librarySwitchForm" class="library-selector-form">
                     <select name="library_id" id="librarySelector" onchange="document.getElementById('librarySwitchForm').submit()" title="Select library" data-i18n-title="library.select">
+                        <option value="0" {% if current_library.id == 0 %}selected{% endif %} data-i18n="library.all">All</option>
                         {% for lib in all_libraries %}
                         <option value="{{ lib.id }}" {% if lib.id == current_library.id %}selected{% endif %}>{{ lib.name }}</option>
                         {% endfor %}

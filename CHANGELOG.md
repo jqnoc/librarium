@@ -5,6 +5,28 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-04-05
+
+### Added
+- "All" option in the library selector: when selected, all pages and
+  statistics aggregate data across every library in the database.
+- Library selector combobox on the edit-metadata page, allowing a book
+  to be moved from one library to another.
+- `_lib_filter()` helper function for dynamic per-query library
+  filtering (returns pass-through `1=1` in All mode).
+
+### Fixed
+- Tag Cloud section on the global statistics page is now positioned at
+  the end of the page, after Top Authors.
+- Reading Heat Map weekday labels (Mon, Wed, Fri) now align correctly
+  with their corresponding data rows.
+
+### Changed
+- `_get_current_library_id()` returns `0` for the All-libraries
+  pseudo-selection.
+- All library-filtered SQL queries (~46) converted from static
+  `library_id = ?` to dynamic `_lib_filter()` pattern.
+
 ## [0.12.0] — 2026-04-03
 
 ### Added
