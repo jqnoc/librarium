@@ -22,7 +22,7 @@ server as a child process and displays it in a native window. There is
 | Entry point (Electron) | `main.js` |
 | Entry point (Backend) | `app.py` |
 | Version | Defined in `APP_VERSION` (`app.py`) and `package.json` |
-| Database | SQLite per-user DBs in `data/` folder (WAL mode) |
+| Database | SQLite per-user DBs in AppData (WAL mode) |
 | Python | 3.12+ |
 | Node.js | 18+ |
 | Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
@@ -384,9 +384,9 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/author_detail.html` | Author detail |
 | `templates/edit_author.html` | Edit author form |
 | `templates/sources.html` | Source management |
-| `data/*.db` | Per-user SQLite databases (gitignored) |
-| `data/users.json` | User accounts and preferences (gitignored) |
-| `data/backups/` | Automatic daily backups |
+| `data/*.db` | Per-user SQLite databases (AppData, gitignored) |
+| `data/users.json` | User accounts and preferences (AppData, gitignored) |
+| `data/backups/` | Automatic daily backups (AppData) |
 
 ---
 
@@ -476,6 +476,13 @@ Every response that modifies code **must** update `CHANGELOG.md`:
 | `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` |
 
 All three **must** stay in sync after each release.
+
+### Release badge (MANDATORY)
+
+The `README.md` contains a release badge that links to the latest
+GitHub release: `[![GitHub Release](...)](https://github.com/jqnoc/librarium/releases/latest)`.
+When cutting a release, verify the badge is present and points to
+`/releases/latest` (not a specific tag) so it always resolves.
 
 ---
 

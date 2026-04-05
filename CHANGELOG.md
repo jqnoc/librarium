@@ -8,14 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- GitHub Release badge in `README.md`
+- GitHub Release badge in `README.md` linking to the latest release
 - Social preview image (`static/social-preview.png`) for the GitHub
   repository, using the project logo and theme gradient
 - Tag Cloud on the global statistics page now renders tags as clickable
   pill-shaped hyperlinks that filter the library index by tag; most
   frequent tags are highlighted with the accent colour
+- "Building & Releasing" section in `README.md` with step-by-step
+  instructions for building the portable executable, tagging, and
+  creating a GitHub Release
 
 ### Changed
+- User databases and `users.json` are now stored in the platform's
+  application data directory (`%APPDATA%/Librarium` on Windows,
+  `~/Library/Application Support/Librarium` on macOS,
+  `~/.local/share/Librarium` on Linux) instead of a `data/` folder
+  next to the application; existing data is automatically migrated on
+  first run
 - Library multi-select dropdown: clicking a library name now switches to
   that single library; only clicking the checkbox enables multi-selection
 - Library dropdown checkboxes restyled with custom appearance using the
@@ -27,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   go into `[Unreleased]` in the changelog, and versions are cut only on
   explicit request; fixes to unreleased features update existing entries
   instead of adding redundant bullets
+- `README.md` Data Storage section updated to reflect AppData paths;
+  release badge now links to the actual releases page
 
 ## [1.0.0] — 2026-04-05
 

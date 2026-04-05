@@ -1,6 +1,6 @@
 # Librarium
 
-![GitHub Release](https://img.shields.io/github/v/release/jqnoc/librarium)
+[![GitHub Release](https://img.shields.io/github/v/release/jqnoc/librarium)](https://github.com/jqnoc/librarium/releases/latest)
 
 A self-contained **Electron desktop application** for tracking personal
 book reading statistics. The backend is a monolithic Flask app with raw
@@ -158,10 +158,24 @@ group's average, so groups with fewer ratings are not under-weighted.
 
 ## Data Storage
 
-Each user has their own SQLite database inside the `data/` folder.
-User accounts are tracked in `data/users.json`. Cover images, author
-photos, and thumbnails are stored as BLOBs in the database. No external
+All application data is stored in the platform's standard application
+data directory:
+
+| Platform | Path |
+|----------|------|
+| Windows | `%APPDATA%\Librarium\` |
+| macOS | `~/Library/Application Support/Librarium/` |
+| Linux | `~/.local/share/Librarium/` (or `$XDG_DATA_HOME/Librarium/`) |
+
+Each user has their own SQLite database named after their username
+(e.g. user "JqnOC" → `jqnoc.db`). User accounts are tracked in
+`users.json` inside the same directory. Cover images, author photos,
+and thumbnails are stored as BLOBs in the database. No external
 database server required.
+
+On first run after upgrading from an older version, any existing
+`data/` databases next to the application are automatically copied
+to the new location.
 
 ## Project Structure
 
@@ -210,6 +224,10 @@ Librarium/
     └── backups/              # Automatic daily backups
 ```
 
+User databases and `users.json` are stored in the platform's application
+data directory (see [Data Storage](#data-storage)), not inside the
+project folder.
+
 ## Technologies
 
 | Layer | Technology |
@@ -221,6 +239,58 @@ Librarium/
 | Frontend | HTML5, CSS3, vanilla JavaScript (ES6) |
 | Charts | Chart.js 4.4.1 (CDN) + chartjs-adapter-date-fns |
 | Images | Pillow 10.x, pillow-heif 0.16+ (HEIF/AVIF support) |
+
+## Building & Releasing
+
+### Build a portable Windows executable
+
+```powershell
+# Set environment variable to skip code signing (no certificate needed)
+$env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+
+# Build the portable .exe
+npx electron-builder --win
+```
+
+The output is `dist/Librarium <version>.exe` — a single portable
+executable that requires no installation.
+
+### Create a new release
+
+1. **Ensure all changes are committed** on the `dev` branch.
+
+2. **Bump the version** in the three canonical locations:
+   - `APP_VERSION` in `app.py`
+   - `"version"` in `package.json`
+   - Replace `## [Unreleased]` in `CHANGELOG.md` with
+     `## [x.y.z] — YYYY-MM-DD` and add a fresh `## [Unreleased]`
+     above it.
+
+3. **Commit the version bump**:
+   ```powershell
+   git add -A
+   git commit -m "release: x.y.z"
+   ```
+
+4. **Merge to `main` and tag**:
+   ```powershell
+   git checkout main
+   git merge dev
+   git tag -a vx.y.z -m "Librarium vx.y.z"
+   git push origin main --tags
+   git checkout dev
+   ```
+
+5. **Build the portable executable** (see above).
+
+6. **Create a GitHub Release**:
+   - Go to [Releases → Draft a new release](https://github.com/jqnoc/librarium/releases/new)
+   - Select the `vx.y.z` tag
+   - Title: `Librarium vx.y.z`
+   - Paste the changelog entries for this version in the description
+   - Drag and drop the `dist/Librarium x.y.z.exe` file into the assets
+   - Check **Set as the latest release**
+   - Click **Publish release**
 
 ## License
 

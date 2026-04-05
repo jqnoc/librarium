@@ -1,7 +1,8 @@
 """Librarium – a local Flask app for tracking reading statistics.
 
-All data (including cover images) is stored in a SQLite database
-at data/librarium.db.
+All data (including cover images) is stored in per-user SQLite databases
+inside the platform's application data directory (e.g. %APPDATA%/Librarium
+on Windows).
 """
 
 import hashlib
@@ -10,6 +11,7 @@ import json
 import math
 import os
 import re
+import sys
 import shutil
 import sqlite3
 import urllib.error
@@ -42,7 +44,25 @@ from flask import (
 
 # ── Paths ────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+
+
+def _get_data_dir() -> Path:
+    """Return the platform-appropriate application data directory.
+
+    Windows:  %APPDATA%/Librarium
+    macOS:    ~/Library/Application Support/Librarium
+    Linux:    ~/.local/share/Librarium  (XDG_DATA_HOME fallback)
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "Librarium"
+
+
+DATA_DIR = _get_data_dir()
 BACKUP_DIR = DATA_DIR / "backups"
 USERS_FILE = DATA_DIR / "users.json"
 MAX_BACKUPS = 5
@@ -5582,7 +5602,30 @@ def undo_delete_book():
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Migrate legacy data/ folder to AppData ──────────────────────────
+    _legacy_data = BASE_DIR / "data"
+    if _legacy_data.is_dir() and _legacy_data != DATA_DIR:
+        _legacy_users = _legacy_data / "users.json"
+        if _legacy_users.exists() and not USERS_FILE.exists():
+            shutil.copy2(str(_legacy_users), str(USERS_FILE))
+            print(f"[migrate] Copied users.json → {USERS_FILE}")
+        for _dbf in _legacy_data.glob("*.db"):
+            _dest = DATA_DIR / _dbf.name
+            if not _dest.exists():
+                shutil.copy2(str(_dbf), str(_dest))
+                print(f"[migrate] Copied {_dbf.name} → {_dest}")
+        _legacy_backups = _legacy_data / "backups"
+        if _legacy_backups.is_dir():
+            _dest_backups = DATA_DIR / "backups"
+            _dest_backups.mkdir(parents=True, exist_ok=True)
+            for _bk in _legacy_backups.glob("*.db"):
+                _bdest = _dest_backups / _bk.name
+                if not _bdest.exists():
+                    shutil.copy2(str(_bk), str(_bdest))
+        print(f"[migrate] Legacy data/ migration complete. Data is now at: {DATA_DIR}")
+        print(f"[migrate] You may delete the old '{_legacy_data}' folder once verified.")
 
     # Run migrations for every existing user's DB
     users_data = _load_users()

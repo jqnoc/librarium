@@ -2,7 +2,7 @@
   "name": "librarium",
   "version": "1.0.0",
   "description": "A local application for tracking personal book reading statistics",
-  "author": "Joaquín O.C.",
+  "author": "Joaquín Ossorio-Castillo",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
