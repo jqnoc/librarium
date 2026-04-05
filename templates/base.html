@@ -37,10 +37,10 @@
                     </button>
                     <div class="library-multi-dropdown" id="libraryMultiDropdown">
                         {% for lib in all_libraries %}
-                        <label class="library-multi-item">
+                        <div class="library-multi-item">
                             <input type="checkbox" value="{{ lib.id }}" {% if lib.id in selected_library_ids %}checked{% endif %} onchange="onLibraryCheckboxChange()">
-                            <span>{{ lib.name }}</span>
-                        </label>
+                            <span class="library-multi-name" data-lib-id="{{ lib.id }}" onclick="onLibraryNameClick(this, event)">{{ lib.name }}</span>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -82,6 +82,14 @@
                 checked = Array.from(boxes);
             }
             var ids = checked.map(function(cb) { return cb.value; }).join(',');
+            submitLibrarySwitch(ids);
+        }
+        function onLibraryNameClick(el, event) {
+            event.stopPropagation();
+            var id = el.getAttribute('data-lib-id');
+            submitLibrarySwitch(id);
+        }
+        function submitLibrarySwitch(ids) {
             var form = document.createElement('form');
             form.method = 'POST';
             form.action = '{{ url_for("switch_library") }}';

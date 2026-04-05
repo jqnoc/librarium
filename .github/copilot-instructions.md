@@ -436,39 +436,38 @@ feat(stats): add status timeline stacked area chart
 
 ## 11. Versioning & Changelog
 
-The project uses semantic versioning applied per change: every
-code-modifying request or commit that changes the project **must**
-include a version bump and a changelog update. Do **not** aggregate
-multiple requests into a single daily version — each user-requested
-change that modifies the repository gets its own version entry.
+The project uses semantic versioning. Development happens on the `dev`
+branch; releases are merged to `main` and tagged. Version bumps happen
+**only when the user explicitly requests a release** — never
+automatically.
 
-### Rules
+### Changelog rules (MANDATORY)
 
-| Scenario | Action |
-|----------|--------|
-| Commit includes a **feat** change | Bump **minor** (increment middle number), reset patch to 0 |
-| Commit includes only **fix** / **refactor** / **chore** / **docs** changes (no feat) | Bump **patch** (increment last number) |
-| **Major** version (`X.0.0`) | Never changed automatically — bump manually for milestone releases |
+Every response that modifies code **must** update `CHANGELOG.md`:
 
-### Procedure (MANDATORY)
+1. **Add entries to the `## [Unreleased]` section** at the top of the
+   file, using the appropriate sub-heading (`Added`, `Fixed`, `Changed`,
+   `Removed`).
+2. **Do NOT create a new version entry** — only add to `[Unreleased]`.
+3. **Do NOT bump `APP_VERSION`** in `app.py` or `version` in
+   `package.json`. Version bumps are performed only when the user
+   explicitly asks to cut a release.
+4. **Avoid redundancy**: before adding a new bullet, check the existing
+   `[Unreleased]` entries. If a previous bullet already covers the same
+   feature or area and the current change is a fix or refinement of that
+   unreleased work, **update the existing bullet in-place** (or remove
+   it and write a better one) instead of adding a separate "Fixed …"
+   entry. Fixes to unreleased features are not changelog-worthy on their
+   own — the user has never seen the broken state.
+5. When the user requests a release:
+   - Determine the new version (feat → minor bump, fix/refactor/chore →
+     patch bump, major → only on explicit request).
+   - Replace `## [Unreleased]` with `## [x.y.z] — YYYY-MM-DD` and add a
+     fresh empty `## [Unreleased]` above it.
+   - Update `APP_VERSION` in `app.py` and `version` in `package.json`
+     to match.
 
-Every response that modifies code (feature, fix, refactor, chore, docs,
-etc.) **must** perform the following steps before finishing the task:
-
-1. **Determine the new version** — check the current `APP_VERSION` in
-  `app.py`. Decide whether the change is a `feat` (minor bump) or a
-  smaller change (patch bump). Do not wait for the end of the day; the
-  version increments on each change.
-2. **Update `APP_VERSION`** in `app.py` to the new version string.
-3. **Update `version`** in `package.json` to the same string.
-4. **Update `CHANGELOG.md`** — add a new entry for the new version
-  using the Keep a Changelog format (`Added`, `Fixed`, `Changed`,
-  `Removed` sections as needed). Each change must have its own version
-  entry; if multiple small edits were part of the same user-requested
-  change, group them under that single version entry.
-5. Ensure the three version locations are consistent and in sync.
-
-### Version locations
+### Version locations (kept in sync only at release time)
 
 | File | Field |
 |------|-------|
@@ -476,7 +475,7 @@ etc.) **must** perform the following steps before finishing the task:
 | `package.json` | `"version": "x.y.z"` |
 | `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` |
 
-All three **must** stay in sync at all times.
+All three **must** stay in sync after each release.
 
 ---
 

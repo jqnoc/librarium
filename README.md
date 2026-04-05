@@ -1,5 +1,7 @@
 # Librarium
 
+![GitHub Release](https://img.shields.io/github/v/release/jqnoc/librarium)
+
 A self-contained **Electron desktop application** for tracking personal
 book reading statistics. The backend is a monolithic Flask app with raw
 SQLite queries, Jinja2 templates, vanilla JS, and Chart.js for charts.

@@ -5,6 +5,29 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- GitHub Release badge in `README.md`
+- Social preview image (`static/social-preview.png`) for the GitHub
+  repository, using the project logo and theme gradient
+- Tag Cloud on the global statistics page now renders tags as clickable
+  pill-shaped hyperlinks that filter the library index by tag; most
+  frequent tags are highlighted with the accent colour
+
+### Changed
+- Library multi-select dropdown: clicking a library name now switches to
+  that single library; only clicking the checkbox enables multi-selection
+- Library dropdown checkboxes restyled with custom appearance using the
+  Librarium accent colour (`--lb-gold`) instead of the browser default
+  blue
+- `--lb-accent` CSS variable now explicitly defined (`#EC8F8D`) so all
+  accent-coloured controls use the brand colour consistently
+- Copilot instructions: version bumps are no longer automatic — changes
+  go into `[Unreleased]` in the changelog, and versions are cut only on
+  explicit request; fixes to unreleased features update existing entries
+  instead of adding redundant bullets
+
 ## [1.0.0] — 2026-04-05
 
 First stable release.

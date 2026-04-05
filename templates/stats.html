@@ -609,21 +609,19 @@ function renderWordCloud(containerId, countsObj) {
     const maxCount = entries[0][1];
     const minCount = entries[entries.length - 1][1];
     const minFontSize = 0.75;
-    const maxFontSize = 2.8;
-    const accentColor = cssVar('--lb-deep-orange') || '#FF5F00';
-    const textColor = cssVar('--lb-text') || '#374151';
+    const maxFontSize = 1.6;
     container.innerHTML = '';
     entries.forEach(([word, count]) => {
-        const span = document.createElement('span');
-        span.textContent = word;
+        const a = document.createElement('a');
+        a.textContent = word;
+        a.href = '/?tag=' + encodeURIComponent(word);
+        a.className = 'tag-cloud-pill';
         const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
         const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
-        const opacity = 0.5 + ratio * 0.5;
-        span.style.fontSize = fontSize + 'rem';
-        span.style.color = ratio > 0.6 ? accentColor : textColor;
-        span.style.opacity = opacity;
-        span.title = `${word}: ${count}`;
-        container.appendChild(span);
+        a.style.fontSize = fontSize + 'rem';
+        if (ratio > 0.6) a.classList.add('tag-cloud-pill--hot');
+        a.title = `${word}: ${count}`;
+        container.appendChild(a);
     });
 }
 
