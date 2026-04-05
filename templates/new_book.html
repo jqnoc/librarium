@@ -72,7 +72,12 @@
                     </datalist>
                 </div>
                 <div class="form-group">
-                    <!-- Empty column for alignment -->
+                    <label for="library_id" data-i18n="bookForm.library">Library</label>
+                    <select id="library_id" name="library_id" class="form-control">
+                        {% for lib in all_libraries %}
+                        <option value="{{ lib.id }}" {% if lib.id == default_library_id %}selected{% endif %}>{{ lib.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
         </div>

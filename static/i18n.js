@@ -20,8 +20,8 @@
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
 
         // ── Library selector / management ───────────────────────────────
-        'library.select':        { en: 'Select library',        es: 'Seleccionar biblioteca' },
-        'library.all':           { en: 'All',                   es: 'Todo' },
+        'library.select':        { en: 'Select libraries',      es: 'Seleccionar bibliotecas' },
+        'library.allLibraries':  { en: 'All libraries',         es: 'Todas las bibliotecas' },
         'library.manage':        { en: 'Manage libraries',      es: 'Gestionar bibliotecas' },
         'library.manageTitle':   { en: 'Manage Libraries',      es: 'Gestionar Bibliotecas' },
         'library.createNew':     { en: 'Create New Library',    es: 'Crear Nueva Biblioteca' },

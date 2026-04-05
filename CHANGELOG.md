@@ -5,6 +5,29 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-04-05
+
+### Added
+- Multi-library checkbox selector: the library dropdown is now a multi-select
+  checkbox dropdown, allowing any combination of libraries to be active at once.
+- Library selector field on the new-book form, so new books can be assigned
+  to any library regardless of the current view filter.
+- Two new rating groups for visual media (manga, comics, graphic novels, BD):
+  **Visual Art** (6 dimensions) and **Sequential Narrative** (6 dimensions),
+  bringing the total to 51 dimensions across 9 groups.
+
+### Changed
+- `_get_current_library_id()` replaced by `_get_selected_library_ids()`
+  returning a list of selected library IDs.
+- `_lib_filter()` now accepts a list of IDs and generates `IN (?, …)`
+  clauses when multiple libraries are selected.
+- Library selection cookie format changed from single ID to
+  comma-separated list (backward-compatible with old single-ID cookies).
+
+### Removed
+- "All" pseudo-library option (replaced by multi-checkbox selection
+  where all checkboxes checked is equivalent).
+
 ## [0.13.0] — 2026-04-05
 
 ### Added

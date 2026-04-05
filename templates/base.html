@@ -20,14 +20,30 @@
             <div class="site-title">
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium logo" class="site-logo">
                 <a href="{{ url_for('index') }}">Librarium</a>
-                <form method="POST" action="{{ url_for('switch_library') }}" id="librarySwitchForm" class="library-selector-form">
-                    <select name="library_id" id="librarySelector" onchange="document.getElementById('librarySwitchForm').submit()" title="Select library" data-i18n-title="library.select">
-                        <option value="0" {% if current_library.id == 0 %}selected{% endif %} data-i18n="library.all">All</option>
+                <div class="library-multi-select" id="libraryMultiSelect">
+                    <button type="button" class="library-multi-btn" id="libraryMultiBtn" onclick="toggleLibraryDropdown()" title="Select libraries" data-i18n-title="library.select">
+                        <span id="libraryMultiLabel">
+                            {%- set sel_count = selected_library_ids|length -%}
+                            {%- set all_count = all_libraries|length -%}
+                            {%- if sel_count == all_count or sel_count == 0 -%}
+                                <span data-i18n="library.allLibraries">All libraries</span>
+                            {%- elif sel_count == 1 -%}
+                                {%- for lib in all_libraries if lib.id == selected_library_ids[0] -%}{{ lib.name }}{%- endfor -%}
+                            {%- else -%}
+                                {{ sel_count }} / {{ all_count }}
+                            {%- endif -%}
+                        </span>
+                        <span class="library-multi-caret">▾</span>
+                    </button>
+                    <div class="library-multi-dropdown" id="libraryMultiDropdown">
                         {% for lib in all_libraries %}
-                        <option value="{{ lib.id }}" {% if lib.id == current_library.id %}selected{% endif %}>{{ lib.name }}</option>
+                        <label class="library-multi-item">
+                            <input type="checkbox" value="{{ lib.id }}" {% if lib.id in selected_library_ids %}checked{% endif %} onchange="onLibraryCheckboxChange()">
+                            <span>{{ lib.name }}</span>
+                        </label>
                         {% endfor %}
-                    </select>
-                </form>
+                    </div>
+                </div>
                 <button type="button" class="library-manage-btn" onclick="document.getElementById('libraryModal').style.display='flex'" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
                 {% if current_user %}
                 <span class="current-user-badge" title="{{ current_user }}">
@@ -53,6 +69,37 @@
         </div>
     </header>
     <script>
+        /* ── Library multi-select dropdown ──────────────────────────────── */
+        function toggleLibraryDropdown() {
+            var dd = document.getElementById('libraryMultiDropdown');
+            dd.classList.toggle('open');
+        }
+        function onLibraryCheckboxChange() {
+            var boxes = document.querySelectorAll('#libraryMultiDropdown input[type=checkbox]');
+            var checked = Array.from(boxes).filter(function(cb) { return cb.checked; });
+            if (checked.length === 0) {
+                boxes.forEach(function(cb) { cb.checked = true; });
+                checked = Array.from(boxes);
+            }
+            var ids = checked.map(function(cb) { return cb.value; }).join(',');
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("switch_library") }}';
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'library_ids';
+            input.value = ids;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        }
+        document.addEventListener('click', function(e) {
+            var ms = document.getElementById('libraryMultiSelect');
+            if (ms && !ms.contains(e.target)) {
+                document.getElementById('libraryMultiDropdown').classList.remove('open');
+            }
+        });
+
         function undoDelete(event) {
             event.preventDefault();
             var form = document.createElement('form');

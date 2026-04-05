@@ -50,7 +50,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "0.13.0"
+APP_VERSION = "0.14.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -1259,59 +1259,61 @@ def close_db(exc):
 
 
 # ── Library helpers ──────────────────────────────────────────────────────
-def _get_current_library_id() -> int:
-    """Return the active library ID from cookie (0 = All), falling back to the first library."""
+def _get_selected_library_ids() -> list[int]:
+    """Return selected library IDs from cookie (comma-separated).
+
+    An empty list means *all* libraries are selected (no filter).
+    Backward-compatible: old cookie value ``"0"`` (All) is treated as
+    empty; a single numeric value ``"3"`` becomes ``[3]``.
+    """
     raw = request.cookies.get("librarium_library", "")
-    if raw:
+    if not raw:
+        return []
+    db = get_db()
+    all_ids = {r["id"] for r in db.execute("SELECT id FROM libraries").fetchall()}
+    selected: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
         try:
-            lib_id = int(raw)
-            if lib_id == 0:
-                return 0  # "All libraries" pseudo-selection
-            db = get_db()
-            if db.execute("SELECT 1 FROM libraries WHERE id = ?", (lib_id,)).fetchone():
-                return lib_id
+            lid = int(part)
+            if lid in all_ids:
+                selected.append(lid)
         except (ValueError, TypeError):
             pass
-    db = get_db()
-    row = db.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()
-    return row["id"] if row else 1
+    return selected
 
 
-def _lib_filter(lib_id: int, col: str = "library_id") -> tuple[str, tuple]:
-    """Return (sql_condition, params) for optional library filtering.
+def _lib_filter(lib_ids: list[int], col: str = "library_id") -> tuple[str, tuple]:
+    """Return (sql_condition, params) for library filtering.
 
-    When *lib_id* is 0 ("All libraries"), the condition is always true.
-    Otherwise it restricts to the given library.
+    An empty *lib_ids* list means no filtering (all libraries).
     """
-    if lib_id == 0:
+    if not lib_ids:
         return ("1=1", ())
-    return (f"{col} = ?", (lib_id,))
+    if len(lib_ids) == 1:
+        return (f"{col} = ?", (lib_ids[0],))
+    placeholders = ",".join("?" * len(lib_ids))
+    return (f"{col} IN ({placeholders})", tuple(lib_ids))
 
 
 @app.context_processor
 def inject_library_context():
-    """Make current_library and all_libraries available in every template."""
+    """Make selected_library_ids and all_libraries available in every template."""
     try:
         db = get_db()
-        lib_id = _get_current_library_id()
-        if lib_id == 0:
-            current_lib = None
-        else:
-            current_lib = db.execute(
-                "SELECT * FROM libraries WHERE id = ?", (lib_id,)
-            ).fetchone()
+        lib_ids = _get_selected_library_ids()
         all_libs = db.execute(
             "SELECT * FROM libraries ORDER BY id"
         ).fetchall()
+        all_lib_dicts = [dict(l) for l in all_libs]
+        all_lib_ids = [l["id"] for l in all_libs]
+        # When nothing is explicitly selected, all libraries are active
+        sel_ids = lib_ids if lib_ids else all_lib_ids
         current_user = request.cookies.get("librarium_user", "")
         backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
-        cur_lib_dict = dict(current_lib) if current_lib else (
-            {"id": 0, "name": "All", "slug": "all"} if lib_id == 0
-            else {"id": 1, "name": "Books", "slug": "books"}
-        )
         return {
-            "current_library": cur_lib_dict,
-            "all_libraries": [dict(l) for l in all_libs],
+            "selected_library_ids": sel_ids,
+            "all_libraries": all_lib_dicts,
             "app_version": APP_VERSION,
             "current_user": current_user,
             "backup_dir": backup_dir,
@@ -1319,7 +1321,7 @@ def inject_library_context():
         }
     except Exception:
         return {
-            "current_library": {"id": 1, "name": "Books", "slug": "books"},
+            "selected_library_ids": [],
             "all_libraries": [],
             "app_version": APP_VERSION,
             "current_user": request.cookies.get("librarium_user", "") if request else "",
@@ -1402,6 +1404,28 @@ RATING_DIMENSIONS = [
             {"key": "practicality",   "label": "Practicality",   "tip": "Actionable takeaways, real-world applicability"},
             {"key": "objectivity",    "label": "Objectivity",    "tip": "Balanced perspective, fairness"},
             {"key": "relevance",      "label": "Relevance",      "tip": "Timeliness and current applicability"},
+        ],
+    },
+    {
+        "group": "Visual Art",
+        "items": [
+            {"key": "art_quality",        "label": "Art Quality",        "tip": "Overall quality of illustrations, line work, and artistic style"},
+            {"key": "character_design",    "label": "Character Design",   "tip": "Visual distinctiveness and memorability of characters"},
+            {"key": "color_inking",        "label": "Color & Inking",     "tip": "Quality of coloring palette or black-and-white inking"},
+            {"key": "background_art",      "label": "Background Art",     "tip": "Detail, atmosphere, and richness of environments"},
+            {"key": "cover_art",           "label": "Cover Art",          "tip": "Visual impact and appeal of cover illustrations"},
+            {"key": "visual_consistency",  "label": "Visual Consistency", "tip": "Art quality maintained across chapters and volumes"},
+        ],
+    },
+    {
+        "group": "Sequential Narrative",
+        "items": [
+            {"key": "panel_layout",          "label": "Panel Layout",          "tip": "Page composition, panel flow, and reading rhythm"},
+            {"key": "visual_storytelling",   "label": "Visual Storytelling",   "tip": "How effectively the art drives the narrative without words"},
+            {"key": "action_choreography",   "label": "Action Choreography",   "tip": "Dynamic movement, impact, and clarity in action scenes"},
+            {"key": "expressiveness",        "label": "Expressiveness",        "tip": "Emotional range conveyed through faces and body language"},
+            {"key": "text_integration",      "label": "Text Integration",      "tip": "Harmony of speech bubbles, sound effects, and narration with art"},
+            {"key": "splash_pages",          "label": "Splash Pages",          "tip": "Storytelling impact of full-page and double-page spreads"},
         ],
     },
 ]
@@ -1567,8 +1591,8 @@ def _normalize_input_date(value: str) -> str:
 def _collect_languages() -> list[str]:
     """Return a sorted list of unique languages used in the current library."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
     langs: set[str] = set()
     for row in db.execute(f"SELECT language, original_language FROM books WHERE {lf}", lp).fetchall():
         for val in (row["language"], row["original_language"]):
@@ -1580,15 +1604,15 @@ def _collect_languages() -> list[str]:
 def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     """Scan books in the current library and return unique values per field."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     # Only query the columns we need
     safe_fields = [f for f in fields if re.match(r'^[a-z_]+$', f)]
     if not safe_fields:
         return {}
     cols = ", ".join(safe_fields)
-    lf, lp = _lib_filter(lib_id)
+    lf, lp = _lib_filter(lib_ids)
     rows = db.execute(f"SELECT {cols} FROM books WHERE {lf}", lp).fetchall()
     buckets: dict[str, set[str]] = {f: set() for f in safe_fields}
     for row in rows:
@@ -1658,7 +1682,7 @@ def _get_source_by_id(source_id: str) -> dict | None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _build_index_per_reading(db, lib_id):
+def _build_index_per_reading(db, lib_ids):
     """Build one library entry per *selected reading* across ALL editions.
 
     Selection logic per edition:
@@ -1667,7 +1691,7 @@ def _build_index_per_reading(db, lib_id):
     - >1 readings, none finished → show the one with highest priority
       (reading > abandoned > not-started > draft)
     """
-    lf, lp = _lib_filter(lib_id)
+    lf, lp = _lib_filter(lib_ids)
     book_rows = db.execute(
         f"SELECT id, name, subtitle, author, status, pages, starting_page, "
         f"has_cover, cover_hash, publisher, language, publication_date, "
@@ -1823,9 +1847,9 @@ def _build_index_per_reading(db, lib_id):
 def index():
     """Main page – list all books in the current library."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     # Use query params if present, otherwise fall back to cookie, then default
     sort1 = request.args.get("sort1") or request.cookies.get("librarium_sort1", "status")
     sort2 = request.args.get("sort2") or request.cookies.get("librarium_sort2", "last_session")
@@ -1837,9 +1861,9 @@ def index():
         show_readings = "0"
 
     if show_readings == "1":
-        books = _build_index_per_reading(db, lib_id)
+        books = _build_index_per_reading(db, lib_ids)
     else:
-        lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+        lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
         edition_filter = " AND (b.work_id IS NULL OR b.is_primary_edition = 1)" if show_editions != "1" else ""
         rows = db.execute(f"""
         SELECT
@@ -2100,7 +2124,7 @@ def index():
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _compute_status_timeline(db, lib_id):
+def _compute_status_timeline(db, lib_ids):
     """Compute book-status counts over time for a library.
 
     Returns ``{"dates": [...], "series": {"reading": [...], ...}}``.
@@ -2119,7 +2143,7 @@ def _compute_status_timeline(db, lib_id):
 
     today = _date.today()
     today_s = today.isoformat()
-    lf, lp = _lib_filter(lib_id)
+    lf, lp = _lib_filter(lib_ids)
     STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
     # Sort key: lower = processed first on the same date
     _STATUS_ORDER = {"not-started": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
@@ -2292,9 +2316,9 @@ def _compute_status_timeline(db, lib_id):
 def global_stats():
     """Global statistics page – aggregate reading stats for the current library."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     # Pages by year: sessions + periods
     pages_by_year: dict[str, int] = {}
@@ -2512,9 +2536,9 @@ def api_cumulative_pages():
     Response: list of {date: 'YYYY-MM-DD', pages: int, cumulative: int}
     """
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     book_id = request.args.get('book_id')
     year = request.args.get('year')
 
@@ -2535,7 +2559,7 @@ def api_cumulative_pages():
             f"SELECT p.end_date AS d, SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date"
             ") GROUP BY d ORDER BY d"
         )
-        params = (lib_id) + lp_b
+        params = lp_b * 2
 
     rows = db.execute(q, params).fetchall()
 
@@ -2558,10 +2582,10 @@ def api_cumulative_pages():
 def api_status_timeline():
     """Return status-count timeseries for the stacked area chart."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
-    return jsonify(_compute_status_timeline(db, lib_id))
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    return jsonify(_compute_status_timeline(db, lib_ids))
 
 
 @app.route('/api/cumulative_pages_per_book')
@@ -2574,9 +2598,9 @@ def api_cumulative_pages_per_book():
     Response: { labels: [dates], datasets: [ { book_id, label, data: [cumulative_values], total } ] }
     """
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     year = request.args.get('year')
     if not year:
         return jsonify({"error": "year query parameter required"}), 400
@@ -2590,7 +2614,7 @@ def api_cumulative_pages_per_book():
         f"WHERE p.end_date != '' AND p.pages > 0 AND SUBSTR(p.end_date,1,4) = ? AND {lf_b} "
         ") s GROUP BY s.book_id, d ORDER BY s.book_id, d"
     )
-    rows = db.execute(q, (year, lib_id, year) + lp_b).fetchall()
+    rows = db.execute(q, (year,) + lp_b + (year,) + lp_b).fetchall()
 
     book_map: dict[str, dict] = {}
     all_dates: set[str] = set()
@@ -2624,7 +2648,7 @@ def api_cumulative_pages_per_book():
             f"WHERE p.book_id = ? AND p.end_date != '' AND p.pages > 0 AND p.end_date < ? AND {lf_b} "
             ") s"
         )
-        carry = db.execute(carry_q, (bid, year_start, lib_id, bid, year_start) + lp_b).fetchone()
+        carry = db.execute(carry_q, (bid, year_start) + lp_b + (bid, year_start) + lp_b).fetchone()
         book_map[bid]['carry_over'] = int(carry['total']) if carry else 0
 
     # Build per-book anchor points so the chart shows a step pattern:
@@ -2714,9 +2738,9 @@ def api_cumulative_pages_per_book():
 def stats_year(year: str):
     """Yearly statistics page."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     year_sessions = []
     for row in db.execute(f"""
@@ -3003,9 +3027,9 @@ def stats_year(year: str):
 def stats_year_books(year: str):
     """Display all books/readings finished in a specific year with their covers."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     sort = request.args.get("sort", "date")
     if sort not in ("alpha", "author", "date", "rating"):
         sort = "date"
@@ -3096,9 +3120,9 @@ def stats_year_books(year: str):
 def activity():
     """Activity dashboard – reading habits, trends, and streaks."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     # 1. Daily session aggregates (all time)
     daily_sessions: dict[str, dict] = {}
@@ -3336,9 +3360,9 @@ def activity():
 def authors_list():
     """Display a list of all authors with their book counts."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     rows = db.execute(f"SELECT id, name, author, has_cover, cover_hash, status FROM books WHERE {lf}", lp).fetchall()
 
     # Build a map of author names that have photos → photo_hash
@@ -3384,9 +3408,9 @@ def authors_list():
 def author_detail(author_name: str):
     """Display all books by a given author, plus author metadata."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_author_show_editions", "0")
     edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
@@ -3565,10 +3589,10 @@ def edit_author(author_name: str):
 def series_list():
     """Display all series in the current library."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
-    lf_s, lp_s = _lib_filter(lib_id, "s.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    lf_s, lp_s = _lib_filter(lib_ids, "s.library_id")
 
     rows = db.execute(f"""
         SELECT s.id, s.name,
@@ -3613,9 +3637,9 @@ def series_list():
 def series_detail(series_id: int):
     """Display all books in a series, ordered by series index."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     series_row = db.execute(
         f"SELECT * FROM series WHERE id = ? AND {lf}", (series_id) + lp
@@ -3670,9 +3694,9 @@ def series_detail(series_id: int):
 def rename_series(series_id: int):
     """Rename a series."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     new_name = request.form.get("name", "").strip()
     if not new_name:
         flash("Series name cannot be empty.", "error")
@@ -3688,9 +3712,9 @@ def rename_series(series_id: int):
 def delete_series(series_id: int):
     """Delete a series (unlinks books but doesn't delete them)."""
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     db.execute(f"""
         DELETE FROM book_series WHERE series_id = ? AND book_id IN (
             SELECT id FROM books WHERE {lf}
@@ -4277,9 +4301,9 @@ def save_ratings(book_id: str):
 @app.route("/book/<book_id>/edit", methods=["GET", "POST"])
 def edit_metadata(book_id: str):
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
@@ -4745,12 +4769,15 @@ def isbn_lookup():
 @app.route("/book/new", methods=["GET", "POST"])
 def new_book():
     db = get_db()
-    lib_id = _get_current_library_id()
-    lf, lp = _lib_filter(lib_id)
-    lf_b, lp_b = _lib_filter(lib_id, "b.library_id")
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         author = request.form.get("author", "").strip()
+        # Determine target library for the new book
+        form_lib = request.form.get("library_id", "").strip()
+        active_lib = int(form_lib) if form_lib and form_lib.isdigit() else (lib_ids[0] if lib_ids else 1)
         if not name:
             flash("Book name is required.", "error")
             return redirect(url_for("new_book"))
@@ -4887,7 +4914,7 @@ def new_book():
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
             has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
-            cover_thumb, lib_id, link_work_id or None, is_primary,
+            cover_thumb, active_lib, link_work_id or None, is_primary,
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
@@ -4906,7 +4933,7 @@ def new_book():
                 sid = existing["id"]
             else:
                 db.execute("INSERT INTO series (name, library_id) VALUES (?, ?)",
-                           (s_name, lib_id if lib_id else 1))
+                           (s_name, active_lib))
                 db.commit()
                 sid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
             db.execute(
@@ -4971,7 +4998,8 @@ def new_book():
                            all_series=all_series,
                            prefill=prefill,
                            parent_work_id=parent_work_id,
-                           parent_book_name=parent_book_name)
+                           parent_book_name=parent_book_name,
+                           default_library_id=lib_ids[0] if lib_ids else 1)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -5052,20 +5080,23 @@ def delete_source(source_id: str):
 
 @app.route("/library/switch", methods=["POST"])
 def switch_library():
-    """Switch the active library (stores choice in a cookie). 0 = All."""
-    lib_id = request.form.get("library_id", "")
-    if lib_id == "0":
-        # "All libraries" pseudo-selection
-        resp = make_response(redirect(request.referrer or url_for("index")))
-        resp.set_cookie("librarium_library", "0", max_age=60 * 60 * 24 * 365 * 5,
-                         samesite="Lax", httponly=True)
-        return resp
+    """Update selected libraries (comma-separated IDs in cookie)."""
+    raw = request.form.get("library_ids", "")
     db = get_db()
-    row = db.execute("SELECT id FROM libraries WHERE id = ?", (lib_id,)).fetchone()
-    if not row:
-        abort(400)
+    all_ids = {r["id"] for r in db.execute("SELECT id FROM libraries").fetchall()}
+    selected: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        try:
+            lid = int(part)
+            if lid in all_ids:
+                selected.append(lid)
+        except (ValueError, TypeError):
+            pass
+    # Empty string = all libraries selected
+    cookie_val = ",".join(str(i) for i in selected) if len(selected) < len(all_ids) else ""
     resp = make_response(redirect(request.referrer or url_for("index")))
-    resp.set_cookie("librarium_library", str(lib_id), max_age=60 * 60 * 24 * 365 * 5,
+    resp.set_cookie("librarium_library", cookie_val, max_age=60 * 60 * 24 * 365 * 5,
                      samesite="Lax", httponly=True)
     return resp
 
@@ -5158,12 +5189,13 @@ def delete_library(lib_id: int):
     db.execute("DELETE FROM books WHERE library_id = ?", (lib_id,))
     db.execute("DELETE FROM libraries WHERE id = ?", (lib_id,))
     db.commit()
-    # If the deleted library was the active one, reset cookie
+    # Remove the deleted library from the selection cookie
     current = request.cookies.get("librarium_library", "")
-    if current == str(lib_id):
-        first = db.execute("SELECT id FROM libraries ORDER BY id LIMIT 1").fetchone()
-        resp = make_response(redirect(url_for("index")))
-        resp.set_cookie("librarium_library", str(first["id"]), max_age=60 * 60 * 24 * 365 * 5,
+    remaining_ids = [p.strip() for p in current.split(",") if p.strip() and p.strip() != str(lib_id)]
+    new_cookie = ",".join(remaining_ids)
+    if new_cookie != current:
+        resp = make_response(redirect(request.referrer or url_for("index")))
+        resp.set_cookie("librarium_library", new_cookie, max_age=60 * 60 * 24 * 365 * 5,
                          samesite="Lax", httponly=True)
         flash(f"Library '{lib_name}' deleted.", "success")
         return resp
