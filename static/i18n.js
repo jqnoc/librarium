@@ -52,6 +52,11 @@
         'users.importFile':      { en: 'Import from file',      es: 'Importar desde archivo' },
         'users.create':          { en: 'Create',                es: 'Crear' },
 
+        // ── Error pages ─────────────────────────────────────────────────
+        'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },
+        'error.notFoundHint':    { en: 'The page you are looking for does not exist or has been moved.', es: 'La página que buscas no existe o ha sido movida.' },
+        'error.backHome':        { en: 'Back to library',       es: 'Volver a la biblioteca' },
+
         // ── Add Book dialog ─────────────────────────────────────────────
         'addBook.title':         { en: 'Add Book',              es: 'Añadir Libro' },
         'addBook.manually':      { en: 'Add Manually',          es: 'Añadir Manualmente' },

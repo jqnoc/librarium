@@ -10,7 +10,7 @@ single-file architecture maintainable.
 
 Librarium is a **self-contained Electron desktop application** for tracking
 personal book reading statistics. The backend is a monolithic single-file
-Flask app (`app.py`, ~4 500+ lines) with raw SQLite queries, Jinja2
+Flask app (`app.py`, ~5 000+ lines) with raw SQLite queries, Jinja2
 templates, vanilla JS, and Chart.js for charts. Electron spawns the Flask
 server as a child process and displays it in a native window. There is
 **no test suite** — all verification is manual.
@@ -85,6 +85,13 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 13. `migrate_add_total_time` — total_time_seconds on books, progress_pct on sessions and periods
 14. `migrate_add_period_duration` — duration_seconds on periods
 15. `migrate_add_cover_thumb` — cover_thumb BLOB on books (with backfill)
+16. `migrate_add_photo_thumb` — photo_thumb BLOB on authors (with backfill)
+17. `migrate_shared_authors` — make authors global (remove library_id scoping)
+18. `migrate_shared_sources` — make sources global (remove library_id scoping)
+19. `migrate_add_author_gender` — gender column on authors
+20. `migrate_add_tags` — tags column on books
+21. `migrate_normalize_genres` — normalise genre strings
+22. `migrate_merge_genres_into_tags` — merge genres into the tags column
 
 When adding a new migration:
 
@@ -96,13 +103,14 @@ When adding a new migration:
 
 ### 2.5 Template filters
 
-Four Jinja2 template filters are registered:
+Five Jinja2 template filters are registered:
 
 | Filter | Purpose |
-|--------|---------|
+|--------|--------|
 | `format_status` | Status string → display label |
 | `format_authors` | Comma-separated author list |
 | `date_ddmmyyyy` | ISO date → dd/mm/yyyy |
+| `display_date` | Wrap date in `<span data-date>` for client-side i18n formatting |
 | `source_type_label` | Source type key → display label |
 
 ### 2.6 Status system
@@ -117,12 +125,12 @@ Five book statuses:
 | `abandoned` | `.badge.status-abandoned` | `--lb-abandoned` (#DC2626) |
 | `draft` | `.badge.status-draft` | `--lb-draft` (#6B7280) |
 
-Canonical sort order is defined in `STATUS_ORDER` (line ~1132).
+Canonical sort order is defined in `STATUS_ORDER` (line ~2045).
 
 When adding a new status:
 
 - [ ] Add to `STATUS_ORDER` dict
-- [ ] Add to `status_labels_map` dict (line ~1491)
+- [ ] Add to `status_labels_map` dict (line ~2500)
 - [ ] Add CSS class and colour variable in `static/style.css`
 - [ ] Add `<option>` in `new_book.html`, `edit_metadata.html`, and the
   filter dropdown in `index.html`
@@ -130,7 +138,7 @@ When adding a new status:
 
 ### 2.7 Rating system
 
-39 dimensions across 7 groups defined in `RATING_DIMENSIONS`:
+51 dimensions across 9 groups defined in `RATING_DIMENSIONS`:
 
 1. **Emotional Impact** (6): heartfelt, tear, inspiring, melancholy, nostalgia, cathartic
 2. **Story & Plot** (6): plot_quality, predictability, pacing, plot_twists, worldbuilding, character_arc
@@ -139,6 +147,8 @@ When adding a new status:
 5. **Engagement** (4): addiction, afterglow, rereadability, originality
 6. **Intellectual** (5): thought_provoking, complexity, historical_cultural_value, argumentation, clarity
 7. **Non-Fiction** (6): research_depth, accuracy, evidence, practicality, objectivity, relevance
+8. **Visual Art** (6): art_quality, character_design, color_inking, background_art, cover_art, visual_consistency
+9. **Sequential Narrative** (6): panel_layout, visual_storytelling, action_choreography, expressiveness, text_integration, splash_pages
 
 Overall average is **grouped**: average of each non-empty group's
 average (via `_calc_avg_rating()`). When adding a dimension, add it to
@@ -148,21 +158,14 @@ the appropriate group in `RATING_DIMENSIONS`.
 
 ## 3. Frontend Conventions
 
-### 3.1 CSS palettes
+### 3.1 CSS theme
 
-Six color palettes, selected via `data-palette` attribute on `<html>`:
+The app uses a single colour theme defined in `:root` CSS custom
+properties (prefixed `--lb-`). There is no palette switching system.
+Chart colours are also theme-aware (`--lb-chart-*` variables).
 
-| Palette key | Name | Default? |
-|------------|------|----------|
-| *(root)* | Orange | — |
-| `green` | Mori | — |
-| `hone` | Hone | **Yes (default)** |
-| `kawara` | Kawara | — |
-| `umi` | Umi | — |
-| `hinode` | Hinode | — |
-
-Each palette overrides CSS custom properties (prefixed `--lb-`).
-Chart colours are also palette-aware (`--lb-chart-*` variables).
+Key variables: `--lb-gold` (#EC8F8D), `--lb-deep-orange` (#537D96),
+`--lb-orange` (#44A194), `--lb-accent` (#EC8F8D), `--lb-dark` (#2a4a5a).
 
 ### 3.2 Internationalisation (i18n)
 
@@ -225,6 +228,7 @@ and **list** — toggled by the user and stored in a cookie.
 | `/authors/<name>` | GET | Author detail page |
 | `/authors/<name>/edit` | GET, POST | Edit author info and photo |
 | `/author_photo/<name>` | GET | Serve author photo from DB |
+| `/author_photo_thumb/<name>` | GET | Serve author photo thumbnail from DB |
 | `/series` | GET | Series list |
 | `/series/<id>` | GET | Series detail |
 | `/series/<id>/rename` | POST | Rename a series |
@@ -239,50 +243,62 @@ and **list** — toggled by the user and stored in a cookie.
 | `/library/<id>/delete` | POST | Delete a library |
 | `/cover/<id>` | GET | Serve book cover image from DB |
 | `/cover_thumb/<id>` | GET | Serve book cover thumbnail from DB |
+| `/backup/create` | POST | Trigger a manual backup |
+| `/users` | GET | User selection / creation screen |
+| `/users/create` | POST | Create a new user |
+| `/users/switch` | POST | Switch to a different user |
+| `/users/update-backup-dir` | POST | Update a user's custom backup directory |
 
 ### API endpoints
 
 | URL | Method | Purpose |
-|-----|--------|---------|
+|-----|--------|--------|
 | `/api/cumulative_pages` | GET | Cumulative pages data for charts |
 | `/api/cumulative_pages_per_book` | GET | Per-book cumulative pages |
 | `/api/status_timeline` | GET | Status-over-time data for stacked area chart |
+| `/api/isbn_lookup` | GET | Look up book metadata by ISBN via Open Library |
+| `/api/shutdown-backup` | POST | Trigger a backup before shutdown |
 
 ---
 
 ## 5. Database Schema Quick Reference
 
 ```
-books       (id TEXT PK, title, subtitle, author, status, pages, isbn,
-             publisher, pub_year, language, original_language, source_id,
-             date_added, date_started, date_finished, genres, notes,
-             cover_blob, cover_mime, cover_color, cover_palette,
-             cover_hash, cover_thumb, library_id, work_id,
-             is_primary_edition, format, binding, audio_format,
-             total_time_seconds)
+books       (id TEXT PK, name, subtitle, author, slug, language,
+             original_title, original_language, original_publication_date,
+             publication_date, isbn, pages, starting_page, publisher,
+             genre, summary, translator, illustrator, editor,
+             prologue_author, status, source_type, source_id,
+             purchase_date, purchase_price, borrowed_start, borrowed_end,
+             has_cover, cover BLOB, is_gift, cover_color, cover_palette,
+             cover_hash, cover_thumb BLOB, library_id FK, subtitle,
+             series_id FK, series_index, work_id, is_primary_edition,
+             format, binding, audio_format, total_time_seconds, tags)
 
-readings    (id INTEGER PK, book_id FK, reading_number, status,
-             date_started, date_finished)
+readings    (id INTEGER PK, book_id FK, reading_number, status, notes)
 
-sessions    (id INTEGER PK, reading_id FK, book_id FK, date, page_start,
-             page_end, hours, minutes, seconds, progress_pct)
+sessions    (id INTEGER PK, book_id FK, date, pages, duration_seconds,
+             reading_id FK, progress_pct)
 
-periods     (id INTEGER PK, reading_id FK, book_id FK, date_from,
-             date_to, pages, notes, progress_pct)
+periods     (id INTEGER PK, book_id FK, start_date, end_date, pages,
+             note, reading_id FK, progress_pct, duration_seconds)
 
-ratings     (id INTEGER PK, book_id FK, dimension_key, value)
+ratings     (book_id FK, dimension_key, value,
+             PRIMARY KEY (book_id, dimension_key))
 
-authors     (id INTEGER PK, name UNIQUE, bio, photo_blob, photo_mime,
-             photo_hash, library_id)
+authors     (name TEXT PK, photo BLOB, has_photo, birth_date,
+             birth_place, death_date, death_place, biography,
+             photo_hash, photo_thumb BLOB, gender)
 
-series      (id INTEGER PK, name, library_id)
+series      (id INTEGER PK, name, library_id FK,
+             UNIQUE(name, library_id))
 
-book_series (id INTEGER PK, book_id FK, series_id FK, position)
+book_series (book_id FK, series_id FK, series_index,
+             PRIMARY KEY (book_id, series_id))
 
-sources     (id INTEGER PK, name, type, city, country, url, notes,
-             library_id)
+sources     (id TEXT PK, type, name, short_name, location, url, notes)
 
-libraries   (id INTEGER PK, name UNIQUE)
+libraries   (id INTEGER PK, name, slug UNIQUE)
 ```
 
 ---
@@ -291,10 +307,13 @@ libraries   (id INTEGER PK, name UNIQUE)
 
 ### Multi-library
 
-- The active library ID is stored in `session["library_id"]`.
-- Helper `_get_lib_id()` (not currently in the codebase — the index route
-  reads `session.get("library_id")` directly) determines the active library.
-- Most queries filter by `library_id`.
+- Selected library IDs are stored in a cookie (`librarium_library`,
+  comma-separated).
+- Helper `_get_selected_library_ids()` parses the cookie and returns a
+  list of IDs; an empty list means "all libraries".
+- Helper `_lib_filter(lib_ids, col)` returns a `(sql, params)` tuple
+  for WHERE clauses.
+- Most queries filter by `library_id` using `_lib_filter()`.
 
 ### Multi-edition (work system)
 
@@ -321,10 +340,16 @@ Key helper patterns in `app.py`:
 | Function | Purpose |
 |----------|---------|
 | `get_db()` | Per-request DB connection |
+| `_get_selected_library_ids()` | Parse library cookie → list of IDs |
+| `_lib_filter()` | Build SQL WHERE clause for library filtering |
 | `_get_current_reading_id()` | Latest reading ID for a book |
 | `_load_ratings()` / `_save_ratings()` | Rating CRUD |
 | `_calc_avg_rating()` | Grouped average |
 | `_compute_status_timeline()` | Reconstruct status history from dates |
+| `_load_users()` / `_save_users()` | Read / write `users.json` |
+| `_set_active_user_db()` | Switch global `DB_PATH` and `BACKUP_DIR` for a user |
+| `_get_user_db_path()` | Resolve DB file path for a username |
+| `_run_all_migrations()` | Execute all migrations sequentially |
 | `validate_and_restore_db()` | Integrity check + backup restore |
 | `backup_database()` | Daily backup with pruning |
 | `sanitize_html()` | Allowlist-based HTML sanitiser for notes |
@@ -352,7 +377,7 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | New rating dimension | Appears in book detail ratings form; average calculation still correct |
 | New migration | Runs on fresh DB and already-migrated DB without errors |
 | New route | URL resolves, template renders, form submissions work |
-| CSS palette change | All 6 palettes still render correctly; chart colours update |
+| CSS palette change | Theme colours render correctly; chart colours update |
 | i18n change | Both EN and ES display correct text; no missing keys in console |
 | Chart change | Chart renders with data; responsive on narrow window |
 
@@ -369,9 +394,9 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `requirements.txt` | Python dependencies |
 | `run-librarium.bat` | Windows launcher (`npm start`) |
 | `CHANGELOG.md` | Version history (Keep a Changelog format) |
-| `static/style.css` | Stylesheet (palettes, layout, components) |
+| `static/style.css` | Stylesheet (layout, components) |
 | `static/i18n.js` | EN/ES translations |
-| `templates/base.html` | Base layout (navbar, palette switcher, Chart.js CDN) |
+| `templates/base.html` | Base layout (navbar, Chart.js CDN) |
 | `templates/index.html` | Library page (card/cover/list views, filters) |
 | `templates/book_detail.html` | Book detail (sessions, periods, ratings, editions) |
 | `templates/edit_metadata.html` | Edit book metadata form |
@@ -384,9 +409,9 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/author_detail.html` | Author detail |
 | `templates/edit_author.html` | Edit author form |
 | `templates/sources.html` | Source management |
-| `data/*.db` | Per-user SQLite databases (AppData, gitignored) |
-| `data/users.json` | User accounts and preferences (AppData, gitignored) |
-| `data/backups/` | Automatic daily backups (AppData) |
+| `templates/series.html` | Series list |
+| `templates/series_detail.html` | Series detail |
+| `templates/users.html` | User selection / creation |
 
 ---
 
@@ -488,7 +513,7 @@ When cutting a release, verify the badge is present and points to
 
 ## 12. Known Issues & Technical Debt
 
-- **Monolithic `app.py`**: ~4 500+ lines in a single file. No plans to
+- **Monolithic `app.py`**: ~5 000+ lines in a single file. No plans to
   refactor, but be aware of line-number drift when making changes.
 - **No automated tests**: All verification is manual.
 - **`app.secret_key`**: Hardcoded as `"librarium-local-dev-key"` — acceptable

@@ -70,7 +70,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -1861,6 +1861,12 @@ def _build_index_per_reading(db, lib_ids):
             b["reading_number"] = None
 
     return books
+
+
+# ── Error handlers ───────────────────────────────────────────────────────
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("404.html"), 404
 
 
 @app.route("/")

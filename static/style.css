@@ -903,6 +903,31 @@ select.form-control { cursor: pointer; }
 
 .btn-group { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
 
+/* ── Error pages ───────────────────────────────────────────────────────── */
+.error-page {
+    text-align: center;
+    padding: 4rem 1rem;
+}
+.error-code {
+    font-size: 6rem;
+    font-weight: 700;
+    background: var(--lb-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 0.5rem;
+    line-height: 1;
+}
+.error-message {
+    font-size: 1.5rem;
+    color: var(--lb-text);
+    margin-bottom: 0.5rem;
+}
+.error-hint {
+    color: var(--lb-text-light);
+    margin-bottom: 2rem;
+}
+
 /* ── Flash messages ────────────────────────────────────────────────────── */
 .flash {
     padding: .75rem 1rem;

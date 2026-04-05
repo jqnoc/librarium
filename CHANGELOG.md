@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-04-05
+
 ### Added
+- Custom 404 error page with themed styling and i18n support (EN / ES)
 - GitHub Release badge in `README.md` linking to the latest release
 - Social preview image (`static/social-preview.png`) for the GitHub
   repository, using the project logo and theme gradient
@@ -32,12 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blue
 - `--lb-accent` CSS variable now explicitly defined (`#EC8F8D`) so all
   accent-coloured controls use the brand colour consistently
-- Copilot instructions: version bumps are no longer automatic — changes
-  go into `[Unreleased]` in the changelog, and versions are cut only on
-  explicit request; fixes to unreleased features update existing entries
-  instead of adding redundant bullets
+- Copilot agent directives rewritten to match actual codebase: corrected
+  rating dimensions (39 → 51, 7 → 9 groups), migrations (15 → 22),
+  template filters (4 → 5), routes (40 → 51), database schema, helper
+  functions, CSS theme description, multi-library mechanism, file
+  conventions, and line-count references
 - `README.md` Data Storage section updated to reflect AppData paths;
-  release badge now links to the actual releases page
+  release badge now links to the actual releases page; project structure
+  tree no longer shows a misleading `data/` folder
 
 ## [1.0.0] — 2026-04-05
 

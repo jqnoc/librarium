@@ -184,7 +184,7 @@ Librarium/
 ├── main.js                   # Electron main process
 ├── preload.js                # Electron preload (sandboxed renderer bridge)
 ├── package.json              # Node.js manifest (Electron dep, build config)
-├── app.py                    # Entire Flask application (~4 500+ lines)
+├── app.py                    # Entire Flask application (~5 000+ lines)
 ├── requirements.txt          # Python dependencies
 ├── run-librarium.bat         # Windows launcher
 ├── Librarium.vbs             # Silent Windows launcher (no console)
@@ -219,14 +219,11 @@ Librarium/
 │   ├── series.html           # Series list
 │   ├── series_detail.html    # Series detail
 │   └── users.html            # User selection / creation
-└── data/                     # Per-user SQLite databases (gitignored)
-    ├── users.json            # User accounts
-    └── backups/              # Automatic daily backups
 ```
 
-User databases and `users.json` are stored in the platform's application
-data directory (see [Data Storage](#data-storage)), not inside the
-project folder.
+User databases, `users.json`, and backups are stored in the platform's
+application data directory (see [Data Storage](#data-storage)), not
+inside the project folder.
 
 ## Technologies
 
