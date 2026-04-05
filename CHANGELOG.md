@@ -5,6 +5,21 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-04-05
+
+First stable release.
+
+### Added
+- `LICENSE.md` — Creative Commons Attribution-NonCommercial-NoDerivatives
+  4.0 International license
+
+### Changed
+- Complete `README.md` rewrite reflecting the actual state of the project:
+  Electron shell, multi-user system, per-user databases, ISBN lookup,
+  51-dimension rating system (9 groups), tags (replacing genres),
+  multi-library checkbox selector, shared authors/sources, updated
+  project structure, technologies table, and license section
+
 ## [0.14.1] — 2026-04-05
 
 ### Fixed
