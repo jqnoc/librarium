@@ -7,50 +7,6 @@
     <span class="library-epigraph" data-i18n="index.epigraph">&ldquo;Domus sine librario, sicut castrum sine armamentario.&rdquo;</span>
 </div>
 
-<!-- Library Stats Ribbon -->
-<div class="library-stat-ribbon">
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">📚</div>
-        <div class="library-stat-value">{{ total_books }}</div>
-        <div class="library-stat-label" data-i18n="index.totalBooks">Total Books</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">📄</div>
-        <div class="library-stat-value">{{ "{:,}".format(total_library_pages) }}</div>
-        <div class="library-stat-label" data-i18n="index.totalPages">Total Pages</div>
-    </div>
-    <div class="library-stat-tile" title="{{ total_library_time_hms }}">
-        <div class="library-stat-icon">⏱️</div>
-        <div class="library-stat-value">{{ total_library_time }}</div>
-        <div class="library-stat-label" data-i18n="index.totalTimeRead">Total Time Read</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">✍️</div>
-        <div class="library-stat-value">{{ unique_authors }}</div>
-        <div class="library-stat-label" data-i18n="index.uniqueAuthors">Unique Authors</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">✅</div>
-        <div class="library-stat-value">{{ finished_count }}</div>
-        <div class="library-stat-label" data-i18n="index.finished">Finished</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">📖</div>
-        <div class="library-stat-value">{{ reading_count }}</div>
-        <div class="library-stat-label" data-i18n="index.currentlyReading">Currently Reading</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">📕</div>
-        <div class="library-stat-value">{{ not_started_count }}</div>
-        <div class="library-stat-label" data-i18n="index.notStarted">Not Started</div>
-    </div>
-    <div class="library-stat-tile">
-        <div class="library-stat-icon">🏠</div>
-        <div class="library-stat-value">{{ owned_count }}</div>
-        <div class="library-stat-label" data-i18n="index.booksOwned">Books Owned</div>
-    </div>
-</div>
-
 <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
     <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
         <!-- Search -->

@@ -19,7 +19,7 @@
         <div class="header-inner">
             <div class="site-title">
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium logo" class="site-logo">
-                <a href="{{ url_for('index') }}">Librarium</a>
+                <a href="{{ url_for('dashboard') }}">Librarium</a>
                 <div class="library-multi-select" id="libraryMultiSelect">
                     <button type="button" class="library-multi-btn" id="libraryMultiBtn" onclick="toggleLibraryDropdown()" title="Select libraries" data-i18n-title="library.select">
                         <span id="libraryMultiLabel">
@@ -52,6 +52,7 @@
                 {% endif %}
             </div>
             <nav class="header-nav">
+                <a href="{{ url_for('dashboard') }}" data-i18n="nav.dashboard">Dashboard</a>
                 <a href="{{ url_for('index') }}" data-i18n="nav.library">Library</a>
                 <a href="{{ url_for('authors_list') }}" data-i18n="nav.authors">Authors</a>
                 <a href="{{ url_for('series_list') }}" data-i18n="nav.series">Series</a>

@@ -16,9 +16,6 @@
 <!-- Summary ribbon (JS-populated) -->
 <div id="summaryRibbon" class="stat-ribbon"></div>
 
-<!-- Streaks & Consistency (JS-populated) -->
-<div id="streakCards" class="streak-row"></div>
-
 <!-- Daily Activity Chart -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
@@ -34,34 +31,6 @@
             </div>
         </div>
         <canvas id="dailyChart" style="max-height: 350px;"></canvas>
-    </div>
-</div>
-
-<!-- Activity Heatmap -->
-<div class="card" style="margin-bottom: 2rem;">
-    <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);">
-            <span data-i18n="activity.heatmap">Reading Heatmap</span>
-            <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="activity.last52">(last 52 weeks)</span>
-        </h3>
-        <div class="heatmap-wrapper">
-            <div class="heatmap-day-labels">
-                <span data-i18n="activity.mon">Mon</span><span></span><span data-i18n="activity.wed">Wed</span><span></span><span data-i18n="activity.fri">Fri</span><span></span><span></span>
-            </div>
-            <div class="heatmap-main">
-                <div class="heatmap-months" id="heatmapMonths"></div>
-                <div class="heatmap-grid" id="heatmapGrid"></div>
-            </div>
-        </div>
-        <div class="heatmap-legend" id="heatmapLegend">
-            <span data-i18n="activity.less">Less</span>
-            <div class="heatmap-cell" id="hmL0"></div>
-            <div class="heatmap-cell" id="hmL1"></div>
-            <div class="heatmap-cell" id="hmL2"></div>
-            <div class="heatmap-cell" id="hmL3"></div>
-            <div class="heatmap-cell" id="hmL4"></div>
-            <span data-i18n="activity.more">More</span>
-        </div>
     </div>
 </div>
 
@@ -92,25 +61,6 @@
     </div>
 </div>
 
-<!-- Estimated Finish Dates -->
-{% if reading_books %}
-<div class="card" style="margin-bottom: 2rem;">
-    <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="activity.estFinishDates">Estimated Finish Dates</h3>
-        <p style="font-size: 0.82rem; color: var(--lb-text-light); margin-bottom: 1rem;" data-i18n="activity.estFinishDesc">Based on your reading pace over the last 30 days.</p>
-        <div id="finishEstimates" class="finish-estimates-grid"></div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Personal Records -->
-<div class="card" style="margin-bottom: 2rem;">
-    <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="activity.personalRecords">Personal Records 🏆</h3>
-        <div id="personalRecords" class="records-grid"></div>
-    </div>
-</div>
-
 {% else %}
 <div class="empty-state">
     <div class="icon">📈</div>
@@ -128,18 +78,8 @@
 // Data from backend
 // ═══════════════════════════════════════════════════════════════════════════
 const dailyData        = {{ daily_data | tojson }};
-const sessionDailyData = {{ session_daily_data | tojson }};
 const sessionBookDates = {{ session_book_dates | tojson }};
 const allBooks         = {{ all_books | tojson }};
-const readingBooks     = {{ reading_books | tojson }};
-const bookDaily        = {{ book_daily | tojson }};
-const allSessions      = {{ all_sessions | tojson }};
-const totalAllPages    = {{ total_all_pages }};
-const totalAllSeconds  = {{ total_all_seconds }};
-const booksFinished    = {{ books_finished_count }};
-const mostParallel     = {{ most_parallel | tojson }};
-const longestFinishedBook = {{ longest_finished_book | tojson }};
-const mostRereadBook      = {{ most_reread_book | tojson }};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State
@@ -208,150 +148,6 @@ function getFilteredData(days) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Compute streaks (all-time)
-// ═══════════════════════════════════════════════════════════════════════════
-function computeStreaks() {
-    const readDates = new Set(dailyData.filter(d => d.pages > 0).map(d => d.date));
-    if (readDates.size === 0) return { current: 0, longest: 0 };
-
-    const today = new Date(); today.setHours(0,0,0,0);
-
-    // Current streak: count back from today (or yesterday)
-    let current = 0;
-    let check = new Date(today);
-    if (!readDates.has(dateStr(check))) {
-        check = addDays(check, -1);
-    }
-    while (readDates.has(dateStr(check))) {
-        current++;
-        check = addDays(check, -1);
-    }
-
-    // Longest streak
-    const sorted = Array.from(readDates).sort();
-    let longest = 0, streak = 1;
-    for (let i = 1; i < sorted.length; i++) {
-        const diff = Math.round((parseDate(sorted[i]) - parseDate(sorted[i-1])) / 86400000);
-        if (diff === 1) { streak++; }
-        else { longest = Math.max(longest, streak); streak = 1; }
-    }
-    longest = Math.max(longest, streak);
-    return { current, longest };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Compute consistency for a period
-// ═══════════════════════════════════════════════════════════════════════════
-function computeConsistency(days) {
-    const today = new Date(); today.setHours(0,0,0,0);
-    let count = 0;
-    for (let i = 0; i < days; i++) {
-        const ds = dateStr(addDays(today, -i));
-        if (dataByDate[ds] && dataByDate[ds].pages > 0) count++;
-    }
-    return { daysRead: count, totalDays: days, pct: count / days * 100 };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Compute personal records (all-time)
-// ═══════════════════════════════════════════════════════════════════════════
-function computeRecords() {
-    // Use session-only data (no periods) for accurate records
-    if (sessionDailyData.length === 0) return { bestDay: null, bestWeek: null, bestMonth: null };
-
-    const sessionByDate = {};
-    sessionDailyData.forEach(d => { sessionByDate[d.date] = d; });
-
-    const sortedData = [...sessionDailyData].sort((a,b) => a.date.localeCompare(b.date));
-    const first = parseDate(sortedData[0].date);
-    const last  = parseDate(sortedData[sortedData.length - 1].date);
-
-    // Fill all calendar days between first and last (session-only)
-    const allDays = [];
-    for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
-        const ds = dateStr(d);
-        const data = sessionByDate[ds];
-        allDays.push({ date: ds, pages: data ? data.pages : 0, seconds: data ? data.seconds : 0 });
-    }
-    if (allDays.length === 0) return { bestDay: null, bestWeek: null, bestMonth: null };
-
-    // Best day
-    let bestDay = { pages: 0, date: '', seconds: 0 };
-    for (const d of allDays) {
-        if (d.pages > bestDay.pages) bestDay = { pages: d.pages, date: d.date, seconds: d.seconds };
-    }
-
-    // Best week (sliding window of 7)
-    let bestWeek = { pages: 0, seconds: 0, start: '', end: '' };
-    if (allDays.length >= 7) {
-        let pSum = 0, sSum = 0;
-        for (let i = 0; i < 7; i++) { pSum += allDays[i].pages; sSum += allDays[i].seconds; }
-        bestWeek = { pages: pSum, seconds: sSum, start: allDays[0].date, end: allDays[6].date };
-        for (let i = 7; i < allDays.length; i++) {
-            pSum += allDays[i].pages - allDays[i-7].pages;
-            sSum += allDays[i].seconds - allDays[i-7].seconds;
-            if (pSum > bestWeek.pages) {
-                bestWeek = { pages: pSum, seconds: sSum, start: allDays[i-6].date, end: allDays[i].date };
-            }
-        }
-    } else {
-        const p = allDays.reduce((s,d) => s+d.pages, 0);
-        const sc = allDays.reduce((s,d) => s+d.seconds, 0);
-        bestWeek = { pages: p, seconds: sc, start: allDays[0].date, end: allDays[allDays.length-1].date };
-    }
-
-    // Best month (sliding window of 30)
-    let bestMonth = { pages: 0, seconds: 0, start: '', end: '' };
-    if (allDays.length >= 30) {
-        let pSum = 0, sSum = 0;
-        for (let i = 0; i < 30; i++) { pSum += allDays[i].pages; sSum += allDays[i].seconds; }
-        bestMonth = { pages: pSum, seconds: sSum, start: allDays[0].date, end: allDays[29].date };
-        for (let i = 30; i < allDays.length; i++) {
-            pSum += allDays[i].pages - allDays[i-30].pages;
-            sSum += allDays[i].seconds - allDays[i-30].seconds;
-            if (pSum > bestMonth.pages) {
-                bestMonth = { pages: pSum, seconds: sSum, start: allDays[i-29].date, end: allDays[i].date };
-            }
-        }
-    } else {
-        const p = allDays.reduce((s,d) => s+d.pages, 0);
-        const sc = allDays.reduce((s,d) => s+d.seconds, 0);
-        bestMonth = { pages: p, seconds: sc, start: allDays[0].date, end: allDays[allDays.length-1].date };
-    }
-
-    return { bestDay, bestWeek, bestMonth };
-}
-
-function computeExtendedRecords() {
-    // Longest reading day (by time)
-    let longestDay = { seconds: 0, date: '', pages: 0 };
-    sessionDailyData.forEach(d => {
-        if (d.seconds > longestDay.seconds) longestDay = { seconds: d.seconds, date: d.date, pages: d.pages };
-    });
-
-    // Longest single session
-    let longestSession = { seconds: 0, date: '', pages: 0, bookId: '' };
-    allSessions.forEach(s => {
-        if (s.seconds > longestSession.seconds) {
-            longestSession = { seconds: s.seconds, date: s.date, pages: s.pages, bookId: s.book_id };
-        }
-    });
-
-    // Fastest reading day (pages/hour, minimum 30 min = 1800s)
-    let fastestDay = { pph: 0, date: '', pages: 0, seconds: 0 };
-    sessionDailyData.forEach(d => {
-        if (d.seconds >= 1800) {
-            const pph = d.pages / (d.seconds / 3600);
-            if (pph > fastestDay.pph) {
-                fastestDay = { pph, date: d.date, pages: d.pages, seconds: d.seconds };
-            }
-        }
-    });
-
-    return { longestDay, longestSession, fastestDay };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Render: Summary ribbon
 // ═══════════════════════════════════════════════════════════════════════════
 function renderSummary(days) {
@@ -389,136 +185,6 @@ function renderSummary(days) {
                 <div style="font-size:0.75rem; color:var(--lb-text-light);">${t('activity.pagesLabel')}</div>
             </div>
         </div>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Render: Streaks & Consistency
-// ═══════════════════════════════════════════════════════════════════════════
-function renderStreaks(days) {
-    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
-    const streaks = computeStreaks();
-    const con = computeConsistency(days);
-
-    document.getElementById('streakCards').innerHTML = `
-        <div class="card" style="flex:1; min-width:160px;">
-            <div class="card-body" style="text-align:center;">
-                <div class="meta-label">🔥 ${t('activity.currentStreak')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${streaks.current}</div>
-                <div style="font-size:0.75rem; color:var(--lb-text-light);">${streaks.current !== 1 ? t('activity.days') : t('activity.day')}</div>
-            </div>
-        </div>
-        <div class="card" style="flex:1; min-width:160px;">
-            <div class="card-body" style="text-align:center;">
-                <div class="meta-label">🏆 ${t('activity.longestStreak')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${streaks.longest}</div>
-                <div style="font-size:0.75rem; color:var(--lb-text-light);">${streaks.longest !== 1 ? t('activity.days') : t('activity.day')}</div>
-            </div>
-        </div>
-        <div class="card" style="flex:1; min-width:160px;">
-            <div class="card-body" style="text-align:center;">
-                <div class="meta-label">📈 ${t('activity.consistency')}</div>
-                <div style="font-size:1.6rem; font-weight:700; color:var(--lb-deep-orange);">${con.pct.toFixed(1)}%</div>
-                <div style="font-size:0.75rem; color:var(--lb-text-light);">${con.daysRead} / ${con.totalDays} ${t('activity.days')}</div>
-            </div>
-        </div>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Render: Heatmap (always last 52 weeks)
-// ═══════════════════════════════════════════════════════════════════════════
-function getHeatmapColors() {
-    const hex = cssVar('--lb-chart-line');
-    let r = 255, g = 95, b = 0;
-    if (hex && hex.startsWith('#') && hex.length >= 7) {
-        r = parseInt(hex.slice(1,3), 16);
-        g = parseInt(hex.slice(3,5), 16);
-        b = parseInt(hex.slice(5,7), 16);
-    }
-    return [
-        '#ebedf0',
-        `rgba(${r},${g},${b},0.25)`,
-        `rgba(${r},${g},${b},0.50)`,
-        `rgba(${r},${g},${b},0.75)`,
-        `rgba(${r},${g},${b},1.00)`,
-    ];
-}
-
-function renderHeatmap() {
-    const grid   = document.getElementById('heatmapGrid');
-    const months = document.getElementById('heatmapMonths');
-    grid.innerHTML = '';
-    months.innerHTML = '';
-
-    const today = new Date(); today.setHours(0,0,0,0);
-
-    // Monday of this week
-    const dow = today.getDay(); // 0=Sun
-    const thisMonday = addDays(today, dow === 0 ? -6 : -(dow - 1));
-    // Start 51 weeks before this Monday (52 weeks total including current)
-    const startDate = addDays(thisMonday, -51 * 7);
-    const totalDays = Math.round((today - startDate) / 86400000) + 1;
-    const numWeeks = Math.ceil(totalDays / 7);
-
-    // Collect non-zero page values for quartile calculation
-    const nonZero = [];
-    for (let i = 0; i < totalDays; i++) {
-        const ds = dateStr(addDays(startDate, i));
-        const d = dataByDate[ds];
-        if (d && d.pages > 0) nonZero.push(d.pages);
-    }
-    nonZero.sort((a,b) => a - b);
-    const q1 = nonZero[Math.floor(nonZero.length * 0.25)] || 1;
-    const q2 = nonZero[Math.floor(nonZero.length * 0.50)] || 1;
-    const q3 = nonZero[Math.floor(nonZero.length * 0.75)] || 1;
-
-    function getLevel(pages) {
-        if (pages <= 0) return 0;
-        if (pages <= q1) return 1;
-        if (pages <= q2) return 2;
-        if (pages <= q3) return 3;
-        return 4;
-    }
-
-    const colors = getHeatmapColors();
-
-    // Set legend colors
-    for (let i = 0; i <= 4; i++) {
-        document.getElementById('hmL' + i).style.background = colors[i];
-    }
-
-    // Render cells column-by-column (week by week)
-    // CSS grid-auto-flow: column with 7 rows → each 7 items = one column/week
-    let lastMonth = -1;
-    for (let week = 0; week < numWeeks; week++) {
-        // Month label check at start of each week
-        const weekStart = addDays(startDate, week * 7);
-        if (weekStart.getMonth() !== lastMonth && weekStart <= today) {
-            lastMonth = weekStart.getMonth();
-            const label = document.createElement('span');
-            label.textContent = weekStart.toLocaleString('en', { month: 'short' });
-            label.style.position = 'absolute';
-            label.style.left = (week * 17) + 'px';
-            months.appendChild(label);
-        }
-
-        for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-            const cellDate = addDays(startDate, week * 7 + dayOfWeek);
-            const cell = document.createElement('div');
-            cell.className = 'heatmap-cell';
-
-            if (cellDate > today) {
-                cell.style.visibility = 'hidden';
-            } else {
-                const ds = dateStr(cellDate);
-                const data = dataByDate[ds];
-                const pages = data ? data.pages : 0;
-                const level = getLevel(pages);
-                cell.style.background = colors[level];
-                cell.title = ds + ': ' + pages + ' page' + (pages !== 1 ? 's' : '');
-            }
-            grid.appendChild(cell);
-        }
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -786,195 +452,14 @@ function renderActiveBooks(days) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Render: Estimated Finish Dates
-// ═══════════════════════════════════════════════════════════════════════════
-function renderFinishEstimates() {
-    const container = document.getElementById('finishEstimates');
-    if (!container) return;
-
-    const today = new Date(); today.setHours(0,0,0,0);
-    const thirtyAgoStr = dateStr(addDays(today, -30));
-    const todayStr = dateStr(today);
-
-    let html = '';
-    readingBooks.forEach(book => {
-        const sessions = bookDaily[book.id] || [];
-        const recentSessions = sessions
-            .filter(s => s.date >= thirtyAgoStr && s.date <= todayStr)
-            .sort((a, b) => a.date.localeCompare(b.date));
-        const recentPages = recentSessions.reduce((sum, s) => sum + s.pages, 0);
-
-        // Divide by days since first session in window (not full 30 days)
-        let spanDays = 0;
-        if (recentSessions.length > 0) {
-            const firstSession = parseDate(recentSessions[0].date);
-            spanDays = Math.round((today - firstSession) / 86400000) + 1;
-            spanDays = Math.max(spanDays, 1);
-        }
-        const pace = spanDays > 0 ? recentPages / spanDays : 0;
-
-        let estStr = 'No recent activity';
-        let estDate = '';
-        if (pace > 0 && book.pages_remaining > 0) {
-            const d = Math.ceil(book.pages_remaining / pace);
-            estStr = '~' + d + ' day' + (d !== 1 ? 's' : '');
-            estDate = addDays(today, d).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
-        } else if (book.pages_remaining === 0) {
-            estStr = 'Almost done!';
-        }
-
-        const cover = book.has_cover
-            ? '<img src="/cover/' + book.id + '?v=' + (book.cover_hash || '') + '" alt="' + esc(book.name) + '">'
-            : '<div class="cover-placeholder" style="width:100%;height:100%;background:var(--lb-gradient);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📖</div>';
-
-        html += `
-            <div class="finish-card">
-                <a href="/book/${book.id}" class="finish-cover">${cover}</a>
-                <div class="finish-info">
-                    <a href="/book/${book.id}" class="finish-title">${esc(book.name)}</a>
-                    <div class="progress-bar-wrap"><div class="progress-bar" style="width:${book.progress_pct}%"></div></div>
-                    <div style="font-size:0.82rem; color:var(--lb-text-light);">
-                        ${book.pages_read} / ${book.effective_pages} pages (${book.progress_pct}%)
-                    </div>
-                    <div style="font-size:0.82rem; margin-top:0.35rem;">
-                        <span style="color:var(--lb-text-light);">${pace > 0 ? pace.toFixed(1) + ' pg/day' : '—'}</span>
-                        <span style="color:var(--lb-deep-orange); font-weight:600; margin-left:0.5rem;">${estStr}</span>
-                        ${estDate ? '<span style="color:var(--lb-text-light);"> · ' + estDate + '</span>' : ''}
-                    </div>
-                </div>
-            </div>`;
-    });
-
-    container.innerHTML = html || '<p style="color:var(--lb-text-light); margin:0;">No books currently being read.</p>';
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Render: Personal Records
-// ═══════════════════════════════════════════════════════════════════════════
-function renderRecords() {
-    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
-    const r = computeRecords();
-    const ext = computeExtendedRecords();
-    const container = document.getElementById('personalRecords');
-
-    if (!r.bestDay) {
-        container.innerHTML = '<p style="color:var(--lb-text-light); margin:0;">Not enough data yet.</p>';
-        return;
-    }
-
-    // Book name for longest session
-    const lsBook = ext.longestSession.bookId && allBooks[ext.longestSession.bookId]
-        ? allBooks[ext.longestSession.bookId].name : '';
-
-    // Book names for most parallel
-    let parallelNames = '';
-    let parallelTooltip = '';
-    if (mostParallel.count > 0 && mostParallel.date) {
-        const bids = allSessions
-            .filter(s => s.date === mostParallel.date)
-            .map(s => s.book_id);
-        const unique = [...new Set(bids)];
-        const names = unique.map(bid => allBooks[bid] ? esc(allBooks[bid].name) : '?');
-        parallelTooltip = '<ul style="margin:0;padding:0 0 0 1.1em;text-align:left">' +
-            names.map(n => '<li>' + n + '</li>').join('') + '</ul>';
-    }
-
-    container.innerHTML = `
-        <div class="record-card">
-            <div class="record-icon">📄</div>
-            <div class="record-label">${t('activity.mostPagesDay')}</div>
-            <div class="record-value">${r.bestDay.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestDay.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestDay.seconds) + '</div>' : ''}
-            <div class="record-date">${fmtDateNice(r.bestDay.date)}</div>
-        </div>
-        <div class="record-card">
-            <div class="record-icon">⏱️</div>
-            <div class="record-label">${t('activity.mostTimeDay')}</div>
-            <div class="record-value">${formatDuration(ext.longestDay.seconds)}</div>
-            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.longestDay.pages} ${t('activity.pagesLabel')}</div>
-            <div class="record-date">${fmtDateNice(ext.longestDay.date)}</div>
-        </div>
-        <div class="record-card">
-            <div class="record-icon">🔖</div>
-            <div class="record-label">${t('activity.longestSession')}</div>
-            <div class="record-value">${formatDuration(ext.longestSession.seconds)}</div>
-            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.longestSession.pages} ${t('activity.pagesLabel')}</div>
-            ${lsBook ? '<div class="record-date">' + esc(lsBook) + '</div>' : ''}
-            <div class="record-date">${fmtDateNice(ext.longestSession.date)}</div>
-        </div>
-        ${ext.fastestDay.pph > 0 ? `
-        <div class="record-card">
-            <div class="record-icon">⚡</div>
-            <div class="record-label">${t('activity.fastestDay')}</div>
-            <div class="record-value">${ext.fastestDay.pph.toFixed(1)} pg/h</div>
-            <div style="font-size:0.82rem; color:var(--lb-text-light);">${ext.fastestDay.pages} ${t('activity.pagesLabel')} · ${formatDuration(ext.fastestDay.seconds)}</div>
-            <div class="record-date">${fmtDateNice(ext.fastestDay.date)}</div>
-        </div>` : ''}
-        <div class="record-card">
-            <div class="record-icon">📆</div>
-            <div class="record-label">${t('activity.bestWeek')}</div>
-            <div class="record-value">${r.bestWeek.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestWeek.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestWeek.seconds) + '</div>' : ''}
-            <div class="record-date">${fmtDateNice(r.bestWeek.start)} – ${fmtDateNice(r.bestWeek.end)}</div>
-        </div>
-        <div class="record-card">
-            <div class="record-icon">🗓️</div>
-            <div class="record-label">${t('activity.bestMonth')}</div>
-            <div class="record-value">${r.bestMonth.pages.toLocaleString()} ${t('activity.pagesLabel')}</div>
-            ${r.bestMonth.seconds > 0 ? '<div style="font-size:0.82rem; color:var(--lb-text-light);">' + formatDuration(r.bestMonth.seconds) + '</div>' : ''}
-            <div class="record-date">${fmtDateNice(r.bestMonth.start)} – ${fmtDateNice(r.bestMonth.end)}</div>
-        </div>
-        ${mostParallel.count > 1 ? `
-        <div class="record-card record-card-tooltip-wrap">
-            <div class="record-icon">📚</div>
-            <div class="record-label">${t('activity.mostBooksParallel')}</div>
-            <div class="record-value">${mostParallel.count} ${t('activity.books')}</div>
-            <div class="record-date">${fmtDateNice(mostParallel.date)}</div>
-            ${parallelTooltip ? '<div class="record-tooltip">' + parallelTooltip + '</div>' : ''}
-        </div>` : ''}
-        <div class="record-card">
-            <div class="record-icon">✅</div>
-            <div class="record-label">${t('activity.totalBooksFinished')}</div>
-            <div class="record-value">${booksFinished}</div>
-        </div>
-        <div class="record-card">
-            <div class="record-icon">📖</div>
-            <div class="record-label">${t('activity.totalPagesAll')}</div>
-            <div class="record-value">${totalAllPages.toLocaleString()}</div>
-        </div>
-        <div class="record-card">
-            <div class="record-icon">⏳</div>
-            <div class="record-label">${t('activity.totalTimeAll')}</div>
-            <div class="record-value">${formatDuration(totalAllSeconds)}</div>
-        </div>
-        ${longestFinishedBook ? `
-        <div class="record-card">
-            <div class="record-icon">📏</div>
-            <div class="record-label">${t('activity.longestBookRead')}</div>
-            <div class="record-value">${longestFinishedBook.pages.toLocaleString()} ${t('activity.pagesSuffix')}</div>
-            <a href="/book/${longestFinishedBook.id}" style="font-size:0.78rem; color:var(--lb-deep-orange); text-decoration:none;">${esc(longestFinishedBook.name)}</a>
-        </div>` : ''}
-        ${mostRereadBook ? `
-        <div class="record-card">
-            <div class="record-icon">🔁</div>
-            <div class="record-label">${t('activity.mostRereadBook')}</div>
-            <div class="record-value">${mostRereadBook.count} ${t('activity.readTimes')}</div>
-            <a href="/book/${mostRereadBook.id}" style="font-size:0.78rem; color:var(--lb-deep-orange); text-decoration:none;">${esc(mostRereadBook.name)}</a>
-        </div>` : ''}`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Main update (called when period or mode changes)
 // ═══════════════════════════════════════════════════════════════════════════
 function updateAll() {
     renderSummary(currentPeriod);
-    renderStreaks(currentPeriod);
     createDailyChart(currentPeriod);
     createWeekdayChart(currentPeriod);
     createPaceChart(currentPeriod);
     renderActiveBooks(currentPeriod);
-    renderFinishEstimates();
-    renderRecords();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -999,7 +484,6 @@ document.querySelectorAll('input[name="dailyMode"]').forEach(radio => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Initial render
 // ═══════════════════════════════════════════════════════════════════════════
-renderHeatmap();
 updateAll();
 
 {% endif %}

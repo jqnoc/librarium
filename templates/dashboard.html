@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+{% block title %}Librarium – Dashboard{% endblock %}
+
+{% block content %}
+<div class="library-header">
+    <h1 data-i18n="dash.title">Dashboard</h1>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Hero Stats Ribbon                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="library-stat-ribbon">
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📚</div>
+        <div class="library-stat-value">{{ total_books }}</div>
+        <div class="library-stat-label" data-i18n="index.totalBooks">Total Books</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">✅</div>
+        <div class="library-stat-value">{{ finished_count }}</div>
+        <div class="library-stat-label" data-i18n="index.finished">Finished</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📖</div>
+        <div class="library-stat-value">{{ reading_count }}</div>
+        <div class="library-stat-label" data-i18n="index.currentlyReading">Currently Reading</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">📄</div>
+        <div class="library-stat-value">{{ "{:,}".format(total_library_pages) }}</div>
+        <div class="library-stat-label" data-i18n="index.totalPages">Total Pages</div>
+    </div>
+    <div class="library-stat-tile" title="{{ total_library_time_hms }}">
+        <div class="library-stat-icon">⏱️</div>
+        <div class="library-stat-value">{{ total_library_time }}</div>
+        <div class="library-stat-label" data-i18n="index.totalTimeRead">Total Time Read</div>
+    </div>
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">✍️</div>
+        <div class="library-stat-value">{{ unique_authors }}</div>
+        <div class="library-stat-label" data-i18n="index.uniqueAuthors">Unique Authors</div>
+    </div>
+    {% if avg_rating %}
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">⭐</div>
+        <div class="library-stat-value">{{ "%.2f" | format(avg_rating) }}</div>
+        <div class="library-stat-label" data-i18n="dash.avgRating">Avg Rating</div>
+    </div>
+    {% endif %}
+    <div class="library-stat-tile">
+        <div class="library-stat-icon">🏠</div>
+        <div class="library-stat-value">{{ owned_count }}</div>
+        <div class="library-stat-label" data-i18n="index.booksOwned">Books Owned</div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Currently Reading                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if reading_books %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.currentlyReading">Currently Reading</h2>
+    <div class="dash-reading-grid">
+        {% for book in reading_books %}
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-reading-card">
+            <div class="dash-reading-cover">
+                {% if book.has_cover %}
+                <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                {% else %}
+                <div class="cover-placeholder">📖</div>
+                {% endif %}
+            </div>
+            <div class="dash-reading-info">
+                <div class="dash-reading-title">{{ book.name }}</div>
+                <div class="dash-reading-author">{{ book.author }}</div>
+                <div class="progress-bar-wrap"><div class="progress-bar" style="width:{{ book.progress_pct }}%"></div></div>
+                <div class="dash-reading-meta">
+                    {% if book.format in ('audiobook', 'ebook') %}
+                    {{ book.progress_pct }}%
+                    {% else %}
+                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> ({{ book.progress_pct }}%)
+                    {% endif %}
+                </div>
+                {% if book.last_activity %}
+                <div class="dash-reading-last" data-date="{{ book.last_activity }}"></div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- This Year + Streak & Consistency                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="dash-two-col">
+    <!-- This Year at a Glance -->
+    <div class="dash-section">
+        <h2 class="dash-heading"><span data-i18n="dash.thisYear">This Year at a Glance</span> ({{ current_year }})</h2>
+        <div class="dash-year-grid">
+            <div class="record-card">
+                <div class="record-icon">✅</div>
+                <div class="record-value">{{ books_finished_this_year }}</div>
+                <div class="record-label" data-i18n="dash.booksFinishedYear">Books Finished</div>
+                {% if yoy_diff != 0 %}
+                <div class="dash-yoy {% if yoy_diff > 0 %}dash-yoy-up{% else %}dash-yoy-down{% endif %}">
+                    {{ "↑" if yoy_diff > 0 else "↓" }} {{ yoy_diff|abs }} <span data-i18n="dash.vsLastYear">vs last year</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="record-card">
+                <div class="record-icon">📄</div>
+                <div class="record-value">{{ "{:,}".format(pages_this_year) }}</div>
+                <div class="record-label" data-i18n="dash.pagesYear">Pages Read</div>
+            </div>
+            <div class="record-card">
+                <div class="record-icon">⏱️</div>
+                <div class="record-value">{{ time_this_year }}</div>
+                <div class="record-label" data-i18n="dash.timeYear">Time Read</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Streak & Consistency -->
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.streaks">Streak & Consistency</h2>
+        <div id="dashStreakCards" class="dash-year-grid"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Activity Heatmap (compact, last 12 weeks)                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if daily_data %}
+<div class="dash-section">
+    <h2 class="dash-heading">
+        <span data-i18n="activity.heatmap">Reading Heatmap</span>
+        <span style="font-size: 0.75rem; color: var(--lb-text-light);" data-i18n="dash.last12Weeks">(last 12 weeks)</span>
+    </h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="heatmap-wrapper">
+                <div class="heatmap-day-labels">
+                    <span data-i18n="activity.mon">Mon</span><span></span><span data-i18n="activity.wed">Wed</span><span></span><span data-i18n="activity.fri">Fri</span><span></span><span></span>
+                </div>
+                <div class="heatmap-main">
+                    <div class="heatmap-months" id="dashHeatmapMonths"></div>
+                    <div class="heatmap-grid" id="dashHeatmapGrid"></div>
+                </div>
+            </div>
+            <div class="heatmap-legend" id="dashHeatmapLegend">
+                <span data-i18n="activity.less">Less</span>
+                <div class="heatmap-cell" id="dashHmL0"></div>
+                <div class="heatmap-cell" id="dashHmL1"></div>
+                <div class="heatmap-cell" id="dashHmL2"></div>
+                <div class="heatmap-cell" id="dashHmL3"></div>
+                <div class="heatmap-cell" id="dashHmL4"></div>
+                <span data-i18n="activity.more">More</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Recent Activity Feed                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if recent_activity %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.recentActivity">Recent Activity</h2>
+    <div class="card">
+        <div class="card-body dash-feed">
+            {% for item in recent_activity %}
+            <div class="dash-feed-item">
+                <div class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</div>
+                <div class="dash-feed-text">
+                    <span data-i18n="dash.read">Read</span>
+                    <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
+                    <span data-i18n="dash.of">of</span>
+                    <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                    {% if item.seconds %}
+                    <span class="dash-feed-time">({{ item.seconds // 3600 }}h {{ (item.seconds % 3600) // 60 }}m)</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Top Rated + Records                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="dash-two-col">
+    <!-- Top Rated Books -->
+    {% if top_rated %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.topRated">Top Rated Books</h2>
+        <div class="dash-top-rated">
+            {% for book in top_rated %}
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-rated-card">
+                <div class="dash-rated-cover">
+                    {% if book.has_cover %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                    {% else %}
+                    <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
+                    {% endif %}
+                </div>
+                <div class="dash-rated-info">
+                    <div class="dash-rated-title">{{ book.name }}</div>
+                    <div class="dash-rated-author">{{ book.author }}</div>
+                    <div class="dash-rated-score">⭐ {{ "%.2f" | format(book.rating) }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Records -->
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.records">Records</h2>
+        <div class="dash-records-grid">
+            {% if highest_rated_book %}
+            <div class="record-card">
+                <div class="record-icon">⭐</div>
+                <div class="record-label" data-i18n="stats.highestRated">Highest Rated Book</div>
+                <div class="record-value">{{ "%.2f" | format(highest_rated_book.rating) }}</div>
+                <a href="{{ url_for('book_detail', book_id=highest_rated_book.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ highest_rated_book.name }}</a>
+            </div>
+            {% endif %}
+            {% if longest_finished %}
+            <div class="record-card">
+                <div class="record-icon">📏</div>
+                <div class="record-label" data-i18n="stats.longestBook">Longest Book Read</div>
+                <div class="record-value">{{ "{:,}".format(longest_finished.pages) }} pp</div>
+                <a href="{{ url_for('book_detail', book_id=longest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ longest_finished.name }}</a>
+            </div>
+            {% endif %}
+            {% if shortest_finished %}
+            <div class="record-card">
+                <div class="record-icon">📐</div>
+                <div class="record-label" data-i18n="stats.shortestBook">Shortest Book Read</div>
+                <div class="record-value">{{ "{:,}".format(shortest_finished.pages) }} pp</div>
+                <a href="{{ url_for('book_detail', book_id=shortest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ shortest_finished.name }}</a>
+            </div>
+            {% endif %}
+            {% if most_reread %}
+            <div class="record-card">
+                <div class="record-icon">🔁</div>
+                <div class="record-label" data-i18n="stats.mostReread">Most Re-read</div>
+                <div class="record-value">{{ most_reread.count }}x</div>
+                <a href="{{ url_for('book_detail', book_id=most_reread.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ most_reread.name }}</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Format/Source + Tag Cloud                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="dash-two-col">
+    <!-- Format & Source -->
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.formatSource">Format & Source</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="card">
+                <div class="card-body" style="text-align: center;">
+                    <h3 style="margin-top: 0; font-size: 0.9rem; color: var(--lb-deep-orange);" data-i18n="dash.byFormat">By Format</h3>
+                    <canvas id="formatDonut" style="max-height: 200px;"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body" style="text-align: center;">
+                    <h3 style="margin-top: 0; font-size: 0.9rem; color: var(--lb-deep-orange);" data-i18n="dash.bySource">By Source</h3>
+                    <canvas id="sourceDonut" style="max-height: 200px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Cloud -->
+    {% if top_tags %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.tagCloud">Tag Cloud</h2>
+        <div class="card">
+            <div class="card-body">
+                <div id="dashTagCloud" class="word-cloud"></div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Author Spotlight + Series Progress                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="dash-two-col">
+    <!-- Author Spotlight -->
+    {% if most_read_author %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.authorSpotlight">Author Spotlight</h2>
+        <div class="card">
+            <div class="card-body" style="display: flex; align-items: center; gap: 1.2rem;">
+                <a href="{{ url_for('author_detail', author_name=most_read_author.name) }}" class="dash-author-photo">
+                    {% if most_read_author.has_photo %}
+                    <img src="{{ url_for('author_photo_thumb', author_name=most_read_author.name) }}?v={{ most_read_author.photo_hash }}" alt="{{ most_read_author.name }}">
+                    {% else %}
+                    <div class="cover-placeholder" style="width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">✍️</div>
+                    {% endif %}
+                </a>
+                <div>
+                    <a href="{{ url_for('author_detail', author_name=most_read_author.name) }}" style="font-weight: 600; color: var(--lb-deep-orange); text-decoration: none; font-size: 1.1rem;">{{ most_read_author.name }}</a>
+                    <div style="color: var(--lb-text-light); font-size: 0.85rem;">{{ most_read_author.count }} <span data-i18n="dash.booksInLibrary">books in library</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Series Progress -->
+    {% if series_progress %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.seriesProgress">Series Progress</h2>
+        <div class="card">
+            <div class="card-body">
+                {% for sp in series_progress %}
+                <div class="dash-series-item">
+                    <a href="{{ url_for('series_detail', series_id=sp.id) }}" class="dash-series-name">{{ sp.name }}</a>
+                    <div class="dash-series-bar-wrap">
+                        <div class="progress-bar-wrap" style="flex: 1;"><div class="progress-bar" style="width:{{ sp.pct }}%"></div></div>
+                        <span class="dash-series-count">{{ sp.finished }}/{{ sp.total }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Language Diversity + TBR Pile                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="dash-two-col">
+    <!-- Language Diversity -->
+    {% if language_counts %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.languages">Language Diversity</h2>
+        <div class="card">
+            <div class="card-body" style="text-align: center;">
+                <canvas id="langDonut" style="max-height: 200px;"></canvas>
+                <p style="margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--lb-text-light);">
+                    <span data-i18n="dash.readIn">You've read books in</span>
+                    <strong>{{ language_counts|length }}</strong>
+                    <span data-i18n="dash.languages2">languages</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TBR Pile -->
+    {% if not_started_count > 0 %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.tbrPile">To Be Read</h2>
+        <div class="card">
+            <div class="card-body">
+                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
+                    <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
+                </p>
+                <div class="dash-tbr-covers">
+                    {% for book in tbr_list %}
+                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
+                        {% if book.has_cover %}
+                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                        {% else %}
+                        <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Library Health                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if books_without_cover > 0 or finished_unrated > 0 or authors_without_photo > 0 %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.libraryHealth">Library Health</h2>
+    <div class="dash-health-row">
+        {% if finished_unrated > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">⭐</span>
+            <span><strong>{{ finished_unrated }}</strong> <span data-i18n="dash.unratedBooks">finished books have no rating</span></span>
+        </div>
+        {% endif %}
+        {% if books_without_cover > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">🖼️</span>
+            <span><strong>{{ books_without_cover }}</strong> <span data-i18n="dash.noCover">books without cover</span></span>
+        </div>
+        {% endif %}
+        {% if authors_without_photo > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">📷</span>
+            <span><strong>{{ authors_without_photo }}</strong> <span data-i18n="dash.noPhoto">authors without photo</span></span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// Data from backend
+// ═══════════════════════════════════════════════════════════════════════════
+const dailyData     = {{ daily_data | tojson }};
+const readingBooks  = {{ reading_books | tojson }};
+const formatCounts  = {{ format_counts | tojson }};
+const sourceCounts  = {{ source_counts | tojson }};
+{% if language_counts %}const languageCounts = {{ language_counts | tojson }};{% endif %}
+{% if top_tags %}const topTags = {{ top_tags | tojson }};{% endif %}
+
+function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function dateStr(d) {
+    return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+}
+function parseDate(s) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+function addDays(d, n) {
+    const r = new Date(d.getTime());
+    r.setDate(r.getDate() + n);
+    return r;
+}
+
+const dataByDate = {};
+dailyData.forEach(d => { dataByDate[d.date] = d; });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Streaks & Consistency
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+    const readDates = new Set(dailyData.filter(d => d.pages > 0).map(d => d.date));
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Current streak
+    let current = 0;
+    let check = new Date(today);
+    if (!readDates.has(dateStr(check))) check = addDays(check, -1);
+    while (readDates.has(dateStr(check))) { current++; check = addDays(check, -1); }
+
+    // Longest streak
+    const sorted = Array.from(readDates).sort();
+    let longest = 0, streak = 1;
+    for (let i = 1; i < sorted.length; i++) {
+        const diff = Math.round((parseDate(sorted[i]) - parseDate(sorted[i-1])) / 86400000);
+        if (diff === 1) streak++; else { longest = Math.max(longest, streak); streak = 1; }
+    }
+    longest = Math.max(longest, streak);
+
+    // Consistency (last 30 days)
+    let daysRead30 = 0;
+    for (let i = 0; i < 30; i++) {
+        const ds = dateStr(addDays(today, -i));
+        if (dataByDate[ds] && dataByDate[ds].pages > 0) daysRead30++;
+    }
+
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
+    const container = document.getElementById('dashStreakCards');
+    if (container) {
+        container.innerHTML = `
+            <div class="record-card">
+                <div class="record-icon">🔥</div>
+                <div class="record-value">${current}</div>
+                <div class="record-label">${t('activity.currentStreak')}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${current !== 1 ? t('activity.days') : t('activity.day')}</div>
+            </div>
+            <div class="record-card">
+                <div class="record-icon">🏆</div>
+                <div class="record-value">${longest}</div>
+                <div class="record-label">${t('activity.longestStreak')}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${longest !== 1 ? t('activity.days') : t('activity.day')}</div>
+            </div>
+            <div class="record-card">
+                <div class="record-icon">📈</div>
+                <div class="record-value">${(daysRead30 / 30 * 100).toFixed(1)}%</div>
+                <div class="record-label">${t('activity.consistency')}</div>
+                <div style="font-size:0.75rem; color:var(--lb-text-light);">${daysRead30} / 30 ${t('activity.days')}</div>
+            </div>`;
+    }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Compact Heatmap (last 12 weeks)
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+    const grid   = document.getElementById('dashHeatmapGrid');
+    const months = document.getElementById('dashHeatmapMonths');
+    if (!grid || !months) return;
+    grid.innerHTML = '';
+    months.innerHTML = '';
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dow = today.getDay();
+    const thisMonday = addDays(today, dow === 0 ? -6 : -(dow - 1));
+    const WEEKS = 12;
+    const startDate = addDays(thisMonday, -(WEEKS - 1) * 7);
+    const totalDays = Math.round((today - startDate) / 86400000) + 1;
+    const numWeeks = Math.ceil(totalDays / 7);
+
+    const nonZero = [];
+    for (let i = 0; i < totalDays; i++) {
+        const ds = dateStr(addDays(startDate, i));
+        const d = dataByDate[ds];
+        if (d && d.pages > 0) nonZero.push(d.pages);
+    }
+    nonZero.sort((a,b) => a - b);
+    const q1 = nonZero[Math.floor(nonZero.length * 0.25)] || 1;
+    const q2 = nonZero[Math.floor(nonZero.length * 0.50)] || 1;
+    const q3 = nonZero[Math.floor(nonZero.length * 0.75)] || 1;
+
+    function getLevel(pages) {
+        if (pages <= 0) return 0;
+        if (pages <= q1) return 1;
+        if (pages <= q2) return 2;
+        if (pages <= q3) return 3;
+        return 4;
+    }
+
+    const hex = cssVar('--lb-chart-line');
+    let r = 255, g = 95, b = 0;
+    if (hex && hex.startsWith('#') && hex.length >= 7) {
+        r = parseInt(hex.slice(1,3), 16);
+        g = parseInt(hex.slice(3,5), 16);
+        b = parseInt(hex.slice(5,7), 16);
+    }
+    const colors = [
+        '#ebedf0',
+        `rgba(${r},${g},${b},0.25)`,
+        `rgba(${r},${g},${b},0.50)`,
+        `rgba(${r},${g},${b},0.75)`,
+        `rgba(${r},${g},${b},1.00)`,
+    ];
+
+    for (let i = 0; i <= 4; i++) {
+        const el = document.getElementById('dashHmL' + i);
+        if (el) el.style.background = colors[i];
+    }
+
+    let lastMonth = -1;
+    for (let week = 0; week < numWeeks; week++) {
+        const weekStart = addDays(startDate, week * 7);
+        if (weekStart.getMonth() !== lastMonth && weekStart <= today) {
+            lastMonth = weekStart.getMonth();
+            const label = document.createElement('span');
+            label.textContent = weekStart.toLocaleString('en', { month: 'short' });
+            label.style.position = 'absolute';
+            label.style.left = (week * 17) + 'px';
+            months.appendChild(label);
+        }
+        for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+            const cellDate = addDays(startDate, week * 7 + dayOfWeek);
+            const cell = document.createElement('div');
+            cell.className = 'heatmap-cell';
+            if (cellDate > today) {
+                cell.style.visibility = 'hidden';
+            } else {
+                const ds = dateStr(cellDate);
+                const data = dataByDate[ds];
+                const pages = data ? data.pages : 0;
+                cell.style.background = colors[getLevel(pages)];
+                cell.title = ds + ': ' + pages + ' page' + (pages !== 1 ? 's' : '');
+            }
+            grid.appendChild(cell);
+        }
+    }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Last Activity relative dates
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
+    document.querySelectorAll('.dash-reading-last[data-date]').forEach(function(el) {
+        const ds = el.getAttribute('data-date');
+        if (!ds) return;
+        const d = parseDate(ds);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const diff = Math.round((today - d) / 86400000);
+        if (diff === 0) el.textContent = t('dash.today');
+        else if (diff === 1) el.textContent = t('dash.yesterday');
+        else el.textContent = diff + ' ' + t('dash.daysAgo');
+    });
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Donut Charts
+// ═══════════════════════════════════════════════════════════════════════════
+const TOOLTIP_OPTS = {
+    backgroundColor: cssVar('--lb-chart-tooltip-bg') || '#1f2937',
+    titleColor: cssVar('--lb-chart-tooltip-title') || '#FFC300',
+    bodyColor: '#fff',
+    borderColor: cssVar('--lb-chart-tooltip-border') || '#374151',
+    borderWidth: 1, padding: 12, displayColors: true,
+};
+const DONUT_COLORS = [
+    cssVar('--lb-chart-bar1') || '#537D96',
+    cssVar('--lb-chart-bar2') || '#EC8F8D',
+    cssVar('--lb-finished')   || '#10B981',
+    cssVar('--lb-reading')    || '#3B82F6',
+    cssVar('--lb-not-started')|| '#8B5CF6',
+    cssVar('--lb-abandoned')  || '#DC2626',
+    cssVar('--lb-draft')      || '#6B7280',
+    '#F59E0B', '#06B6D4',
+];
+
+function makeDonut(canvasId, dataMap) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const entries = Object.entries(dataMap).filter(e => e[1] > 0).sort((a,b) => b[1] - a[1]);
+    if (entries.length === 0) { canvas.parentElement.innerHTML = '<p style="color:var(--lb-muted);">No data</p>'; return; }
+    new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: entries.map(e => e[0].charAt(0).toUpperCase() + e[0].slice(1)),
+            datasets: [{ data: entries.map(e => e[1]), backgroundColor: DONUT_COLORS.slice(0, entries.length), borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 10, font: { size: 11 } } },
+                tooltip: { ...TOOLTIP_OPTS, callbacks: {
+                    label(ctx) { const total = ctx.dataset.data.reduce((s,v) => s+v, 0); return `${ctx.label}: ${ctx.parsed} (${(ctx.parsed/total*100).toFixed(1)}%)`; }
+                }}
+            }
+        }
+    });
+}
+
+makeDonut('formatDonut', formatCounts);
+makeDonut('sourceDonut', sourceCounts);
+{% if language_counts %}makeDonut('langDonut', languageCounts);{% endif %}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tag Cloud (compact)
+// ═══════════════════════════════════════════════════════════════════════════
+{% if top_tags %}
+(function() {
+    const container = document.getElementById('dashTagCloud');
+    if (!container) return;
+    const entries = Object.entries(topTags).sort((a,b) => b[1] - a[1]);
+    if (entries.length === 0) return;
+    const maxCount = entries[0][1], minCount = entries[entries.length-1][1];
+    entries.forEach(([word, count]) => {
+        const a = document.createElement('a');
+        a.textContent = word;
+        a.href = '/library?tag=' + encodeURIComponent(word);
+        a.className = 'tag-cloud-pill';
+        const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
+        a.style.fontSize = (0.75 + ratio * 0.85) + 'rem';
+        if (ratio > 0.6) a.classList.add('tag-cloud-pill--hot');
+        a.title = word + ': ' + count;
+        container.appendChild(a);
+    });
+})();
+{% endif %}
+</script>
+{% endblock %}

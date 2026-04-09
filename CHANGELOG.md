@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Dashboard page (`/`) as the new landing page with hero stats ribbon,
+  currently reading books, this-year-at-a-glance with YoY comparison,
+  streaks & consistency, compact heatmap (12 weeks), recent activity
+  feed, top-rated books, records, format & source donut charts, tag
+  cloud, author spotlight, series progress, language diversity, TBR
+  pile, and library health nudges
+- Dashboard link in the navigation bar; logo now links to the dashboard
+- Full i18n support (EN / ES) for all new dashboard strings
+
+### Changed
+- Library page moved from `/` to `/library`; all existing library links
+  and redirects updated accordingly
+- Removed stats ribbon from the library index page (moved to dashboard)
+- Removed summary record cards (highest rated, longest, shortest, most
+  re-read) from the global stats page (moved to dashboard)
+- Removed streaks & consistency, heatmap, estimated finish dates, and
+  personal records from the activity page (moved to dashboard)
+- 404 page now links back to the dashboard instead of the library
+
 ## [1.1.0] — 2026-04-05
 
 ### Added

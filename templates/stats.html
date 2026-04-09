@@ -65,50 +65,6 @@
 
 <h2 style="color: var(--lb-deep-orange); margin-top: 2.5rem; margin-bottom: 1.5rem;" data-i18n="stats.libraryStats">Library Stats 📊</h2>
 
-<!-- Summary cards row -->
-<div class="library-records-row" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
-    {% if highest_rated_book %}
-    <div class="record-card" style="flex: 1; min-width: 180px;">
-        <div class="record-icon">⭐</div>
-        <div class="record-label" data-i18n="stats.highestRated">Highest Rated Book</div>
-        <div class="record-value">{{ "%.2f" | format(highest_rated_book.rating) }}</div>
-        <a href="{{ url_for('book_detail', book_id=highest_rated_book.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ highest_rated_book.name }}</a>
-    </div>
-    {% endif %}
-    {% if avg_finished_rating %}
-    <div class="record-card" style="flex: 1; min-width: 180px;">
-        <div class="record-icon">📊</div>
-        <div class="record-label" data-i18n="stats.avgRating">Average Rating (Finished)</div>
-        <div class="record-value">{{ "%.2f" | format(avg_finished_rating) }}</div>
-        <div class="record-date" data-i18n="stats.acrossRated">across rated books</div>
-    </div>
-    {% endif %}
-    {% if longest_finished %}
-    <div class="record-card" style="flex: 1; min-width: 180px;">
-        <div class="record-icon">📏</div>
-        <div class="record-label" data-i18n="stats.longestBook">Longest Book Read</div>
-        <div class="record-value">{{ "{:,}".format(longest_finished.pages) }} pp</div>
-        <a href="{{ url_for('book_detail', book_id=longest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ longest_finished.name }}</a>
-    </div>
-    {% endif %}
-    {% if shortest_finished %}
-    <div class="record-card" style="flex: 1; min-width: 180px;">
-        <div class="record-icon">📐</div>
-        <div class="record-label" data-i18n="stats.shortestBook">Shortest Book Read</div>
-        <div class="record-value">{{ "{:,}".format(shortest_finished.pages) }} pp</div>
-        <a href="{{ url_for('book_detail', book_id=shortest_finished.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ shortest_finished.name }}</a>
-    </div>
-    {% endif %}
-    {% if most_reread %}
-    <div class="record-card" style="flex: 1; min-width: 180px;">
-        <div class="record-icon">🔁</div>
-        <div class="record-label" data-i18n="stats.mostReread">Most Re-read</div>
-        <div class="record-value">{{ most_reread.count }} times</div>
-        <a href="{{ url_for('book_detail', book_id=most_reread.id) }}" class="record-date" style="text-decoration: none; color: var(--lb-deep-orange);">{{ most_reread.name }}</a>
-    </div>
-    {% endif %}
-</div>
-
 <!-- Library bar charts -->
 <div class="library-charts-stack">
     <div class="library-charts-grid">
