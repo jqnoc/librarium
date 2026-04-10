@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Dashboard page (`/`) as the new landing page with hero stats ribbon,
-  currently reading books, this-year-at-a-glance with YoY comparison,
-  streaks & consistency, compact heatmap (12 weeks), recent activity
-  feed, top-rated books, records, format & source donut charts, tag
-  cloud, author spotlight, series progress, language diversity, TBR
-  pile, and library health nudges
+  currently reading books, this-year-at-a-glance with YoY comparison
+  (books, pages, and time), streaks & consistency, reading heatmap
+  (52 weeks), comprehensive recent activity feed (50 items with
+  thumbnails and event types: read, finished, started, bought, borrowed,
+  gifted), top-rated books, records, format & source donut charts, tag
+  cloud, author spotlight (4 random authors), series progress, language
+  diversity, dynamic TBR pile, and expanded library health nudges
+  (unrated, no cover, no photo, no tags, abandoned, no pages, no
+  summary, no author)
 - Dashboard link in the navigation bar; logo now links to the dashboard
 - Full i18n support (EN / ES) for all new dashboard strings
 

@@ -1874,6 +1874,7 @@ def dashboard():
     """Dashboard – overview of reading stats, currently reading, streaks, etc."""
     from collections import Counter
     from datetime import date, timedelta
+    import random
 
     db = get_db()
     lib_ids = _get_selected_library_ids()
@@ -2076,21 +2077,125 @@ def dashboard():
                 books_finished_prev_ytd += 1
     yoy_diff = books_finished_this_year - books_finished_prev_ytd
 
-    # ── Recent activity feed ─────────────────────────────────────────────
-    recent_sessions = db.execute(
-        "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name "
+    # Pages and time for previous year YTD
+    pages_prev_ytd = 0
+    time_prev_ytd = 0
+    for row in db.execute(
+        "SELECT COALESCE(SUM(s.pages),0) AS p, COALESCE(SUM(s.duration_seconds),0) AS t "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date DESC, s.id DESC LIMIT 10", lp_b
-    ).fetchall()
+        f"WHERE s.date >= ? AND s.date <= ? AND {lf_b}", (prev_year_start, same_day_prev_year, *lp_b)
+    ).fetchall():
+        pages_prev_ytd += row["p"] or 0
+        time_prev_ytd += row["t"] or 0
+    for row in db.execute(
+        "SELECT COALESCE(SUM(p.pages),0) AS p FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.end_date >= ? AND p.end_date <= ? AND {lf_b}", (prev_year_start, same_day_prev_year, *lp_b)
+    ).fetchall():
+        pages_prev_ytd += row["p"] or 0
+    yoy_pages_diff = pages_this_year - pages_prev_ytd
+    yoy_time_diff = time_this_year - time_prev_ytd
+
+    # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = []
-    for rs in recent_sessions:
+    # Sessions: "read N pages of X"
+    for rs in db.execute(
+        "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "b.has_cover, b.cover_hash "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date DESC, s.id DESC LIMIT 50", lp_b
+    ).fetchall():
         recent_activity.append({
-            "date": rs["date"],
-            "pages": rs["pages"],
-            "seconds": rs["duration_seconds"],
-            "book_id": rs["book_id"],
-            "book_name": rs["book_name"],
+            "date": rs["date"], "type": "session",
+            "pages": rs["pages"], "seconds": rs["duration_seconds"],
+            "book_id": rs["book_id"], "book_name": rs["book_name"],
+            "has_cover": bool(rs["has_cover"]), "cover_hash": rs["cover_hash"] or "",
         })
+    # Periods: "read N pages of X"
+    for rp in db.execute(
+        "SELECT p.end_date, p.pages, p.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "b.has_cover, b.cover_hash "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} ORDER BY p.end_date DESC, p.id DESC LIMIT 50", lp_b
+    ).fetchall():
+        recent_activity.append({
+            "date": rp["end_date"], "type": "period",
+            "pages": rp["pages"], "seconds": rp["duration_seconds"],
+            "book_id": rp["book_id"], "book_name": rp["book_name"],
+            "has_cover": bool(rp["has_cover"]), "cover_hash": rp["cover_hash"] or "",
+        })
+    # Finished readings: "finished X"
+    for fr in db.execute(
+        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
+        "FROM readings r JOIN books b ON b.id = r.book_id "
+        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
+    ).fetchall():
+        candidates = []
+        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (fr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (fr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        if candidates:
+            recent_activity.append({
+                "date": max(candidates), "type": "finished",
+                "book_id": fr["book_id"], "book_name": fr["book_name"],
+                "has_cover": bool(fr["has_cover"]), "cover_hash": fr["cover_hash"] or "",
+            })
+    # Started: first activity date per reading → "started X"
+    for sr in db.execute(
+        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
+        "FROM readings r JOIN books b ON b.id = r.book_id "
+        f"WHERE {lf_b}", lp_b
+    ).fetchall():
+        candidates = []
+        r = db.execute("SELECT MIN(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (sr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        r = db.execute("SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''", (sr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        if candidates:
+            recent_activity.append({
+                "date": min(candidates), "type": "started",
+                "book_id": sr["book_id"], "book_name": sr["book_name"],
+                "has_cover": bool(sr["has_cover"]), "cover_hash": sr["cover_hash"] or "",
+            })
+    # Purchased: "bought X"
+    for bk in db.execute(
+        f"SELECT id, name, has_cover, cover_hash, purchase_date, source_type, source_id "
+        f"FROM books WHERE {lf} AND purchase_date IS NOT NULL AND purchase_date != '' "
+        f"AND source_type IN ('owned','physical_store','web_store') AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchall():
+        recent_activity.append({
+            "date": bk["purchase_date"], "type": "bought",
+            "book_id": bk["id"], "book_name": bk["name"],
+            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
+        })
+    # Borrowed: "borrowed X from Y"
+    for bk in db.execute(
+        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.borrowed_start, b.source_id, "
+        f"s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
+        f"AND b.source_type IN ('library','person') AND (b.work_id IS NULL OR b.is_primary_edition = 1)", lp
+    ).fetchall():
+        recent_activity.append({
+            "date": bk["borrowed_start"], "type": "borrowed",
+            "book_id": bk["id"], "book_name": bk["name"],
+            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
+            "source_name": bk["source_name"] or "",
+        })
+    # Gifted: "received X as a gift"
+    for bk in db.execute(
+        f"SELECT id, name, has_cover, cover_hash, purchase_date "
+        f"FROM books WHERE {lf} AND is_gift = 1 AND purchase_date IS NOT NULL AND purchase_date != '' "
+        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchall():
+        recent_activity.append({
+            "date": bk["purchase_date"], "type": "gift",
+            "book_id": bk["id"], "book_name": bk["name"],
+            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
+        })
+    # Sort by date descending and take 50 most recent
+    recent_activity.sort(key=lambda x: x["date"], reverse=True)
+    recent_activity = recent_activity[:50]
 
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated: list[dict] = []
@@ -2205,12 +2310,12 @@ def dashboard():
     tbr_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'not-started' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY RANDOM() LIMIT 6", lp
+        f"ORDER BY RANDOM() LIMIT 30", lp
     ).fetchall()
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
 
-    # ── Most-read author ────────────────────────────────────────────────
+    # ── Author spotlight (4 random authors) ──────────────────────────────
     author_counts: dict[str, int] = Counter()
     for bk in db.execute(
         f"SELECT author FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1) AND author IS NOT NULL AND author != ''", lp
@@ -2219,17 +2324,19 @@ def dashboard():
             a = a.strip()
             if a:
                 author_counts[a] += 1
-    most_read_author = None
+    spotlight_authors: list[dict] = []
     if author_counts:
-        top_author_name, top_author_count = author_counts.most_common(1)[0]
-        author_row = db.execute("SELECT name, has_photo, photo_hash FROM authors WHERE name = ?",
-                                 (top_author_name,)).fetchone()
-        most_read_author = {
-            "name": top_author_name,
-            "count": top_author_count,
-            "has_photo": bool(author_row["has_photo"]) if author_row else False,
-            "photo_hash": (author_row["photo_hash"] or "") if author_row else "",
-        }
+        all_author_names = list(author_counts.keys())
+        chosen = random.sample(all_author_names, min(4, len(all_author_names)))
+        for author_name in chosen:
+            author_row = db.execute("SELECT name, has_photo, photo_hash FROM authors WHERE name = ?",
+                                     (author_name,)).fetchone()
+            spotlight_authors.append({
+                "name": author_name,
+                "count": author_counts[author_name],
+                "has_photo": bool(author_row["has_photo"]) if author_row else False,
+                "photo_hash": (author_row["photo_hash"] or "") if author_row else "",
+            })
 
     # ── Language diversity ───────────────────────────────────────────────
     language_counts: dict[str, int] = Counter()
@@ -2250,6 +2357,26 @@ def dashboard():
     ).fetchone()[0]
     authors_without_photo = db.execute(
         "SELECT COUNT(*) FROM authors WHERE (has_photo IS NULL OR has_photo = 0) AND name != 'Anonymous'"
+    ).fetchone()[0]
+    books_without_tags = db.execute(
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND (tags IS NULL OR tags = '') "
+        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchone()[0]
+    abandoned_count = db.execute(
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND status = 'abandoned' "
+        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchone()[0]
+    books_without_pages = db.execute(
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND (pages IS NULL OR pages = 0) "
+        f"AND format NOT IN ('audiobook') AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchone()[0]
+    books_without_summary = db.execute(
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND (summary IS NULL OR summary = '') "
+        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
+    ).fetchone()[0]
+    books_without_author = db.execute(
+        f"SELECT COUNT(*) FROM books WHERE {lf} AND (author IS NULL OR author = '') "
+        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
     ).fetchone()[0]
 
     return render_template(
@@ -2294,13 +2421,22 @@ def dashboard():
         # TBR
         tbr_list=tbr_list,
         # Author spotlight
-        most_read_author=most_read_author,
+        spotlight_authors=spotlight_authors,
         # Language
         language_counts=dict(language_counts),
         # Library health
         books_without_cover=books_without_cover,
         finished_unrated=finished_unrated,
         authors_without_photo=authors_without_photo,
+        books_without_tags=books_without_tags,
+        abandoned_count=abandoned_count,
+        books_without_pages=books_without_pages,
+        books_without_summary=books_without_summary,
+        books_without_author=books_without_author,
+        # YoY pages/time
+        yoy_pages_diff=yoy_pages_diff,
+        yoy_time_diff=yoy_time_diff,
+        yoy_time_diff_fmt=_format_duration_long(abs(yoy_time_diff)),
     )
 
 

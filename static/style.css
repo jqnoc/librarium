@@ -1761,14 +1761,39 @@ select.form-control { cursor: pointer; }
 .dash-feed-item {
     display: flex;
     gap: 0.75rem;
-    align-items: baseline;
+    align-items: center;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--lb-border);
     font-size: 0.88rem;
 }
 .dash-feed-item:last-child { border-bottom: none; }
+.dash-feed-thumb {
+    width: 32px;
+    min-width: 32px;
+    height: 48px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.dash-feed-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.dash-feed-thumb-ph {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+.dash-feed-body {
+    flex: 1;
+    min-width: 0;
+}
 .dash-feed-date {
-    min-width: 90px;
     color: var(--lb-text-light);
     font-size: 0.8rem;
 }
@@ -1861,10 +1886,12 @@ select.form-control { cursor: pointer; }
 .dash-tbr-covers {
     display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: hidden;
 }
 .dash-tbr-item {
     width: 60px;
+    min-width: 60px;
     border-radius: 6px;
     overflow: hidden;
     box-shadow: var(--lb-shadow);
@@ -1874,18 +1901,63 @@ select.form-control { cursor: pointer; }
 .dash-tbr-item img { width: 100%; display: block; }
 
 /* Author spotlight */
-.dash-author-photo img {
+.dash-spotlight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+}
+.dash-spotlight-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0.75rem;
+    background: var(--lb-surface);
+    border-radius: var(--lb-radius, 12px);
+    box-shadow: var(--lb-shadow);
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.15s, transform 0.15s;
+    text-align: center;
+}
+.dash-spotlight-card:hover {
+    box-shadow: var(--lb-shadow-lg);
+    transform: translateY(-2px);
+}
+.dash-spotlight-photo img {
     width: 60px;
     height: 60px;
     border-radius: 50%;
     object-fit: cover;
 }
+.dash-spotlight-ph {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.dash-spotlight-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--lb-deep-orange);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.dash-spotlight-count {
+    font-size: 0.78rem;
+    color: var(--lb-text-light);
+}
 
 /* Library health nudges */
 .dash-health-row {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem;
 }
 .dash-health-card {
     display: flex;

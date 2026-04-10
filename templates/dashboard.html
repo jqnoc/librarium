@@ -113,11 +113,21 @@
                 <div class="record-icon">📄</div>
                 <div class="record-value">{{ "{:,}".format(pages_this_year) }}</div>
                 <div class="record-label" data-i18n="dash.pagesYear">Pages Read</div>
+                {% if yoy_pages_diff != 0 %}
+                <div class="dash-yoy {% if yoy_pages_diff > 0 %}dash-yoy-up{% else %}dash-yoy-down{% endif %}">
+                    {{ "↑" if yoy_pages_diff > 0 else "↓" }} {{ "{:,}".format(yoy_pages_diff|abs) }} <span data-i18n="dash.vsLastYear">vs last year</span>
+                </div>
+                {% endif %}
             </div>
             <div class="record-card">
                 <div class="record-icon">⏱️</div>
                 <div class="record-value">{{ time_this_year }}</div>
                 <div class="record-label" data-i18n="dash.timeYear">Time Read</div>
+                {% if yoy_time_diff != 0 %}
+                <div class="dash-yoy {% if yoy_time_diff > 0 %}dash-yoy-up{% else %}dash-yoy-down{% endif %}">
+                    {{ "↑" if yoy_time_diff > 0 else "↓" }} {{ yoy_time_diff_fmt }} <span data-i18n="dash.vsLastYear">vs last year</span>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -136,7 +146,7 @@
 <div class="dash-section">
     <h2 class="dash-heading">
         <span data-i18n="activity.heatmap">Reading Heatmap</span>
-        <span style="font-size: 0.75rem; color: var(--lb-text-light);" data-i18n="dash.last12Weeks">(last 12 weeks)</span>
+        <span style="font-size: 0.75rem; color: var(--lb-text-light);" data-i18n="dash.last52Weeks">(last 52 weeks)</span>
     </h2>
     <div class="card">
         <div class="card-body">
@@ -173,15 +183,45 @@
         <div class="card-body dash-feed">
             {% for item in recent_activity %}
             <div class="dash-feed-item">
-                <div class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</div>
-                <div class="dash-feed-text">
-                    <span data-i18n="dash.read">Read</span>
-                    <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
-                    <span data-i18n="dash.of">of</span>
-                    <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
-                    {% if item.seconds %}
-                    <span class="dash-feed-time">({{ item.seconds // 3600 }}h {{ (item.seconds % 3600) // 60 }}m)</span>
+                <a href="{{ url_for('book_detail', book_id=item.book_id) }}" class="dash-feed-thumb">
+                    {% if item.has_cover %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=item.book_id) }}?v={{ item.cover_hash }}" alt="{{ item.book_name }}" loading="lazy">
+                    {% else %}
+                    <div class="cover-placeholder dash-feed-thumb-ph">📖</div>
                     {% endif %}
+                </a>
+                <div class="dash-feed-body">
+                    <div class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</div>
+                    <div class="dash-feed-text">
+                        {% if item.type == 'session' or item.type == 'period' %}
+                        <span data-i18n="dash.read">Read</span>
+                        <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
+                        <span data-i18n="dash.of">of</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% if item.seconds %}
+                        <span class="dash-feed-time">({{ item.seconds // 3600 }}h {{ (item.seconds % 3600) // 60 }}m)</span>
+                        {% endif %}
+                        {% elif item.type == 'finished' %}
+                        <span data-i18n="dash.actFinished">Finished</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a> 🎉
+                        {% elif item.type == 'started' %}
+                        <span data-i18n="dash.actStarted">Started reading</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% elif item.type == 'bought' %}
+                        <span data-i18n="dash.actBought">Bought</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% elif item.type == 'borrowed' %}
+                        <span data-i18n="dash.actBorrowed">Borrowed</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% if item.source_name %}
+                        <span data-i18n="dash.actFrom">from</span> <strong>{{ item.source_name }}</strong>
+                        {% endif %}
+                        {% elif item.type == 'gift' %}
+                        <span data-i18n="dash.actGift">Received</span>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        <span data-i18n="dash.actAsGift">as a gift</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -300,23 +340,23 @@
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="dash-two-col">
     <!-- Author Spotlight -->
-    {% if most_read_author %}
+    {% if spotlight_authors %}
     <div class="dash-section">
         <h2 class="dash-heading" data-i18n="dash.authorSpotlight">Author Spotlight</h2>
-        <div class="card">
-            <div class="card-body" style="display: flex; align-items: center; gap: 1.2rem;">
-                <a href="{{ url_for('author_detail', author_name=most_read_author.name) }}" class="dash-author-photo">
-                    {% if most_read_author.has_photo %}
-                    <img src="{{ url_for('author_photo_thumb', author_name=most_read_author.name) }}?v={{ most_read_author.photo_hash }}" alt="{{ most_read_author.name }}">
+        <div class="dash-spotlight-grid">
+            {% for auth in spotlight_authors %}
+            <a href="{{ url_for('author_detail', author_name=auth.name) }}" class="dash-spotlight-card">
+                <div class="dash-spotlight-photo">
+                    {% if auth.has_photo %}
+                    <img src="{{ url_for('author_photo_thumb', author_name=auth.name) }}?v={{ auth.photo_hash }}" alt="{{ auth.name }}">
                     {% else %}
-                    <div class="cover-placeholder" style="width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">✍️</div>
+                    <div class="cover-placeholder dash-spotlight-ph">✍️</div>
                     {% endif %}
-                </a>
-                <div>
-                    <a href="{{ url_for('author_detail', author_name=most_read_author.name) }}" style="font-weight: 600; color: var(--lb-deep-orange); text-decoration: none; font-size: 1.1rem;">{{ most_read_author.name }}</a>
-                    <div style="color: var(--lb-text-light); font-size: 0.85rem;">{{ most_read_author.count }} <span data-i18n="dash.booksInLibrary">books in library</span></div>
                 </div>
-            </div>
+                <div class="dash-spotlight-name">{{ auth.name }}</div>
+                <div class="dash-spotlight-count">{{ auth.count }} <span data-i18n="dash.booksInLibrary">books</span></div>
+            </a>
+            {% endfor %}
         </div>
     </div>
     {% endif %}
@@ -372,7 +412,7 @@
                 <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
                     <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
                 </p>
-                <div class="dash-tbr-covers">
+                <div class="dash-tbr-covers" id="dashTbrCovers">
                     {% for book in tbr_list %}
                     <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
                         {% if book.has_cover %}
@@ -392,14 +432,14 @@
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Health                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% if books_without_cover > 0 or finished_unrated > 0 or authors_without_photo > 0 %}
+{% if books_without_cover > 0 or finished_unrated > 0 or authors_without_photo > 0 or books_without_tags > 0 or abandoned_count > 0 or books_without_pages > 0 or books_without_summary > 0 or books_without_author > 0 %}
 <div class="dash-section">
     <h2 class="dash-heading" data-i18n="dash.libraryHealth">Library Health</h2>
     <div class="dash-health-row">
         {% if finished_unrated > 0 %}
         <div class="dash-health-card">
             <span class="dash-health-icon">⭐</span>
-            <span><strong>{{ finished_unrated }}</strong> <span data-i18n="dash.unratedBooks">finished books have no rating</span></span>
+            <span><strong>{{ finished_unrated }}</strong> <span data-i18n="dash.unratedBooks">finished books unrated</span></span>
         </div>
         {% endif %}
         {% if books_without_cover > 0 %}
@@ -412,6 +452,36 @@
         <div class="dash-health-card">
             <span class="dash-health-icon">📷</span>
             <span><strong>{{ authors_without_photo }}</strong> <span data-i18n="dash.noPhoto">authors without photo</span></span>
+        </div>
+        {% endif %}
+        {% if books_without_tags > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">🏷️</span>
+            <span><strong>{{ books_without_tags }}</strong> <span data-i18n="dash.noTags">books without tags</span></span>
+        </div>
+        {% endif %}
+        {% if abandoned_count > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">🚪</span>
+            <span><strong>{{ abandoned_count }}</strong> <span data-i18n="dash.abandonedBooks">abandoned books</span></span>
+        </div>
+        {% endif %}
+        {% if books_without_pages > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">📏</span>
+            <span><strong>{{ books_without_pages }}</strong> <span data-i18n="dash.noPages">books without page count</span></span>
+        </div>
+        {% endif %}
+        {% if books_without_summary > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">📝</span>
+            <span><strong>{{ books_without_summary }}</strong> <span data-i18n="dash.noSummary">books without summary</span></span>
+        </div>
+        {% endif %}
+        {% if books_without_author > 0 %}
+        <div class="dash-health-card">
+            <span class="dash-health-icon">👤</span>
+            <span><strong>{{ books_without_author }}</strong> <span data-i18n="dash.noAuthor">books without author</span></span>
         </div>
         {% endif %}
     </div>
@@ -508,7 +578,7 @@ dailyData.forEach(d => { dataByDate[d.date] = d; });
 })();
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Compact Heatmap (last 12 weeks)
+// Compact Heatmap (last 52 weeks)
 // ═══════════════════════════════════════════════════════════════════════════
 (function() {
     const grid   = document.getElementById('dashHeatmapGrid');
@@ -520,7 +590,7 @@ dailyData.forEach(d => { dataByDate[d.date] = d; });
     const today = new Date(); today.setHours(0,0,0,0);
     const dow = today.getDay();
     const thisMonday = addDays(today, dow === 0 ? -6 : -(dow - 1));
-    const WEEKS = 12;
+    const WEEKS = 52;
     const startDate = addDays(thisMonday, -(WEEKS - 1) * 7);
     const totalDays = Math.round((today - startDate) / 86400000) + 1;
     const numWeeks = Math.ceil(totalDays / 7);
@@ -598,7 +668,7 @@ dailyData.forEach(d => { dataByDate[d.date] = d; });
 // ═══════════════════════════════════════════════════════════════════════════
 (function() {
     var t = window.librariumI18n ? window.librariumI18n.t : function(k) { return k; };
-    document.querySelectorAll('.dash-reading-last[data-date]').forEach(function(el) {
+    document.querySelectorAll('.dash-reading-last[data-date], .dash-feed-date[data-date]').forEach(function(el) {
         const ds = el.getAttribute('data-date');
         if (!ds) return;
         const d = parseDate(ds);
@@ -681,5 +751,25 @@ makeDonut('sourceDonut', sourceCounts);
     });
 })();
 {% endif %}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TBR Pile Dynamic Sizing
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+    const container = document.getElementById('dashTbrCovers');
+    if (!container) return;
+    const items = Array.from(container.children);
+    if (items.length === 0) return;
+    function fitTbr() {
+        const containerWidth = container.offsetWidth;
+        const itemWidth = 60 + 8; // width + gap
+        const maxVisible = Math.max(1, Math.floor(containerWidth / itemWidth));
+        items.forEach(function(item, i) {
+            item.style.display = i < maxVisible ? '' : 'none';
+        });
+    }
+    fitTbr();
+    window.addEventListener('resize', fitTbr);
+})();
 </script>
 {% endblock %}
