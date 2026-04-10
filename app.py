@@ -1509,6 +1509,197 @@ def _calc_avg_rating(ratings: dict) -> float | None:
     return math.floor(avg * 100 + 0.5) / 100  # round half-up (matches JS)
 
 
+def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
+                             date_from: str | None = None,
+                             date_to: str | None = None) -> list[dict]:
+    """Collect raw activity events, agglutinate per (date, book_id), and return
+    the merged list sorted by date descending.  When *date_from* / *date_to*
+    are given (YYYY-MM-DD strings) only events within that range are included.
+    """
+    _raw: list[dict] = []
+
+    # Optional date-range SQL fragments
+    def _dr(col: str) -> str:
+        parts = []
+        if date_from:
+            parts.append(f"{col} >= ?")
+        if date_to:
+            parts.append(f"{col} <= ?")
+        return (" AND " + " AND ".join(parts)) if parts else ""
+
+    def _dp() -> tuple:
+        p: list[str] = []
+        if date_from:
+            p.append(date_from)
+        if date_to:
+            p.append(date_to)
+        return tuple(p)
+
+    # Sessions
+    for rs in db.execute(
+        "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "b.has_cover, b.cover_hash "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND {lf_b}{_dr('s.date')} ORDER BY s.date DESC, s.id DESC",
+        lp_b + _dp(),
+    ).fetchall():
+        _raw.append({"date": rs["date"], "type": "session", "pages": rs["pages"],
+                      "seconds": rs["duration_seconds"], "book_id": rs["book_id"],
+                      "book_name": rs["book_name"], "has_cover": bool(rs["has_cover"]),
+                      "cover_hash": rs["cover_hash"] or ""})
+
+    # Periods
+    for rp in db.execute(
+        "SELECT p.end_date, p.pages, p.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "b.has_cover, b.cover_hash "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b}{_dr('p.end_date')} "
+        f"ORDER BY p.end_date DESC, p.id DESC",
+        lp_b + _dp(),
+    ).fetchall():
+        _raw.append({"date": rp["end_date"], "type": "period", "pages": rp["pages"],
+                      "seconds": rp["duration_seconds"], "book_id": rp["book_id"],
+                      "book_name": rp["book_name"], "has_cover": bool(rp["has_cover"]),
+                      "cover_hash": rp["cover_hash"] or ""})
+
+    # Finished
+    for fr in db.execute(
+        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
+        "FROM readings r JOIN books b ON b.id = r.book_id "
+        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
+    ).fetchall():
+        candidates = []
+        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (fr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (fr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        if candidates:
+            d = max(candidates)
+            if (not date_from or d >= date_from) and (not date_to or d <= date_to):
+                _raw.append({"date": d, "type": "finished", "book_id": fr["book_id"],
+                              "book_name": fr["book_name"], "has_cover": bool(fr["has_cover"]),
+                              "cover_hash": fr["cover_hash"] or ""})
+
+    # Started
+    for sr in db.execute(
+        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
+        "FROM readings r JOIN books b ON b.id = r.book_id "
+        f"WHERE {lf_b}", lp_b
+    ).fetchall():
+        candidates = []
+        r = db.execute("SELECT MIN(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (sr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        r = db.execute("SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''", (sr["id"],)).fetchone()
+        if r and r["d"]: candidates.append(r["d"])
+        if candidates:
+            d = min(candidates)
+            if (not date_from or d >= date_from) and (not date_to or d <= date_to):
+                _raw.append({"date": d, "type": "started", "book_id": sr["book_id"],
+                              "book_name": sr["book_name"], "has_cover": bool(sr["has_cover"]),
+                              "cover_hash": sr["cover_hash"] or ""})
+
+    # Purchased
+    dr_buy = ""
+    dp_buy: list[str] = []
+    if date_from:
+        dr_buy += " AND b.purchase_date >= ?"
+        dp_buy.append(date_from)
+    if date_to:
+        dr_buy += " AND b.purchase_date <= ?"
+        dp_buy.append(date_to)
+    for bk in db.execute(
+        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.purchase_date, "
+        f"b.source_type, b.source_id, b.purchase_price, s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"AND b.source_type IN ('owned','physical_store','web_store') "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_buy}",
+        lp + tuple(dp_buy),
+    ).fetchall():
+        _raw.append({"date": bk["purchase_date"], "type": "bought", "book_id": bk["id"],
+                      "book_name": bk["name"], "has_cover": bool(bk["has_cover"]),
+                      "cover_hash": bk["cover_hash"] or "", "purchase_price": bk["purchase_price"] or "",
+                      "source_name": bk["source_name"] or ""})
+
+    # Borrowed
+    dr_bor = ""
+    dp_bor: list[str] = []
+    if date_from:
+        dr_bor += " AND b.borrowed_start >= ?"
+        dp_bor.append(date_from)
+    if date_to:
+        dr_bor += " AND b.borrowed_start <= ?"
+        dp_bor.append(date_to)
+    for bk in db.execute(
+        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.borrowed_start, b.source_id, "
+        f"s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
+        f"AND b.source_type IN ('library','person') "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_bor}",
+        lp + tuple(dp_bor),
+    ).fetchall():
+        _raw.append({"date": bk["borrowed_start"], "type": "borrowed", "book_id": bk["id"],
+                      "book_name": bk["name"], "has_cover": bool(bk["has_cover"]),
+                      "cover_hash": bk["cover_hash"] or "", "source_name": bk["source_name"] or ""})
+
+    # Gifted
+    dr_gift = ""
+    dp_gift: list[str] = []
+    if date_from:
+        dr_gift += " AND purchase_date >= ?"
+        dp_gift.append(date_from)
+    if date_to:
+        dr_gift += " AND purchase_date <= ?"
+        dp_gift.append(date_to)
+    for bk in db.execute(
+        f"SELECT id, name, has_cover, cover_hash, purchase_date "
+        f"FROM books WHERE {lf} AND is_gift = 1 AND purchase_date IS NOT NULL AND purchase_date != '' "
+        f"AND (work_id IS NULL OR is_primary_edition = 1){dr_gift}",
+        lp + tuple(dp_gift),
+    ).fetchall():
+        _raw.append({"date": bk["purchase_date"], "type": "gift", "book_id": bk["id"],
+                      "book_name": bk["name"], "has_cover": bool(bk["has_cover"]),
+                      "cover_hash": bk["cover_hash"] or ""})
+
+    # Agglutinate
+    _agg: dict[tuple[str, str], dict] = {}
+    for ev in _raw:
+        key = (ev["date"], ev["book_id"])
+        if key not in _agg:
+            _agg[key] = {
+                "date": ev["date"], "book_id": ev["book_id"],
+                "book_name": ev["book_name"],
+                "has_cover": ev["has_cover"], "cover_hash": ev["cover_hash"],
+                "pages": 0, "seconds": 0,
+                "started": False, "finished": False,
+                "bought": False, "borrowed": False, "gift": False,
+                "source_name": "", "purchase_price": "",
+            }
+        g = _agg[key]
+        t = ev["type"]
+        if t in ("session", "period"):
+            g["pages"] += ev.get("pages", 0) or 0
+            g["seconds"] += ev.get("seconds", 0) or 0
+        elif t == "started":
+            g["started"] = True
+        elif t == "finished":
+            g["finished"] = True
+        elif t == "bought":
+            g["bought"] = True
+            g["purchase_price"] = ev.get("purchase_price", "")
+            if ev.get("source_name"):
+                g["source_name"] = ev["source_name"]
+        elif t == "borrowed":
+            g["borrowed"] = True
+            if ev.get("source_name"):
+                g["source_name"] = ev["source_name"]
+        elif t == "gift":
+            g["gift"] = True
+
+    return sorted(_agg.values(), key=lambda x: x["date"], reverse=True)
+
+
 # ── Template filters ─────────────────────────────────────────────────────
 @app.template_filter('format_status')
 def format_status_filter(status: str) -> str:
@@ -2096,147 +2287,7 @@ def dashboard():
     yoy_time_diff = time_this_year - time_prev_ytd
 
     # ── Recent activity feed (comprehensive events) ──────────────────────
-    # Collect all raw events (no per-query LIMIT — agglutination happens
-    # below, and the 50-item cap is enforced *after* merging).
-    _raw_events: list[dict] = []
-    # Sessions: "read N pages of X"
-    for rs in db.execute(
-        "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name, "
-        "b.has_cover, b.cover_hash "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date DESC, s.id DESC", lp_b
-    ).fetchall():
-        _raw_events.append({
-            "date": rs["date"], "type": "session",
-            "pages": rs["pages"], "seconds": rs["duration_seconds"],
-            "book_id": rs["book_id"], "book_name": rs["book_name"],
-            "has_cover": bool(rs["has_cover"]), "cover_hash": rs["cover_hash"] or "",
-        })
-    # Periods: "read N pages of X"
-    for rp in db.execute(
-        "SELECT p.end_date, p.pages, p.duration_seconds, b.id AS book_id, b.name AS book_name, "
-        "b.has_cover, b.cover_hash "
-        "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} ORDER BY p.end_date DESC, p.id DESC", lp_b
-    ).fetchall():
-        _raw_events.append({
-            "date": rp["end_date"], "type": "period",
-            "pages": rp["pages"], "seconds": rp["duration_seconds"],
-            "book_id": rp["book_id"], "book_name": rp["book_name"],
-            "has_cover": bool(rp["has_cover"]), "cover_hash": rp["cover_hash"] or "",
-        })
-    # Finished readings: "finished X"
-    for fr in db.execute(
-        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
-        "FROM readings r JOIN books b ON b.id = r.book_id "
-        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
-    ).fetchall():
-        candidates = []
-        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (fr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (fr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates:
-            _raw_events.append({
-                "date": max(candidates), "type": "finished",
-                "book_id": fr["book_id"], "book_name": fr["book_name"],
-                "has_cover": bool(fr["has_cover"]), "cover_hash": fr["cover_hash"] or "",
-            })
-    # Started: first activity date per reading → "started X"
-    for sr in db.execute(
-        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
-        "FROM readings r JOIN books b ON b.id = r.book_id "
-        f"WHERE {lf_b}", lp_b
-    ).fetchall():
-        candidates = []
-        r = db.execute("SELECT MIN(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (sr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''", (sr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates:
-            _raw_events.append({
-                "date": min(candidates), "type": "started",
-                "book_id": sr["book_id"], "book_name": sr["book_name"],
-                "has_cover": bool(sr["has_cover"]), "cover_hash": sr["cover_hash"] or "",
-            })
-    # Purchased: "bought X" — includes source name & price for display
-    for bk in db.execute(
-        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.purchase_date, "
-        f"b.source_type, b.source_id, b.purchase_price, "
-        f"s.name AS source_name "
-        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
-        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
-        f"AND b.source_type IN ('owned','physical_store','web_store') AND (b.work_id IS NULL OR b.is_primary_edition = 1)", lp
-    ).fetchall():
-        _raw_events.append({
-            "date": bk["purchase_date"], "type": "bought",
-            "book_id": bk["id"], "book_name": bk["name"],
-            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
-            "purchase_price": bk["purchase_price"] or "",
-            "source_name": bk["source_name"] or "",
-        })
-    # Borrowed: "borrowed X from Y"
-    for bk in db.execute(
-        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.borrowed_start, b.source_id, "
-        f"s.name AS source_name "
-        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
-        f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
-        f"AND b.source_type IN ('library','person') AND (b.work_id IS NULL OR b.is_primary_edition = 1)", lp
-    ).fetchall():
-        _raw_events.append({
-            "date": bk["borrowed_start"], "type": "borrowed",
-            "book_id": bk["id"], "book_name": bk["name"],
-            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
-            "source_name": bk["source_name"] or "",
-        })
-    # Gifted: "received X as a gift"
-    for bk in db.execute(
-        f"SELECT id, name, has_cover, cover_hash, purchase_date "
-        f"FROM books WHERE {lf} AND is_gift = 1 AND purchase_date IS NOT NULL AND purchase_date != '' "
-        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchall():
-        _raw_events.append({
-            "date": bk["purchase_date"], "type": "gift",
-            "book_id": bk["id"], "book_name": bk["name"],
-            "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
-        })
-
-    # ── Agglutinate: merge events for the same book on the same day ────
-    _agg: dict[tuple[str, str], dict] = {}
-    for ev in _raw_events:
-        key = (ev["date"], ev["book_id"])
-        if key not in _agg:
-            _agg[key] = {
-                "date": ev["date"], "book_id": ev["book_id"],
-                "book_name": ev["book_name"],
-                "has_cover": ev["has_cover"], "cover_hash": ev["cover_hash"],
-                "pages": 0, "seconds": 0,
-                "started": False, "finished": False,
-                "bought": False, "borrowed": False, "gift": False,
-                "source_name": "", "purchase_price": "",
-            }
-        g = _agg[key]
-        t = ev["type"]
-        if t in ("session", "period"):
-            g["pages"] += ev.get("pages", 0) or 0
-            g["seconds"] += ev.get("seconds", 0) or 0
-        elif t == "started":
-            g["started"] = True
-        elif t == "finished":
-            g["finished"] = True
-        elif t == "bought":
-            g["bought"] = True
-            g["purchase_price"] = ev.get("purchase_price", "")
-            if ev.get("source_name"):
-                g["source_name"] = ev["source_name"]
-        elif t == "borrowed":
-            g["borrowed"] = True
-            if ev.get("source_name"):
-                g["source_name"] = ev["source_name"]
-        elif t == "gift":
-            g["gift"] = True
-    # Sort by date descending and enforce the 50-item limit *after* merge
-    recent_activity = sorted(_agg.values(), key=lambda x: x["date"], reverse=True)[:50]
+    recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated: list[dict] = []
@@ -3651,6 +3702,91 @@ def stats_year_books(year: str):
 
     return render_template("stats_year_books.html", year=year, books=books_finished, sort=sort,
                            prev_year=prev_year, next_year=next_year)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Calendar
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/calendar")
+def calendar_view():
+    """Monthly calendar view with per-day activity feed."""
+    import calendar as _cal
+
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+
+    # Determine requested month (defaults to current)
+    today = date.today()
+    try:
+        year = int(request.args.get("year", today.year))
+        month = int(request.args.get("month", today.month))
+        if month < 1 or month > 12:
+            raise ValueError
+        # Clamp year to a reasonable range
+        year = max(2000, min(2099, year))
+    except (ValueError, TypeError):
+        year, month = today.year, today.month
+
+    # Month boundaries
+    first_day = date(year, month, 1)
+    last_day_num = _cal.monthrange(year, month)[1]
+    last_day = date(year, month, last_day_num)
+    date_from = first_day.isoformat()
+    date_to = last_day.isoformat()
+
+    # Collect agglutinated events for the month
+    events = _collect_activity_events(db, lf, lp, lf_b, lp_b,
+                                      date_from=date_from, date_to=date_to)
+    # Group by date
+    events_by_date: dict[str, list[dict]] = {}
+    for ev in events:
+        events_by_date.setdefault(ev["date"], []).append(ev)
+
+    # Build calendar grid (weeks × 7)
+    cal = _cal.Calendar(firstweekday=0)  # Monday start
+    weeks: list[list[dict | None]] = []
+    for week in cal.monthdatescalendar(year, month):
+        row: list[dict | None] = []
+        for d in week:
+            if d.month != month:
+                row.append(None)  # outside current month
+            else:
+                ds = d.isoformat()
+                row.append({
+                    "day": d.day,
+                    "date": ds,
+                    "is_today": d == today,
+                    "events": events_by_date.get(ds, []),
+                })
+        weeks.append(row)
+
+    # Prev / next month
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+
+    # Serialize events_by_date to JSON for the JS detail panel
+    _events_json = json.dumps(events_by_date, ensure_ascii=False)
+
+    return render_template(
+        "calendar.html",
+        year=year,
+        month=month,
+        month_name=first_day.strftime("%B"),
+        weeks=weeks,
+        today_str=today.isoformat(),
+        prev_year=prev_year, prev_month=prev_month,
+        next_year=next_year, next_month=next_month,
+        _events_json=_events_json,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

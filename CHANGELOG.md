@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no tags, abandoned, no pages, no summary, no author)
 - Dashboard link in the navigation bar; logo now links to the dashboard
 - Full i18n support (EN / ES) for all new dashboard strings
+- Calendar page (`/calendar`) with navigable month view: colour-coded
+  activity dots per day, click-to-expand detail panel showing the same
+  agglutinated event format as the dashboard, today highlight,
+  previous/next month navigation, and "Today" shortcut button
+- Full i18n support (EN / ES) for all calendar strings including
+  day-of-week headers and month names
 
 ### Changed
 - Library page moved from `/` to `/library`; all existing library links

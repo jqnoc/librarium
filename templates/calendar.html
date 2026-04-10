@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Calendar – Librarium{% endblock %}
+
+{% block content %}
+<h1 data-i18n="cal.title">Calendar</h1>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Month Navigation                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="cal-nav">
+    <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}" class="cal-nav-btn" title="Previous month">‹</a>
+    <span class="cal-nav-title" data-i18n-month="{{ month }}">{{ month_name }} {{ year }}</span>
+    <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}" class="cal-nav-btn" title="Next month">›</a>
+    <a href="{{ url_for('calendar_view') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Calendar Grid                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="cal-grid">
+    <div class="cal-header">
+        <div class="cal-header-cell" data-i18n="cal.mon">Mon</div>
+        <div class="cal-header-cell" data-i18n="cal.tue">Tue</div>
+        <div class="cal-header-cell" data-i18n="cal.wed">Wed</div>
+        <div class="cal-header-cell" data-i18n="cal.thu">Thu</div>
+        <div class="cal-header-cell" data-i18n="cal.fri">Fri</div>
+        <div class="cal-header-cell cal-weekend" data-i18n="cal.sat">Sat</div>
+        <div class="cal-header-cell cal-weekend" data-i18n="cal.sun">Sun</div>
+    </div>
+    {% for week in weeks %}
+    <div class="cal-week">
+        {% for cell in week %}
+        {% if cell is none %}
+        <div class="cal-cell cal-cell--outside"></div>
+        {% else %}
+        <div class="cal-cell{% if cell.is_today %} cal-cell--today{% endif %}{% if cell.events %} cal-cell--has-events{% endif %}"
+             {% if cell.events %}data-date="{{ cell.date }}"{% endif %}>
+            <div class="cal-day-num">{{ cell.day }}</div>
+            {% if cell.events %}
+            <div class="cal-dots">
+                {% for ev in cell.events[:4] %}
+                <span class="cal-dot{% if ev.finished %} cal-dot--finished{% elif ev.started %} cal-dot--started{% elif ev.bought or ev.borrowed or ev.gift %} cal-dot--acquired{% endif %}"></span>
+                {% endfor %}
+                {% if cell.events|length > 4 %}<span class="cal-dot-more">+{{ cell.events|length - 4 }}</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Day Detail Panel (shown on click)                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="calDetail" class="cal-detail" style="display:none;">
+    <div class="cal-detail-header">
+        <h2 id="calDetailTitle" class="cal-detail-title"></h2>
+        <button type="button" class="cal-detail-close" onclick="document.getElementById('calDetail').style.display='none'">✕</button>
+    </div>
+    <div id="calDetailBody" class="cal-detail-body dash-feed"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    // Pre-build event data keyed by date for fast lookup
+    const eventsByDate = {{ _events_json | safe }};
+
+    const detail = document.getElementById('calDetail');
+    const detailTitle = document.getElementById('calDetailTitle');
+    const detailBody = document.getElementById('calDetailBody');
+    var t = window.librariumI18n ? window.librariumI18n.t : function(k, fb) { return fb || k; };
+
+    function formatDate(ds) {
+        const [y, m, d] = ds.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function formatTime(seconds) {
+        if (!seconds) return '';
+        var h = Math.floor(seconds / 3600);
+        var m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return '(' + h + 'h ' + m + 'm)';
+        return '(' + m + 'm)';
+    }
+
+    function renderEvent(ev) {
+        var thumb = '';
+        if (ev.has_cover) {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><img src="/cover_thumb/' + ev.book_id + '?v=' + ev.cover_hash + '" loading="lazy"></a>';
+        } else {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><div class="cover-placeholder dash-feed-thumb-ph">📖</div></a>';
+        }
+
+        var link = '<a href="/book/' + ev.book_id + '">' + escHtml(ev.book_name) + '</a>';
+        var parts = [];
+
+        // Primary action
+        if (ev.bought) {
+            var line = '<strong>' + t('dash.actBought', 'Bought') + '</strong> ' + link;
+            if (ev.source_name) line += ' ' + t('dash.actAt', 'at') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
+            if (ev.purchase_price) line += ' <span class="dash-feed-time">(' + escHtml(ev.purchase_price) + ')</span>';
+            parts.push(line);
+        } else if (ev.borrowed) {
+            var line = '<strong>' + t('dash.actBorrowed', 'Borrowed') + '</strong> ' + link;
+            if (ev.source_name) line += ' ' + t('dash.actFrom', 'from') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
+            parts.push(line);
+        } else if (ev.gift) {
+            parts.push('<strong>' + t('dash.actGift', 'Received') + '</strong> ' + link + ' ' + t('dash.actAsGift', 'as a gift'));
+        } else if (ev.started) {
+            parts.push('<strong>' + t('dash.actStarted', 'Started reading') + '</strong> ' + link);
+        } else if (ev.pages > 0) {
+            parts.push(t('dash.read', 'Read') + ' <strong>' + ev.pages + '</strong> ' + t('activity.pagesLabel', 'pages') + ' ' + t('dash.of', 'of') + ' ' + link + (ev.seconds ? ' <span class="dash-feed-time">' + formatTime(ev.seconds) + '</span>' : ''));
+        } else if (ev.finished) {
+            parts.push('<strong>' + t('dash.actFinished', 'Finished') + '</strong> ' + link + ' 🎉');
+        }
+
+        // Secondary: started (when primary is acquisition)
+        if (ev.started && (ev.bought || ev.borrowed || ev.gift)) {
+            parts.push(', <strong>' + t('dash.actStartedShort', 'started reading') + '</strong>');
+        }
+
+        // Secondary: read pages (when primary is started/acquisition)
+        if (ev.pages > 0 && (ev.started || ev.bought || ev.borrowed || ev.gift)) {
+            parts.push(' ' + t('dash.andRead', 'and read') + ' <strong>' + ev.pages + '</strong> ' + t('activity.pagesLabel', 'pages') + (ev.seconds ? ' <span class="dash-feed-time">' + formatTime(ev.seconds) + '</span>' : ''));
+        }
+
+        // Secondary: finished
+        if (ev.finished && (ev.pages > 0 || ev.started || ev.bought || ev.borrowed || ev.gift)) {
+            parts.push(' ' + t('dash.andFinished', 'and finished it') + ' 🎉');
+        }
+
+        return '<div class="dash-feed-item">' + thumb +
+               '<div class="dash-feed-body"><div class="dash-feed-text">' +
+               parts.join('') + '</div></div></div>';
+    }
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+
+    // Click handler on calendar cells with events
+    document.querySelectorAll('.cal-cell--has-events').forEach(function(cell) {
+        cell.addEventListener('click', function() {
+            var ds = this.getAttribute('data-date');
+            var evs = eventsByDate[ds] || [];
+            detailTitle.textContent = formatDate(ds);
+            detailBody.innerHTML = evs.map(renderEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivity', 'No activity') + '</p>';
+            detail.style.display = '';
+            detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Highlight selected cell
+            document.querySelectorAll('.cal-cell--selected').forEach(function(c) { c.classList.remove('cal-cell--selected'); });
+            cell.classList.add('cal-cell--selected');
+        });
+    });
+
+    // Localise month name in nav title
+    (function() {
+        var el = document.querySelector('.cal-nav-title');
+        if (!el) return;
+        var m = parseInt(el.getAttribute('data-i18n-month'), 10);
+        var monthKeys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june',
+                         'cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'];
+        var localMonth = t(monthKeys[m - 1]);
+        if (localMonth && localMonth !== monthKeys[m - 1]) {
+            el.textContent = localMonth + ' {{ year }}';
+        }
+    })();
+})();
+</script>
+{% endblock %}
