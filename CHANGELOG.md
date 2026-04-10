@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   currently reading books, this-year-at-a-glance with YoY comparison
   (books, pages, and time), streaks & consistency, reading heatmap
   (52 weeks), comprehensive recent activity feed (50 items with
-  thumbnails and event types: read, finished, started, bought, borrowed,
-  gifted), top-rated books, records, format & source donut charts, tag
-  cloud, author spotlight (4 random authors), series progress, language
-  diversity, dynamic TBR pile, and expanded library health nudges
-  (unrated, no cover, no photo, no tags, abandoned, no pages, no
-  summary, no author)
+  thumbnails and agglutinated events per book per day: read pages are
+  summed, started/finished/bought/borrowed/gifted events are merged into
+  a single line; bought entries now show store name and price; time
+  display omits the "0h" prefix when under one hour), top-rated books,
+  records, format & source donut charts, tag cloud, author spotlight
+  (4 random authors), series progress, language diversity, dynamic TBR
+  pile, and expanded library health nudges (unrated, no cover, no photo,
+  no tags, abandoned, no pages, no summary, no author)
 - Dashboard link in the navigation bar; logo now links to the dashboard
 - Full i18n support (EN / ES) for all new dashboard strings
 

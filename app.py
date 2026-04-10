@@ -2096,15 +2096,17 @@ def dashboard():
     yoy_time_diff = time_this_year - time_prev_ytd
 
     # ── Recent activity feed (comprehensive events) ──────────────────────
-    recent_activity = []
+    # Collect all raw events (no per-query LIMIT — agglutination happens
+    # below, and the 50-item cap is enforced *after* merging).
+    _raw_events: list[dict] = []
     # Sessions: "read N pages of X"
     for rs in db.execute(
         "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name, "
         "b.has_cover, b.cover_hash "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date DESC, s.id DESC LIMIT 50", lp_b
+        f"WHERE s.date != '' AND {lf_b} ORDER BY s.date DESC, s.id DESC", lp_b
     ).fetchall():
-        recent_activity.append({
+        _raw_events.append({
             "date": rs["date"], "type": "session",
             "pages": rs["pages"], "seconds": rs["duration_seconds"],
             "book_id": rs["book_id"], "book_name": rs["book_name"],
@@ -2115,9 +2117,9 @@ def dashboard():
         "SELECT p.end_date, p.pages, p.duration_seconds, b.id AS book_id, b.name AS book_name, "
         "b.has_cover, b.cover_hash "
         "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} ORDER BY p.end_date DESC, p.id DESC LIMIT 50", lp_b
+        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} ORDER BY p.end_date DESC, p.id DESC", lp_b
     ).fetchall():
-        recent_activity.append({
+        _raw_events.append({
             "date": rp["end_date"], "type": "period",
             "pages": rp["pages"], "seconds": rp["duration_seconds"],
             "book_id": rp["book_id"], "book_name": rp["book_name"],
@@ -2135,7 +2137,7 @@ def dashboard():
         r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (fr["id"],)).fetchone()
         if r and r["d"]: candidates.append(r["d"])
         if candidates:
-            recent_activity.append({
+            _raw_events.append({
                 "date": max(candidates), "type": "finished",
                 "book_id": fr["book_id"], "book_name": fr["book_name"],
                 "has_cover": bool(fr["has_cover"]), "cover_hash": fr["cover_hash"] or "",
@@ -2152,21 +2154,26 @@ def dashboard():
         r = db.execute("SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''", (sr["id"],)).fetchone()
         if r and r["d"]: candidates.append(r["d"])
         if candidates:
-            recent_activity.append({
+            _raw_events.append({
                 "date": min(candidates), "type": "started",
                 "book_id": sr["book_id"], "book_name": sr["book_name"],
                 "has_cover": bool(sr["has_cover"]), "cover_hash": sr["cover_hash"] or "",
             })
-    # Purchased: "bought X"
+    # Purchased: "bought X" — includes source name & price for display
     for bk in db.execute(
-        f"SELECT id, name, has_cover, cover_hash, purchase_date, source_type, source_id "
-        f"FROM books WHERE {lf} AND purchase_date IS NOT NULL AND purchase_date != '' "
-        f"AND source_type IN ('owned','physical_store','web_store') AND (work_id IS NULL OR is_primary_edition = 1)", lp
+        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.purchase_date, "
+        f"b.source_type, b.source_id, b.purchase_price, "
+        f"s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"AND b.source_type IN ('owned','physical_store','web_store') AND (b.work_id IS NULL OR b.is_primary_edition = 1)", lp
     ).fetchall():
-        recent_activity.append({
+        _raw_events.append({
             "date": bk["purchase_date"], "type": "bought",
             "book_id": bk["id"], "book_name": bk["name"],
             "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
+            "purchase_price": bk["purchase_price"] or "",
+            "source_name": bk["source_name"] or "",
         })
     # Borrowed: "borrowed X from Y"
     for bk in db.execute(
@@ -2176,7 +2183,7 @@ def dashboard():
         f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
         f"AND b.source_type IN ('library','person') AND (b.work_id IS NULL OR b.is_primary_edition = 1)", lp
     ).fetchall():
-        recent_activity.append({
+        _raw_events.append({
             "date": bk["borrowed_start"], "type": "borrowed",
             "book_id": bk["id"], "book_name": bk["name"],
             "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
@@ -2188,14 +2195,48 @@ def dashboard():
         f"FROM books WHERE {lf} AND is_gift = 1 AND purchase_date IS NOT NULL AND purchase_date != '' "
         f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
     ).fetchall():
-        recent_activity.append({
+        _raw_events.append({
             "date": bk["purchase_date"], "type": "gift",
             "book_id": bk["id"], "book_name": bk["name"],
             "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
         })
-    # Sort by date descending and take 50 most recent
-    recent_activity.sort(key=lambda x: x["date"], reverse=True)
-    recent_activity = recent_activity[:50]
+
+    # ── Agglutinate: merge events for the same book on the same day ────
+    _agg: dict[tuple[str, str], dict] = {}
+    for ev in _raw_events:
+        key = (ev["date"], ev["book_id"])
+        if key not in _agg:
+            _agg[key] = {
+                "date": ev["date"], "book_id": ev["book_id"],
+                "book_name": ev["book_name"],
+                "has_cover": ev["has_cover"], "cover_hash": ev["cover_hash"],
+                "pages": 0, "seconds": 0,
+                "started": False, "finished": False,
+                "bought": False, "borrowed": False, "gift": False,
+                "source_name": "", "purchase_price": "",
+            }
+        g = _agg[key]
+        t = ev["type"]
+        if t in ("session", "period"):
+            g["pages"] += ev.get("pages", 0) or 0
+            g["seconds"] += ev.get("seconds", 0) or 0
+        elif t == "started":
+            g["started"] = True
+        elif t == "finished":
+            g["finished"] = True
+        elif t == "bought":
+            g["bought"] = True
+            g["purchase_price"] = ev.get("purchase_price", "")
+            if ev.get("source_name"):
+                g["source_name"] = ev["source_name"]
+        elif t == "borrowed":
+            g["borrowed"] = True
+            if ev.get("source_name"):
+                g["source_name"] = ev["source_name"]
+        elif t == "gift":
+            g["gift"] = True
+    # Sort by date descending and enforce the 50-item limit *after* merge
+    recent_activity = sorted(_agg.values(), key=lambda x: x["date"], reverse=True)[:50]
 
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated: list[dict] = []

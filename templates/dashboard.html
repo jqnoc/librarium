@@ -193,33 +193,59 @@
                 <div class="dash-feed-body">
                     <div class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</div>
                     <div class="dash-feed-text">
-                        {% if item.type == 'session' or item.type == 'period' %}
+                        {# ── Primary action (the one that names the book) ── #}
+                        {% if item.bought %}
+                        <strong data-i18n="dash.actBought">Bought</strong>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% if item.source_name %}
+                        <span data-i18n="dash.actAt">at</span> <strong>{{ item.source_name }}</strong>
+                        {% endif %}
+                        {% if item.purchase_price %}
+                        <span class="dash-feed-time">({{ item.purchase_price }})</span>
+                        {% endif %}
+                        {% elif item.borrowed %}
+                        <strong data-i18n="dash.actBorrowed">Borrowed</strong>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% if item.source_name %}
+                        <span data-i18n="dash.actFrom">from</span> <strong>{{ item.source_name }}</strong>
+                        {% endif %}
+                        {% elif item.gift %}
+                        <strong data-i18n="dash.actGift">Received</strong>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        <span data-i18n="dash.actAsGift">as a gift</span>
+                        {% elif item.started %}
+                        <strong data-i18n="dash.actStarted">Started reading</strong>
+                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
+                        {% elif item.pages > 0 %}
                         <span data-i18n="dash.read">Read</span>
                         <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
                         <span data-i18n="dash.of">of</span>
                         <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
                         {% if item.seconds %}
-                        <span class="dash-feed-time">({{ item.seconds // 3600 }}h {{ (item.seconds % 3600) // 60 }}m)</span>
+                        <span class="dash-feed-time">({% if item.seconds >= 3600 %}{{ item.seconds // 3600 }}h {% endif %}{{ (item.seconds % 3600) // 60 }}m)</span>
                         {% endif %}
-                        {% elif item.type == 'finished' %}
-                        <span data-i18n="dash.actFinished">Finished</span>
+                        {% elif item.finished %}
+                        <strong data-i18n="dash.actFinished">Finished</strong>
                         <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a> 🎉
-                        {% elif item.type == 'started' %}
-                        <span data-i18n="dash.actStarted">Started reading</span>
-                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
-                        {% elif item.type == 'bought' %}
-                        <span data-i18n="dash.actBought">Bought</span>
-                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
-                        {% elif item.type == 'borrowed' %}
-                        <span data-i18n="dash.actBorrowed">Borrowed</span>
-                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
-                        {% if item.source_name %}
-                        <span data-i18n="dash.actFrom">from</span> <strong>{{ item.source_name }}</strong>
                         {% endif %}
-                        {% elif item.type == 'gift' %}
-                        <span data-i18n="dash.actGift">Received</span>
-                        <a href="{{ url_for('book_detail', book_id=item.book_id) }}">{{ item.book_name }}</a>
-                        <span data-i18n="dash.actAsGift">as a gift</span>
+
+                        {# ── Secondary: "started reading" when primary is acquisition ── #}
+                        {% if item.started and (item.bought or item.borrowed or item.gift) %}
+                        , <strong data-i18n="dash.actStartedShort">started reading</strong>
+                        {% endif %}
+
+                        {# ── Secondary: read pages (when primary is started/acquisition) ── #}
+                        {% if item.pages > 0 and (item.started or item.bought or item.borrowed or item.gift) %}
+                        <span data-i18n="dash.andRead">and read</span>
+                        <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
+                        {% if item.seconds %}
+                        <span class="dash-feed-time">({% if item.seconds >= 3600 %}{{ item.seconds // 3600 }}h {% endif %}{{ (item.seconds % 3600) // 60 }}m)</span>
+                        {% endif %}
+                        {% endif %}
+
+                        {# ── Secondary: "and finished it 🎉" ── #}
+                        {% if item.finished and (item.pages > 0 or item.started or item.bought or item.borrowed or item.gift) %}
+                        <span data-i18n="dash.andFinished">and finished it</span> 🎉
                         {% endif %}
                     </div>
                 </div>
