@@ -2294,8 +2294,8 @@ def dashboard():
     # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
-    # ── Last books bought (50 most recent) ─────────────────────────────
-    last_books_bought: list[dict] = []
+    # ── Last books owned (50 most recent) ─────────────────────────────
+    last_books_owned: list[dict] = []
     for row in db.execute(
         f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.purchase_date, "
         f"b.purchase_price, b.source_type, b.is_gift, "
