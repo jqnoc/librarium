@@ -31,10 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   detail panel, multi-date selection (Ctrl-click to toggle individual
   dates, Shift-click for ranges) with per-book agglutinated stats when
   multiple dates are selected, and today highlight
-- Agglutinated activity reports per book in the Gantt reading timeline
-  on the yearly stats page (`/stats/year/<year>`)
+- Agglutinated year activity summary per book as a new section on the
+  yearly stats page (`/stats/year/<year>`), with cover thumbnails, book
+  links, and proper comma/and conjunction (between the Per-book
+  Cumulative Pages chart and Reading Sessions table)
+- "Books Bought by Year" bar chart on the global statistics page
+  (`/stats`), placed between the Time Read chart and the Status
+  Timeline; clicking a bar navigates to a new detail page
+  (`/stats/year/<year>/bought`) listing all books bought that year with
+  cover, author, purchase date, location, price, and gift indicator;
+  sortable by date, title, author, or price
 - Full i18n support (EN / ES) for all calendar strings including
   day-of-week headers and month names
+
+### Fixed
+- Calendar detail panel date display now respects the app's i18n
+  language setting instead of always using the browser locale
 
 ### Changed
 - Library page moved from `/` to `/library`; all existing library links

@@ -444,6 +444,7 @@
         'stats.timeline5y':         { en: 'Last 5 Years',              es: 'Últimos 5 Años' },
         'stats.timeline1y':         { en: 'Last Year',                 es: 'Último Año' },
         'stats.tagCloud':           { en: 'Tag Cloud',                 es: 'Nube de Etiquetas' },
+        'stats.booksBoughtByYear':  { en: 'Books Bought by Year',     es: 'Libros Comprados por Año' },
 
         // ── Year stats ──────────────────────────────────────────────────
         'yearStats.backToGlobal':   { en: '← Back to Global Stats',    es: '← Volver a Estadísticas Globales' },
@@ -470,6 +471,7 @@
         'yearStats.colEndDate':     { en: 'End Date',                  es: 'Fecha Fin' },
         'yearStats.colNote':        { en: 'Note',                      es: 'Nota' },
         'yearStats.noSessions':     { en: 'No reading sessions in',    es: 'Sin sesiones de lectura en' },
+        'yearStats.activitySummary':{ en: 'Year Activity Summary',     es: 'Resumen de Actividad del Año' },
 
         // ── Year books ──────────────────────────────────────────────────
         'yearBooks.backToGlobal':  { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },
@@ -482,6 +484,20 @@
         'yearBooks.sortRating':    { en: 'Rating',                     es: 'Valoración' },
         'yearBooks.finishedLabel': { en: 'Finished:',                  es: 'Terminado:' },
         'yearBooks.empty':         { en: 'No books were finished in',  es: 'No se terminaron libros en' },
+
+        // ── Year bought ─────────────────────────────────────────────────
+        'yearBought.backToGlobal': { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },
+        'yearBought.title':        { en: 'Books Bought in',            es: 'Libros Comprados en' },
+        'yearBought.bought':       { en: 'bought',                     es: 'comprado(s)' },
+        'yearBought.sortBy':       { en: 'Sort by:',                   es: 'Ordenar por:' },
+        'yearBought.sortDate':     { en: 'Date',                       es: 'Fecha' },
+        'yearBought.sortTitle':    { en: 'Title',                      es: 'Título' },
+        'yearBought.sortAuthor':   { en: 'Author',                     es: 'Autor' },
+        'yearBought.sortPrice':    { en: 'Price',                      es: 'Precio' },
+        'yearBought.dateLabel':    { en: 'Date:',                      es: 'Fecha:' },
+        'yearBought.locationLabel':{ en: 'Location:',                  es: 'Lugar:' },
+        'yearBought.gift':         { en: 'Gift',                       es: 'Regalo' },
+        'yearBought.empty':        { en: 'No books were bought in',    es: 'No se compraron libros en' },
 
         // ── Calendar page ──────────────────────────────────────────────
         'cal.title':                 { en: 'Calendar',                 es: 'Calendario' },

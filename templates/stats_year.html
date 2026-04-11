@@ -66,77 +66,21 @@
             </div>
             <!-- Book bars -->
             {% for item in gantt_data %}
-            <div style="display: flex; align-items: flex-start; margin-bottom: 0.5rem; min-width: 600px;">
-                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--lb-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem; padding-top: 2px;{% if item.status == 'reading' %} font-style: italic;{% endif %}" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}">{{ item.name }}</div>
-                <div style="flex: 1;">
-                    <div style="position: relative; height: 20px; background: var(--lb-surface-alt, #f3f4f6); border-radius: 3px;">
-                        {# Idle span (full extent, light colour) #}
-                        {% set span_left = item.start / total_days * 100 %}
-                        {% set span_width_raw = (item.end - item.start + 1) / total_days * 100 %}
-                        {% set span_width = span_width_raw if span_width_raw > 0.3 else 0.3 %}
-                        <div style="position: absolute; left: {{ "%.2f" | format(span_left) }}%; width: {{ "%.2f" | format(span_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.2;"></div>
-                        {# Active segments (full colour) #}
-                        {% for seg in item.segments %}
-                        {% set seg_left = seg.start / total_days * 100 %}
-                        {% set seg_width_raw = (seg.end - seg.start + 1) / total_days * 100 %}
-                        {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
-                        <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.85;" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}"></div>
-                        {% endfor %}
-                    </div>
-                    {% if item.activity %}
-                    {% set act = item.activity %}
-                    <div class="gantt-activity-summary">
-                        {# Build a list of activity parts #}
-                        {% set parts = [] %}
-                        {% if act.bought %}
-                            {% if act.source_name and act.purchase_price %}
-                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <span data-i18n="dash.actAt">at</span> <strong>' ~ act.source_name ~ '</strong> <span class="dash-feed-time">(' ~ act.purchase_price ~ ')</span>') %}{% endif %}
-                            {% elif act.source_name %}
-                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <span data-i18n="dash.actAt">at</span> <strong>' ~ act.source_name ~ '</strong>') %}{% endif %}
-                            {% elif act.purchase_price %}
-                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <span class="dash-feed-time">(' ~ act.purchase_price ~ ')</span>') %}{% endif %}
-                            {% else %}
-                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span>') %}{% endif %}
-                            {% endif %}
-                        {% endif %}
-                        {% if act.borrowed %}
-                            {% if act.source_name %}
-                                {% if parts.append('<span data-i18n="dash.actBorrowed">Borrowed</span> <span data-i18n="dash.actFrom">from</span> <strong>' ~ act.source_name ~ '</strong>') %}{% endif %}
-                            {% else %}
-                                {% if parts.append('<span data-i18n="dash.actBorrowed">Borrowed</span>') %}{% endif %}
-                            {% endif %}
-                        {% endif %}
-                        {% if act.gift %}
-                            {% if parts.append('<span data-i18n="dash.actGift">Received</span> <span data-i18n="dash.actAsGift">as a gift</span>') %}{% endif %}
-                        {% endif %}
-                        {% if act.started %}
-                            {% if parts.append('<span data-i18n="dash.actStartedShort">started reading</span>') %}{% endif %}
-                        {% endif %}
-                        {% if act.pages > 0 %}
-                            {% set time_fmt = '' %}
-                            {% if act.seconds %}
-                                {% set hrs = act.seconds // 3600 %}
-                                {% set mins = (act.seconds % 3600) // 60 %}
-                                {% if hrs > 0 %}
-                                    {% set time_fmt = ' <span class="dash-feed-time">(' ~ hrs ~ 'h ' ~ mins ~ 'm)</span>' %}
-                                {% else %}
-                                    {% set time_fmt = ' <span class="dash-feed-time">(' ~ mins ~ 'm)</span>' %}
-                                {% endif %}
-                            {% endif %}
-                            {% if parts.append('<span data-i18n="dash.actReadLower">read</span> <strong>' ~ act.pages ~ '</strong> <span data-i18n="activity.pagesLabel">pages</span>' ~ time_fmt) %}{% endif %}
-                        {% endif %}
-                        {% if act.finished %}
-                            {% if parts.append('<span data-i18n="dash.actFinishedShort">finished it</span> 🎉') %}{% endif %}
-                        {% endif %}
-                        {% if parts|length == 1 %}
-                            {{ parts[0] }}
-                        {% elif parts|length == 2 %}
-                            {{ parts[0] }} <span data-i18n="dash.andConnector">and</span> {{ parts[1] }}
-                        {% elif parts|length > 2 %}
-                            {% for p in parts %}{% if not loop.last %}{{ p }}{% if loop.index < parts|length - 1 %}, {% endif %}{% else %} <span data-i18n="dash.andConnector">and</span> {{ p }}{% endif %}{% endfor %}
-                        {% endif %}
-                    </div>
-                    {% endif %}
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem; min-width: 600px;">
+                <div style="width: 200px; flex-shrink: 0; font-size: 0.8rem; font-weight: 500; color: var(--lb-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0.75rem;{% if item.status == 'reading' %} font-style: italic;{% endif %}" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}">{{ item.name }}</div>
+                <div style="flex: 1; position: relative; height: 20px; background: var(--lb-surface-alt, #f3f4f6); border-radius: 3px;">
+                    {# Idle span (full extent, light colour) #}
+                    {% set span_left = item.start / total_days * 100 %}
+                    {% set span_width_raw = (item.end - item.start + 1) / total_days * 100 %}
+                    {% set span_width = span_width_raw if span_width_raw > 0.3 else 0.3 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(span_left) }}%; width: {{ "%.2f" | format(span_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.2;"></div>
+                    {# Active segments (full colour) #}
+                    {% for seg in item.segments %}
+                    {% set seg_left = seg.start / total_days * 100 %}
+                    {% set seg_width_raw = (seg.end - seg.start + 1) / total_days * 100 %}
+                    {% set seg_width = seg_width_raw if seg_width_raw > 0.25 else 0.25 %}
+                    <div style="position: absolute; left: {{ "%.2f" | format(seg_left) }}%; width: {{ "%.2f" | format(seg_width) }}%; height: 100%; background: {{ item.color }}; border-radius: 3px; opacity: 0.85;" title="{{ item.name }}{% if item.subtitle %} – {{ item.subtitle }}{% endif %}"></div>
+                    {% endfor %}
                 </div>
             </div>
             {% endfor %}
@@ -183,6 +127,99 @@
         <canvas id="booksPerYearCumulative" style="max-height: 500px;"></canvas>
     </div>
 </div>
+
+<!-- ── Year activity summary per book ────────────────────────────────── -->
+{% set activity_items = gantt_data | selectattr('activity') | list %}
+{% if activity_items %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin: 0 0 1rem 0; color: var(--lb-deep-orange);" data-i18n="yearStats.activitySummary">Year Activity Summary</h3>
+        <div class="dash-feed">
+            {% for item in activity_items %}
+            {% set act = item.activity %}
+            {% if act.pages or act.started or act.finished or act.bought or act.borrowed or act.gift %}
+            <div class="dash-feed-item">
+                {% if item.has_cover %}
+                <a href="{{ url_for('book_detail', book_id=item.book_id) }}" class="dash-feed-thumb"><img src="{{ url_for('book_cover_thumb', book_id=item.book_id, v=item.cover_hash) }}" loading="lazy"></a>
+                {% else %}
+                <a href="{{ url_for('book_detail', book_id=item.book_id) }}" class="dash-feed-thumb"><div class="cover-placeholder dash-feed-thumb-ph">📖</div></a>
+                {% endif %}
+                <div class="dash-feed-body">
+                    <div class="dash-feed-text">
+                        {# Build parts list #}
+                        {% set parts = [] %}
+                        {% if act.bought %}
+                            {% if act.source_name and act.purchase_price %}
+                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> <span data-i18n="dash.actAt">at</span> <strong>' ~ act.source_name ~ '</strong> <span class="dash-feed-time">(' ~ act.purchase_price ~ ')</span>') %}{% endif %}
+                            {% elif act.source_name %}
+                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> <span data-i18n="dash.actAt">at</span> <strong>' ~ act.source_name ~ '</strong>') %}{% endif %}
+                            {% elif act.purchase_price %}
+                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> <span class="dash-feed-time">(' ~ act.purchase_price ~ ')</span>') %}{% endif %}
+                            {% else %}
+                                {% if parts.append('<span data-i18n="dash.actBought">Bought</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a>') %}{% endif %}
+                            {% endif %}
+                        {% elif act.borrowed %}
+                            {% if act.source_name %}
+                                {% if parts.append('<span data-i18n="dash.actBorrowed">Borrowed</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> <span data-i18n="dash.actFrom">from</span> <strong>' ~ act.source_name ~ '</strong>') %}{% endif %}
+                            {% else %}
+                                {% if parts.append('<span data-i18n="dash.actBorrowed">Borrowed</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a>') %}{% endif %}
+                            {% endif %}
+                        {% elif act.gift %}
+                            {% if parts.append('<span data-i18n="dash.actGift">Received</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> <span data-i18n="dash.actAsGift">as a gift</span>') %}{% endif %}
+                        {% elif act.started %}
+                            {% if parts.append('<span data-i18n="dash.actStarted">Started reading</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a>') %}{% endif %}
+                        {% elif act.pages > 0 %}
+                            {% set time_fmt = '' %}
+                            {% if act.seconds %}
+                                {% set hrs = act.seconds // 3600 %}
+                                {% set mins = (act.seconds % 3600) // 60 %}
+                                {% if hrs > 0 %}
+                                    {% set time_fmt = ' <span class="dash-feed-time">(' ~ hrs ~ 'h ' ~ mins ~ 'm)</span>' %}
+                                {% else %}
+                                    {% set time_fmt = ' <span class="dash-feed-time">(' ~ mins ~ 'm)</span>' %}
+                                {% endif %}
+                            {% endif %}
+                            {% if parts.append('<span data-i18n="dash.read">Read</span> <strong>' ~ act.pages ~ '</strong> <span data-i18n="activity.pagesLabel">pages</span> <span data-i18n="dash.of">of</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a>' ~ time_fmt) %}{% endif %}
+                        {% elif act.finished %}
+                            {% if parts.append('<span data-i18n="dash.actFinished">Finished</span> <a href="' ~ url_for('book_detail', book_id=item.book_id) ~ '"><strong>' ~ item.name ~ '</strong></a> 🎉') %}{% endif %}
+                        {% endif %}
+                        {# Secondary parts #}
+                        {% if act.started and (act.bought or act.borrowed or act.gift) %}
+                            {% if parts.append('<span data-i18n="dash.actStartedShort">started reading</span>') %}{% endif %}
+                        {% endif %}
+                        {% if act.pages > 0 and (act.started or act.bought or act.borrowed or act.gift) %}
+                            {% set time_fmt2 = '' %}
+                            {% if act.seconds %}
+                                {% set hrs2 = act.seconds // 3600 %}
+                                {% set mins2 = (act.seconds % 3600) // 60 %}
+                                {% if hrs2 > 0 %}
+                                    {% set time_fmt2 = ' <span class="dash-feed-time">(' ~ hrs2 ~ 'h ' ~ mins2 ~ 'm)</span>' %}
+                                {% else %}
+                                    {% set time_fmt2 = ' <span class="dash-feed-time">(' ~ mins2 ~ 'm)</span>' %}
+                                {% endif %}
+                            {% endif %}
+                            {% if parts.append('<span data-i18n="dash.actReadLower">read</span> <strong>' ~ act.pages ~ '</strong> <span data-i18n="activity.pagesLabel">pages</span>' ~ time_fmt2) %}{% endif %}
+                        {% endif %}
+                        {% if act.finished and (act.pages > 0 or act.started or act.bought or act.borrowed or act.gift) %}
+                            {% if parts.append('<span data-i18n="dash.actFinishedShort">finished it</span> 🎉') %}{% endif %}
+                        {% endif %}
+                        {# Join with commas and "and" #}
+                        {% if parts|length == 1 %}
+                            {{ parts[0] }}
+                        {% elif parts|length == 2 %}
+                            {{ parts[0] }} <span data-i18n="dash.andConnector">and</span> {{ parts[1] }}
+                        {% elif parts|length > 2 %}
+                            {% for p in parts %}{% if not loop.last %}{{ p }}{% if loop.index < parts|length - 1 %}, {% endif %}{% else %} <span data-i18n="dash.andConnector">and</span> {{ p }}{% endif %}{% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- ── Reading sessions table ────────────────────────────────────────── -->
 <h2 data-i18n="yearStats.sessions">Reading Sessions</h2>

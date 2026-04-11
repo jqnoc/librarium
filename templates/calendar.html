@@ -108,7 +108,9 @@
     function formatDate(ds) {
         const [y, m, d] = ds.split('-').map(Number);
         const dt = new Date(y, m - 1, d);
-        return dt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        var lang = window.librariumI18n ? window.librariumI18n.getLang() : 'en';
+        var locale = lang === 'es' ? 'es-ES' : 'en-US';
+        return dt.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
 
     function formatTime(seconds) {

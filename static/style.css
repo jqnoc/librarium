@@ -1994,18 +1994,6 @@ select.form-control { cursor: pointer; }
 .cal-detail-close:hover { background: var(--lb-light-bg); color: var(--lb-text); }
 .cal-detail-body { max-height: 400px; overflow-y: auto; }
 
-/* Gantt activity summary */
-.gantt-activity-summary {
-    font-size: 0.75rem;
-    color: var(--lb-text-light);
-    margin-top: 2px;
-    line-height: 1.4;
-}
-.gantt-activity-summary strong {
-    color: var(--lb-text);
-    font-weight: 600;
-}
-
 /* Top rated list */
 .dash-top-rated {
     display: flex;

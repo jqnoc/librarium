@@ -3126,12 +3126,26 @@ def global_stats():
     if others_total > 0:
         publisher_chart["Other"] = others_total
 
+    # Books bought by year (based on purchase_date)
+    bought_by_year: dict[str, int] = {}
+    for row in db.execute(
+        "SELECT SUBSTR(purchase_date, 1, 4) AS yr, COUNT(*) AS c "
+        f"FROM books WHERE purchase_date != '' AND purchase_date IS NOT NULL AND {lf} "
+        "GROUP BY yr ORDER BY yr", lp
+    ).fetchall():
+        if row["yr"] and len(row["yr"]) == 4:
+            bought_by_year[row["yr"]] = row["c"]
+    bought_years = sorted(bought_by_year.keys())
+    bought_data = [bought_by_year.get(y, 0) for y in bought_years]
+
     return render_template(
         "stats.html",
         years=all_years,
         pages_data=pages_data,
         books_data=books_data,
         time_data=time_data,
+        bought_years=bought_years,
+        bought_data=bought_data,
         status_chart=status_chart_clean,
         tag_counts=tag_counts_clean,
         language_counts=language_counts_clean,
@@ -3409,7 +3423,7 @@ def stats_year(year: str):
     # book_id → count of distinct readings appearing in this year (for labelling)
     book_reading_counts: dict[str, set] = {}
 
-    def _ensure_gantt_entry(bid, rid, name, color, status="", subtitle="", reading_number=None):
+    def _ensure_gantt_entry(bid, rid, name, color, status="", subtitle="", reading_number=None, has_cover=False, cover_hash=""):
         key = (bid, rid)
         if key not in gantt_books:
             gantt_books[key] = {
@@ -3420,6 +3434,8 @@ def stats_year(year: str):
                 "subtitle": subtitle or "",
                 "color": color or "#888888",
                 "status": status,
+                "has_cover": bool(has_cover),
+                "cover_hash": cover_hash or "",
                 "active_dates": set(),
                 "has_before": False,
                 "has_after": False,
@@ -3431,7 +3447,7 @@ def stats_year(year: str):
     # Sessions in the current year → active dates (per reading)
     for row in db.execute(f"""
         SELECT s.date, s.book_id, s.reading_id, b.name, b.subtitle, b.cover_color, b.status,
-               r.reading_number
+               b.has_cover, b.cover_hash, r.reading_number
         FROM sessions s
         JOIN books b ON b.id = s.book_id
         LEFT JOIN readings r ON r.id = s.reading_id
@@ -3439,7 +3455,7 @@ def stats_year(year: str):
     """, (year,) + lp_b).fetchall():
         bid = row["book_id"]
         rid = row["reading_id"] or "__none__"
-        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
+        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"], row["has_cover"], row["cover_hash"])
         try:
             gantt_books[(bid, rid)]["active_dates"].add(date.fromisoformat(row["date"]))
         except (ValueError, TypeError):
@@ -3448,7 +3464,7 @@ def stats_year(year: str):
     # Periods overlapping the current year → expand into active dates (per reading)
     for row in db.execute(f"""
         SELECT p.start_date, p.end_date, p.book_id, p.reading_id, b.name, b.subtitle, b.cover_color, b.status,
-               r.reading_number
+               b.has_cover, b.cover_hash, r.reading_number
         FROM periods p
         JOIN books b ON b.id = p.book_id
         LEFT JOIN readings r ON r.id = p.reading_id
@@ -3456,7 +3472,7 @@ def stats_year(year: str):
     """, (f"{year}-01-01", f"{year}-12-31") + lp_b).fetchall():
         bid = row["book_id"]
         rid = row["reading_id"] or "__none__"
-        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"])
+        _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"], row["has_cover"], row["cover_hash"])
         try:
             sd = date.fromisoformat(row["start_date"])
             ed = date.fromisoformat(row["end_date"])
@@ -3598,6 +3614,8 @@ def stats_year(year: str):
             "subtitle": info["subtitle"],
             "color": info["color"],
             "status": info["status"],
+            "has_cover": info["has_cover"],
+            "cover_hash": info["cover_hash"],
             "start": start_day,
             "end": end_day,
             "segments": active_segments,
@@ -3767,6 +3785,81 @@ def stats_year_books(year: str):
             next_year = sorted_years[idx + 1]
 
     return render_template("stats_year_books.html", year=year, books=books_finished, sort=sort,
+                           prev_year=prev_year, next_year=next_year)
+
+
+@app.route("/stats/year/<year>/bought")
+def stats_year_bought(year: str):
+    """Display all books bought in a specific year with location, date, and price."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    sort = request.args.get("sort", "date")
+    if sort not in ("alpha", "author", "date", "price"):
+        sort = "date"
+
+    rows = db.execute(f"""
+        SELECT b.id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash,
+               b.purchase_date, b.purchase_price, b.source_type, b.is_gift,
+               s.name AS source_name, s.location AS source_location
+        FROM books b
+        LEFT JOIN sources s ON s.id = b.source_id
+        WHERE b.purchase_date IS NOT NULL AND b.purchase_date != ''
+              AND SUBSTR(b.purchase_date, 1, 4) = ? AND {lf}
+    """, (year,) + lp).fetchall()
+
+    books_bought = []
+    for row in rows:
+        books_bought.append({
+            "id": row["id"],
+            "name": row["name"],
+            "subtitle": row["subtitle"] or "",
+            "author": row["author"] or "",
+            "has_cover": bool(row["has_cover"]),
+            "cover_hash": row["cover_hash"] or "",
+            "purchase_date": row["purchase_date"],
+            "purchase_price": row["purchase_price"] or "",
+            "source_name": row["source_name"] or "",
+            "source_location": row["source_location"] or "",
+            "is_gift": bool(row["is_gift"]),
+        })
+
+    if sort == "alpha":
+        books_bought.sort(key=lambda b: b["name"].lower())
+    elif sort == "author":
+        books_bought.sort(key=lambda b: (b["author"].lower(), b["name"].lower()))
+    elif sort == "price":
+        def _price_key(b):
+            p = b["purchase_price"]
+            if not p:
+                return (1, 0.0, b["name"].lower())
+            # Try to extract numeric price
+            import re as _re
+            m = _re.search(r"[\d,.]+", p.replace(",", "."))
+            return (0, -(float(m.group()) if m else 0.0), b["name"].lower())
+        books_bought.sort(key=_price_key)
+    else:  # date
+        books_bought.sort(key=lambda b: b["purchase_date"])
+
+    # Determine prev/next years with purchases
+    all_purchase_years = set()
+    for row in db.execute(
+        f"SELECT DISTINCT SUBSTR(purchase_date, 1, 4) AS yr FROM books "
+        f"WHERE purchase_date IS NOT NULL AND purchase_date != '' AND {lf}", lp
+    ).fetchall():
+        if row["yr"] and len(row["yr"]) == 4:
+            all_purchase_years.add(row["yr"])
+    sorted_years = sorted(all_purchase_years)
+    prev_year = None
+    next_year = None
+    if year in sorted_years:
+        idx = sorted_years.index(year)
+        if idx > 0:
+            prev_year = sorted_years[idx - 1]
+        if idx < len(sorted_years) - 1:
+            next_year = sorted_years[idx + 1]
+
+    return render_template("stats_year_bought.html", year=year, books=books_bought, sort=sort,
                            prev_year=prev_year, next_year=next_year)
 
 

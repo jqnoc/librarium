@@ -31,6 +31,16 @@
 </div>
 {% endif %}
 
+<!-- ── Books bought by year ──────────────────────────────────────────── -->
+{% if bought_data and bought_data|sum > 0 %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.booksBoughtByYear">Books Bought by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <canvas id="boughtChart" style="max-height: 350px; cursor: pointer;"></canvas>
+    </div>
+</div>
+{% endif %}
+
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Stats                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -400,6 +410,75 @@ if (timeData.some(v => v > 0)) {
         }
     });
 }
+{% endif %}
+
+// ── Books Bought by Year Chart ────────────────────────────────────────
+{% if bought_data and bought_data|sum > 0 %}
+const boughtYears = {{ bought_years | tojson }};
+const boughtData = {{ bought_data | tojson }};
+const boughtCtx = document.getElementById('boughtChart').getContext('2d');
+new Chart(boughtCtx, {
+    type: 'bar',
+    data: {
+        labels: boughtYears,
+        datasets: [{
+            label: 'Books Bought',
+            data: boughtData,
+            backgroundColor: cssVar('--lb-chart-bar2'),
+            borderColor: cssVar('--lb-chart-tooltip-border'),
+            borderWidth: 2,
+            borderRadius: 8,
+            borderSkipped: false
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2.5,
+        onClick: (event, activeElements) => {
+            if (activeElements.length > 0) {
+                const index = activeElements[0].index;
+                const year = boughtYears[index];
+                window.location.href = `/stats/year/${year}/bought`;
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                titleColor: cssVar('--lb-chart-tooltip-title'),
+                bodyColor: '#fff',
+                borderColor: cssVar('--lb-chart-tooltip-border'),
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                    label: function(context) {
+                        const count = context.parsed.y;
+                        return `${count} book${count !== 1 ? 's' : ''} bought`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    color: '#6B7280',
+                    stepSize: 1,
+                    callback: function(value) {
+                        return Number.isInteger(value) ? value : null;
+                    }
+                },
+                grid: { color: 'rgba(229, 231, 235, 0.5)' }
+            },
+            x: {
+                ticks: { color: '#6B7280', font: { size: 14, weight: 600 } },
+                grid: { display: false }
+            }
+        }
+    }
+});
 {% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════
