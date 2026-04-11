@@ -14,18 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (52 weeks), comprehensive recent activity feed (50 items with
   thumbnails and agglutinated events per book per day: read pages are
   summed, started/finished/bought/borrowed/gifted events are merged into
-  a single line; bought entries now show store name and price; time
-  display omits the "0h" prefix when under one hour), top-rated books,
-  records, format & source donut charts, tag cloud, author spotlight
-  (4 random authors), series progress, language diversity, dynamic TBR
-  pile, and expanded library health nudges (unrated, no cover, no photo,
-  no tags, abandoned, no pages, no summary, no author)
+  a single line with proper comma/and conjunction; bought entries now
+  show store name and price; time display omits the "0h" prefix when
+  under one hour), "Books Bought this Year" section (scrollable,
+  side-by-side with Recent Activity), top-rated books, records, format &
+  source donut charts, tag cloud, author spotlight (4 random authors),
+  series progress, language diversity, dynamic TBR pile, and expanded
+  library health nudges (unrated, no cover, no photo, no tags, abandoned,
+  no pages, no summary, no author)
 - Dashboard link in the navigation bar; logo now links to the dashboard
 - Full i18n support (EN / ES) for all new dashboard strings
-- Calendar page (`/calendar`) with navigable month view: colour-coded
-  activity dots per day, click-to-expand detail panel showing the same
-  agglutinated event format as the dashboard, today highlight,
-  previous/next month navigation, and "Today" shortcut button
+- Calendar page (`/calendar`) with navigable month view: year and month
+  dropdown selectors (month list adapts based on the current year),
+  previous/next arrows and "Today" shortcut, book cover thumbnails in
+  each day cell (up to 4 per day with +N overflow), click-to-expand
+  detail panel, multi-date selection (Ctrl-click to toggle individual
+  dates, Shift-click for ranges) with per-book agglutinated stats when
+  multiple dates are selected, and today highlight
+- Agglutinated activity reports per book in the Gantt reading timeline
+  on the yearly stats page (`/stats/year/<year>`)
 - Full i18n support (EN / ES) for all calendar strings including
   day-of-week headers and month names
 

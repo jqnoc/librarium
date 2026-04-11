@@ -1814,6 +1814,16 @@ select.form-control { cursor: pointer; }
     gap: 0.75rem;
     margin-bottom: 1.25rem;
 }
+.cal-select {
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--lb-radius);
+    border: 1px solid var(--lb-border);
+    background: var(--lb-card-bg);
+    color: var(--lb-text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+}
 .cal-nav-btn {
     display: inline-flex;
     align-items: center;
@@ -1882,6 +1892,8 @@ select.form-control { cursor: pointer; }
     cursor: default;
     transition: background 0.12s;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 .cal-cell:last-child { border-right: none; }
 .cal-cell--outside {
@@ -1914,22 +1926,30 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text);
     margin-bottom: 0.25rem;
 }
-.cal-dots {
+.cal-covers {
     display: flex;
     gap: 3px;
     flex-wrap: wrap;
+    align-items: flex-end;
+    margin-top: auto;
+}
+.cal-cover-thumb {
+    width: 24px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+.cal-cover-ph {
+    width: 24px;
+    height: 34px;
+    display: flex;
     align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    background: var(--lb-surface-alt, #f3f4f6);
+    border-radius: 2px;
 }
-.cal-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--lb-deep-orange);
-    flex-shrink: 0;
-}
-.cal-dot--finished { background: var(--lb-finished); }
-.cal-dot--started  { background: var(--lb-reading); }
-.cal-dot--acquired { background: var(--lb-not-started); }
 .cal-dot-more {
     font-size: 0.65rem;
     color: var(--lb-text-light);
@@ -1974,11 +1994,37 @@ select.form-control { cursor: pointer; }
 .cal-detail-close:hover { background: var(--lb-light-bg); color: var(--lb-text); }
 .cal-detail-body { max-height: 400px; overflow-y: auto; }
 
+/* Gantt activity summary */
+.gantt-activity-summary {
+    font-size: 0.75rem;
+    color: var(--lb-text-light);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+.gantt-activity-summary strong {
+    color: var(--lb-text);
+    font-weight: 600;
+}
+
 /* Top rated list */
 .dash-top-rated {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+/* Books bought this year */
+.dash-bought-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.dash-bought-meta {
+    font-size: 0.75rem;
+    color: var(--lb-text-light);
+    margin-top: 0.15rem;
 }
 .dash-rated-card {
     display: flex;

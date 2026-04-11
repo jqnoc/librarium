@@ -5,11 +5,23 @@
 <h1 data-i18n="cal.title">Calendar</h1>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Month Navigation                                                       -->
+<!-- Month Navigation with Year / Month selectors                           -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="cal-nav">
     <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}" class="cal-nav-btn" title="Previous month">‹</a>
-    <span class="cal-nav-title" data-i18n-month="{{ month }}">{{ month_name }} {{ year }}</span>
+    <select id="calYearSelect" class="cal-select">
+        {% for y in available_years %}
+        <option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+    </select>
+    <select id="calMonthSelect" class="cal-select">
+        {% set month_keys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june','cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'] %}
+        {% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+        {% set max_month = today_month if year == today_year else 12 %}
+        {% for m in range(1, max_month + 1) %}
+        <option value="{{ m }}"{% if m == month %} selected{% endif %} data-i18n-opt="{{ month_keys[m-1] }}">{{ month_names[m-1] }}</option>
+        {% endfor %}
+    </select>
     <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}" class="cal-nav-btn" title="Next month">›</a>
     <a href="{{ url_for('calendar_view') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
 </div>
@@ -34,14 +46,24 @@
         <div class="cal-cell cal-cell--outside"></div>
         {% else %}
         <div class="cal-cell{% if cell.is_today %} cal-cell--today{% endif %}{% if cell.events %} cal-cell--has-events{% endif %}"
-             {% if cell.events %}data-date="{{ cell.date }}"{% endif %}>
+             {% if cell.events %}data-cal-date="{{ cell.date }}"{% endif %}>
             <div class="cal-day-num">{{ cell.day }}</div>
             {% if cell.events %}
-            <div class="cal-dots">
-                {% for ev in cell.events[:4] %}
-                <span class="cal-dot{% if ev.finished %} cal-dot--finished{% elif ev.started %} cal-dot--started{% elif ev.bought or ev.borrowed or ev.gift %} cal-dot--acquired{% endif %}"></span>
+            <div class="cal-covers">
+                {% set seen_books = [] %}
+                {% for ev in cell.events %}
+                {% if ev.book_id not in seen_books %}
+                {% if seen_books.append(ev.book_id) %}{% endif %}
+                {% if seen_books|length <= 4 %}
+                {% if ev.has_cover %}
+                <img src="/cover_thumb/{{ ev.book_id }}?v={{ ev.cover_hash }}" class="cal-cover-thumb" loading="lazy" alt="">
+                {% else %}
+                <div class="cal-cover-ph">📖</div>
+                {% endif %}
+                {% endif %}
+                {% endif %}
                 {% endfor %}
-                {% if cell.events|length > 4 %}<span class="cal-dot-more">+{{ cell.events|length - 4 }}</span>{% endif %}
+                {% if seen_books|length > 4 %}<span class="cal-dot-more">+{{ seen_books|length - 4 }}</span>{% endif %}
             </div>
             {% endif %}
         </div>
@@ -69,11 +91,19 @@
 (function() {
     // Pre-build event data keyed by date for fast lookup
     const eventsByDate = {{ _events_json | safe }};
+    const currentYear = {{ year }};
+    const todayYear = {{ today_year }};
+    const todayMonth = {{ today_month }};
 
     const detail = document.getElementById('calDetail');
     const detailTitle = document.getElementById('calDetailTitle');
     const detailBody = document.getElementById('calDetailBody');
     var t = window.librariumI18n ? window.librariumI18n.t : function(k, fb) { return fb || k; };
+
+    var monthKeys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june',
+                     'cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'];
+    var monthFallbacks = ['January','February','March','April','May','June',
+                          'July','August','September','October','November','December'];
 
     function formatDate(ds) {
         const [y, m, d] = ds.split('-').map(Number);
@@ -89,27 +119,20 @@
         return '(' + m + 'm)';
     }
 
-    function renderEvent(ev) {
-        var thumb = '';
-        if (ev.has_cover) {
-            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><img src="/cover_thumb/' + ev.book_id + '?v=' + ev.cover_hash + '" loading="lazy"></a>';
-        } else {
-            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><div class="cover-placeholder dash-feed-thumb-ph">📖</div></a>';
-        }
-
+    function buildEventLine(ev) {
         var link = '<a href="/book/' + ev.book_id + '">' + escHtml(ev.book_name) + '</a>';
         var parts = [];
 
-        // Primary action
+        // Determine the primary action
         if (ev.bought) {
-            var line = '<strong>' + t('dash.actBought', 'Bought') + '</strong> ' + link;
-            if (ev.source_name) line += ' ' + t('dash.actAt', 'at') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
-            if (ev.purchase_price) line += ' <span class="dash-feed-time">(' + escHtml(ev.purchase_price) + ')</span>';
-            parts.push(line);
+            var seg = '<strong>' + t('dash.actBought', 'Bought') + '</strong> ' + link;
+            if (ev.source_name) seg += ' ' + t('dash.actAt', 'at') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
+            if (ev.purchase_price) seg += ' <span class="dash-feed-time">(' + escHtml(ev.purchase_price) + ')</span>';
+            parts.push(seg);
         } else if (ev.borrowed) {
-            var line = '<strong>' + t('dash.actBorrowed', 'Borrowed') + '</strong> ' + link;
-            if (ev.source_name) line += ' ' + t('dash.actFrom', 'from') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
-            parts.push(line);
+            var seg = '<strong>' + t('dash.actBorrowed', 'Borrowed') + '</strong> ' + link;
+            if (ev.source_name) seg += ' ' + t('dash.actFrom', 'from') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
+            parts.push(seg);
         } else if (ev.gift) {
             parts.push('<strong>' + t('dash.actGift', 'Received') + '</strong> ' + link + ' ' + t('dash.actAsGift', 'as a gift'));
         } else if (ev.started) {
@@ -120,24 +143,51 @@
             parts.push('<strong>' + t('dash.actFinished', 'Finished') + '</strong> ' + link + ' 🎉');
         }
 
-        // Secondary: started (when primary is acquisition)
+        // Secondary: started (chained with comma)
         if (ev.started && (ev.bought || ev.borrowed || ev.gift)) {
-            parts.push(', <strong>' + t('dash.actStartedShort', 'started reading') + '</strong>');
+            parts.push(t('dash.actStartedShort', 'started reading'));
         }
 
-        // Secondary: read pages (when primary is started/acquisition)
+        // Secondary: read pages (chained)
         if (ev.pages > 0 && (ev.started || ev.bought || ev.borrowed || ev.gift)) {
-            parts.push(' ' + t('dash.andRead', 'and read') + ' <strong>' + ev.pages + '</strong> ' + t('activity.pagesLabel', 'pages') + (ev.seconds ? ' <span class="dash-feed-time">' + formatTime(ev.seconds) + '</span>' : ''));
+            parts.push(t('dash.read', 'Read').toLowerCase() + ' <strong>' + ev.pages + '</strong> ' + t('activity.pagesLabel', 'pages') + (ev.seconds ? ' <span class="dash-feed-time">' + formatTime(ev.seconds) + '</span>' : ''));
         }
 
-        // Secondary: finished
+        // Secondary: finished (chained)
         if (ev.finished && (ev.pages > 0 || ev.started || ev.bought || ev.borrowed || ev.gift)) {
-            parts.push(' ' + t('dash.andFinished', 'and finished it') + ' 🎉');
+            parts.push(t('dash.actFinishedShort', 'finished it') + ' 🎉');
+        }
+
+        // Join with proper connectors: commas between parts, "and" before the last
+        if (parts.length <= 1) return parts[0] || '';
+        if (parts.length === 2) return parts[0] + ' ' + t('dash.andConnector', 'and') + ' ' + parts[1];
+        return parts.slice(0, -1).join(', ') + ' ' + t('dash.andConnector', 'and') + ' ' + parts[parts.length - 1];
+    }
+
+    function renderEvent(ev) {
+        var thumb = '';
+        if (ev.has_cover) {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><img src="/cover_thumb/' + ev.book_id + '?v=' + ev.cover_hash + '" loading="lazy"></a>';
+        } else {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><div class="cover-placeholder dash-feed-thumb-ph">📖</div></a>';
         }
 
         return '<div class="dash-feed-item">' + thumb +
                '<div class="dash-feed-body"><div class="dash-feed-text">' +
-               parts.join('') + '</div></div></div>';
+               buildEventLine(ev) + '</div></div></div>';
+    }
+
+    function renderAgglutinatedEvent(ev) {
+        var thumb = '';
+        if (ev.has_cover) {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><img src="/cover_thumb/' + ev.book_id + '?v=' + ev.cover_hash + '" loading="lazy"></a>';
+        } else {
+            thumb = '<a href="/book/' + ev.book_id + '" class="dash-feed-thumb"><div class="cover-placeholder dash-feed-thumb-ph">📖</div></a>';
+        }
+
+        return '<div class="dash-feed-item">' + thumb +
+               '<div class="dash-feed-body"><div class="dash-feed-text">' +
+               buildEventLine(ev) + '</div></div></div>';
     }
 
     function escHtml(s) {
@@ -146,33 +196,210 @@
         return d.innerHTML;
     }
 
-    // Click handler on calendar cells with events
-    document.querySelectorAll('.cal-cell--has-events').forEach(function(cell) {
-        cell.addEventListener('click', function() {
-            var ds = this.getAttribute('data-date');
-            var evs = eventsByDate[ds] || [];
-            detailTitle.textContent = formatDate(ds);
-            detailBody.innerHTML = evs.map(renderEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivity', 'No activity') + '</p>';
-            detail.style.display = '';
-            detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Multi-select state
+    var selectedDates = [];
+    var lastClickedDate = null;
 
-            // Highlight selected cell
-            document.querySelectorAll('.cal-cell--selected').forEach(function(c) { c.classList.remove('cal-cell--selected'); });
-            cell.classList.add('cal-cell--selected');
+    function agglutinateByBook(dates) {
+        var bookMap = {};
+        for (var i = 0; i < dates.length; i++) {
+            var ds = dates[i];
+            var evs = eventsByDate[ds] || [];
+            for (var j = 0; j < evs.length; j++) {
+                var ev = evs[j];
+                var bid = ev.book_id;
+                if (!bookMap[bid]) {
+                    bookMap[bid] = {
+                        book_id: ev.book_id, book_name: ev.book_name,
+                        has_cover: ev.has_cover, cover_hash: ev.cover_hash,
+                        pages: 0, seconds: 0,
+                        started: false, finished: false,
+                        bought: false, borrowed: false, gift: false,
+                        source_name: '', purchase_price: ''
+                    };
+                }
+                var g = bookMap[bid];
+                g.pages += (ev.pages || 0);
+                g.seconds += (ev.seconds || 0);
+                if (ev.started) g.started = true;
+                if (ev.finished) g.finished = true;
+                if (ev.bought) { g.bought = true; g.purchase_price = ev.purchase_price || g.purchase_price; g.source_name = ev.source_name || g.source_name; }
+                if (ev.borrowed) { g.borrowed = true; g.source_name = ev.source_name || g.source_name; }
+                if (ev.gift) g.gift = true;
+            }
+        }
+        var result = [];
+        for (var bid in bookMap) {
+            result.push(bookMap[bid]);
+        }
+        return result;
+    }
+
+    function updateDetailPanel() {
+        if (selectedDates.length === 0) {
+            detail.style.display = 'none';
+            return;
+        }
+
+        selectedDates.sort();
+
+        if (selectedDates.length === 1) {
+            detailTitle.textContent = formatDate(selectedDates[0]);
+            var evs = eventsByDate[selectedDates[0]] || [];
+            detailBody.innerHTML = evs.map(renderEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivity', 'No activity') + '</p>';
+        } else {
+            // Multi-date selection: agglutinate per book
+            detailTitle.textContent = formatDate(selectedDates[0]) + ' – ' + formatDate(selectedDates[selectedDates.length - 1]);
+            var agg = agglutinateByBook(selectedDates);
+            detailBody.innerHTML = agg.map(renderAgglutinatedEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivity', 'No activity') + '</p>';
+        }
+
+        detail.style.display = '';
+        detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearSelection() {
+        document.querySelectorAll('.cal-cell--selected').forEach(function(c) { c.classList.remove('cal-cell--selected'); });
+        selectedDates = [];
+    }
+
+    function getDateRange(d1, d2) {
+        var dates = [];
+        var a = d1 < d2 ? d1 : d2;
+        var b = d1 < d2 ? d2 : d1;
+        var parts = a.split('-').map(Number);
+        var current = new Date(parts[0], parts[1] - 1, parts[2]);
+        var parts2 = b.split('-').map(Number);
+        var end = new Date(parts2[0], parts2[1] - 1, parts2[2]);
+        while (current <= end) {
+            var y = current.getFullYear();
+            var m = String(current.getMonth() + 1).padStart(2, '0');
+            var dd = String(current.getDate()).padStart(2, '0');
+            dates.push(y + '-' + m + '-' + dd);
+            current.setDate(current.getDate() + 1);
+        }
+        return dates;
+    }
+
+    // Click handler on calendar cells with events
+    document.querySelectorAll('.cal-cell[data-cal-date]').forEach(function(cell) {
+        cell.addEventListener('click', function(e) {
+            var ds = this.getAttribute('data-cal-date');
+
+            if (e.shiftKey && lastClickedDate) {
+                // Shift-click: select range from last clicked to this
+                clearSelection();
+                var range = getDateRange(lastClickedDate, ds);
+                selectedDates = range;
+                // Highlight all cells in ranges
+                range.forEach(function(rd) {
+                    var c = document.querySelector('.cal-cell[data-cal-date="' + rd + '"]');
+                    if (c) c.classList.add('cal-cell--selected');
+                });
+            } else if (e.ctrlKey || e.metaKey) {
+                // Ctrl-click: toggle this date
+                var idx = selectedDates.indexOf(ds);
+                if (idx >= 0) {
+                    selectedDates.splice(idx, 1);
+                    this.classList.remove('cal-cell--selected');
+                } else {
+                    selectedDates.push(ds);
+                    this.classList.add('cal-cell--selected');
+                }
+                lastClickedDate = ds;
+            } else {
+                // Normal click: single selection
+                clearSelection();
+                selectedDates = [ds];
+                this.classList.add('cal-cell--selected');
+                lastClickedDate = ds;
+            }
+
+            updateDetailPanel();
         });
     });
 
-    // Localise month name in nav title
-    (function() {
-        var el = document.querySelector('.cal-nav-title');
-        if (!el) return;
-        var m = parseInt(el.getAttribute('data-i18n-month'), 10);
-        var monthKeys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june',
-                         'cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'];
-        var localMonth = t(monthKeys[m - 1]);
-        if (localMonth && localMonth !== monthKeys[m - 1]) {
-            el.textContent = localMonth + ' {{ year }}';
+    // Also allow clicking cells without events for multi-select
+    document.querySelectorAll('.cal-cell:not(.cal-cell--outside):not([data-cal-date])').forEach(function(cell) {
+        // Give these cells a date for range selection
+        var dayNum = cell.querySelector('.cal-day-num');
+        if (dayNum) {
+            var day = parseInt(dayNum.textContent, 10);
+            var ds = currentYear + '-' + String({{ month }}).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            cell.setAttribute('data-cal-date', ds);
+            cell.addEventListener('click', function(e) {
+                if (e.shiftKey && lastClickedDate) {
+                    clearSelection();
+                    var range = getDateRange(lastClickedDate, ds);
+                    selectedDates = range;
+                    range.forEach(function(rd) {
+                        var c = document.querySelector('.cal-cell[data-cal-date="' + rd + '"]');
+                        if (c) c.classList.add('cal-cell--selected');
+                    });
+                } else if (e.ctrlKey || e.metaKey) {
+                    var idx = selectedDates.indexOf(ds);
+                    if (idx >= 0) {
+                        selectedDates.splice(idx, 1);
+                        this.classList.remove('cal-cell--selected');
+                    } else {
+                        selectedDates.push(ds);
+                        this.classList.add('cal-cell--selected');
+                    }
+                    lastClickedDate = ds;
+                } else {
+                    clearSelection();
+                    selectedDates = [ds];
+                    this.classList.add('cal-cell--selected');
+                    lastClickedDate = ds;
+                }
+                updateDetailPanel();
+            });
         }
+    });
+
+    // ── Year / Month selector navigation ────────────────────────────────
+    var yearSelect = document.getElementById('calYearSelect');
+    var monthSelect = document.getElementById('calMonthSelect');
+
+    function navigateToSelected() {
+        var y = yearSelect.value;
+        var m = monthSelect.value;
+        window.location.href = '/calendar?year=' + y + '&month=' + m;
+    }
+
+    yearSelect.addEventListener('change', function() {
+        var y = parseInt(yearSelect.value, 10);
+        var currentMonth = parseInt(monthSelect.value, 10);
+        // Repopulate months based on selected year
+        var maxMonth = (y === todayYear) ? todayMonth : 12;
+        monthSelect.innerHTML = '';
+        for (var i = 1; i <= maxMonth; i++) {
+            var opt = document.createElement('option');
+            opt.value = i;
+            var localMonth = t(monthKeys[i - 1]);
+            opt.textContent = (localMonth && localMonth !== monthKeys[i - 1]) ? localMonth : monthFallbacks[i - 1];
+            if (i === currentMonth && currentMonth <= maxMonth) opt.selected = true;
+            monthSelect.appendChild(opt);
+        }
+        // If current month exceeds max, select the last month
+        if (currentMonth > maxMonth) {
+            monthSelect.value = maxMonth;
+        }
+        navigateToSelected();
+    });
+
+    monthSelect.addEventListener('change', navigateToSelected);
+
+    // Localise month names in the month selector
+    (function() {
+        var opts = monthSelect.querySelectorAll('option');
+        opts.forEach(function(opt) {
+            var key = opt.getAttribute('data-i18n-opt');
+            if (key) {
+                var localized = t(key);
+                if (localized && localized !== key) opt.textContent = localized;
+            }
+        });
     })();
 })();
 </script>

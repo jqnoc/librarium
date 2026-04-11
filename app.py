@@ -2289,6 +2289,31 @@ def dashboard():
     # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
+    # ── Books bought this year ───────────────────────────────────────────
+    bought_this_year: list[dict] = []
+    for row in db.execute(
+        f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.purchase_date, "
+        f"b.purchase_price, b.source_type, b.is_gift, "
+        f"s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"AND SUBSTR(b.purchase_date, 1, 4) = ? "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
+        f"ORDER BY b.purchase_date DESC", lp + (current_year,)
+    ).fetchall():
+        bought_this_year.append({
+            "id": row["id"],
+            "name": row["name"],
+            "author": row["author"] or "",
+            "has_cover": bool(row["has_cover"]),
+            "cover_hash": row["cover_hash"] or "",
+            "purchase_date": row["purchase_date"],
+            "purchase_price": row["purchase_price"] or "",
+            "source_name": row["source_name"] or "",
+            "source_type": row["source_type"] or "",
+            "is_gift": bool(row["is_gift"]),
+        })
+
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated: list[dict] = []
     for bid_row in all_book_ids:
@@ -2496,6 +2521,8 @@ def dashboard():
         yoy_diff=yoy_diff,
         # Recent activity
         recent_activity=recent_activity,
+        # Books bought this year
+        bought_this_year=bought_this_year,
         # Top rated
         top_rated=top_rated,
         # Records
@@ -3566,6 +3593,7 @@ def stats_year(year: str):
             display_name = f"{info['name']} (#{info['reading_number']})"
 
         gantt_data.append({
+            "book_id": bid,
             "name": display_name,
             "subtitle": info["subtitle"],
             "color": info["color"],
@@ -3578,6 +3606,44 @@ def stats_year(year: str):
 
     # Sort by first-ever reading session/period, then by name
     gantt_data.sort(key=lambda g: (g["first_ever"], g["name"]))
+
+    # ── Per-book activity summaries for gantt entries ────────────────────
+    # Collect full activity events for the year, then attach per book_id
+    year_events = _collect_activity_events(
+        db, lf, lp, lf_b, lp_b,
+        date_from=f"{year}-01-01", date_to=f"{year}-12-31",
+    )
+    # Group by book_id (agglutinated across the whole year)
+    gantt_events: dict[str, dict] = {}
+    for ev in year_events:
+        bid = ev["book_id"]
+        if bid not in gantt_events:
+            gantt_events[bid] = {
+                "pages": 0, "seconds": 0,
+                "started": False, "finished": False,
+                "bought": False, "borrowed": False, "gift": False,
+                "source_name": "", "purchase_price": "",
+            }
+        g = gantt_events[bid]
+        g["pages"] += ev.get("pages", 0) or 0
+        g["seconds"] += ev.get("seconds", 0) or 0
+        if ev.get("started"):
+            g["started"] = True
+        if ev.get("finished"):
+            g["finished"] = True
+        if ev.get("bought"):
+            g["bought"] = True
+            g["purchase_price"] = ev.get("purchase_price", "") or g["purchase_price"]
+            g["source_name"] = ev.get("source_name", "") or g["source_name"]
+        if ev.get("borrowed"):
+            g["borrowed"] = True
+            g["source_name"] = ev.get("source_name", "") or g["source_name"]
+        if ev.get("gift"):
+            g["gift"] = True
+    # Attach to gantt_data
+    for gd in gantt_data:
+        bid = gd.get("book_id", "")
+        gd["activity"] = gantt_events.get(bid, {})
 
     # Determine prev/next years with data
     data_years = set()
@@ -3776,6 +3842,37 @@ def calendar_view():
     # Serialize events_by_date to JSON for the JS detail panel
     _events_json = json.dumps(events_by_date, ensure_ascii=False)
 
+    # Available years for the year selector (union of all years with activity)
+    avail_years: set[int] = set()
+    for row in db.execute(
+        "SELECT DISTINCT SUBSTR(s.date, 1, 4) AS yr FROM sessions s "
+        f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
+    ).fetchall():
+        try:
+            avail_years.add(int(row["yr"]))
+        except (ValueError, TypeError):
+            pass
+    for row in db.execute(
+        "SELECT DISTINCT SUBSTR(p.end_date, 1, 4) AS yr FROM periods p "
+        f"JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND {lf_b}", lp_b
+    ).fetchall():
+        try:
+            avail_years.add(int(row["yr"]))
+        except (ValueError, TypeError):
+            pass
+    for row in db.execute(
+        f"SELECT DISTINCT SUBSTR(purchase_date, 1, 4) AS yr FROM books "
+        f"WHERE {lf} AND purchase_date IS NOT NULL AND purchase_date != ''", lp
+    ).fetchall():
+        try:
+            avail_years.add(int(row["yr"]))
+        except (ValueError, TypeError):
+            pass
+    avail_years.add(today.year)
+    if year not in avail_years:
+        avail_years.add(year)
+    available_years = sorted(avail_years)
+
     return render_template(
         "calendar.html",
         year=year,
@@ -3783,9 +3880,12 @@ def calendar_view():
         month_name=first_day.strftime("%B"),
         weeks=weeks,
         today_str=today.isoformat(),
+        today_year=today.year,
+        today_month=today.month,
         prev_year=prev_year, prev_month=prev_month,
         next_year=next_year, next_month=next_month,
         _events_json=_events_json,
+        available_years=available_years,
     )
 
 
