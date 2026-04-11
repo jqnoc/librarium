@@ -174,7 +174,7 @@
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Recent Activity Feed + Last Books Bought                               -->
+<!-- Recent Activity Feed + Last Books Owned                                -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="dash-two-col">
     {% if recent_activity %}
@@ -182,53 +182,64 @@
         <h2 class="dash-heading" data-i18n="dash.recentActivity">Recent Activity</h2>
         <div class="dash-bought-list">
             {% for item in recent_activity %}
-            <a href="{{ url_for('book_detail', book_id=item.book_id) }}" class="dash-rated-card">
+            <div class="dash-rated-card">
                 <div class="dash-rated-cover">
+                    <a href="{{ url_for('book_detail', book_id=item.book_id) }}">
                     {% if item.has_cover %}
                     <img src="{{ url_for('book_cover_thumb', book_id=item.book_id) }}?v={{ item.cover_hash }}" alt="{{ item.book_name }}" loading="lazy">
                     {% else %}
                     <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
                     {% endif %}
+                    </a>
                 </div>
                 <div class="dash-rated-info">
-                    <div class="dash-rated-title">{{ item.book_name }}</div>
+                    <div class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</div>
                     <div class="dash-bought-meta">
-                        <span class="dash-feed-date" data-date="{{ item.date }}">{{ item.date }}</span>
-                        ·
                         {# ── Build activity description ── #}
                         {% set sec_started = item.started and (item.bought or item.borrowed or item.gift) %}
                         {% set sec_read = item.pages > 0 and (item.started or item.bought or item.borrowed or item.gift) %}
                         {% set sec_finished = item.finished and (item.pages > 0 or item.started or item.bought or item.borrowed or item.gift) %}
                         {% set sec_count = (1 if sec_started else 0) + (1 if sec_read else 0) + (1 if sec_finished else 0) %}
                         {% set ns = namespace(sec_idx=0) %}
+                        {% set book_link %}<a href="{{ url_for('book_detail', book_id=item.book_id) }}" class="dash-activity-link">{{ item.book_name }}</a>{% endset %}
 
                         {# Primary action #}
                         {% if item.bought %}
-                        <strong data-i18n="dash.actBought">Bought</strong>
+                        <span data-i18n="dash.actBought">Bought</span>
+                        {{ book_link }}
                         {% if item.source_name %}
                         <span data-i18n="dash.actAt">at</span> <strong>{{ item.source_name }}</strong>
                         {% endif %}
                         {% if item.purchase_price %}
-                        ({{ item.purchase_price }})
+                        (<em>{{ item.purchase_price }}</em>)
                         {% endif %}
                         {% elif item.borrowed %}
-                        <strong data-i18n="dash.actBorrowed">Borrowed</strong>
+                        <span data-i18n="dash.actBorrowed">Borrowed</span>
+                        {{ book_link }}
                         {% if item.source_name %}
                         <span data-i18n="dash.actFrom">from</span> <strong>{{ item.source_name }}</strong>
                         {% endif %}
                         {% elif item.gift %}
-                        <strong data-i18n="dash.actGift">Received</strong>
+                        <span data-i18n="dash.actGift">Received</span>
+                        {{ book_link }}
                         <span data-i18n="dash.actAsGift">as a gift</span>
+                        {% if item.source_name %}
+                        <span data-i18n="dash.actFrom">from</span> <strong>{{ item.source_name }}</strong>
+                        {% endif %}
                         {% elif item.started %}
-                        <strong data-i18n="dash.actStarted">Started reading</strong>
+                        <span data-i18n="dash.actStarted">Started reading</span>
+                        {{ book_link }}
                         {% elif item.pages > 0 %}
                         <span data-i18n="dash.read">Read</span>
                         <strong>{{ item.pages }}</strong> <span data-i18n="activity.pagesLabel">pages</span>
+                        <span data-i18n="dash.of">of</span>
+                        {{ book_link }}
                         {% if item.seconds %}
                         ({% if item.seconds >= 3600 %}{{ item.seconds // 3600 }}h {% endif %}{{ (item.seconds % 3600) // 60 }}m)
                         {% endif %}
                         {% elif item.finished %}
-                        <strong data-i18n="dash.actFinished">Finished</strong> 🎉
+                        <span data-i18n="dash.actFinished">Finished</span>
+                        {{ book_link }} 🎉
                         {% endif %}
 
                         {# Secondary parts #}
@@ -255,17 +266,17 @@
                         {% endif %}
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
 
-    {% if last_books_bought %}
+    {% if last_books_owned %}
     <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.lastBooksBought">Last Books Bought</h2>
+        <h2 class="dash-heading" data-i18n="dash.lastBooksOwned">Last Books Owned</h2>
         <div class="dash-bought-list">
-            {% for book in last_books_bought %}
+            {% for book in last_books_owned %}
             <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-rated-card">
                 <div class="dash-rated-cover">
                     {% if book.has_cover %}
@@ -278,14 +289,21 @@
                     <div class="dash-rated-title">{{ book.name }}</div>
                     <div class="dash-rated-author">{{ book.author }}</div>
                     <div class="dash-bought-meta">
-                        <span class="dash-feed-date" data-date="{{ book.purchase_date }}">{{ book.purchase_date }}</span>
                         {% if book.is_gift %}
-                        · <span data-i18n="dash.actAsGift">as a gift</span>
-                        {% elif book.source_name %}
-                        · {{ book.source_name }}
+                        <span data-i18n="dash.ownedGift">Received as a gift</span>
+                        {% if book.source_name %}
+                        <span data-i18n="dash.actFrom">from</span> <strong>{{ book.source_name }}</strong>
+                        {% endif %}
+                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.purchase_date }}">{{ book.purchase_date }}</span></strong>
+                        {% else %}
+                        <span data-i18n="dash.ownedBought">Bought</span>
+                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.purchase_date }}">{{ book.purchase_date }}</span></strong>
+                        {% if book.source_name %}
+                        <span data-i18n="dash.actAt">at</span> <strong>{{ book.source_name }}</strong>
                         {% endif %}
                         {% if book.purchase_price %}
-                        · <strong>{{ book.purchase_price }}</strong>
+                        (<em>{{ book.purchase_price }}</em>)
+                        {% endif %}
                         {% endif %}
                     </div>
                 </div>

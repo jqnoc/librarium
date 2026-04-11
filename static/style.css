@@ -2027,6 +2027,12 @@ select.form-control { cursor: pointer; }
     transition: box-shadow 0.15s;
 }
 .dash-rated-card:hover { box-shadow: var(--lb-shadow-lg); }
+.dash-activity-link {
+    color: var(--lb-deep-orange);
+    font-weight: 600;
+    text-decoration: none;
+}
+.dash-activity-link:hover { text-decoration: underline; }
 .dash-rated-cover {
     width: 36px;
     min-width: 36px;

@@ -22,19 +22,26 @@
     <p style="color: var(--lb-text-light); margin: 0;">
         {{ books | length }} book{{ 's' if books | length != 1 else '' }} <span data-i18n="yearBought.bought">bought</span>
     </p>
-    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
-        <span data-i18n="yearBought.sortBy">Sort by:</span>
-        <select onchange="window.location.href='{{ url_for('stats_year_bought', year=year) }}?sort=' + this.value"
-                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
-            <option value="date"   {% if sort == 'date'   %}selected{% endif %} data-i18n="yearBought.sortDate">Date</option>
-            <option value="alpha"  {% if sort == 'alpha'  %}selected{% endif %} data-i18n="yearBought.sortTitle">Title</option>
-            <option value="author" {% if sort == 'author' %}selected{% endif %} data-i18n="yearBought.sortAuthor">Author</option>
-            <option value="price"  {% if sort == 'price'  %}selected{% endif %} data-i18n="yearBought.sortPrice">Price</option>
-        </select>
-    </label>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <div class="view-switcher">
+            <button class="view-btn active" data-view="card" data-i18n-title="index.btnCardView" title="Card view">🃏</button>
+            <button class="view-btn" data-view="list" data-i18n-title="index.btnListView" title="List view">📋</button>
+        </div>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
+            <span data-i18n="yearBought.sortBy">Sort by:</span>
+            <select onchange="window.location.href='{{ url_for('stats_year_bought', year=year) }}?sort=' + this.value"
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
+                <option value="date"   {% if sort == 'date'   %}selected{% endif %} data-i18n="yearBought.sortDate">Date</option>
+                <option value="alpha"  {% if sort == 'alpha'  %}selected{% endif %} data-i18n="yearBought.sortTitle">Title</option>
+                <option value="author" {% if sort == 'author' %}selected{% endif %} data-i18n="yearBought.sortAuthor">Author</option>
+                <option value="price"  {% if sort == 'price'  %}selected{% endif %} data-i18n="yearBought.sortPrice">Price</option>
+            </select>
+        </label>
+    </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;">
+<!-- ── Card view ───────────────────────────────────── -->
+<div id="view-card" class="bought-view" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;">
     {% for book in books %}
     <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -72,6 +79,64 @@
     </a>
     {% endfor %}
 </div>
+
+<!-- ── List view ───────────────────────────────────── -->
+<div id="view-list" class="bought-view" style="display: none;">
+    <div class="table-wrap">
+        <table class="library-list-table">
+            <thead>
+                <tr>
+                    <th style="width:60px;" data-i18n="index.colCover">Cover</th>
+                    <th data-i18n="index.colTitle">Title</th>
+                    <th data-i18n="index.colAuthor">Author</th>
+                    <th data-i18n="yearBought.dateLabel">Date</th>
+                    <th data-i18n="yearBought.locationLabel">Location</th>
+                    <th data-i18n="yearBought.sortPrice">Price</th>
+                    <th style="width:50px;">🎁</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in books %}
+                <tr onclick="if(event.ctrlKey||event.metaKey){window.open('{{ url_for('book_detail', book_id=book.id) }}','_blank')}else{window.location='{{ url_for('book_detail', book_id=book.id) }}'}" style="cursor:pointer;">
+                    <td style="padding: 0.4rem 0.5rem;">
+                        <div class="list-cover-thumb">
+                            {% if book.has_cover %}
+                            <img src="{{ url_for('book_cover_thumb', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}">
+                            {% else %}
+                            <span class="cover-placeholder" style="font-size:1.2rem;">📖</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="font-weight:600;">{{ book.name }}{% if book.subtitle %}<span class="book-subtitle" style="display:block;">{{ book.subtitle }}</span>{% endif %}</td>
+                    <td>{{ book.author | format_authors }}</td>
+                    <td>{{ book.purchase_date | display_date }}</td>
+                    <td>{{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}</td>
+                    <td>{% if book.purchase_price %}<span style="color: var(--lb-deep-orange); font-weight: 500;">{{ book.purchase_price }}</span>{% else %}—{% endif %}</td>
+                    <td>{% if book.is_gift %}🎁{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function() {
+    var key = 'librarium_bought_view';
+    var saved = localStorage.getItem(key) || 'card';
+    function switchBoughtView(v) {
+        document.querySelectorAll('.bought-view').forEach(function(el) { el.style.display = 'none'; });
+        var t = document.getElementById('view-' + v);
+        if (t) t.style.display = v === 'card' ? 'grid' : '';
+        document.querySelectorAll('.view-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.view === v); });
+        localStorage.setItem(key, v);
+    }
+    switchBoughtView(saved);
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('view-btn')) switchBoughtView(e.target.dataset.view);
+    });
+})();
+</script>
 
 {% else %}
 <div class="empty-state">

@@ -12,15 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   currently reading books, this-year-at-a-glance with YoY comparison
   (books, pages, and time), streaks & consistency, reading heatmap
   (52 weeks), comprehensive recent activity feed (50 items with
-  thumbnails and agglutinated events per book per day: read pages are
+  thumbnails and agglutinated events per book per day: date shown first,
+  then action description with book name as link; read pages are
   summed, started/finished/bought/borrowed/gifted events are merged into
-  a single line with proper comma/and conjunction; bought entries now
-  show store name and price; time display omits the "0h" prefix when
-  under one hour), "Last Books Bought" section (50 most recent purchases,
-  scrollable, side-by-side with Recent Activity), top-rated books,
-  records, format &
+  a single line with proper comma/and conjunction; bought entries show
+  store name and price; borrowed entries show source name; time display
+  omits the "0h" prefix when
+  under one hour), "Last Books Owned" section (50 most recent owned
+  books with human-readable messages: bought/gift with date, source,
+  and price; scrollable, side-by-side with Recent Activity), top-rated
+  books, records, format &
   source donut charts, tag cloud, author spotlight (4 random authors),
-  series progress, language diversity, dynamic TBR pile, and expanded
+  series progress, language diversity, dynamic TBR pile (15 random
+  books), and expanded
   library health nudges (unrated, no cover, no photo, no tags, abandoned,
   no pages, no summary, no author)
 - Dashboard link in the navigation bar; logo now links to the dashboard
@@ -41,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Timeline; clicking a bar navigates to a new detail page
   (`/stats/year/<year>/bought`) listing all books bought that year with
   cover, author, purchase date, location, price, and gift indicator;
-  sortable by date, title, author, or price
+  card/list view toggle (saved in localStorage); sortable by date,
+  title, author, or price
 - Full i18n support (EN / ES) for all calendar strings including
   day-of-week headers and month names
 
@@ -53,10 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Dashboard "Books Bought this Year" section replaced with "Last Books
-  Bought" showing the 50 most recent purchases regardless of year
-- Dashboard "Recent Activity" feed restyled from inline text sentences
-  to compact card layout (cover thumbnail, title, activity metadata),
-  matching the "Last Books Bought" visual style
+  Owned" showing the 50 most recent owned books with human-readable
+  messages (bought on date at place with price in italics; received as a
+  gift from person on date)
+- Dashboard "Recent Activity" feed restyled: date shown first, then
+  action text with book title as a clickable link (e.g. "Read 6 pages of
+  *Book Title* (33m)"); borrowed items show source name
+- Dashboard TBR pile reduced from 30 to 15 random books
 - Library page moved from `/` to `/library`; all existing library links
   and redirects updated accordingly
 - Removed stats ribbon from the library index page (moved to dashboard)

@@ -1653,14 +1653,17 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
         dr_gift += " AND purchase_date <= ?"
         dp_gift.append(date_to)
     for bk in db.execute(
-        f"SELECT id, name, has_cover, cover_hash, purchase_date "
-        f"FROM books WHERE {lf} AND is_gift = 1 AND purchase_date IS NOT NULL AND purchase_date != '' "
-        f"AND (work_id IS NULL OR is_primary_edition = 1){dr_gift}",
-        lp + tuple(dp_gift),
+        f"SELECT b.id, b.name, b.has_cover, b.cover_hash, b.purchase_date, "
+        f"s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf_b} AND b.is_gift = 1 AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_gift}",
+        lp_b + tuple(dp_gift),
     ).fetchall():
         _raw.append({"date": bk["purchase_date"], "type": "gift", "book_id": bk["id"],
                       "book_name": bk["name"], "has_cover": bool(bk["has_cover"]),
-                      "cover_hash": bk["cover_hash"] or ""})
+                      "cover_hash": bk["cover_hash"] or "",
+                      "source_name": bk["source_name"] or ""})
 
     # Agglutinate
     _agg: dict[tuple[str, str], dict] = {}
@@ -1696,6 +1699,8 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
                 g["source_name"] = ev["source_name"]
         elif t == "gift":
             g["gift"] = True
+            if ev.get("source_name"):
+                g["source_name"] = ev["source_name"]
 
     return sorted(_agg.values(), key=lambda x: x["date"], reverse=True)
 
@@ -2300,7 +2305,7 @@ def dashboard():
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
         f"ORDER BY b.purchase_date DESC LIMIT 50", lp
     ).fetchall():
-        last_books_bought.append({
+        last_books_owned.append({
             "id": row["id"],
             "name": row["name"],
             "author": row["author"] or "",
@@ -2426,7 +2431,7 @@ def dashboard():
     tbr_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'not-started' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY RANDOM() LIMIT 30", lp
+        f"ORDER BY RANDOM() LIMIT 15", lp
     ).fetchall()
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
@@ -2520,8 +2525,8 @@ def dashboard():
         yoy_diff=yoy_diff,
         # Recent activity
         recent_activity=recent_activity,
-        # Last books bought
-        last_books_bought=last_books_bought,
+        # Last books owned
+        last_books_owned=last_books_owned,
         # Top rated
         top_rated=top_rated,
         # Records
