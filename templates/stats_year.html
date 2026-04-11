@@ -205,11 +205,11 @@
                         {% endif %}
                         {# Join with commas and "and" #}
                         {% if parts|length == 1 %}
-                            {{ parts[0] }}
+                            {{ parts[0] | safe }}
                         {% elif parts|length == 2 %}
-                            {{ parts[0] }} <span data-i18n="dash.andConnector">and</span> {{ parts[1] }}
+                            {{ parts[0] | safe }} <span data-i18n="dash.andConnector">and</span> {{ parts[1] | safe }}
                         {% elif parts|length > 2 %}
-                            {% for p in parts %}{% if not loop.last %}{{ p }}{% if loop.index < parts|length - 1 %}, {% endif %}{% else %} <span data-i18n="dash.andConnector">and</span> {{ p }}{% endif %}{% endfor %}
+                            {% for p in parts %}{% if not loop.last %}{{ p | safe }}{% if loop.index < parts|length - 1 %}, {% endif %}{% else %} <span data-i18n="dash.andConnector">and</span> {{ p | safe }}{% endif %}{% endfor %}
                         {% endif %}
                     </div>
                 </div>

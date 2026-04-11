@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summed, started/finished/bought/borrowed/gifted events are merged into
   a single line with proper comma/and conjunction; bought entries now
   show store name and price; time display omits the "0h" prefix when
-  under one hour), "Books Bought this Year" section (scrollable,
-  side-by-side with Recent Activity), top-rated books, records, format &
+  under one hour), "Last Books Bought" section (50 most recent purchases,
+  scrollable, side-by-side with Recent Activity), top-rated books,
+  records, format &
   source donut charts, tag cloud, author spotlight (4 random authors),
   series progress, language diversity, dynamic TBR pile, and expanded
   library health nudges (unrated, no cover, no photo, no tags, abandoned,
@@ -45,10 +46,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   day-of-week headers and month names
 
 ### Fixed
+- Year Activity Summary on yearly stats page now renders HTML correctly
+  (fixed Jinja2 auto-escaping of `<span>` tags in agglutinated output)
 - Calendar detail panel date display now respects the app's i18n
   language setting instead of always using the browser locale
 
 ### Changed
+- Dashboard "Books Bought this Year" section replaced with "Last Books
+  Bought" showing the 50 most recent purchases regardless of year
+- Dashboard "Recent Activity" feed restyled from inline text sentences
+  to compact card layout (cover thumbnail, title, activity metadata),
+  matching the "Last Books Bought" visual style
 - Library page moved from `/` to `/library`; all existing library links
   and redirects updated accordingly
 - Removed stats ribbon from the library index page (moved to dashboard)

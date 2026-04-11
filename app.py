@@ -2289,19 +2289,18 @@ def dashboard():
     # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
-    # ── Books bought this year ───────────────────────────────────────────
-    bought_this_year: list[dict] = []
+    # ── Last books bought (50 most recent) ─────────────────────────────
+    last_books_bought: list[dict] = []
     for row in db.execute(
         f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.purchase_date, "
         f"b.purchase_price, b.source_type, b.is_gift, "
         f"s.name AS source_name "
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
         f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
-        f"AND SUBSTR(b.purchase_date, 1, 4) = ? "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
-        f"ORDER BY b.purchase_date DESC", lp + (current_year,)
+        f"ORDER BY b.purchase_date DESC LIMIT 50", lp
     ).fetchall():
-        bought_this_year.append({
+        last_books_bought.append({
             "id": row["id"],
             "name": row["name"],
             "author": row["author"] or "",
@@ -2521,8 +2520,8 @@ def dashboard():
         yoy_diff=yoy_diff,
         # Recent activity
         recent_activity=recent_activity,
-        # Books bought this year
-        bought_this_year=bought_this_year,
+        # Last books bought
+        last_books_bought=last_books_bought,
         # Top rated
         top_rated=top_rated,
         # Records

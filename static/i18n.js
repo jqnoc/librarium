@@ -614,7 +614,7 @@
         'dash.actIt':               { en: 'it',                    es: '' },
         'dash.actReadLower':        { en: 'read',                  es: 'leyó' },
         'dash.actFinishedShort':    { en: 'finished it',           es: 'lo terminó' },
-        'dash.boughtThisYear':      { en: 'Books Bought this Year',es: 'Libros Comprados este Año' },
+        'dash.lastBooksBought':     { en: 'Last Books Bought',     es: 'Últimos Libros Comprados' },
         'dash.topRated':            { en: 'Top Rated',             es: 'Mejor Valorados' },
         'dash.records':             { en: 'Records',               es: 'Récords' },
         'dash.formatSource':        { en: 'Format & Source',       es: 'Formato y Fuente' },
