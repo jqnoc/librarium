@@ -491,6 +491,9 @@ Every response that modifies code **must** update `CHANGELOG.md`:
      fresh empty `## [Unreleased]` above it.
    - Update `APP_VERSION` in `app.py` and `version` in `package.json`
      to match.
+6. **No artificial line breaks**: each changelog bullet must be a single
+   line — do **not** hard-wrap at 72 or 80 columns. Word wrap in the
+   editor and on GitHub handles long lines correctly.
 
 ### Version locations (kept in sync only at release time)
 

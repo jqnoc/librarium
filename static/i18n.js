@@ -288,6 +288,7 @@
         'authorDetail.showAllEditions': { en: 'Show All Editions', es: 'Mostrar Todas las Ediciones' },
         'authorDetail.gender':        { en: 'Gender',              es: 'Género' },
         'authorDetail.empty':         { en: 'No books found for this author.', es: 'No se encontraron libros de este autor.' },
+        'authorDetail.quotes':        { en: 'Quotes',              es: 'Citas' },
 
         // ── Edit author ─────────────────────────────────────────────────
         'editAuthor.backToAuthor':  { en: '← Back to Author',     es: '← Volver al Autor' },
@@ -668,7 +669,7 @@
 
         // ── Dashboard spotlights ────────────────────────────────────────
         'dash.quoteOfTheDay':       { en: 'Quote of the Day',      es: 'Cita del Día' },
-        'dash.wordOfTheDay':        { en: 'Word of the Day',       es: 'Palabra del Día' },
+        'dash.wordOfTheDay':        { en: 'Words of the Day',      es: 'Palabras del Día' },
 
         // ── Bookly import ───────────────────────────────────────────────
         'bookForm.booklyImportTitle': { en: '📕 Import from Bookly', es: '📕 Importar desde Bookly' },

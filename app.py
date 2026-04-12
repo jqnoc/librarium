@@ -70,7 +70,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -2579,7 +2579,7 @@ def dashboard():
 
     quote_of_the_day = None
     qotd_row = db.execute(
-        f"SELECT q.text, q.page, b.name AS book_name, b.author, b.id AS book_id "
+        f"SELECT q.text, q.page, b.name AS book_name, b.author, b.id AS book_id, b.language "
         f"FROM quotes q JOIN books b ON b.id = q.book_id "
         f"WHERE {lf_b} ORDER BY RANDOM() LIMIT 1", lp_b
     ).fetchone()
@@ -4245,9 +4245,22 @@ def author_detail(author_name: str):
         "birth_place": "", "death_date": "", "death_place": "", "biography": "",
         "gender": "unknown",
     }
+
+    # Load all quotes from this author's books
+    book_ids = [b["id"] for b in books]
+    author_quotes = []
+    if book_ids:
+        ph = ",".join("?" * len(book_ids))
+        author_quotes = [dict(r) for r in db.execute(
+            f"SELECT q.text, q.page, b.name AS book_name, b.id AS book_id, b.language "
+            f"FROM quotes q JOIN books b ON b.id = q.book_id "
+            f"WHERE q.book_id IN ({ph}) ORDER BY RANDOM()",
+            book_ids,
+        ).fetchall()]
+
     resp = make_response(render_template("author_detail.html", author=author_name,
                            books=books, author_info=author_info, sort=sort,
-                           show_editions=show_editions))
+                           show_editions=show_editions, author_quotes=author_quotes))
     resp.set_cookie("librarium_author_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
     return resp
 
@@ -5106,7 +5119,7 @@ def add_quote(book_id: str):
     db = get_db()
     if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
         abort(404)
-    text = request.form.get("text", "").strip()
+    text = sanitize_html(request.form.get("text", "").strip())
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:
@@ -5119,7 +5132,7 @@ def add_quote(book_id: str):
 @app.route("/book/<book_id>/quotes/<int:qid>/edit", methods=["POST"])
 def edit_quote(book_id: str, qid: int):
     db = get_db()
-    text = request.form.get("text", "").strip()
+    text = sanitize_html(request.form.get("text", "").strip())
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:
@@ -5144,7 +5157,7 @@ def add_thought(book_id: str):
     db = get_db()
     if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
         abort(404)
-    text = request.form.get("text", "").strip()
+    text = sanitize_html(request.form.get("text", "").strip())
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:
@@ -5157,7 +5170,7 @@ def add_thought(book_id: str):
 @app.route("/book/<book_id>/thoughts/<int:tid>/edit", methods=["POST"])
 def edit_thought(book_id: str, tid: int):
     db = get_db()
-    text = request.form.get("text", "").strip()
+    text = sanitize_html(request.form.get("text", "").strip())
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:
@@ -5183,7 +5196,7 @@ def add_word(book_id: str):
     if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
         abort(404)
     word = request.form.get("word", "").strip()
-    definition = request.form.get("definition", "").strip()
+    definition = sanitize_html(request.form.get("definition", "").strip())
     if word:
         db.execute("INSERT INTO words (book_id, word, definition) VALUES (?, ?, ?)",
                    (book_id, word, definition))
@@ -5195,7 +5208,7 @@ def add_word(book_id: str):
 def edit_word(book_id: str, wid: int):
     db = get_db()
     word = request.form.get("word", "").strip()
-    definition = request.form.get("definition", "").strip()
+    definition = sanitize_html(request.form.get("definition", "").strip())
     if word:
         db.execute("UPDATE words SET word = ?, definition = ? WHERE id = ? AND book_id = ?",
                    (word, definition, wid, book_id))
@@ -5267,6 +5280,8 @@ def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
 
     # Parse thoughts and quotes (same format: p.NUMBER • text)
     page_entry_re = re.compile(r"p\.(\d+)\s*[•·]\s*")
+    # Quotation marks to strip from beginning/end of extracted quotes
+    _quote_marks = '\'\"«»""''‹›„‟‚‛「」『』'
 
     for section_name in ("thoughts", "quotes"):
         if section_name not in sections:
@@ -5283,6 +5298,9 @@ def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
                 entry_text = parts[j + 1].strip() if j + 1 < len(parts) else ""
                 # Clean up: remove excessive whitespace from PDF extraction
                 entry_text = re.sub(r"\s+", " ", entry_text).strip()
+                # Strip leading/trailing quotation marks (Bookly wraps quotes)
+                if section_name == "quotes":
+                    entry_text = entry_text.strip(_quote_marks).strip()
                 if entry_text:
                     entries.append({"text": entry_text, "page": page_num})
 

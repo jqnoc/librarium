@@ -119,4 +119,19 @@
     <a href="{{ url_for('authors_list') }}" class="btn btn-secondary" data-i18n="authorDetail.backToAuthors">← Back to Authors</a>
 </div>
 {% endif %}
+
+<!-- ── Quotes ──────────────────────────────────────────────────────────── -->
+{% if author_quotes %}
+<h2 style="margin-top: 2rem;" data-i18n="authorDetail.quotes">Quotes</h2>
+<div style="column-count: 3; column-gap: 1.5rem;">
+    {% for q in author_quotes %}
+    <div style="break-inside: avoid; margin-bottom: 1rem; padding: 1rem; background: var(--lb-surface); border-radius: 8px; border-left: 3px solid var(--lb-accent);">
+        <div style="font-style: italic; color: var(--lb-text-dark); line-height: 1.5;">{% if q.language and q.language|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}&ldquo;{{ q.text | safe }}&rdquo;{% endif %}</div>
+        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--lb-text-light);">
+            {% if q.page %}p. {{ q.page }} · {% endif %}<a href="{{ url_for('book_detail', book_id=q.book_id) }}">{{ q.book_name }}</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

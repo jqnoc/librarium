@@ -504,6 +504,141 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 {% endif %}
 
+<!-- ── Quotes ────────────────────────────────────────────────────────── -->
+<h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>
+
+{% if quotes %}
+<div class="annotations-list">
+    {% for q in quotes %}
+    <div class="annotation-card annotation-quote" id="quote-{{ q.id }}">
+        <div class="annotation-body">
+            <div class="annotation-text">{% if info.get('language', '')|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}\u201c{{ q.text | safe }}\u201d{% endif %}</div>
+            {% if q.page %}<div class="annotation-page">p. {{ q.page }}</div>{% endif %}
+        </div>
+        <div class="annotation-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})">✏️</button>
+            <form method="POST" action="{{ url_for('delete_quote', book_id=book_id, qid=q.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Delete this quote?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+        </div>
+        <div class="annotation-edit-row" id="quote-edit-{{ q.id }}">
+            <form method="POST" action="{{ url_for('edit_quote', book_id=book_id, qid=q.id) }}" class="annotation-edit-form">
+                <textarea id="edit-quote-{{ q.id }}" name="text" rows="3" required>{{ q.text }}</textarea>
+                <input type="number" name="page" value="{{ q.page or '' }}" placeholder="Page" min="1" style="width:80px;">
+                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})" data-i18n="form.cancel">Cancel</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noQuotes">No quotes yet.</p>
+</div>
+{% endif %}
+
+<div class="add-annotation-panel">
+    <form method="POST" action="{{ url_for('add_quote', book_id=book_id) }}" class="annotation-add-form">
+        <textarea id="add-quote-text" name="text" rows="2" required placeholder="Quote text..." data-i18n-placeholder="book.quoteTextPlaceholder"></textarea>
+        <div class="annotation-add-row">
+            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addQuoteBtn">+ Add Quote</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Thoughts ──────────────────────────────────────────────────────── -->
+<h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
+
+{% if thoughts %}
+<div class="annotations-list">
+    {% for th in thoughts %}
+    <div class="annotation-card annotation-thought" id="thought-{{ th.id }}">
+        <div class="annotation-body">
+            <div class="annotation-text">{{ th.text | safe }}</div>
+            {% if th.page %}<div class="annotation-page">p. {{ th.page }}</div>{% endif %}
+        </div>
+        <div class="annotation-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})">✏️</button>
+            <form method="POST" action="{{ url_for('delete_thought', book_id=book_id, tid=th.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Delete this thought?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+        </div>
+        <div class="annotation-edit-row" id="thought-edit-{{ th.id }}">
+            <form method="POST" action="{{ url_for('edit_thought', book_id=book_id, tid=th.id) }}" class="annotation-edit-form">
+                <textarea id="edit-thought-{{ th.id }}" name="text" rows="3" required>{{ th.text }}</textarea>
+                <input type="number" name="page" value="{{ th.page or '' }}" placeholder="Page" min="1" style="width:80px;">
+                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})" data-i18n="form.cancel">Cancel</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noThoughts">No thoughts yet.</p>
+</div>
+{% endif %}
+
+<div class="add-annotation-panel">
+    <form method="POST" action="{{ url_for('add_thought', book_id=book_id) }}" class="annotation-add-form">
+        <textarea id="add-thought-text" name="text" rows="2" required placeholder="Your thought..." data-i18n-placeholder="book.thoughtTextPlaceholder"></textarea>
+        <div class="annotation-add-row">
+            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addThoughtBtn">+ Add Thought</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Words ─────────────────────────────────────────────────────────── -->
+<h2 id="words"><span data-i18n="book.words">Words</span> <span class="annotation-count">({{ words | length }})</span></h2>
+
+{% if words %}
+<div class="annotations-list annotations-words">
+    {% for w in words %}
+    <div class="annotation-card annotation-word" id="word-{{ w.id }}">
+        <div class="annotation-body">
+            <div class="annotation-word-term">{{ w.word }}</div>
+            <div class="annotation-word-def">{{ w.definition | safe }}</div>
+        </div>
+        <div class="annotation-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})">✏️</button>
+            <form method="POST" action="{{ url_for('delete_word', book_id=book_id, wid=w.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Delete this word?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+        </div>
+        <div class="annotation-edit-row" id="word-edit-{{ w.id }}">
+            <form method="POST" action="{{ url_for('edit_word', book_id=book_id, wid=w.id) }}" class="annotation-edit-form">
+                <input type="text" name="word" value="{{ w.word }}" required placeholder="Word" style="width:150px;">
+                <textarea id="edit-word-{{ w.id }}" name="definition" rows="2" required>{{ w.definition }}</textarea>
+                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})" data-i18n="form.cancel">Cancel</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noWords">No words yet.</p>
+</div>
+{% endif %}
+
+<div class="add-annotation-panel">
+    <form method="POST" action="{{ url_for('add_word', book_id=book_id) }}" class="annotation-add-form">
+        <div class="annotation-add-row">
+            <input type="text" name="word" required placeholder="Word" style="width:150px;" data-i18n-placeholder="book.wordPlaceholder">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addWordBtn">+ Add Word</button>
+        </div>
+        <textarea id="add-word-def" name="definition" rows="2" required placeholder="Definition..." data-i18n-placeholder="book.definitionPlaceholder"></textarea>
+    </form>
+</div>
+
 <!-- ── Sessions table ────────────────────────────────────────────────── -->
 <h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--lb-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
@@ -720,141 +855,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
-<!-- ── Quotes ────────────────────────────────────────────────────────── -->
-<h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>
-
-{% if quotes %}
-<div class="annotations-list">
-    {% for q in quotes %}
-    <div class="annotation-card annotation-quote" id="quote-{{ q.id }}">
-        <div class="annotation-body">
-            <div class="annotation-text">"{{ q.text }}"</div>
-            {% if q.page %}<div class="annotation-page">p. {{ q.page }}</div>{% endif %}
-        </div>
-        <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})">✏️</button>
-            <form method="POST" action="{{ url_for('delete_quote', book_id=book_id, qid=q.id) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete this quote?');">
-                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
-            </form>
-        </div>
-        <div class="annotation-edit-row" id="quote-edit-{{ q.id }}">
-            <form method="POST" action="{{ url_for('edit_quote', book_id=book_id, qid=q.id) }}" class="annotation-edit-form">
-                <textarea name="text" rows="3" required>{{ q.text }}</textarea>
-                <input type="number" name="page" value="{{ q.page or '' }}" placeholder="Page" min="1" style="width:80px;">
-                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})" data-i18n="form.cancel">Cancel</button>
-            </form>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-state" style="padding: 1rem;">
-    <p data-i18n="book.noQuotes">No quotes yet.</p>
-</div>
-{% endif %}
-
-<div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_quote', book_id=book_id) }}" class="annotation-add-form">
-        <textarea name="text" rows="2" required placeholder="Quote text..." data-i18n-placeholder="book.quoteTextPlaceholder"></textarea>
-        <div class="annotation-add-row">
-            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
-            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addQuoteBtn">+ Add Quote</button>
-        </div>
-    </form>
-</div>
-
-<!-- ── Thoughts ──────────────────────────────────────────────────────── -->
-<h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
-
-{% if thoughts %}
-<div class="annotations-list">
-    {% for th in thoughts %}
-    <div class="annotation-card annotation-thought" id="thought-{{ th.id }}">
-        <div class="annotation-body">
-            <div class="annotation-text">{{ th.text }}</div>
-            {% if th.page %}<div class="annotation-page">p. {{ th.page }}</div>{% endif %}
-        </div>
-        <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})">✏️</button>
-            <form method="POST" action="{{ url_for('delete_thought', book_id=book_id, tid=th.id) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete this thought?');">
-                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
-            </form>
-        </div>
-        <div class="annotation-edit-row" id="thought-edit-{{ th.id }}">
-            <form method="POST" action="{{ url_for('edit_thought', book_id=book_id, tid=th.id) }}" class="annotation-edit-form">
-                <textarea name="text" rows="3" required>{{ th.text }}</textarea>
-                <input type="number" name="page" value="{{ th.page or '' }}" placeholder="Page" min="1" style="width:80px;">
-                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})" data-i18n="form.cancel">Cancel</button>
-            </form>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-state" style="padding: 1rem;">
-    <p data-i18n="book.noThoughts">No thoughts yet.</p>
-</div>
-{% endif %}
-
-<div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_thought', book_id=book_id) }}" class="annotation-add-form">
-        <textarea name="text" rows="2" required placeholder="Your thought..." data-i18n-placeholder="book.thoughtTextPlaceholder"></textarea>
-        <div class="annotation-add-row">
-            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
-            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addThoughtBtn">+ Add Thought</button>
-        </div>
-    </form>
-</div>
-
-<!-- ── Words ─────────────────────────────────────────────────────────── -->
-<h2 id="words"><span data-i18n="book.words">Words</span> <span class="annotation-count">({{ words | length }})</span></h2>
-
-{% if words %}
-<div class="annotations-list annotations-words">
-    {% for w in words %}
-    <div class="annotation-card annotation-word" id="word-{{ w.id }}">
-        <div class="annotation-body">
-            <div class="annotation-word-term">{{ w.word }}</div>
-            <div class="annotation-word-def">{{ w.definition }}</div>
-        </div>
-        <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})">✏️</button>
-            <form method="POST" action="{{ url_for('delete_word', book_id=book_id, wid=w.id) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete this word?');">
-                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
-            </form>
-        </div>
-        <div class="annotation-edit-row" id="word-edit-{{ w.id }}">
-            <form method="POST" action="{{ url_for('edit_word', book_id=book_id, wid=w.id) }}" class="annotation-edit-form">
-                <input type="text" name="word" value="{{ w.word }}" required placeholder="Word" style="width:150px;">
-                <textarea name="definition" rows="2" required>{{ w.definition }}</textarea>
-                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})" data-i18n="form.cancel">Cancel</button>
-            </form>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-state" style="padding: 1rem;">
-    <p data-i18n="book.noWords">No words yet.</p>
-</div>
-{% endif %}
-
-<div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_word', book_id=book_id) }}" class="annotation-add-form">
-        <div class="annotation-add-row">
-            <input type="text" name="word" required placeholder="Word" style="width:150px;" data-i18n-placeholder="book.wordPlaceholder">
-            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addWordBtn">+ Add Word</button>
-        </div>
-        <textarea name="definition" rows="2" required placeholder="Definition..." data-i18n-placeholder="book.definitionPlaceholder"></textarea>
-    </form>
-</div>
-
 <!-- ── Editions ────────────────────────────────────────────────────────── -->
 {% if editions and editions | length > 1 %}
 <h2 data-i18n="book.editions">Editions</h2>
@@ -977,6 +977,19 @@ function toggleAnnotationEdit(type, id) {
     const row = document.getElementById(type + '-edit-' + id);
     row.classList.toggle('active');
 }
+
+// ── Rich-text toolbars for annotation textareas ──────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    var irt = window.librariumI18n.initRichTextToolbar;
+    // Add-form textareas
+    irt('add-quote-text');
+    irt('add-thought-text');
+    irt('add-word-def');
+    // Edit-form textareas
+    document.querySelectorAll('textarea[id^="edit-quote-"]').forEach(function(ta) { irt(ta.id); });
+    document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { irt(ta.id); });
+    document.querySelectorAll('textarea[id^="edit-word-"]').forEach(function(ta) { irt(ta.id); });
+});
 
 // ── Build cumulative progress chart ──────────────────────────────────
 {% if sessions %}
