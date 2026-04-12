@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Annotations system: quotes, thoughts, and words per book edition with
+  dedicated database tables, full CRUD (add, edit, delete) inline on the
+  book detail page; quotes and thoughts ordered by page number (null-page
+  entries last), words ordered alphabetically in a responsive grid
+- Bookly PDF import on the edit metadata page: upload a Bookly summary
+  PDF to automatically extract and import quotes, thoughts, and words;
+  optional checkbox to clear existing annotations before importing
+- "Quote of the Day" and "Word of the Day" spotlight sections on the
+  dashboard, placed between Currently Reading and This Year at a Glance;
+  quote is random from any book, words are random per language
+- Full i18n support (EN / ES) for all annotation and spotlight strings
 - Dashboard page (`/`) as the new landing page with hero stats ribbon,
   currently reading books, this-year-at-a-glance with YoY comparison
   (books, pages, and time), streaks & consistency, reading heatmap

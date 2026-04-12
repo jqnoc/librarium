@@ -649,6 +649,32 @@
         'gender.male':              { en: 'Male',                  es: 'Masculino' },
         'gender.female':            { en: 'Female',                es: 'Femenino' },
         'gender.unknown':           { en: 'Unknown',               es: 'Desconocido' },
+
+        // ── Annotations (Quotes, Thoughts, Words) ──────────────────────
+        'book.quotes':              { en: 'Quotes',                es: 'Citas' },
+        'book.thoughts':            { en: 'Thoughts',              es: 'Reflexiones' },
+        'book.words':               { en: 'Words',                 es: 'Palabras' },
+        'book.noQuotes':            { en: 'No quotes yet.',        es: 'Aún no hay citas.' },
+        'book.noThoughts':          { en: 'No thoughts yet.',      es: 'Aún no hay reflexiones.' },
+        'book.noWords':             { en: 'No words yet.',         es: 'Aún no hay palabras.' },
+        'book.addQuoteBtn':         { en: '+ Add Quote',           es: '+ Añadir Cita' },
+        'book.addThoughtBtn':       { en: '+ Add Thought',         es: '+ Añadir Reflexión' },
+        'book.addWordBtn':          { en: '+ Add Word',            es: '+ Añadir Palabra' },
+        'book.quoteTextPlaceholder':  { en: 'Quote text...',       es: 'Texto de la cita...' },
+        'book.thoughtTextPlaceholder': { en: 'Your thought...',    es: 'Tu reflexión...' },
+        'book.pagePlaceholder':     { en: 'Page',                  es: 'Página' },
+        'book.wordPlaceholder':     { en: 'Word',                  es: 'Palabra' },
+        'book.definitionPlaceholder': { en: 'Definition...',       es: 'Definición...' },
+
+        // ── Dashboard spotlights ────────────────────────────────────────
+        'dash.quoteOfTheDay':       { en: 'Quote of the Day',      es: 'Cita del Día' },
+        'dash.wordOfTheDay':        { en: 'Word of the Day',       es: 'Palabra del Día' },
+
+        // ── Bookly import ───────────────────────────────────────────────
+        'bookForm.booklyImportTitle': { en: '📕 Import from Bookly', es: '📕 Importar desde Bookly' },
+        'bookForm.booklyImportDesc':  { en: 'Upload a Bookly summary PDF to import quotes, thoughts, and words.', es: 'Sube un PDF de resumen de Bookly para importar citas, reflexiones y palabras.' },
+        'bookForm.booklyClearExisting': { en: 'Remove existing quotes, thoughts & words before importing', es: 'Eliminar citas, reflexiones y palabras existentes antes de importar' },
+        'bookForm.booklyImportBtn': { en: '📥 Import',             es: '📥 Importar' },
     };
 
     // ── Public API ──────────────────────────────────────────────────────

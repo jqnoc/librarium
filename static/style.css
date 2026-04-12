@@ -2185,5 +2185,257 @@ select.form-control { cursor: pointer; }
     .dash-reading-grid { grid-template-columns: 1fr; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Annotations (Quotes, Thoughts, Words)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.annotation-count {
+    font-size: 0.8em;
+    color: var(--lb-text-light);
+    font-weight: 400;
+}
+
+.annotations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.annotation-card {
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius-lg);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--lb-shadow);
+    position: relative;
+}
+
+.annotation-card:hover .annotation-actions {
+    opacity: 1;
+}
+
+.annotation-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.annotation-quote .annotation-text {
+    font-style: italic;
+    color: var(--lb-text);
+    line-height: 1.6;
+    font-size: 1.02rem;
+    border-left: 3px solid var(--lb-deep-orange);
+    padding-left: 0.85rem;
+}
+
+.annotation-thought .annotation-text {
+    color: var(--lb-text);
+    line-height: 1.6;
+}
+
+.annotation-page {
+    font-size: 0.82rem;
+    color: var(--lb-text-light);
+    margin-top: 0.25rem;
+}
+
+.annotation-actions {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.annotation-edit-row {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--lb-border);
+}
+
+.annotation-edit-row.active {
+    display: block;
+}
+
+.annotation-edit-form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.annotation-edit-form textarea {
+    flex: 1;
+    min-width: 200px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
+.annotation-edit-form input[type="text"],
+.annotation-edit-form input[type="number"] {
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
+/* Words styling */
+.annotation-word-term {
+    font-weight: 700;
+    color: var(--lb-deep-orange);
+    font-size: 1.05rem;
+}
+
+.annotation-word-def {
+    color: var(--lb-text);
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.annotations-words {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+/* Add annotation panels */
+.add-annotation-panel {
+    margin-bottom: 2rem;
+}
+
+.annotation-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.annotation-add-form textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+    resize: vertical;
+}
+
+.annotation-add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.annotation-add-row input[type="text"],
+.annotation-add-row input[type="number"] {
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard Spotlights (Quote of the Day, Word of the Day)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spotlight-card {
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius-lg);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--lb-shadow);
+}
+
+.spotlight-quote {
+    text-align: center;
+}
+
+.spotlight-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.spotlight-quote-text {
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: var(--lb-text);
+    margin: 0 0 0.75rem 0;
+    padding: 0;
+    border: none;
+}
+
+.spotlight-meta {
+    font-size: 0.85rem;
+    color: var(--lb-text-light);
+}
+
+.spotlight-meta a {
+    color: var(--lb-orange);
+    text-decoration: none;
+}
+
+.spotlight-meta a:hover {
+    text-decoration: underline;
+}
+
+.spotlight-author {
+    font-style: italic;
+}
+
+.spotlight-page {
+    color: var(--lb-text-lighter);
+}
+
+.spotlight-words-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.spotlight-word {
+    text-align: left;
+}
+
+.spotlight-word-lang {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--lb-text-light);
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.spotlight-word-term {
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--lb-deep-orange);
+    margin-bottom: 0.35rem;
+}
+
+.spotlight-word-def {
+    color: var(--lb-text);
+    line-height: 1.5;
+    font-size: 0.92rem;
+    margin-bottom: 0.5rem;
+}
+
 
 

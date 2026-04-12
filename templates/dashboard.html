@@ -92,6 +92,45 @@
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Quote of the Day & Word of the Day                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if quote_of_the_day or word_of_the_day %}
+<div class="dash-two-col">
+    {% if quote_of_the_day %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.quoteOfTheDay">Quote of the Day</h2>
+        <div class="spotlight-card spotlight-quote">
+            <div class="spotlight-icon">💬</div>
+            <blockquote class="spotlight-quote-text">"{{ quote_of_the_day.text }}"</blockquote>
+            <div class="spotlight-meta">
+                {% if quote_of_the_day.page %}<span class="spotlight-page">p. {{ quote_of_the_day.page }}</span> · {% endif %}
+                <a href="{{ url_for('book_detail', book_id=quote_of_the_day.book_id) }}">{{ quote_of_the_day.book_name }}</a>
+                {% if quote_of_the_day.author %}<span class="spotlight-author"> — {{ quote_of_the_day.author }}</span>{% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if word_of_the_day %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.wordOfTheDay">Word of the Day</h2>
+        <div class="spotlight-words-grid">
+            {% for lang, w in word_of_the_day.items() %}
+            <div class="spotlight-card spotlight-word">
+                <div class="spotlight-word-lang">{{ lang }}</div>
+                <div class="spotlight-word-term">{{ w.word }}</div>
+                <div class="spotlight-word-def">{{ w.definition }}</div>
+                <div class="spotlight-meta">
+                    <a href="{{ url_for('book_detail', book_id=w.book_id) }}">{{ w.book_name }}</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- This Year + Streak & Consistency                                       -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="dash-two-col">

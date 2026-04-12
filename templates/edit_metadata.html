@@ -390,6 +390,26 @@
     </div>
 </form>
 
+<!-- ── Bookly Import ─────────────────────────────────────────────────── -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0;" data-i18n="bookForm.booklyImportTitle">📕 Import from Bookly</h3>
+        <p style="font-size: 0.9rem; color: var(--lb-text-light); margin-bottom: 1rem;" data-i18n="bookForm.booklyImportDesc">Upload a Bookly summary PDF to import quotes, thoughts, and words.</p>
+        <form method="POST" action="{{ url_for('import_bookly', book_id=book_id) }}" enctype="multipart/form-data" class="inline-form" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div class="form-group">
+                <input type="file" name="bookly_pdf" accept=".pdf" required class="form-control">
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" name="clear_existing" value="1" id="clear_existing">
+                <label for="clear_existing" style="margin: 0; font-size: 0.9rem;" data-i18n="bookForm.booklyClearExisting">Remove existing quotes, thoughts & words before importing</label>
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary" data-i18n="bookForm.booklyImportBtn">📥 Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>

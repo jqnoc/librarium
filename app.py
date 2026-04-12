@@ -414,6 +414,27 @@ def init_schema() -> None:
             series_index TEXT    NOT NULL DEFAULT '',
             PRIMARY KEY (book_id, series_id)
         );
+
+        CREATE TABLE IF NOT EXISTS quotes (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            text    TEXT    NOT NULL DEFAULT '',
+            page    INTEGER DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS thoughts (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            text    TEXT    NOT NULL DEFAULT '',
+            page    INTEGER DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS words (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            word       TEXT    NOT NULL DEFAULT '',
+            definition TEXT    NOT NULL DEFAULT ''
+        );
     """)
     # Insert the default "Books" library for fresh databases
     if db.execute("SELECT COUNT(*) FROM libraries").fetchone()[0] == 0:
@@ -448,6 +469,7 @@ def _run_all_migrations() -> None:
     migrate_add_tags()
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
+    migrate_add_annotations()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1159,6 +1181,44 @@ def migrate_merge_genres_into_tags() -> None:
     db.commit()
     db.close()
     print(f">> Migration complete - genres merged into tags for {len(rows)} books.")
+
+
+# ── Migration: Add annotations tables (quotes, thoughts, words) ─────────
+def migrate_add_annotations() -> None:
+    """Create quotes, thoughts, and words tables."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    existing = {r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if "quotes" in existing and "thoughts" in existing and "words" in existing:
+        db.close()
+        return
+    print(">> Migrating: adding annotations tables (quotes, thoughts, words) ...")
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS quotes (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            text    TEXT    NOT NULL DEFAULT '',
+            page    INTEGER DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS thoughts (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            text    TEXT    NOT NULL DEFAULT '',
+            page    INTEGER DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS words (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            word       TEXT    NOT NULL DEFAULT '',
+            definition TEXT    NOT NULL DEFAULT ''
+        );
+    """)
+    db.commit()
+    db.close()
+    print(">> Migration complete — annotations tables created.")
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -2500,6 +2560,32 @@ def dashboard():
         f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
     ).fetchone()[0]
 
+    # ── Word of the Day (per language) & Quote of the Day ────────────────
+    word_of_the_day: dict[str, dict] = {}
+    for lang_row in db.execute(
+        f"SELECT DISTINCT b.language FROM words w "
+        f"JOIN books b ON b.id = w.book_id "
+        f"WHERE {lf_b} AND b.language IS NOT NULL AND b.language != ''", lp_b
+    ).fetchall():
+        lang = lang_row["language"]
+        row = db.execute(
+            f"SELECT w.word, w.definition, b.name AS book_name, b.id AS book_id "
+            f"FROM words w JOIN books b ON b.id = w.book_id "
+            f"WHERE {lf_b} AND b.language = ? ORDER BY RANDOM() LIMIT 1",
+            (*lp_b, lang),
+        ).fetchone()
+        if row:
+            word_of_the_day[lang] = dict(row)
+
+    quote_of_the_day = None
+    qotd_row = db.execute(
+        f"SELECT q.text, q.page, b.name AS book_name, b.author, b.id AS book_id "
+        f"FROM quotes q JOIN books b ON b.id = q.book_id "
+        f"WHERE {lf_b} ORDER BY RANDOM() LIMIT 1", lp_b
+    ).fetchone()
+    if qotd_row:
+        quote_of_the_day = dict(qotd_row)
+
     return render_template(
         "dashboard.html",
         # Hero ribbon
@@ -2560,6 +2646,9 @@ def dashboard():
         yoy_pages_diff=yoy_pages_diff,
         yoy_time_diff=yoy_time_diff,
         yoy_time_diff_fmt=_format_duration_long(abs(yoy_time_diff)),
+        # Spotlights
+        word_of_the_day=word_of_the_day,
+        quote_of_the_day=quote_of_the_day,
     )
 
 
@@ -4912,6 +5001,15 @@ def book_detail(book_id: str):
         editions=editions,
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
+        quotes=[dict(r) for r in db.execute(
+            "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
+        ).fetchall()],
+        thoughts=[dict(r) for r in db.execute(
+            "SELECT * FROM thoughts WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
+        ).fetchall()],
+        words=[dict(r) for r in db.execute(
+            "SELECT * FROM words WHERE book_id = ? ORDER BY word COLLATE NOCASE", (book_id,)
+        ).fetchall()],
     )
 
 
@@ -4994,6 +5092,293 @@ def save_ratings(book_id: str):
                     pass
     _save_ratings(book_id, ratings)
     flash("Ratings saved.", "success")
+    return redirect(url_for("book_detail", book_id=book_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Annotation CRUD (Quotes, Thoughts, Words)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── Quotes ──
+
+@app.route("/book/<book_id>/quotes/add", methods=["POST"])
+def add_quote(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+    text = request.form.get("text", "").strip()
+    page_str = request.form.get("page", "").strip()
+    page = int(page_str) if page_str else None
+    if text:
+        db.execute("INSERT INTO quotes (book_id, text, page) VALUES (?, ?, ?)",
+                   (book_id, text, page))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="quotes"))
+
+
+@app.route("/book/<book_id>/quotes/<int:qid>/edit", methods=["POST"])
+def edit_quote(book_id: str, qid: int):
+    db = get_db()
+    text = request.form.get("text", "").strip()
+    page_str = request.form.get("page", "").strip()
+    page = int(page_str) if page_str else None
+    if text:
+        db.execute("UPDATE quotes SET text = ?, page = ? WHERE id = ? AND book_id = ?",
+                   (text, page, qid, book_id))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="quotes"))
+
+
+@app.route("/book/<book_id>/quotes/<int:qid>/delete", methods=["POST"])
+def delete_quote(book_id: str, qid: int):
+    db = get_db()
+    db.execute("DELETE FROM quotes WHERE id = ? AND book_id = ?", (qid, book_id))
+    db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="quotes"))
+
+
+# ── Thoughts ──
+
+@app.route("/book/<book_id>/thoughts/add", methods=["POST"])
+def add_thought(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+    text = request.form.get("text", "").strip()
+    page_str = request.form.get("page", "").strip()
+    page = int(page_str) if page_str else None
+    if text:
+        db.execute("INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
+                   (book_id, text, page))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+
+
+@app.route("/book/<book_id>/thoughts/<int:tid>/edit", methods=["POST"])
+def edit_thought(book_id: str, tid: int):
+    db = get_db()
+    text = request.form.get("text", "").strip()
+    page_str = request.form.get("page", "").strip()
+    page = int(page_str) if page_str else None
+    if text:
+        db.execute("UPDATE thoughts SET text = ?, page = ? WHERE id = ? AND book_id = ?",
+                   (text, page, tid, book_id))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+
+
+@app.route("/book/<book_id>/thoughts/<int:tid>/delete", methods=["POST"])
+def delete_thought(book_id: str, tid: int):
+    db = get_db()
+    db.execute("DELETE FROM thoughts WHERE id = ? AND book_id = ?", (tid, book_id))
+    db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+
+
+# ── Words ──
+
+@app.route("/book/<book_id>/words/add", methods=["POST"])
+def add_word(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+    word = request.form.get("word", "").strip()
+    definition = request.form.get("definition", "").strip()
+    if word:
+        db.execute("INSERT INTO words (book_id, word, definition) VALUES (?, ?, ?)",
+                   (book_id, word, definition))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+
+
+@app.route("/book/<book_id>/words/<int:wid>/edit", methods=["POST"])
+def edit_word(book_id: str, wid: int):
+    db = get_db()
+    word = request.form.get("word", "").strip()
+    definition = request.form.get("definition", "").strip()
+    if word:
+        db.execute("UPDATE words SET word = ?, definition = ? WHERE id = ? AND book_id = ?",
+                   (word, definition, wid, book_id))
+        db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+
+
+@app.route("/book/<book_id>/words/<int:wid>/delete", methods=["POST"])
+def delete_word(book_id: str, wid: int):
+    db = get_db()
+    db.execute("DELETE FROM words WHERE id = ? AND book_id = ?", (wid, book_id))
+    db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+
+
+# ── Bookly PDF Import ──
+
+def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
+    """Parse a Bookly summary PDF and extract quotes, thoughts, and words."""
+    import pdfplumber
+    result: dict = {"quotes": [], "thoughts": [], "words": []}
+
+    pdf = pdfplumber.open(io.BytesIO(pdf_bytes))
+    full_text = ""
+    for page in pdf.pages:
+        text = page.extract_text(layout=True)
+        if text:
+            full_text += text + "\n"
+    pdf.close()
+
+    # Collapse lines: join continuation lines (those not starting with p.\d+ •)
+    lines = full_text.split("\n")
+    clean_lines: list[str] = []
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            clean_lines.append("")
+            continue
+        clean_lines.append(stripped)
+
+    text_block = "\n".join(clean_lines)
+
+    # Find sections by headers
+    import re
+    thoughts_header = re.search(r"My\s+thoughts\s+about\s+this\s+book", text_block, re.IGNORECASE)
+    quotes_header = re.search(r"Quotes\s+I\s+liked\s+the\s+most", text_block, re.IGNORECASE)
+    words_header = re.search(r"New\s+words\s+I\s+learned", text_block, re.IGNORECASE)
+
+    # Determine section boundaries
+    headers = []
+    if thoughts_header:
+        headers.append(("thoughts", thoughts_header.start()))
+    if quotes_header:
+        headers.append(("quotes", quotes_header.start()))
+    if words_header:
+        headers.append(("words", words_header.start()))
+    headers.sort(key=lambda x: x[1])
+
+    sections: dict[str, str] = {}
+    for i, (name, start) in enumerate(headers):
+        # Find end of header line
+        header_end = text_block.index("\n", start) if "\n" in text_block[start:] else len(text_block)
+        # Section content goes until next section or end
+        if i + 1 < len(headers):
+            end = headers[i + 1][1]
+        else:
+            end = len(text_block)
+        sections[name] = text_block[header_end:end].strip()
+
+    # Parse thoughts and quotes (same format: p.NUMBER • text)
+    page_entry_re = re.compile(r"p\.(\d+)\s*[•·]\s*")
+
+    for section_name in ("thoughts", "quotes"):
+        if section_name not in sections:
+            continue
+        section_text = sections[section_name]
+        entries: list[dict] = []
+
+        # Split by p.NUMBER • pattern
+        parts = page_entry_re.split(section_text)
+        # parts = [pre_text, page1, text1, page2, text2, ...]
+        if len(parts) >= 3:
+            for j in range(1, len(parts), 2):
+                page_num = int(parts[j])
+                entry_text = parts[j + 1].strip() if j + 1 < len(parts) else ""
+                # Clean up: remove excessive whitespace from PDF extraction
+                entry_text = re.sub(r"\s+", " ", entry_text).strip()
+                if entry_text:
+                    entries.append({"text": entry_text, "page": page_num})
+
+        result[section_name] = entries
+
+    # Parse words section
+    if "words" in sections:
+        section_text = sections["words"]
+        word_lines = section_text.split("\n")
+
+        current_word = None
+        current_def_lines: list[str] = []
+
+        for line in word_lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            # Heuristic: a word line is short (typically 1-3 words),
+            # starts lowercase, and doesn't look like a definition continuation.
+            # Definition lines often start with a number+period (Spanish dict style),
+            # an article, uppercase, or "Definition:".
+            is_likely_word = (
+                len(stripped.split()) <= 4
+                and not re.match(r"^\d+\.", stripped)
+                and not stripped.startswith("Definition:")
+                and not stripped.startswith("Sin.:")
+                and len(stripped) < 50
+                and not re.match(r"^(a |an |the |to )", stripped, re.IGNORECASE)
+                and stripped[0].islower()
+            )
+
+            if is_likely_word and current_word is not None:
+                # Save previous word
+                definition = " ".join(current_def_lines).strip()
+                definition = re.sub(r"\s+", " ", definition)
+                if definition:
+                    result["words"].append({"word": current_word, "definition": definition})
+                current_word = stripped
+                current_def_lines = []
+            elif is_likely_word and current_word is None:
+                current_word = stripped
+                current_def_lines = []
+            else:
+                if current_word is not None:
+                    current_def_lines.append(stripped)
+
+        # Don't forget the last word
+        if current_word is not None:
+            definition = " ".join(current_def_lines).strip()
+            definition = re.sub(r"\s+", " ", definition)
+            if definition:
+                result["words"].append({"word": current_word, "definition": definition})
+
+    return result
+
+
+@app.route("/book/<book_id>/import-bookly", methods=["POST"])
+def import_bookly(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+
+    pdf_file = request.files.get("bookly_pdf")
+    if not pdf_file or not pdf_file.filename:
+        flash("No PDF file selected.", "error")
+        return redirect(url_for("edit_metadata", book_id=book_id))
+
+    clear_existing = request.form.get("clear_existing") == "1"
+
+    try:
+        pdf_bytes = pdf_file.read()
+        parsed = _parse_bookly_pdf(pdf_bytes)
+    except Exception as e:
+        flash(f"Failed to parse Bookly PDF: {e}", "error")
+        return redirect(url_for("edit_metadata", book_id=book_id))
+
+    if clear_existing:
+        db.execute("DELETE FROM quotes WHERE book_id = ?", (book_id,))
+        db.execute("DELETE FROM thoughts WHERE book_id = ?", (book_id,))
+        db.execute("DELETE FROM words WHERE book_id = ?", (book_id,))
+
+    for q in parsed["quotes"]:
+        db.execute("INSERT INTO quotes (book_id, text, page) VALUES (?, ?, ?)",
+                   (book_id, q["text"], q.get("page")))
+    for t in parsed["thoughts"]:
+        db.execute("INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
+                   (book_id, t["text"], t.get("page")))
+    for w in parsed["words"]:
+        db.execute("INSERT INTO words (book_id, word, definition) VALUES (?, ?, ?)",
+                   (book_id, w["word"], w["definition"]))
+    db.commit()
+
+    counts = f"{len(parsed['quotes'])} quotes, {len(parsed['thoughts'])} thoughts, {len(parsed['words'])} words"
+    flash(f"Bookly import complete: {counts}.", "success")
     return redirect(url_for("book_detail", book_id=book_id))
 
 
@@ -6349,6 +6734,7 @@ if __name__ == "__main__":
         migrate_add_tags()
         migrate_normalize_genres()
         migrate_merge_genres_into_tags()
+        migrate_add_annotations()
 
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
