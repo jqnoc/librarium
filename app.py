@@ -232,9 +232,23 @@ def _dbx_delete(remote_path: str) -> None:
         pass
 
 
+def _dbx_copy(src_path: str, dst_path: str) -> bool:
+    """Server-side copy on Dropbox. Returns True on success."""
+    dbx = get_dropbox_client()
+    try:
+        dbx.files_copy_v2(src_path, dst_path)
+        return True
+    except ApiError as e:
+        print(f"[dropbox] Copy {src_path} → {dst_path} failed: {e}")
+        return False
+
+
 def _dbx_list_folder(remote_path: str) -> list:
     """List all entries in a Dropbox folder (handles pagination)."""
     dbx = get_dropbox_client()
+    # App-folder root must be listed as "" not "/"
+    if remote_path == "/":
+        remote_path = ""
     try:
         result = dbx.files_list_folder(remote_path)
     except ApiError as e:
@@ -503,7 +517,7 @@ def validate_and_restore_db() -> None:
 
 
 # ── Backup ───────────────────────────────────────────────────────────────
-def backup_database(*, skip_if_recent: bool = True) -> str | None:
+def backup_database(*, skip_if_recent: bool = True, upload_to_dropbox: bool = True) -> str | None:
     """Create a timestamped backup of the database, keeping the last MAX_BACKUPS.
 
     Uses SQLite's Online Backup API so the copy is always consistent,
@@ -512,6 +526,9 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
     When *skip_if_recent* is True (startup call), skips if a backup from
     the current date already exists.  Manual calls pass False to always
     create a new backup.
+    When *upload_to_dropbox* is False, skip the Dropbox upload (used at
+    startup after a fresh download, or during shutdown which handles
+    Dropbox sync separately).
     Returns the backup filename on success, or None if skipped.
     """
     if not DB_PATH.exists():
@@ -542,7 +559,7 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
         old.unlink()
 
     # Upload backup to Dropbox
-    if _is_authenticated():
+    if upload_to_dropbox and _is_authenticated():
         try:
             _dbx_upload(backup_file, f"/backups/{backup_file.name}")
             # Prune old backups on Dropbox too
@@ -6570,15 +6587,35 @@ def create_backup():
 @app.route("/api/shutdown-backup", methods=["POST"])
 def shutdown_backup():
     """Create a backup and sync to Dropbox before the Electron shell quits."""
-    name = backup_database(skip_if_recent=False)
-    # Sync all user DBs to Dropbox before shutdown
+    # Sync all user DBs to Dropbox first (single upload per user)
     if _is_authenticated():
         try:
             users_data = _load_users()
             for u in users_data["users"]:
                 sync_db_to_dropbox(u["name"])
+            # Create server-side backup copies on Dropbox (no re-upload)
+            _dbx_ensure_folder("/backups")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            for u in users_data["users"]:
+                slug = _sanitize_username(u["name"])
+                remote_db = f"/{slug}.db"
+                remote_bk = f"/backups/{slug}_{stamp}.db"
+                _dbx_copy(remote_db, remote_bk)
+            # Prune old remote backups
+            try:
+                entries = _dbx_list_folder("/backups")
+                db_entries = sorted(
+                    [e for e in entries if e.name.endswith(".db")],
+                    key=lambda e: e.name,
+                )
+                for old_entry in db_entries[:-MAX_BACKUPS]:
+                    _dbx_delete(f"/backups/{old_entry.name}")
+            except Exception:
+                pass
         except Exception as e:
             print(f"[dropbox] Shutdown sync failed: {e}")
+    # Create local backup (skip Dropbox — already handled above)
+    name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
     return jsonify({"ok": True, "backup": name})
 
 
@@ -7308,7 +7345,7 @@ if __name__ == "__main__":
         for _u in users_data["users"]:
             _set_active_user_db(_u["name"])
             _run_all_migrations()
-            backup_database()
+            backup_database(upload_to_dropbox=False)
         # Restore active user to last_user (or first)
         _last = users_data.get("last_user", "")
         if _last and any(u["name"] == _last for u in users_data["users"]):
@@ -7318,7 +7355,7 @@ if __name__ == "__main__":
     elif DB_PATH.exists():
         # Legacy single-DB mode: run migrations on default DB
         validate_and_restore_db()
-        backup_database()
+        backup_database(upload_to_dropbox=False)
         _run_all_migrations()
 
     # Start periodic Dropbox sync
