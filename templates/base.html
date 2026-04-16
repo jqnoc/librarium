@@ -205,16 +205,29 @@
                 {% endfor %}
 
                 <hr>
+                {% if dropbox_connected %}
+                <h4 data-i18n="library.cloudStorage">Cloud Storage</h4>
+                <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <svg style="width:14px;height:14px;color:var(--lb-accent);flex-shrink:0" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
+                    <span style="font-size: 0.82rem; color: var(--lb-text-light);">Apps/LibrariumApp/{{ current_user }}.db</span>
+                </div>
+                {% else %}
                 <h4 data-i18n="library.databasePath">Database Path</h4>
                 <div style="margin-top: 0.3rem;">
                     <span style="font-size: 0.82rem; color: var(--lb-text-light); word-break: break-all;" title="{{ db_path }}">{{ db_path }}</span>
                 </div>
+                {% endif %}
 
                 <hr>
                 <h4 data-i18n="backup.title">Database Backup</h4>
                 <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
                     <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>
                 </form>
+                {% if dropbox_connected %}
+                <div style="margin-top: 0.5rem;">
+                    <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dropboxHint">Backups are stored in your Dropbox (Apps/LibrariumApp/backups/).</small>
+                </div>
+                {% else %}
                 <div style="margin-top: 0.75rem;">
                     <label style="font-size: 0.9rem; color: var(--lb-text-light);" data-i18n="backup.directory">Backup Directory</label>
                     <form method="POST" action="{{ url_for('user_update_backup_dir') }}" class="library-create-form" style="margin-top: 0.3rem;">
@@ -223,6 +236,7 @@
                     </form>
                     <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dirHint">Leave empty to use the default location.</small>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

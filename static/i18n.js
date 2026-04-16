@@ -33,6 +33,8 @@
         'library.rename':        { en: 'Rename',                es: 'Renombrar' },
         'library.delete':        { en: 'Delete',                es: 'Eliminar' },
         'library.databasePath':  { en: 'Database Path',          es: 'Ruta de la Base de Datos' },
+        'library.cloudStorage':  { en: 'Cloud Storage',          es: 'Almacenamiento en la Nube' },
+        'library.dropboxPath':   { en: 'Apps/LibrariumApp/',     es: 'Apps/LibrariumApp/' },
 
         // ── Database backup ──────────────────────────────────────────────────────
         'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },
@@ -42,6 +44,7 @@
         'backup.dirDefault':     { en: 'Default',                es: 'Por defecto' },
         'backup.saveDir':        { en: 'Save',                   es: 'Guardar' },
         'backup.dirHint':        { en: 'Leave empty to use the default location.', es: 'Dejar vacío para usar la ubicación por defecto.' },
+        'backup.dropboxHint':    { en: 'Backups are stored in your Dropbox (Apps/LibrariumApp/backups/).', es: 'Las copias de seguridad se guardan en tu Dropbox (Apps/LibrariumApp/backups/).' },
 
         // ── User management ─────────────────────────────────────────────
         'users.selectUser':      { en: 'Select User',           es: 'Seleccionar Usuario' },
