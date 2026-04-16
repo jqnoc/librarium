@@ -71,6 +71,7 @@ def _get_data_dir() -> Path:
 DATA_DIR = _get_data_dir()
 BACKUP_DIR = DATA_DIR / "backups"
 USERS_FILE = DATA_DIR / "users.json"
+IMAGES_DIR = DATA_DIR / "images"
 MAX_BACKUPS = 5
 
 # DB_PATH is set dynamically per-user; default used for migrations at startup
@@ -394,6 +395,27 @@ def _download_all_from_dropbox() -> None:
     # Ensure backups folder exists
     _dbx_ensure_folder("/backups")
 
+    # Download images — only files not already present locally
+    _startup_sync_progress = "Syncing images…"
+    for u in users_data["users"]:
+        slug = _sanitize_username(u["name"])
+        for subfolder in ("covers", "authors"):
+            remote_dir = f"/images/{slug}/{subfolder}"
+            try:
+                entries = _dbx_list_folder(remote_dir)
+            except Exception:
+                continue
+            local_dir = IMAGES_DIR / slug / subfolder
+            local_dir.mkdir(parents=True, exist_ok=True)
+            for entry in entries:
+                local_file = local_dir / entry.name
+                if local_file.exists():
+                    continue  # already have it
+                try:
+                    _dbx_download(f"{remote_dir}/{entry.name}", local_file)
+                except Exception as e:
+                    print(f"[dropbox] Image download failed ({entry.name}): {e}")
+
 
 def _upload_all_to_dropbox() -> None:
     """Upload users.json and all user DBs to Dropbox.
@@ -415,6 +437,22 @@ def _upload_all_to_dropbox() -> None:
             print(f"[dropbox] Uploaded {slug}.db")
 
     _dbx_ensure_folder("/backups")
+
+    # Upload images
+    for u in users_data["users"]:
+        slug = _sanitize_username(u["name"])
+        img_dir = IMAGES_DIR / slug
+        if not img_dir.exists():
+            continue
+        for subfolder in ("covers", "authors"):
+            sub = img_dir / subfolder
+            if not sub.exists():
+                continue
+            _dbx_ensure_folder(f"/images/{slug}/{subfolder}")
+            for img_file in sub.iterdir():
+                if img_file.is_file():
+                    _dbx_upload(img_file, f"/images/{slug}/{subfolder}/{img_file.name}")
+            print(f"[dropbox] Uploaded {slug}/{subfolder} images")
 
 
 def _start_periodic_sync() -> None:
@@ -598,6 +636,58 @@ def backup_database(*, skip_if_recent: bool = True, upload_to_dropbox: bool = Tr
 def _sanitize_username(name: str) -> str:
     """Convert a display name to a safe filename component (lowercase, alnum only)."""
     return re.sub(r"[^a-z0-9]", "", name.lower().strip())
+
+
+def _get_current_username() -> str:
+    """Return the sanitized username for the currently active DB."""
+    # DB_PATH is e.g. …/jqnoc.db → stem is "jqnoc"
+    return DB_PATH.stem
+
+
+def _user_images_dir(username: str | None = None) -> Path:
+    """Return the images directory for a user, creating it if needed."""
+    slug = username or _get_current_username()
+    d = IMAGES_DIR / slug
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _cover_path(book_id: str, username: str | None = None) -> Path:
+    """Return the filesystem path for a book's full-size cover."""
+    return _user_images_dir(username) / "covers" / f"{book_id}.webp"
+
+
+def _author_photo_path(author_name: str, username: str | None = None) -> Path:
+    """Return the filesystem path for an author's full-size photo."""
+    slug = re.sub(r"[^a-z0-9]", "_", author_name.lower().strip())
+    return _user_images_dir(username) / "authors" / f"{slug}.webp"
+
+
+def _save_image_file(dest: Path, blob: bytes) -> None:
+    """Write an image BLOB to the filesystem and upload to Dropbox."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(blob)
+    # Upload to Dropbox
+    if _is_authenticated():
+        username = dest.parent.parent.name  # images/<user>/covers|authors
+        remote = f"/images/{username}/{dest.parent.name}/{dest.name}"
+        try:
+            _dbx_upload(dest, remote)
+        except Exception as e:
+            print(f"[dropbox] Image upload failed ({dest.name}): {e}")
+
+
+def _delete_image_file(path: Path) -> None:
+    """Remove an image file from disk and Dropbox."""
+    if path.exists():
+        path.unlink()
+    if _is_authenticated():
+        username = path.parent.parent.name
+        remote = f"/images/{username}/{path.parent.name}/{path.name}"
+        try:
+            _dbx_delete(remote)
+        except Exception:
+            pass
 
 
 def _load_users() -> dict:
@@ -850,6 +940,7 @@ def _run_all_migrations() -> None:
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
+    migrate_externalize_images()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1599,6 +1690,77 @@ def migrate_add_annotations() -> None:
     db.commit()
     db.close()
     print(">> Migration complete — annotations tables created.")
+
+
+def migrate_externalize_images() -> None:
+    """Extract cover/photo BLOBs from DB to filesystem files, then NULL the columns."""
+    if not DB_PATH.exists():
+        return
+    username = DB_PATH.stem
+    db = sqlite3.connect(str(DB_PATH))
+
+    # Check if any covers or photos still exist as BLOBs
+    cover_count = db.execute(
+        "SELECT COUNT(*) FROM books WHERE cover IS NOT NULL AND LENGTH(cover) > 0"
+    ).fetchone()[0]
+    photo_count = db.execute(
+        "SELECT COUNT(*) FROM authors WHERE photo IS NOT NULL AND LENGTH(photo) > 0"
+    ).fetchone()[0]
+
+    if cover_count == 0 and photo_count == 0:
+        db.close()
+        return  # already migrated
+
+    print(f">> Migrating: externalizing images ({cover_count} covers, {photo_count} photos) ...")
+
+    # Extract covers
+    if cover_count > 0:
+        covers_dir = IMAGES_DIR / username / "covers"
+        covers_dir.mkdir(parents=True, exist_ok=True)
+        rows = db.execute("SELECT id, cover FROM books WHERE cover IS NOT NULL AND LENGTH(cover) > 0").fetchall()
+        for book_id, blob in rows:
+            dest = covers_dir / f"{book_id}.webp"
+            if not dest.exists():
+                dest.write_bytes(blob)
+        db.execute("UPDATE books SET cover = NULL WHERE cover IS NOT NULL")
+        db.commit()
+        print(f"   Extracted {len(rows)} covers to {covers_dir}")
+
+    # Extract author photos
+    if photo_count > 0:
+        authors_dir = IMAGES_DIR / username / "authors"
+        authors_dir.mkdir(parents=True, exist_ok=True)
+        rows = db.execute("SELECT name, photo FROM authors WHERE photo IS NOT NULL AND LENGTH(photo) > 0").fetchall()
+        for name, blob in rows:
+            slug = re.sub(r"[^a-z0-9]", "_", name.lower().strip())
+            dest = authors_dir / f"{slug}.webp"
+            if not dest.exists():
+                dest.write_bytes(blob)
+        db.execute("UPDATE authors SET photo = NULL WHERE photo IS NOT NULL")
+        db.commit()
+        print(f"   Extracted {len(rows)} author photos to {authors_dir}")
+
+    # VACUUM to reclaim space
+    print("   Running VACUUM to reclaim space ...")
+    db.execute("VACUUM")
+    db.close()
+    print(">> Migration complete — images externalized.")
+
+    # Upload extracted images to Dropbox in background
+    if _is_authenticated():
+        print("   Uploading extracted images to Dropbox ...")
+        for subfolder in ("covers", "authors"):
+            sub = IMAGES_DIR / username / subfolder
+            if not sub.exists():
+                continue
+            _dbx_ensure_folder(f"/images/{username}/{subfolder}")
+            for img_file in sub.iterdir():
+                if img_file.is_file():
+                    try:
+                        _dbx_upload(img_file, f"/images/{username}/{subfolder}/{img_file.name}")
+                    except Exception as e:
+                        print(f"[dropbox] Image upload failed ({img_file.name}): {e}")
+        print("   Image upload to Dropbox complete.")
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -4649,7 +4811,7 @@ def author_detail(author_name: str):
 
 @app.route("/author_photo/<path:author_name>")
 def author_photo(author_name: str):
-    """Serve the author's photo from the database."""
+    """Serve the author's photo from the filesystem (or legacy DB BLOB)."""
     db = get_db()
 
     # Lightweight hash-only check for conditional requests
@@ -4665,17 +4827,31 @@ def author_photo(author_name: str):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             return resp
 
-    row = db.execute("SELECT photo, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+    row = db.execute("SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
                      (author_name,)).fetchone()
-    if not row or not row["photo"]:
+    if not row:
         abort(404)
+    photo_hash = row["photo_hash"] or ""
 
-    photo_hash = row["photo_hash"] or hashlib.md5(row["photo"]).hexdigest()[:12]
-    resp = make_response(row["photo"])
-    resp.headers["Content-Type"] = "image/jpeg"
-    resp.headers["ETag"] = f'"{photo_hash}"'
-    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    return resp
+    # Serve from filesystem
+    img_path = _author_photo_path(author_name)
+    if img_path.exists():
+        resp = make_response(img_path.read_bytes())
+        resp.headers["Content-Type"] = "image/webp"
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    # Fallback: legacy BLOB still in DB (not yet migrated)
+    blob_row = db.execute("SELECT photo FROM authors WHERE name = ?", (author_name,)).fetchone()
+    if blob_row and blob_row["photo"]:
+        resp = make_response(blob_row["photo"])
+        resp.headers["Content-Type"] = "image/jpeg"
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    abort(404)
 
 
 @app.route("/author_photo_thumb/<path:author_name>")
@@ -4696,15 +4872,14 @@ def author_photo_thumb(author_name: str):
             return resp
 
     row = db.execute(
-        "SELECT photo_thumb, photo, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
+        "SELECT photo_thumb, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
         (author_name,)
     ).fetchone()
-    if not row or (not row["photo_thumb"] and not row["photo"]):
+    if not row or not row["photo_thumb"]:
         abort(404)
 
-    blob = row["photo_thumb"] or row["photo"]
-    photo_hash = row["photo_hash"] or hashlib.md5(row["photo"]).hexdigest()[:12]
-    resp = make_response(blob)
+    photo_hash = row["photo_hash"] or ""
+    resp = make_response(row["photo_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"{photo_hash}"'
     resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -4751,15 +4926,17 @@ def edit_author(author_name: str):
             photo_blob = photo_file.read()
             photo_hash = hashlib.md5(photo_blob).hexdigest()[:12]
             photo_thumb = _generate_thumbnail(photo_blob)
-            db.execute("UPDATE authors SET photo = ?, has_photo = 1, photo_hash = ?, photo_thumb = ? WHERE name = ?",
-                       (photo_blob, photo_hash, photo_thumb, author_name))
+            db.execute("UPDATE authors SET has_photo = 1, photo_hash = ?, photo_thumb = ? WHERE name = ?",
+                       (photo_hash, photo_thumb, author_name))
             db.commit()
+            _save_image_file(_author_photo_path(author_name), photo_blob)
 
         # Handle photo removal
         if request.form.get("remove_photo") == "1":
-            db.execute("UPDATE authors SET photo = NULL, has_photo = 0, photo_hash = '', photo_thumb = NULL WHERE name = ?",
+            db.execute("UPDATE authors SET has_photo = 0, photo_hash = '', photo_thumb = NULL WHERE name = ?",
                        (author_name,))
             db.commit()
+            _delete_image_file(_author_photo_path(author_name))
 
         flash("Author details updated.", "success")
         return redirect(url_for("author_detail", author_name=author_name))
@@ -5424,16 +5601,30 @@ def book_cover(book_id: str):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             return resp
 
-    row = db.execute("SELECT cover, cover_hash FROM books WHERE id = ?", (book_id,)).fetchone()
-    if not row or not row["cover"]:
+    row = db.execute("SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)).fetchone()
+    if not row:
         abort(404)
+    cover_hash = row["cover_hash"] or ""
 
-    cover_hash = row["cover_hash"] or hashlib.md5(row["cover"]).hexdigest()[:12]
-    resp = make_response(row["cover"])
-    resp.headers["Content-Type"] = "image/jpeg"
-    resp.headers["ETag"] = f'"{cover_hash}"'
-    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    return resp
+    # Serve from filesystem
+    img_path = _cover_path(book_id)
+    if img_path.exists():
+        resp = make_response(img_path.read_bytes())
+        resp.headers["Content-Type"] = "image/webp"
+        resp.headers["ETag"] = f'"{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    # Fallback: legacy BLOB still in DB (not yet migrated)
+    blob_row = db.execute("SELECT cover FROM books WHERE id = ?", (book_id,)).fetchone()
+    if blob_row and blob_row["cover"]:
+        resp = make_response(blob_row["cover"])
+        resp.headers["Content-Type"] = "image/jpeg"
+        resp.headers["ETag"] = f'"{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    abort(404)
 
 
 @app.route("/cover_thumb/<book_id>")
@@ -5453,17 +5644,14 @@ def book_cover_thumb(book_id: str):
             return resp
 
     row = db.execute(
-        "SELECT cover_thumb, cover, cover_hash FROM books WHERE id = ? AND has_cover = 1",
+        "SELECT cover_thumb, cover_hash FROM books WHERE id = ? AND has_cover = 1",
         (book_id,),
     ).fetchone()
-    if not row:
+    if not row or not row["cover_thumb"]:
         abort(404)
 
-    blob = row["cover_thumb"] or row["cover"]
-    if not blob:
-        abort(404)
     cover_hash = row["cover_hash"] or ""
-    resp = make_response(blob)
+    resp = make_response(row["cover_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"t-{cover_hash}"'
     resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -5931,10 +6119,11 @@ def edit_metadata(book_id: str):
             cover_hash = hashlib.md5(cover_blob).hexdigest()[:12]
             cover_thumb = _generate_thumbnail(cover_blob)
             db.execute(
-                "UPDATE books SET cover = ?, has_cover = 1, cover_color = ?, cover_palette = ?, cover_hash = ?, cover_thumb = ? WHERE id = ?",
-                (cover_blob, cover_color, json.dumps(palette), cover_hash, cover_thumb, book_id),
+                "UPDATE books SET has_cover = 1, cover_color = ?, cover_palette = ?, cover_hash = ?, cover_thumb = ? WHERE id = ?",
+                (cover_color, json.dumps(palette), cover_hash, cover_thumb, book_id),
             )
             db.commit()
+            _save_image_file(_cover_path(book_id), cover_blob)
         else:
             # No new cover — check if user selected a different color
             selected_color = request.form.get("cover_color", "").strip()
@@ -6360,6 +6549,9 @@ def new_book():
             except (urllib.error.URLError, OSError):
                 pass  # Cover download failed — continue without cover
 
+        # Save full-size cover to filesystem (not in DB)
+        _cover_blob_for_file = cover_blob  # keep ref for filesystem write after INSERT
+
         # Handle series (many-to-many)
         series_names = request.form.getlist("series_name[]")
         series_indexes = request.form.getlist("series_index[]")
@@ -6384,10 +6576,10 @@ def new_book():
              original_publication_date, publication_date, isbn, pages, starting_page,
              publisher, tags, summary, translator, illustrator, editor, prologue_author,
              status, source_type, source_id, purchase_date, purchase_price,
-             borrowed_start, borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
+             borrowed_start, borrowed_end, is_gift, has_cover, cover_color, cover_palette, cover_hash,
              cover_thumb, library_id, work_id, is_primary_edition,
              format, binding, audio_format, total_time_seconds)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -6401,11 +6593,15 @@ def new_book():
             info["purchase_date"], info["purchase_price"],
             info["borrowed_start"], info["borrowed_end"],
             info["is_gift"],
-            has_cover, cover_blob, cover_color, cover_palette_json, cover_hash,
+            has_cover, cover_color, cover_palette_json, cover_hash,
             cover_thumb, active_lib, link_work_id or None, is_primary,
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
+
+        # Save full-size cover image to filesystem + Dropbox
+        if _cover_blob_for_file:
+            _save_image_file(_cover_path(book_id), _cover_blob_for_file)
 
         # Insert book_series entries
         for s_name, s_idx in zip(series_names, series_indexes):
