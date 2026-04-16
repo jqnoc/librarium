@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `check_user_selected` middleware now checks Dropbox authentication before user selection; unauthenticated requests redirect to `/auth/login`
 - Electron `before-quit` and `window-all-closed` handlers now call `/api/shutdown-backup` and wait for sync completion before killing the Flask process
 - Shutdown sync now uploads each user's database to Dropbox once, then creates backup copies via server-side Dropbox copy (`files_copy_v2`) instead of re-uploading the full database as a backup; startup backups no longer trigger a redundant Dropbox upload
+- Dropbox sync at startup now runs in a background thread so Flask starts immediately and Electron can connect; a "Syncing with Dropbox…" loading page is shown until the download and migrations finish
+- Dropbox file downloads now skip re-downloading when the local file's content hash already matches the remote, avoiding unnecessary 249 MB transfers on subsequent launches
 
 ## [1.2.0] — 2026-04-12
 

@@ -97,6 +97,8 @@ _dbx_client: dropbox.Dropbox | None = None
 _dbx_lock = threading.Lock()
 _sync_thread: threading.Thread | None = None
 _last_download_hash: dict[str, str] = {}   # remote path → content_hash at download time
+_startup_sync_done = threading.Event()      # set when initial download + migrations finish
+_startup_sync_progress: str = ""            # human-readable status for the loading page
 
 
 def _load_auth() -> dict | None:
@@ -162,17 +164,28 @@ _UPLOAD_CHUNK = 140 * 1024 * 1024  # 140 MB — use chunked upload above this
 def _dbx_download(remote_path: str, local_path: Path) -> str | None:
     """Download a file from Dropbox app folder to a local path.
 
+    Skips the download when the local file already matches the remote
+    content hash, to avoid re-downloading large unchanged databases.
     Returns the content_hash on success, or None if the file does not
     exist on Dropbox.
     """
     dbx = get_dropbox_client()
     try:
-        meta, resp = dbx.files_download(remote_path)
+        meta = dbx.files_get_metadata(remote_path)
+        remote_hash = meta.content_hash
+
+        # Skip download if the local file already matches
+        if local_path.exists() and remote_hash:
+            local_hash = _file_content_hash(local_path)
+            if local_hash == remote_hash:
+                _last_download_hash[remote_path] = remote_hash
+                return remote_hash
+
+        _, resp = dbx.files_download(remote_path)
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_bytes(resp.content)
-        content_hash = meta.content_hash
-        _last_download_hash[remote_path] = content_hash
-        return content_hash
+        _last_download_hash[remote_path] = remote_hash
+        return remote_hash
     except ApiError as e:
         if e.error.is_path() and e.error.get_path().is_not_found():
             return None
@@ -356,19 +369,24 @@ def sync_users_json_to_dropbox() -> None:
 def _download_all_from_dropbox() -> None:
     """Download users.json and all user DBs from Dropbox to DATA_DIR.
 
-    Called at startup when authenticated.
+    Called at startup when authenticated.  Updates
+    ``_startup_sync_progress`` so the loading page can show status.
     """
+    global _startup_sync_progress
     dbx = get_dropbox_client()
 
     # Download users.json
+    _startup_sync_progress = "Downloading user data…"
     _dbx_download("/users.json", USERS_FILE)
 
     # Download all user DBs
     users_data = _load_users()
-    for u in users_data["users"]:
+    total = len(users_data["users"])
+    for idx, u in enumerate(users_data["users"], 1):
         slug = _sanitize_username(u["name"])
         remote = f"/{slug}.db"
         local = DATA_DIR / f"{slug}.db"
+        _startup_sync_progress = f"Syncing database {idx}/{total}…"
         h = _dbx_download(remote, local)
         if h:
             print(f"[dropbox] Downloaded {slug}.db")
@@ -6619,6 +6637,15 @@ def shutdown_backup():
     return jsonify({"ok": True, "backup": name})
 
 
+@app.route("/api/startup-status")
+def startup_status():
+    """Return startup sync progress for the loading page."""
+    return jsonify({
+        "done": _startup_sync_done.is_set(),
+        "progress": _startup_sync_progress,
+    })
+
+
 @app.route("/library/create", methods=["POST"])
 def create_library():
     """Create a new library."""
@@ -7022,12 +7049,15 @@ def user_update_backup_dir():
 @app.before_request
 def check_user_selected():
     """Redirect to Dropbox auth if not authenticated, then to user selection if no user is set."""
-    exempt = ("/auth/", "/static")
+    exempt = ("/auth/", "/static", "/api/startup-status")
     if any(request.path.startswith(p) for p in exempt):
         return
     # Check Dropbox authentication first
     if not _is_authenticated():
         return redirect(url_for("auth_login"))
+    # Block while startup sync is in progress
+    if not _startup_sync_done.is_set():
+        return render_template("startup_sync.html")
     # Then check user selection
     exempt_user = ("/users",)
     if any(request.path.startswith(p) for p in exempt_user):
@@ -7326,46 +7356,75 @@ if __name__ == "__main__":
         print(f"[migrate] Legacy data/ migration complete. Data is now at: {DATA_DIR}")
         print(f"[migrate] You may delete the old '{_legacy_data}' folder once verified.")
 
-    # ── Dropbox sync at startup ─────────────────────────────────────────
-    if _is_authenticated():
-        try:
-            print("[dropbox] Downloading data from Dropbox...")
-            _download_all_from_dropbox()
-            print("[dropbox] Sync complete.")
-        except AuthError:
-            print("[dropbox] Auth token expired or revoked. User will need to re-authenticate.")
-            _clear_auth()
-            _reset_dropbox_client()
-        except Exception as e:
-            print(f"[dropbox] Startup sync failed (working offline): {e}")
-
-    # Run migrations for every existing user's DB
-    users_data = _load_users()
-    if users_data["users"]:
-        for _u in users_data["users"]:
-            _set_active_user_db(_u["name"])
-            _run_all_migrations()
-            backup_database(upload_to_dropbox=False)
-        # Restore active user to last_user (or first)
-        _last = users_data.get("last_user", "")
-        if _last and any(u["name"] == _last for u in users_data["users"]):
-            _set_active_user_db(_last)
-        else:
-            _set_active_user_db(users_data["users"][0]["name"])
-    elif DB_PATH.exists():
-        # Legacy single-DB mode: run migrations on default DB
-        validate_and_restore_db()
-        backup_database(upload_to_dropbox=False)
-        _run_all_migrations()
-
-    # Start periodic Dropbox sync
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
 
-    if _is_authenticated():
-        # Guard against Werkzeug reloader spawning duplicate threads
-        if is_electron or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-            _start_periodic_sync()
+    # ── Background startup: Dropbox download + migrations ───────────────
+    def _startup_sync_thread():
+        """Download data from Dropbox, run migrations, then signal ready."""
+        global _startup_sync_progress
+        try:
+            if _is_authenticated():
+                try:
+                    print("[dropbox] Downloading data from Dropbox...")
+                    _download_all_from_dropbox()
+                    print("[dropbox] Sync complete.")
+                except AuthError:
+                    print("[dropbox] Auth token expired or revoked. User will need to re-authenticate.")
+                    _clear_auth()
+                    _reset_dropbox_client()
+                except Exception as e:
+                    print(f"[dropbox] Startup sync failed (working offline): {e}")
+
+            _startup_sync_progress = "Running migrations…"
+            users_data = _load_users()
+            if users_data["users"]:
+                for _u in users_data["users"]:
+                    _set_active_user_db(_u["name"])
+                    _run_all_migrations()
+                    backup_database(upload_to_dropbox=False)
+                # Restore active user to last_user (or first)
+                _last = users_data.get("last_user", "")
+                if _last and any(u["name"] == _last for u in users_data["users"]):
+                    _set_active_user_db(_last)
+                else:
+                    _set_active_user_db(users_data["users"][0]["name"])
+            elif DB_PATH.exists():
+                validate_and_restore_db()
+                backup_database(upload_to_dropbox=False)
+                _run_all_migrations()
+
+            # Start periodic sync after initial download is done
+            if _is_authenticated():
+                if is_electron or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+                    _start_periodic_sync()
+        finally:
+            _startup_sync_progress = ""
+            _startup_sync_done.set()
+            print("[startup] Sync and migrations complete — app ready.")
+
+    if not _is_authenticated():
+        # No Dropbox → run migrations synchronously (fast) and mark ready
+        users_data = _load_users()
+        if users_data["users"]:
+            for _u in users_data["users"]:
+                _set_active_user_db(_u["name"])
+                _run_all_migrations()
+                backup_database(upload_to_dropbox=False)
+            _last = users_data.get("last_user", "")
+            if _last and any(u["name"] == _last for u in users_data["users"]):
+                _set_active_user_db(_last)
+            else:
+                _set_active_user_db(users_data["users"][0]["name"])
+        elif DB_PATH.exists():
+            validate_and_restore_db()
+            backup_database(upload_to_dropbox=False)
+            _run_all_migrations()
+        _startup_sync_done.set()
+    else:
+        # Dropbox download may be slow — run in background so Flask starts immediately
+        _bg = threading.Thread(target=_startup_sync_thread, daemon=True, name="startup-sync")
+        _bg.start()
 
     app.run(
         debug=not is_electron,

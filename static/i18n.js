@@ -69,6 +69,8 @@
         'auth.waitingTitle':     { en: 'Waiting for Dropbox…',   es: 'Esperando a Dropbox…' },
         'auth.waitingMessage':   { en: 'A browser window has been opened for you to authorize Librarium. Please complete the login in your browser and return here.', es: 'Se ha abierto una ventana del navegador para que autorices Librarium. Completa el inicio de sesión en tu navegador y vuelve aquí.' },
         'auth.retryLink':        { en: 'Click here to try again', es: 'Haz clic aquí para intentar de nuevo' },
+        'auth.syncingTitle':     { en: 'Syncing with Dropbox…', es: 'Sincronizando con Dropbox…' },
+        'auth.syncingMessage':   { en: 'Downloading your library data. This may take a moment on the first launch.', es: 'Descargando los datos de tu biblioteca. Esto puede tardar un momento en el primer inicio.' },
 
         // ── Error pages ─────────────────────────────────────────────────
         'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },
