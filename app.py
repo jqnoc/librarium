@@ -84,6 +84,13 @@ app.secret_key = "librarium-local-dev-key"
 # ── Dropbox integration ──────────────────────────────────────────────────
 DROPBOX_APP_KEY = "tlt9ax4wz2mw2i0"
 DROPBOX_REDIRECT_URI = "http://127.0.0.1:48721/auth/callback"
+DROPBOX_SCOPES = [
+    "account_info.read",
+    "files.metadata.read",
+    "files.metadata.write",
+    "files.content.read",
+    "files.content.write",
+]
 AUTH_FILE = DATA_DIR / "auth.json"
 CACHE_DIR = DATA_DIR / "cache"
 _dbx_client: dropbox.Dropbox | None = None
@@ -6683,6 +6690,7 @@ def _complete_oauth(query_params: dict) -> bool:
         csrf_token_session_key="dbx-csrf",
         token_access_type="offline",
         use_pkce=True,
+        scope=DROPBOX_SCOPES,
     )
     # Restore the original PKCE code_verifier from the start() call
     saved_verifier = _oauth_session.pop("_pkce_verifier", None)
@@ -6810,6 +6818,7 @@ def auth_start():
         csrf_token_session_key="dbx-csrf",
         token_access_type="offline",
         use_pkce=True,
+        scope=DROPBOX_SCOPES,
     )
     authorize_url = flow.start()
 
