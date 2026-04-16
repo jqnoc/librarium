@@ -1693,7 +1693,10 @@ def migrate_add_annotations() -> None:
 
 
 def migrate_externalize_images() -> None:
-    """Extract cover/photo BLOBs from DB to filesystem files, then NULL the columns."""
+    """Extract cover/photo BLOBs from DB to filesystem files, then NULL the columns.
+
+    Also backfills missing thumbnails from the extracted filesystem files.
+    """
     if not DB_PATH.exists():
         return
     username = DB_PATH.stem
@@ -1706,48 +1709,95 @@ def migrate_externalize_images() -> None:
     photo_count = db.execute(
         "SELECT COUNT(*) FROM authors WHERE photo IS NOT NULL AND LENGTH(photo) > 0"
     ).fetchone()[0]
+    # Check for missing thumbnails that need backfilling from filesystem
+    missing_cover_thumbs = db.execute(
+        "SELECT COUNT(*) FROM books WHERE has_cover = 1 AND cover_thumb IS NULL"
+    ).fetchone()[0]
+    missing_photo_thumbs = db.execute(
+        "SELECT COUNT(*) FROM authors WHERE has_photo = 1 AND photo_thumb IS NULL"
+    ).fetchone()[0]
 
-    if cover_count == 0 and photo_count == 0:
+    if cover_count == 0 and photo_count == 0 and missing_cover_thumbs == 0 and missing_photo_thumbs == 0:
         db.close()
         return  # already migrated
 
-    print(f">> Migrating: externalizing images ({cover_count} covers, {photo_count} photos) ...")
+    need_vacuum = False
 
-    # Extract covers
-    if cover_count > 0:
-        covers_dir = IMAGES_DIR / username / "covers"
-        covers_dir.mkdir(parents=True, exist_ok=True)
-        rows = db.execute("SELECT id, cover FROM books WHERE cover IS NOT NULL AND LENGTH(cover) > 0").fetchall()
-        for book_id, blob in rows:
-            dest = covers_dir / f"{book_id}.webp"
-            if not dest.exists():
-                dest.write_bytes(blob)
-        db.execute("UPDATE books SET cover = NULL WHERE cover IS NOT NULL")
+    # ── Phase 1: Extract BLOBs to filesystem ────────────────────────────
+    if cover_count > 0 or photo_count > 0:
+        print(f">> Migrating: externalizing images ({cover_count} covers, {photo_count} photos) ...")
+
+        # Extract covers
+        if cover_count > 0:
+            covers_dir = IMAGES_DIR / username / "covers"
+            covers_dir.mkdir(parents=True, exist_ok=True)
+            rows = db.execute("SELECT id, cover FROM books WHERE cover IS NOT NULL AND LENGTH(cover) > 0").fetchall()
+            for book_id, blob in rows:
+                dest = covers_dir / f"{book_id}.webp"
+                if not dest.exists():
+                    dest.write_bytes(blob)
+            db.execute("UPDATE books SET cover = NULL WHERE cover IS NOT NULL")
+            db.commit()
+            print(f"   Extracted {len(rows)} covers to {covers_dir}")
+            need_vacuum = True
+
+        # Extract author photos
+        if photo_count > 0:
+            authors_dir = IMAGES_DIR / username / "authors"
+            authors_dir.mkdir(parents=True, exist_ok=True)
+            rows = db.execute("SELECT name, photo FROM authors WHERE photo IS NOT NULL AND LENGTH(photo) > 0").fetchall()
+            for name, blob in rows:
+                slug = re.sub(r"[^a-z0-9]", "_", name.lower().strip())
+                dest = authors_dir / f"{slug}.webp"
+                if not dest.exists():
+                    dest.write_bytes(blob)
+            db.execute("UPDATE authors SET photo = NULL WHERE photo IS NOT NULL")
+            db.commit()
+            print(f"   Extracted {len(rows)} author photos to {authors_dir}")
+            need_vacuum = True
+
+    # ── Phase 2: Backfill missing thumbnails from filesystem files ──────
+    if missing_cover_thumbs > 0:
+        print(f">> Backfilling {missing_cover_thumbs} missing cover thumbnails ...")
+        rows = db.execute("SELECT id FROM books WHERE has_cover = 1 AND cover_thumb IS NULL").fetchall()
+        filled = 0
+        for (book_id,) in rows:
+            cover_file = IMAGES_DIR / username / "covers" / f"{book_id}.webp"
+            if cover_file.exists():
+                blob = cover_file.read_bytes()
+                thumb = _generate_thumbnail(blob)
+                if thumb:
+                    db.execute("UPDATE books SET cover_thumb = ? WHERE id = ?", (thumb, book_id))
+                    filled += 1
         db.commit()
-        print(f"   Extracted {len(rows)} covers to {covers_dir}")
+        print(f"   Backfilled {filled}/{missing_cover_thumbs} cover thumbnails.")
 
-    # Extract author photos
-    if photo_count > 0:
-        authors_dir = IMAGES_DIR / username / "authors"
-        authors_dir.mkdir(parents=True, exist_ok=True)
-        rows = db.execute("SELECT name, photo FROM authors WHERE photo IS NOT NULL AND LENGTH(photo) > 0").fetchall()
-        for name, blob in rows:
+    if missing_photo_thumbs > 0:
+        print(f">> Backfilling {missing_photo_thumbs} missing author photo thumbnails ...")
+        rows = db.execute("SELECT name FROM authors WHERE has_photo = 1 AND photo_thumb IS NULL").fetchall()
+        filled = 0
+        for (name,) in rows:
             slug = re.sub(r"[^a-z0-9]", "_", name.lower().strip())
-            dest = authors_dir / f"{slug}.webp"
-            if not dest.exists():
-                dest.write_bytes(blob)
-        db.execute("UPDATE authors SET photo = NULL WHERE photo IS NOT NULL")
+            photo_file = IMAGES_DIR / username / "authors" / f"{slug}.webp"
+            if photo_file.exists():
+                blob = photo_file.read_bytes()
+                thumb = _generate_thumbnail(blob)
+                if thumb:
+                    db.execute("UPDATE authors SET photo_thumb = ? WHERE name = ?", (thumb, name))
+                    filled += 1
         db.commit()
-        print(f"   Extracted {len(rows)} author photos to {authors_dir}")
+        print(f"   Backfilled {filled}/{missing_photo_thumbs} author photo thumbnails.")
 
-    # VACUUM to reclaim space
-    print("   Running VACUUM to reclaim space ...")
-    db.execute("VACUUM")
+    # VACUUM to reclaim space after BLOB extraction
+    if need_vacuum:
+        print("   Running VACUUM to reclaim space ...")
+        db.execute("VACUUM")
+
     db.close()
     print(">> Migration complete — images externalized.")
 
     # Upload extracted images to Dropbox in background
-    if _is_authenticated():
+    if _is_authenticated() and (cover_count > 0 or photo_count > 0):
         print("   Uploading extracted images to Dropbox ...")
         for subfolder in ("covers", "authors"):
             sub = IMAGES_DIR / username / subfolder
