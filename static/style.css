@@ -516,6 +516,88 @@ img { max-width: 100%; height: auto; }
     white-space: nowrap;
 }
 
+/* ── Dropbox sync badge (navbar) ───────────────────────────────────────── */
+.dropbox-sync-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.4rem;
+    color: rgba(255,255,255,.7);
+}
+.dropbox-icon-xs {
+    width: 14px;
+    height: 14px;
+}
+
+/* ── Dropbox auth page ─────────────────────────────────────────────────── */
+.auth-description {
+    font-size: 0.92rem;
+    color: var(--lb-text-light);
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+.auth-login-actions {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+}
+.auth-dropbox-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+}
+.dropbox-icon {
+    width: 20px;
+    height: 20px;
+}
+.auth-note {
+    font-size: 0.82rem;
+    color: var(--lb-text-light);
+    text-align: center;
+    line-height: 1.4;
+}
+.auth-success-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--lb-finished);
+    color: #fff;
+    font-size: 1.8rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+/* ── Dropbox account bar (users page) ──────────────────────────────────── */
+.dropbox-account-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1.25rem;
+    background: var(--lb-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    font-size: 0.88rem;
+    color: var(--lb-text);
+}
+.dropbox-icon-sm {
+    width: 16px;
+    height: 16px;
+    color: var(--lb-accent);
+    flex-shrink: 0;
+}
+.dropbox-account-name {
+    font-weight: 500;
+}
+.dropbox-account-email {
+    color: var(--lb-text-light);
+}
+
 /* ── Shutdown overlay ──────────────────────────────────────────────────── */
 .shutdown-overlay {
     display: none;

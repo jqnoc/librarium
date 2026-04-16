@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librarium — Connected</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="user-select-page">
+    <div class="user-select-container">
+        <div class="user-select-header">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" class="user-select-logo">
+            <h1>Librarium</h1>
+        </div>
+
+        <div class="user-select-section" style="text-align: center;">
+            <div class="auth-success-icon">✓</div>
+            <h2 data-i18n="auth.connected">Dropbox Connected</h2>
+            <p class="auth-description" data-i18n="auth.successMessage">Your Dropbox account has been connected successfully. You can close this tab and return to Librarium.</p>
+            <a href="{{ url_for('user_select') }}" class="btn btn-primary" data-i18n="auth.continue" style="margin-top: 1.5rem; display: inline-block;">Continue to Librarium</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+</body>
+</html>

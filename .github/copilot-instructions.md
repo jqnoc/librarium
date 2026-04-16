@@ -25,7 +25,7 @@ server as a child process and displays it in a native window. There is
 | Database | SQLite per-user DBs in AppData (WAL mode) |
 | Python | 3.12+ |
 | Node.js | 18+ |
-| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16 |
+| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16, dropbox ≥ 12.0 |
 | Port | Dynamic (free port at startup) |
 | Startup | `npm start` or `run-librarium.bat` |
 
@@ -64,7 +64,51 @@ are no blueprints, no ORM, and no separate model files.
 - Primary keys: `books.id` uses UUID strings; most other tables use
   INTEGER autoincrement.
 
-### 2.4 Migrations
+### 2.4 Dropbox Cloud Storage
+
+Dropbox is **mandatory**. The app requires Dropbox authentication before
+any user interaction. Data is stored in `Apps/LibrariumApp/` (app-folder
+access type).
+
+#### Auth flow
+- OAuth2 PKCE (no client secret) → system browser → callback to
+  `http://127.0.0.1:48721/auth/callback`.
+- Refresh token + access token persisted in `DATA_DIR/auth.json`.
+- `check_user_selected()` middleware redirects to `/auth/login` if not
+  authenticated.
+
+#### Sync strategy
+- **Startup**: download all `.db` files and `users.json` from Dropbox.
+- **Periodic**: every 5 minutes, upload modified DBs (content-hash
+  change detection via `_file_content_hash()`).
+- **Shutdown**: Electron calls `/api/shutdown-backup` and waits up to
+  30 s for Flask to finish backup + upload before killing the process.
+- WAL checkpoint (`PRAGMA wal_checkpoint(TRUNCATE)`) before every upload.
+
+#### Key helpers
+
+| Function | Purpose |
+|----------|---------|
+| `_load_auth()` / `_save_auth()` / `_clear_auth()` | Auth token CRUD in `auth.json` |
+| `get_dropbox_client()` | Thread-safe singleton Dropbox client (auto-refreshes) |
+| `_dbx_download()` / `_dbx_upload()` | File transfer to/from Dropbox |
+| `_dbx_file_exists()` / `_dbx_list_folder()` | Remote listing |
+| `sync_db_to_dropbox()` | Upload one user DB if changed |
+| `sync_users_json_to_dropbox()` | Upload `users.json` |
+| `_download_all_from_dropbox()` | Startup bulk download |
+| `_upload_all_to_dropbox()` | Shutdown bulk upload |
+| `_start_periodic_sync()` | Start background sync thread |
+
+#### Dropbox folder layout
+```
+Apps/LibrariumApp/
+  users.json
+  <username>.db
+  backups/
+    <username>_YYYYMMDD_HHMMSS.db
+```
+
+### 2.5 Migrations
 
 Migrations are plain functions (`migrate_add_*()`) called sequentially
 in the `if __name__ == "__main__"` block. Each migration is idempotent
@@ -101,7 +145,7 @@ When adding a new migration:
   all existing migrations
 - [ ] Test on a fresh DB *and* an already-migrated DB
 
-### 2.5 Template filters
+### 2.6 Template filters
 
 Five Jinja2 template filters are registered:
 
@@ -113,7 +157,7 @@ Five Jinja2 template filters are registered:
 | `display_date` | Wrap date in `<span data-date>` for client-side i18n formatting |
 | `source_type_label` | Source type key → display label |
 
-### 2.6 Status system
+### 2.7 Status system
 
 Five book statuses:
 
@@ -136,7 +180,7 @@ When adding a new status:
   filter dropdown in `index.html`
 - [ ] Add translations in `static/i18n.js` (both EN and ES)
 
-### 2.7 Rating system
+### 2.8 Rating system
 
 51 dimensions across 9 groups defined in `RATING_DIMENSIONS`:
 
@@ -248,6 +292,11 @@ and **list** — toggled by the user and stored in a cookie.
 | `/users/create` | POST | Create a new user |
 | `/users/switch` | POST | Switch to a different user |
 | `/users/update-backup-dir` | POST | Update a user's custom backup directory |
+| `/auth/login` | GET | Dropbox login page |
+| `/auth/start` | GET | Initiate Dropbox OAuth2 PKCE flow |
+| `/auth/callback` | GET | OAuth2 callback (receives auth code) |
+| `/auth/logout` | POST | Disconnect Dropbox and clear auth tokens |
+| `/auth/status` | GET | JSON endpoint returning auth status |
 
 ### API endpoints
 
@@ -412,6 +461,8 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/series.html` | Series list |
 | `templates/series_detail.html` | Series detail |
 | `templates/users.html` | User selection / creation |
+| `templates/auth_login.html` | Dropbox login / connect page |
+| `templates/auth_success.html` | OAuth callback success page |
 
 ---
 

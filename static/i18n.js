@@ -54,6 +54,16 @@
         'users.importFile':      { en: 'Import from file',      es: 'Importar desde archivo' },
         'users.create':          { en: 'Create',                es: 'Crear' },
 
+        // ── Dropbox auth & sync ─────────────────────────────────────────
+        'auth.connectDropbox':   { en: 'Connect to Dropbox',    es: 'Conectar con Dropbox' },
+        'auth.description':      { en: 'Librarium stores your reading data securely in your Dropbox account. Connect your Dropbox to get started.', es: 'Librarium almacena tus datos de lectura de forma segura en tu cuenta de Dropbox. Conecta tu Dropbox para empezar.' },
+        'auth.connectButton':    { en: 'Connect with Dropbox',  es: 'Conectar con Dropbox' },
+        'auth.note':             { en: 'Your data is stored in the Apps/LibrariumApp folder in your Dropbox. Librarium cannot access any other files.', es: 'Tus datos se almacenan en la carpeta Apps/LibrariumApp de tu Dropbox. Librarium no puede acceder a otros archivos.' },
+        'auth.connected':        { en: 'Dropbox Connected',     es: 'Dropbox Conectado' },
+        'auth.successMessage':   { en: 'Your Dropbox account has been connected successfully. You can close this tab and return to Librarium.', es: 'Tu cuenta de Dropbox se ha conectado correctamente. Puedes cerrar esta pestaña y volver a Librarium.' },
+        'auth.continue':         { en: 'Continue to Librarium', es: 'Continuar a Librarium' },
+        'auth.disconnect':       { en: 'Disconnect',            es: 'Desconectar' },
+
         // ── Error pages ─────────────────────────────────────────────────
         'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },
         'error.notFoundHint':    { en: 'The page you are looking for does not exist or has been moved.', es: 'La página que buscas no existe o ha sido movida.' },

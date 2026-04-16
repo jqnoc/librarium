@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Mandatory Dropbox integration: app now requires Dropbox authentication at startup; all user databases, `users.json`, and backups are synced to the `Apps/LibrariumApp` folder in the user's Dropbox account
+- OAuth2 PKCE flow for Dropbox authentication with refresh token persistence; auth tokens stored in local `auth.json`
+- New routes: `/auth/login`, `/auth/start`, `/auth/callback`, `/auth/logout`, `/auth/status` for the Dropbox OAuth flow
+- Periodic background sync (every 5 minutes) uploads modified databases to Dropbox using content-hash change detection
+- Startup sync: on launch, the app downloads the latest databases and `users.json` from Dropbox before presenting the user selection screen
+- Shutdown sync: Electron now waits for Flask to complete backup and Dropbox upload (with 30s timeout) before quitting
+- Dropbox sync indicator (small Dropbox icon) in the navigation bar when connected
+- Dropbox account info bar on the users page showing display name, email, and a disconnect button
+- Auth login page (`auth_login.html`) and success page (`auth_success.html`) templates
+- Full i18n support (EN / ES) for all Dropbox auth and sync strings
+- CSS styles for auth pages, Dropbox account bar, and sync badge
+
+### Changed
+- Backups are now uploaded to a `/backups/` folder in Dropbox alongside user databases; remote backups are pruned to keep 7 per user
+- `check_user_selected` middleware now checks Dropbox authentication before user selection; unauthenticated requests redirect to `/auth/login`
+- Electron `before-quit` and `window-all-closed` handlers now call `/api/shutdown-backup` and wait for sync completion before killing the Flask process
+
 ## [1.2.0] — 2026-04-12
 
 ### Added

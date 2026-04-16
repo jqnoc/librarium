@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librarium — Connect to Dropbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="user-select-page">
+    <div class="user-select-container">
+        <div class="user-select-header">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" class="user-select-logo">
+            <h1>Librarium</h1>
+        </div>
+
+        {% if error %}
+        <div class="flash flash-error">{{ error }}</div>
+        {% endif %}
+
+        <div class="user-select-section">
+            <h2 data-i18n="auth.connectDropbox">Connect to Dropbox</h2>
+            <p class="auth-description" data-i18n="auth.description">Librarium stores your reading data securely in your Dropbox account. Connect your Dropbox to get started.</p>
+
+            <div class="auth-login-actions">
+                <a href="{{ url_for('auth_start') }}" class="btn btn-primary auth-dropbox-btn">
+                    <svg class="dropbox-icon" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
+                    <span data-i18n="auth.connectButton">Connect with Dropbox</span>
+                </a>
+            </div>
+
+            <p class="auth-note" data-i18n="auth.note">Your data is stored in the Apps/LibrariumApp folder in your Dropbox. Librarium cannot access any other files.</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+</body>
+</html>

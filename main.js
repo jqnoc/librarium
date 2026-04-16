@@ -212,11 +212,44 @@ ipcMain.on("app-minimize", () => {
 // ── App lifecycle ───────────────────────────────────────────────────────
 app.whenReady().then(createWindow);
 
-app.on("window-all-closed", () => {
+let isQuitting = false;
+
+app.on("window-all-closed", async () => {
+  if (!isQuitting) {
+    isQuitting = true;
+    await shutdownAndSync();
+  }
   killFlask();
   app.quit();
 });
 
-app.on("before-quit", () => {
-  killFlask();
+app.on("before-quit", async (event) => {
+  if (!isQuitting) {
+    isQuitting = true;
+    event.preventDefault();
+    await shutdownAndSync();
+    killFlask();
+    app.exit();
+  } else {
+    killFlask();
+  }
 });
+
+/**
+ * Call the Flask shutdown-backup endpoint to create a backup and sync
+ * all data to Dropbox before the app quits.  Times out after 30 seconds.
+ */
+async function shutdownAndSync() {
+  if (!flaskPort) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    await fetch(`http://127.0.0.1:${flaskPort}/api/shutdown-backup`, {
+      method: "POST",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch (e) {
+    console.log(`[shutdown] Sync request failed: ${e.message}`);
+  }
+}
