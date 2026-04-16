@@ -462,6 +462,7 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/series_detail.html` | Series detail |
 | `templates/users.html` | User selection / creation |
 | `templates/auth_login.html` | Dropbox login / connect page |
+| `templates/auth_waiting.html` | OAuth polling page (shown in Electron while user authorizes in browser) |
 | `templates/auth_success.html` | OAuth callback success page |
 
 ---

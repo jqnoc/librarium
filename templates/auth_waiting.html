@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Librarium — Connecting…</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body class="user-select-page">
+    <div class="user-select-container" style="text-align: center;">
+        <div class="user-select-header">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" class="user-select-logo">
+            <h1>Librarium</h1>
+        </div>
+
+        <div class="user-select-section">
+            <div class="auth-waiting-spinner"></div>
+            <h2 data-i18n="auth.waitingTitle">Waiting for Dropbox…</h2>
+            <p class="auth-description" data-i18n="auth.waitingMessage">A browser window has been opened for you to authorize Librarium. Please complete the login in your browser and return here.</p>
+            <p class="auth-note" id="auth-retry-note" style="display:none;">
+                <a href="{{ url_for('auth_start') }}" data-i18n="auth.retryLink">Click here to try again</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+    <script>
+    (function() {
+        var attempts = 0;
+        var maxAttempts = 150; // 5 minutes at 2s intervals
+
+        function poll() {
+            attempts++;
+            fetch('/auth/status')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.authenticated) {
+                        window.location.href = '/users';
+                    } else if (attempts < maxAttempts) {
+                        setTimeout(poll, 2000);
+                    } else {
+                        document.getElementById('auth-retry-note').style.display = '';
+                    }
+                })
+                .catch(function() {
+                    if (attempts < maxAttempts) setTimeout(poll, 2000);
+                });
+        }
+        setTimeout(poll, 2000);
+    })();
+    </script>
+</body>
+</html>

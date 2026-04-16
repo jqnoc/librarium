@@ -571,6 +571,16 @@ img { max-width: 100%; height: auto; }
     justify-content: center;
     margin-bottom: 1rem;
 }
+.auth-waiting-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
+    border: 3px solid var(--lb-border);
+    border-top-color: var(--lb-accent);
+    border-radius: 50%;
+    animation: auth-spin 0.8s linear infinite;
+}
+@keyframes auth-spin { to { transform: rotate(360deg); } }
 
 /* ── Dropbox account bar (users page) ──────────────────────────────────── */
 .dropbox-account-bar {

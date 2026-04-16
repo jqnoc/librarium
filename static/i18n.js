@@ -63,6 +63,9 @@
         'auth.successMessage':   { en: 'Your Dropbox account has been connected successfully. You can close this tab and return to Librarium.', es: 'Tu cuenta de Dropbox se ha conectado correctamente. Puedes cerrar esta pestaña y volver a Librarium.' },
         'auth.continue':         { en: 'Continue to Librarium', es: 'Continuar a Librarium' },
         'auth.disconnect':       { en: 'Disconnect',            es: 'Desconectar' },
+        'auth.waitingTitle':     { en: 'Waiting for Dropbox…',   es: 'Esperando a Dropbox…' },
+        'auth.waitingMessage':   { en: 'A browser window has been opened for you to authorize Librarium. Please complete the login in your browser and return here.', es: 'Se ha abierto una ventana del navegador para que autorices Librarium. Completa el inicio de sesión en tu navegador y vuelve aquí.' },
+        'auth.retryLink':        { en: 'Click here to try again', es: 'Haz clic aquí para intentar de nuevo' },
 
         // ── Error pages ─────────────────────────────────────────────────
         'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },

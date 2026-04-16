@@ -6661,56 +6661,38 @@ def delete_library(lib_id: int):
 # Routes – Dropbox authentication
 # ═══════════════════════════════════════════════════════════════════════════
 
-@app.route("/auth/login")
-def auth_login():
-    """Show the Dropbox login page or initiate OAuth flow."""
-    return render_template("auth_login.html")
+# Module-level state shared between the main Flask server and the
+# temporary OAuth callback server running on port 48721.
+_oauth_session: dict = {}        # stores CSRF + PKCE verifier across requests
+_oauth_result_ready = False      # set to True once callback finishes
+
+_CALLBACK_PORT = int(DROPBOX_REDIRECT_URI.rsplit(":", 1)[-1].split("/")[0])  # 48721
 
 
-@app.route("/auth/start")
-def auth_start():
-    """Initiate the Dropbox OAuth2 PKCE flow."""
-    # Generate PKCE code verifier
-    code_verifier = secrets.token_urlsafe(64)[:128]
-    session["dbx_code_verifier"] = code_verifier
+def _complete_oauth(query_params: dict) -> bool:
+    """Exchange the auth code for tokens and persist auth data.
 
+    Called from the temporary callback server.  Returns True on success.
+    """
+    global _oauth_result_ready
     flow = dropbox.DropboxOAuth2Flow(
         consumer_key=DROPBOX_APP_KEY,
         consumer_secret="",
         redirect_uri=DROPBOX_REDIRECT_URI,
-        session=session,
+        session=_oauth_session,
         csrf_token_session_key="dbx-csrf",
         token_access_type="offline",
         use_pkce=True,
     )
-    authorize_url = flow.start()
-    return redirect(authorize_url)
-
-
-@app.route("/auth/callback")
-def auth_callback():
-    """Handle the Dropbox OAuth2 callback."""
-    flow = dropbox.DropboxOAuth2Flow(
-        consumer_key=DROPBOX_APP_KEY,
-        consumer_secret="",
-        redirect_uri=DROPBOX_REDIRECT_URI,
-        session=session,
-        csrf_token_session_key="dbx-csrf",
-        token_access_type="offline",
-        use_pkce=True,
-    )
+    # Restore the original PKCE code_verifier from the start() call
+    saved_verifier = _oauth_session.pop("_pkce_verifier", None)
+    if saved_verifier:
+        flow.code_verifier = saved_verifier
     try:
-        result = flow.finish(request.args)
-    except dropbox.oauth.BadRequestException:
-        return render_template("auth_login.html", error="Bad request. Please try again.")
-    except dropbox.oauth.BadStateException:
-        return redirect(url_for("auth_start"))
-    except dropbox.oauth.CsrfException:
-        return render_template("auth_login.html", error="Security check failed. Please try again.")
-    except dropbox.oauth.NotApprovedException:
-        return render_template("auth_login.html", error="Access was not approved.")
-    except dropbox.oauth.ProviderException as e:
-        return render_template("auth_login.html", error=f"Dropbox error: {e}")
+        result = flow.finish(query_params)
+    except Exception as e:
+        print(f"[auth] OAuth token exchange failed: {e}")
+        return False
 
     # Fetch account info
     dbx = dropbox.Dropbox(oauth2_access_token=result.access_token)
@@ -6722,44 +6704,138 @@ def auth_callback():
         display_name = ""
         email = ""
 
-    # Save auth data
-    auth_data = {
+    _save_auth({
         "refresh_token": result.refresh_token,
         "account_id": result.account_id,
         "display_name": display_name,
         "email": email,
-    }
-    _save_auth(auth_data)
+    })
     _reset_dropbox_client()
 
-    # Check if Dropbox has existing data
+    # Initial sync
     try:
-        dbx_client = get_dropbox_client()
         _dbx_ensure_folder("/backups")
         remote_users = _dbx_file_exists("/users.json")
         local_users = _load_users()
-
         if remote_users and not local_users["users"]:
-            # Dropbox has data, local does not → download everything
             _download_all_from_dropbox()
         elif not remote_users and local_users["users"]:
-            # Local has data, Dropbox does not → upload everything
             _upload_all_to_dropbox()
         elif remote_users and local_users["users"]:
-            # Both have data → download from Dropbox (Dropbox is source of truth)
             _download_all_from_dropbox()
-        else:
-            # Neither has data → fresh start, just ensure folder structure
-            pass
     except Exception as e:
         print(f"[dropbox] Initial sync error: {e}")
 
-    # Start periodic sync
     _start_periodic_sync()
+    _oauth_result_ready = True
+    return True
 
-    # Redirect to a landing page that tells the user to go back to the app
-    # (when using system browser for OAuth)
-    return render_template("auth_success.html")
+
+def _start_oauth_callback_server() -> None:
+    """Start a one-shot HTTP server on port 48721 to receive the OAuth callback.
+
+    Runs in a daemon thread.  Shuts itself down after handling one request.
+    """
+    import http.server
+    import urllib.parse as _up
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            parsed = _up.urlparse(self.path)
+            if not parsed.path.rstrip("/").endswith("/auth/callback"):
+                self.send_error(404)
+                return
+            params = {k: v[0] for k, v in _up.parse_qs(parsed.query).items()}
+            ok = _complete_oauth(params)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            if ok:
+                self.wfile.write(
+                    b"<!DOCTYPE html><html><body style='font-family:sans-serif;"
+                    b"text-align:center;padding:3rem'>"
+                    b"<h2>Dropbox connected</h2>"
+                    b"<p>You can close this tab and return to Librarium.</p>"
+                    b"</body></html>"
+                )
+            else:
+                self.wfile.write(
+                    b"<!DOCTYPE html><html><body style='font-family:sans-serif;"
+                    b"text-align:center;padding:3rem'>"
+                    b"<h2>Authentication failed</h2>"
+                    b"<p>Please close this tab and try again from Librarium.</p>"
+                    b"</body></html>"
+                )
+            # Shut down the server after handling the callback
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+        def log_message(self, format, *args):
+            print(f"[auth-callback] {args[0]}" if args else "")
+
+    try:
+        server = http.server.HTTPServer(("127.0.0.1", _CALLBACK_PORT), _Handler)
+    except OSError as e:
+        print(f"[auth] Cannot start callback server on port {_CALLBACK_PORT}: {e}")
+        return
+    t = threading.Thread(target=server.serve_forever, daemon=True, name="oauth-cb")
+    t.start()
+    print(f"[auth] Callback server listening on port {_CALLBACK_PORT}")
+
+
+@app.route("/auth/login")
+def auth_login():
+    """Show the Dropbox login page."""
+    return render_template("auth_login.html")
+
+
+@app.route("/auth/start")
+def auth_start():
+    """Initiate the Dropbox OAuth2 PKCE flow.
+
+    1. Stores PKCE / CSRF state in a module-level dict (not Flask session)
+       because the callback arrives on a different port / process.
+    2. Starts a temporary HTTP server on port 48721 for the callback.
+    3. Opens the Dropbox auth URL in the **system browser**.
+    4. Returns a waiting page to the Electron window that polls /auth/status.
+    """
+    global _oauth_session, _oauth_result_ready
+    _oauth_session = {}
+    _oauth_result_ready = False
+
+    flow = dropbox.DropboxOAuth2Flow(
+        consumer_key=DROPBOX_APP_KEY,
+        consumer_secret="",
+        redirect_uri=DROPBOX_REDIRECT_URI,
+        session=_oauth_session,
+        csrf_token_session_key="dbx-csrf",
+        token_access_type="offline",
+        use_pkce=True,
+    )
+    authorize_url = flow.start()
+
+    # Persist the PKCE code_verifier so _complete_oauth can reuse it.
+    # The SDK stores it on the flow object, not in the session dict.
+    _oauth_session["_pkce_verifier"] = flow.code_verifier
+
+    # Start the temporary callback server
+    _start_oauth_callback_server()
+
+    # Open the auth URL in the system browser
+    import webbrowser
+    webbrowser.open(authorize_url)
+
+    # Return a waiting page to the Electron window
+    return render_template("auth_waiting.html")
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    """Fallback callback for when Flask happens to be on port 48721."""
+    params = dict(request.args)
+    ok = _complete_oauth(params)
+    if ok:
+        return render_template("auth_success.html")
+    return render_template("auth_login.html", error="Authentication failed. Please try again.")
 
 
 @app.route("/auth/logout", methods=["POST"])
