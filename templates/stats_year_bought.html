@@ -61,12 +61,12 @@
                 </div>
                 {% if book.source_name %}
                 <div style="font-size: 0.8rem; color: var(--lb-text-lighter); margin-top: 0.25rem;">
-                    {% if book.source_type == 'physical_store' %}🏪{% elif book.source_type == 'web_store' %}🌐{% elif book.source_type == 'library' %}🏛️{% elif book.source_type == 'person' and book.is_gift %}🎁{% elif book.source_type == 'person' %}👤{% else %}📦{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}
+                    {% if book.src_kind == 'physical_store' %}🏪{% elif book.src_kind == 'web_store' %}🌐{% elif book.src_kind == 'library' %}🏛️{% elif book.src_kind == 'person' and book.is_gift %}🎁{% elif book.src_kind == 'person' %}👤{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}
                 </div>
                 {% endif %}
                 {% if book.purchase_price %}
                 <div style="font-size: 0.85rem; color: var(--lb-deep-orange); margin-top: 0.25rem; font-weight: 500;">
-                    💰 {{ book.purchase_price }}
+                    {% if book.is_gift %}🎁{% else %}💰{% endif %} {{ book.purchase_price }}
                 </div>
                 {% endif %}
             </div>
@@ -104,8 +104,8 @@
                     <td style="font-weight:600;">{{ book.name }}{% if book.subtitle %}<span class="book-subtitle" style="display:block;">{{ book.subtitle }}</span>{% endif %}</td>
                     <td>{{ book.author | format_authors }}</td>
                     <td>{{ book.purchase_date | display_date }}</td>
-                    <td>{% if book.source_name %}{% if book.source_type == 'physical_store' %}🏪{% elif book.source_type == 'web_store' %}🌐{% elif book.source_type == 'library' %}🏛️{% elif book.source_type == 'person' and book.is_gift %}🎁{% elif book.source_type == 'person' %}👤{% else %}📦{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}{% else %}—{% endif %}</td>
-                    <td>{% if book.purchase_price %}<span style="color: var(--lb-deep-orange); font-weight: 500;">{{ book.purchase_price }}</span>{% else %}—{% endif %}</td>
+                    <td>{% if book.source_name %}{% if book.src_kind == 'physical_store' %}🏪{% elif book.src_kind == 'web_store' %}🌐{% elif book.src_kind == 'library' %}🏛️{% elif book.src_kind == 'person' and book.is_gift %}🎁{% elif book.src_kind == 'person' %}👤{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}{% else %}—{% endif %}</td>
+                    <td>{% if book.purchase_price %}<span style="color: var(--lb-deep-orange); font-weight: 500;">{% if book.is_gift %}🎁{% else %}💰{% endif %} {{ book.purchase_price }}</span>{% else %}—{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Books Bought page now shows source-type-aware emojis (🏪 physical store, 🌐 web store, 🏛️ library, 🎁 gift, 👤 person) instead of a generic "Location:" label, and no longer shows a redundant "Date:" prefix or separate gift badge
+- Books Bought page now shows source-type-aware emojis (🏪 physical store, 🌐 web store, 🏛️ library, 🎁 gift, 👤 person) instead of a generic "Location:" label, removes the redundant "Date:" prefix, and shows 🎁 instead of 💰 on the price when the book was a gift
 - Calendar view no longer limits visible book covers to 4 per cell; all covers are shown using the existing flex-wrap layout
 - Series list page now loads significantly faster by fetching all series covers in a single batched SQL query instead of one query per series
 

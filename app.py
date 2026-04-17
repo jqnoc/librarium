@@ -4488,7 +4488,7 @@ def stats_year_bought(year: str):
     rows = db.execute(f"""
         SELECT b.id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash,
                b.purchase_date, b.purchase_price, b.source_type, b.is_gift,
-               s.name AS source_name, s.location AS source_location
+               s.name AS source_name, s.location AS source_location, s.type AS src_kind
         FROM books b
         LEFT JOIN sources s ON s.id = b.source_id
         WHERE b.purchase_date IS NOT NULL AND b.purchase_date != ''
@@ -4507,6 +4507,7 @@ def stats_year_bought(year: str):
             "purchase_date": row["purchase_date"],
             "purchase_price": row["purchase_price"] or "",
             "source_type": row["source_type"] or "",
+            "src_kind": row["src_kind"] or "",
             "source_name": row["source_name"] or "",
             "source_location": row["source_location"] or "",
             "is_gift": bool(row["is_gift"]),
