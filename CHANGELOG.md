@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Books Bought page now shows source-type-aware emojis (🏪 physical store, 🌐 web store, 🏛️ library, 🎁 gift, 👤 person) instead of a generic "Location:" label, and no longer shows a redundant "Date:" prefix or separate gift badge
+- Calendar view no longer limits visible book covers to 4 per cell; all covers are shown using the existing flex-wrap layout
+- Series list page now loads significantly faster by fetching all series covers in a single batched SQL query instead of one query per series
+
+### Fixed
+- Library filter, sort, and tag controls now correctly stay on the `/library` page instead of redirecting to the Dashboard
+- Tag Cloud links in the Stats page now navigate to the Library filtered by that tag instead of the Dashboard
+
 ### Added
 - Mandatory Dropbox integration: app now requires Dropbox authentication at startup; all user databases, `users.json`, and backups are synced to the `Apps/LibrariumApp` folder in the user's Dropbox account
 - OAuth2 PKCE flow for Dropbox authentication with refresh token persistence; auth tokens stored in local `auth.json`

@@ -4506,6 +4506,7 @@ def stats_year_bought(year: str):
             "cover_hash": row["cover_hash"] or "",
             "purchase_date": row["purchase_date"],
             "purchase_price": row["purchase_price"] or "",
+            "source_type": row["source_type"] or "",
             "source_name": row["source_name"] or "",
             "source_location": row["source_location"] or "",
             "is_gift": bool(row["is_gift"]),
@@ -5019,23 +5020,37 @@ def series_list():
         ORDER BY s.name COLLATE NOCASE
     """, lp_s).fetchall()
 
+    # Batch-fetch covers for all series in one query (avoids N+1)
+    series_ids = [r["id"] for r in rows]
+    covers_by_series: dict[int, list] = {sid: [] for sid in series_ids}
+    if series_ids:
+        placeholders = ",".join("?" * len(series_ids))
+        cover_rows = db.execute(f"""
+            SELECT series_id, book_id, cover_hash FROM (
+                SELECT bs.series_id, b.id AS book_id, b.cover_hash,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY bs.series_id
+                           ORDER BY CAST(bs.series_index AS REAL) ASC,
+                                    COALESCE(NULLIF(b.original_publication_date, ''), '9999') ASC
+                       ) AS rn
+                FROM books b
+                JOIN book_series bs ON bs.book_id = b.id
+                WHERE bs.series_id IN ({placeholders}) AND b.has_cover = 1
+                  AND (b.work_id IS NULL OR b.is_primary_edition = 1)
+            ) WHERE rn <= 10
+        """, series_ids).fetchall()
+        for cr in cover_rows:
+            covers_by_series[cr["series_id"]].append(
+                {"id": cr["book_id"], "cover_hash": cr["cover_hash"] or ""}
+            )
+
     series = []
     for r in rows:
-        # Fetch up to 10 covers for the collage (ordered by series index)
-        cover_books = db.execute("""
-            SELECT b.id, b.cover_hash
-            FROM books b
-            JOIN book_series bs ON bs.book_id = b.id
-            WHERE bs.series_id = ? AND b.has_cover = 1
-              AND (b.work_id IS NULL OR b.is_primary_edition = 1)
-            ORDER BY CAST(bs.series_index AS REAL) ASC, COALESCE(NULLIF(b.original_publication_date, ''), '9999') ASC
-            LIMIT 10
-        """, (r["id"],)).fetchall()
         series.append({
             "id": r["id"],
             "name": r["name"],
             "book_count": r["book_count"],
-            "covers": [{"id": c["id"], "cover_hash": c["cover_hash"] or ""} for c in cover_books],
+            "covers": covers_by_series[r["id"]],
         })
 
     sort = request.args.get("sort", "name")

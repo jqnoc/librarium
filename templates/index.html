@@ -90,7 +90,7 @@ function updateSort() {
     }
     const showReadings = showReadingsCb.checked ? '1' : '0';
 
-    let url = `/?sort1=${sort1}&status_filter=${statusFilter}&show_editions=${showEditions}&show_readings=${showReadings}`;
+    let url = `/library?sort1=${sort1}&status_filter=${statusFilter}&show_editions=${showEditions}&show_readings=${showReadings}`;
     if (sort2) {
         url += `&sort2=${sort2}`;
     }

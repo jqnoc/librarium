@@ -54,16 +54,13 @@
                 {% for ev in cell.events %}
                 {% if ev.book_id not in seen_books %}
                 {% if seen_books.append(ev.book_id) %}{% endif %}
-                {% if seen_books|length <= 4 %}
                 {% if ev.has_cover %}
                 <img src="/cover_thumb/{{ ev.book_id }}?v={{ ev.cover_hash }}" class="cal-cover-thumb" loading="lazy" alt="">
                 {% else %}
                 <div class="cal-cover-ph">📖</div>
                 {% endif %}
                 {% endif %}
-                {% endif %}
                 {% endfor %}
-                {% if seen_books|length > 4 %}<span class="cal-dot-more">+{{ seen_books|length - 4 }}</span>{% endif %}
             </div>
             {% endif %}
         </div>

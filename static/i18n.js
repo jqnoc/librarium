@@ -513,9 +513,7 @@
         'yearBought.sortTitle':    { en: 'Title',                      es: 'Título' },
         'yearBought.sortAuthor':   { en: 'Author',                     es: 'Autor' },
         'yearBought.sortPrice':    { en: 'Price',                      es: 'Precio' },
-        'yearBought.dateLabel':    { en: 'Date:',                      es: 'Fecha:' },
-        'yearBought.locationLabel':{ en: 'Location:',                  es: 'Lugar:' },
-        'yearBought.gift':         { en: 'Gift',                       es: 'Regalo' },
+        'yearBought.sourceLabel':  { en: 'Source',                     es: 'Origen' },
         'yearBought.empty':        { en: 'No books were bought in',    es: 'No se compraron libros en' },
 
         // ── Calendar page ──────────────────────────────────────────────

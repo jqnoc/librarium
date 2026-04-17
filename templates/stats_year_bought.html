@@ -57,21 +57,16 @@
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
                 <div class="book-author" style="font-size: 0.9rem; color: var(--lb-text-light); margin: 0.25rem 0 0 0;">{{ book.author | format_authors }}</div>
                 <div style="font-size: 0.8rem; color: var(--lb-text-lighter); margin-top: 0.5rem;">
-                    <span data-i18n="yearBought.dateLabel">Date:</span> {{ book.purchase_date | display_date }}
+                    {{ book.purchase_date | display_date }}
                 </div>
                 {% if book.source_name %}
                 <div style="font-size: 0.8rem; color: var(--lb-text-lighter); margin-top: 0.25rem;">
-                    <span data-i18n="yearBought.locationLabel">Location:</span> {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}
+                    {% if book.source_type == 'physical_store' %}🏪{% elif book.source_type == 'web_store' %}🌐{% elif book.source_type == 'library' %}🏛️{% elif book.source_type == 'person' and book.is_gift %}🎁{% elif book.source_type == 'person' %}👤{% else %}📦{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}
                 </div>
                 {% endif %}
                 {% if book.purchase_price %}
                 <div style="font-size: 0.85rem; color: var(--lb-deep-orange); margin-top: 0.25rem; font-weight: 500;">
                     💰 {{ book.purchase_price }}
-                </div>
-                {% endif %}
-                {% if book.is_gift %}
-                <div style="font-size: 0.8rem; color: var(--lb-text-lighter); margin-top: 0.25rem;">
-                    🎁 <span data-i18n="yearBought.gift">Gift</span>
                 </div>
                 {% endif %}
             </div>
@@ -89,10 +84,9 @@
                     <th style="width:60px;" data-i18n="index.colCover">Cover</th>
                     <th data-i18n="index.colTitle">Title</th>
                     <th data-i18n="index.colAuthor">Author</th>
-                    <th data-i18n="yearBought.dateLabel">Date</th>
-                    <th data-i18n="yearBought.locationLabel">Location</th>
+                    <th data-i18n="yearBought.sortDate">Date</th>
+                    <th data-i18n="yearBought.sourceLabel">Source</th>
                     <th data-i18n="yearBought.sortPrice">Price</th>
-                    <th style="width:50px;">🎁</th>
                 </tr>
             </thead>
             <tbody>
@@ -110,9 +104,8 @@
                     <td style="font-weight:600;">{{ book.name }}{% if book.subtitle %}<span class="book-subtitle" style="display:block;">{{ book.subtitle }}</span>{% endif %}</td>
                     <td>{{ book.author | format_authors }}</td>
                     <td>{{ book.purchase_date | display_date }}</td>
-                    <td>{{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}</td>
+                    <td>{% if book.source_name %}{% if book.source_type == 'physical_store' %}🏪{% elif book.source_type == 'web_store' %}🌐{% elif book.source_type == 'library' %}🏛️{% elif book.source_type == 'person' and book.is_gift %}🎁{% elif book.source_type == 'person' %}👤{% else %}📦{% endif %} {{ book.source_name }}{% if book.source_location %} ({{ book.source_location }}){% endif %}{% else %}—{% endif %}</td>
                     <td>{% if book.purchase_price %}<span style="color: var(--lb-deep-orange); font-weight: 500;">{{ book.purchase_price }}</span>{% else %}—{% endif %}</td>
-                    <td>{% if book.is_gift %}🎁{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>

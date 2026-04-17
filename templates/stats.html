@@ -649,7 +649,7 @@ function renderWordCloud(containerId, countsObj) {
     entries.forEach(([word, count]) => {
         const a = document.createElement('a');
         a.textContent = word;
-        a.href = '/?tag=' + encodeURIComponent(word);
+        a.href = '/library?tag=' + encodeURIComponent(word);
         a.className = 'tag-cloud-pill';
         const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
         const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
