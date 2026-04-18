@@ -529,6 +529,7 @@
         'yearBought.sortPrice':    { en: 'Price',                      es: 'Precio' },
         'yearBought.sourceLabel':  { en: 'Source',                     es: 'Origen' },
         'yearBought.empty':        { en: 'No books were bought in',    es: 'No se compraron libros en' },
+        'yearBought.gift':         { en: 'Gift',                       es: 'Regalo' },
 
         // ── Calendar page ──────────────────────────────────────────────
         'cal.title':                 { en: 'Calendar',                 es: 'Calendario' },
