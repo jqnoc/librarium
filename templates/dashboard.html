@@ -101,7 +101,7 @@
         <h2 class="dash-heading" data-i18n="dash.quoteOfTheDay">Quote of the Day</h2>
         <div class="spotlight-card spotlight-quote">
             <div class="spotlight-icon">💬</div>
-            <blockquote class="spotlight-quote-text">{% if quote_of_the_day.language and quote_of_the_day.language|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ quote_of_the_day.text }}»{% else %}\u201c{{ quote_of_the_day.text }}\u201d{% endif %}</blockquote>
+            <blockquote class="spotlight-quote-text">{% if quote_of_the_day.language and quote_of_the_day.language|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ quote_of_the_day.text | safe }}»{% else %}&ldquo;{{ quote_of_the_day.text | safe }}&rdquo;{% endif %}</blockquote>
             <div class="spotlight-meta">
                 {% if quote_of_the_day.page %}<span class="spotlight-page">p. {{ quote_of_the_day.page }}</span> · {% endif %}
                 <a href="{{ url_for('book_detail', book_id=quote_of_the_day.book_id) }}">{{ quote_of_the_day.book_name }}</a>

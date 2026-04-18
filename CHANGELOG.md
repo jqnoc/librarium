@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Series list page now loads significantly faster by fetching all series covers in a single batched SQL query instead of one query per series
 
 ### Fixed
+- Quote of the Day on the Dashboard now renders curly quotes correctly instead of showing literal `\u201c` / `\u201d` escape sequences; also fixes HTML formatting within quotes being escaped
 - Library filter, sort, and tag controls now correctly stay on the `/library` page instead of redirecting to the Dashboard
 - Tag Cloud links in the Stats page now navigate to the Library filtered by that tag instead of the Dashboard
 
