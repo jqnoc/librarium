@@ -2326,6 +2326,55 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text);
     line-height: 1.6;
 }
+.annotation-thought .annotation-text p { margin: 0 0 0.5em; }
+.annotation-thought .annotation-text p:last-child { margin-bottom: 0; }
+.annotation-thought .annotation-text h1,
+.annotation-thought .annotation-text h2,
+.annotation-thought .annotation-text h3,
+.annotation-thought .annotation-text h4 { margin: 0.6em 0 0.3em; font-weight: 600; }
+.annotation-thought .annotation-text h2 { font-size: 1.2rem; }
+.annotation-thought .annotation-text h3 { font-size: 1.08rem; }
+.annotation-thought .annotation-text h4 { font-size: 1rem; }
+.annotation-thought .annotation-text blockquote {
+    margin: 0.5em 0;
+    padding: 0.25em 0.75em;
+    border-left: 3px solid var(--lb-border);
+    color: var(--lb-text-light);
+}
+.annotation-thought .annotation-text pre {
+    margin: 0.5em 0;
+    padding: 0.6em 0.8em;
+    background: var(--lb-light-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    overflow-x: auto;
+    font-size: 0.88rem;
+}
+.annotation-thought .annotation-text code {
+    padding: 0.15em 0.35em;
+    background: var(--lb-light-bg);
+    border-radius: 3px;
+    font-size: 0.88rem;
+}
+.annotation-thought .annotation-text pre code {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+}
+.annotation-thought .annotation-text ul,
+.annotation-thought .annotation-text ol {
+    margin: 0.4em 0;
+    padding-left: 1.5em;
+}
+.annotation-thought .annotation-text hr {
+    margin: 0.75em 0;
+    border: none;
+    border-top: 1px solid var(--lb-border);
+}
+.annotation-thought .annotation-text del {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
 
 .annotation-page {
     font-size: 0.82rem;

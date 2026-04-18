@@ -24,6 +24,7 @@ from datetime import datetime, date
 from html.parser import HTMLParser
 from pathlib import Path
 
+import markdown as _markdown_lib
 from PIL import Image
 from pillow_heif import register_heif_opener
 
@@ -486,14 +487,16 @@ _ALLOWED_ATTRS = {'a': frozenset({'href'})}
 class _Sanitiser(HTMLParser):
     """Strip tags and attributes not on the allowlist."""
 
-    def __init__(self):
+    def __init__(self, allowed_tags=None, allowed_attrs=None):
         super().__init__(convert_charrefs=True)
         self._parts: list[str] = []
+        self._tags = allowed_tags if allowed_tags is not None else _ALLOWED_TAGS
+        self._attrs = allowed_attrs if allowed_attrs is not None else _ALLOWED_ATTRS
 
     def handle_starttag(self, tag, attrs):
-        if tag not in _ALLOWED_TAGS:
+        if tag not in self._tags:
             return
-        allowed = _ALLOWED_ATTRS.get(tag, frozenset())
+        allowed = self._attrs.get(tag, frozenset())
         safe_attrs = []
         for k, v in attrs:
             if k in allowed:
@@ -508,7 +511,7 @@ class _Sanitiser(HTMLParser):
             self._parts.append(f'<{tag}>')
 
     def handle_endtag(self, tag):
-        if tag in _ALLOWED_TAGS:
+        if tag in self._tags:
             self._parts.append(f'</{tag}>')
 
     def handle_data(self, data):
@@ -523,6 +526,29 @@ def sanitize_html(raw: str) -> str:
     """Return *raw* with only safe HTML tags/attrs preserved."""
     s = _Sanitiser()
     s.feed(raw)
+    return s.get_clean()
+
+
+# ── Markdown renderer (for thoughts) ───────────────────────────────────
+_MD_ALLOWED_TAGS = frozenset({
+    'p', 'br', 'hr',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'b', 'strong', 'i', 'em', 'u', 's', 'del',
+    'ul', 'ol', 'li',
+    'a', 'blockquote', 'code', 'pre',
+})
+
+
+def render_markdown(text: str) -> str:
+    """Convert Markdown text to sanitized HTML."""
+    if not text:
+        return ""
+    # Strikethrough: ~~text~~ → <del>text</del>
+    text = re.sub(r'~~(.+?)~~', r'<del>\1</del>', text, flags=re.DOTALL)
+    md = _markdown_lib.Markdown(extensions=['fenced_code', 'nl2br', 'sane_lists'])
+    html = md.convert(text)
+    s = _Sanitiser(allowed_tags=_MD_ALLOWED_TAGS)
+    s.feed(html)
     return s.get_clean()
 
 
@@ -2398,6 +2424,13 @@ def display_date_filter(value: str) -> str:
         return ""
     escaped = raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
     return Markup(f'<span data-date="{escaped}">{escaped}</span>')
+
+
+@app.template_filter('md_to_html')
+def md_to_html_filter(text: str) -> str:
+    """Convert Markdown to sanitized HTML."""
+    from markupsafe import Markup
+    return Markup(render_markdown(text))
 
 
 # ── Utility helpers ──────────────────────────────────────────────────────
@@ -5793,7 +5826,7 @@ def add_thought(book_id: str):
     db = get_db()
     if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
         abort(404)
-    text = sanitize_html(request.form.get("text", "").strip())
+    text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:
@@ -5806,7 +5839,7 @@ def add_thought(book_id: str):
 @app.route("/book/<book_id>/thoughts/<int:tid>/edit", methods=["POST"])
 def edit_thought(book_id: str, tid: int):
     db = get_db()
-    text = sanitize_html(request.form.get("text", "").strip())
+    text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str else None
     if text:

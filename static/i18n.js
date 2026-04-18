@@ -335,6 +335,20 @@
         'rt.link':          { en: 'Insert link',    es: 'Insertar enlace' },
         'rt.clear':         { en: 'Clear formatting', es: 'Limpiar formato' },
 
+        // ── Markdown toolbar ────────────────────────────────────────────
+        'md.bold':          { en: 'Bold',             es: 'Negrita' },
+        'md.italic':        { en: 'Italic',           es: 'Cursiva' },
+        'md.strike':        { en: 'Strikethrough',    es: 'Tachado' },
+        'md.h2':            { en: 'Heading 2',        es: 'Encabezado 2' },
+        'md.h3':            { en: 'Heading 3',        es: 'Encabezado 3' },
+        'md.ul':            { en: 'Bulleted list',    es: 'Lista con viñetas' },
+        'md.ol':            { en: 'Numbered list',    es: 'Lista numerada' },
+        'md.quote':         { en: 'Blockquote',       es: 'Cita en bloque' },
+        'md.link':          { en: 'Insert link',      es: 'Insertar enlace' },
+        'md.code':          { en: 'Inline code',      es: 'Código en línea' },
+        'md.codeblock':     { en: 'Code block',       es: 'Bloque de código' },
+        'md.hr':            { en: 'Horizontal rule',  es: 'Línea horizontal' },
+
         // ── New book & Edit metadata (shared) ───────────────────────────
         'bookForm.backToLibrary':   { en: '← Back to Library',   es: '← Volver a la Biblioteca' },
         'bookForm.backToBook':      { en: '← Back to Book',      es: '← Volver al Libro' },
@@ -964,6 +978,93 @@
         ta.dispatchEvent(new Event('input'));
     }
 
+    // ── Markdown toolbar for textareas ───────────────────────────────
+    function initMarkdownToolbar(textareaId) {
+        var ta = document.getElementById(textareaId);
+        if (!ta) return;
+
+        var toolbar = document.createElement('div');
+        toolbar.className = 'rt-toolbar';
+
+        var buttons = [
+            { label: '<b>B</b>',  key: 'md.bold',      wrap: '**' },
+            { label: '<i>I</i>',  key: 'md.italic',    wrap: '*' },
+            { label: '<s>S</s>',  key: 'md.strike',    wrap: '~~' },
+            { sep: true },
+            { label: 'H2',        key: 'md.h2',        prefix: '## ' },
+            { label: 'H3',        key: 'md.h3',        prefix: '### ' },
+            { sep: true },
+            { label: '• ―',       key: 'md.ul',        prefix: '- ' },
+            { label: '1. ―',      key: 'md.ol',        prefix: '1. ' },
+            { label: '❝',         key: 'md.quote',     prefix: '> ' },
+            { sep: true },
+            { label: '🔗',        key: 'md.link',      action: 'link' },
+            { label: '&lt;&gt;',  key: 'md.code',      wrap: '`' },
+            { label: '{ }',       key: 'md.codeblock', action: 'codeblock' },
+            { label: '—',         key: 'md.hr',        action: 'hr' },
+        ];
+
+        buttons.forEach(function (b) {
+            if (b.sep) {
+                var sep = document.createElement('span');
+                sep.className = 'rt-sep';
+                toolbar.appendChild(sep);
+                return;
+            }
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rt-btn';
+            btn.innerHTML = b.label;
+            btn.setAttribute('data-i18n-title', b.key);
+            btn.title = t(b.key);
+            btn.addEventListener('click', function () {
+                handleMarkdownAction(ta, b);
+            });
+            toolbar.appendChild(btn);
+        });
+
+        ta.parentNode.insertBefore(toolbar, ta);
+    }
+
+    function handleMarkdownAction(ta, b) {
+        var start = ta.selectionStart;
+        var end   = ta.selectionEnd;
+        var text  = ta.value;
+        var sel   = text.substring(start, end);
+        var replacement;
+        var cursorOffset = 0;
+
+        if (b.action === 'link') {
+            var url = prompt(t('md.link'), 'https://');
+            if (!url) return;
+            replacement = '[' + (sel || 'link') + '](' + url + ')';
+        } else if (b.action === 'codeblock') {
+            replacement = '```\n' + (sel || '') + '\n```';
+        } else if (b.action === 'hr') {
+            var before = text.substring(0, start);
+            var needNewline = before.length > 0 && !before.endsWith('\n');
+            replacement = (needNewline ? '\n' : '') + '---\n';
+        } else if (b.wrap) {
+            replacement = b.wrap + sel + b.wrap;
+            if (!sel) cursorOffset = -b.wrap.length;
+        } else if (b.prefix) {
+            if (sel) {
+                var lines = sel.split('\n');
+                replacement = lines.map(function(l) { return b.prefix + l; }).join('\n');
+            } else {
+                replacement = b.prefix;
+            }
+        } else {
+            replacement = sel;
+        }
+
+        ta.value = text.substring(0, start) + replacement + text.substring(end);
+        ta.focus();
+        var cursorPos = start + replacement.length + cursorOffset;
+        ta.setSelectionRange(cursorPos, cursorPos);
+        ta.dispatchEvent(new Event('input'));
+    }
+
     // Expose for usage in inline scripts
-    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar, formatDisplayDate: formatDisplayDate, formatDates: formatDates };
+    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar, initMarkdownToolbar: initMarkdownToolbar, formatDisplayDate: formatDisplayDate, formatDates: formatDates };
 })();

@@ -557,7 +557,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% for th in thoughts %}
     <div class="annotation-card annotation-thought" id="thought-{{ th.id }}">
         <div class="annotation-body">
-            <div class="annotation-text">{{ th.text | safe }}</div>
+            <div class="annotation-text">{{ th.text | md_to_html }}</div>
             {% if th.page %}<div class="annotation-page">p. {{ th.page }}</div>{% endif %}
         </div>
         <div class="annotation-actions">
@@ -981,13 +981,14 @@ function toggleAnnotationEdit(type, id) {
 // ── Rich-text toolbars for annotation textareas ──────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     var irt = window.librariumI18n.initRichTextToolbar;
+    var imt = window.librariumI18n.initMarkdownToolbar;
     // Add-form textareas
     irt('add-quote-text');
-    irt('add-thought-text');
+    imt('add-thought-text');
     irt('add-word-def');
     // Edit-form textareas
     document.querySelectorAll('textarea[id^="edit-quote-"]').forEach(function(ta) { irt(ta.id); });
-    document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { irt(ta.id); });
+    document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { imt(ta.id); });
     document.querySelectorAll('textarea[id^="edit-word-"]').forEach(function(ta) { irt(ta.id); });
 });
 
