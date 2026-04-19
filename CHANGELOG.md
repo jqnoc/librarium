@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auth login, waiting, success, and startup-sync templates for the Dropbox OAuth and initial sync flows
 - Full i18n support (EN / ES) for all Dropbox auth and sync strings
 - CSS styles for auth pages, Dropbox account bar, and sync badge
+- Product opportunity review document in `OPPORTUNITIES.md` capturing future feature and improvement ideas for later prioritisation
 
 ### Changed
 - Portable Windows builds now bundle the Flask backend as a standalone executable via PyInstaller, so the packaged app no longer depends on a system Python installation
