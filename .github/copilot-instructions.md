@@ -559,6 +559,19 @@ feat(stats): add status timeline stacked area chart
 * add i18n keys for timeline labels in EN and ES
 ```
 
+### Staging New Files (MANDATORY)
+
+Whenever Copilot creates a **new file that should remain in the
+repository** (source file, config, docs, asset, script, etc.), it must
+stage that file with `git add <path>` before finishing the task.
+
+- Do **not** leave newly created repository files unstaged for the user
+  to discover manually.
+- Stage only intentional repo files; do **not** stage generated build
+  outputs, caches, or ignored files.
+- If multiple new repo files are created, stage each of them explicitly
+  or with a precise `git add` that covers only those intended files.
+
 ---
 
 ## 11. Versioning & Changelog
