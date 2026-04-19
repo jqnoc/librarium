@@ -9,7 +9,7 @@
     if (!params.has('sort')) {
         var saved = localStorage.getItem('librarium_authors_sort');
         if (saved && saved !== 'name') {
-            window.location.replace('{{ url_for('authors_list') }}?sort=' + saved);
+            window.location.replace('{{ url_for("authors_list") }}?sort=' + saved);
         }
     }
 })();
@@ -33,7 +33,7 @@
 function updateAuthorSort() {
     var value = document.getElementById('authorSort').value;
     localStorage.setItem('librarium_authors_sort', value);
-    window.location.href = '{{ url_for('authors_list') }}?sort=' + value;
+    window.location.href = '{{ url_for("authors_list") }}?sort=' + value;
 }
 </script>
 
@@ -66,6 +66,11 @@ function updateAuthorSort() {
                     <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.2rem;">
                         {{ author.book_count }} book{{ 's' if author.book_count != 1 else '' }}
                     </div>
+                    {% if author.pen_names %}
+                    <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.2rem;">
+                        <span data-i18n="authors.penNames">Pen names:</span> {{ author.pen_names | join(', ') }}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -33,7 +33,7 @@
                             {% if a.lower() == 'anonymous' %}
                                 {{ a }}
                             {% else %}
-                                <a href="{{ url_for('author_detail', author_name=a) }}" style="color: var(--lb-orange); text-decoration: none;">{{ a }}</a>
+                                <a href="{{ url_for('author_detail', author_name=author_page_name(a)) }}" style="color: var(--lb-orange); text-decoration: none;">{{ a }}</a>
                             {% endif %}
                             {%- if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}
                         {% endfor %}

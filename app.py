@@ -902,7 +902,8 @@ def init_schema() -> None:
             biography   TEXT    NOT NULL DEFAULT '',
             photo_hash  TEXT    NOT NULL DEFAULT '',
             photo_thumb BLOB    DEFAULT NULL,
-            gender      TEXT    NOT NULL DEFAULT 'unknown'
+            gender      TEXT    NOT NULL DEFAULT 'unknown',
+            canonical_author TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS readings (
@@ -1000,6 +1001,7 @@ def _run_all_migrations() -> None:
     migrate_shared_authors()
     migrate_shared_sources()
     migrate_add_author_gender()
+    migrate_add_author_canonical_author()
     migrate_add_tags()
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
@@ -1093,7 +1095,8 @@ def migrate_add_authors() -> None:
             birth_place TEXT NOT NULL DEFAULT '',
             death_date  TEXT NOT NULL DEFAULT '',
             death_place TEXT NOT NULL DEFAULT '',
-            biography   TEXT NOT NULL DEFAULT ''
+            biography   TEXT NOT NULL DEFAULT '',
+            canonical_author TEXT NOT NULL DEFAULT ''
         )
     """)
     db.commit()
@@ -1526,6 +1529,8 @@ def migrate_shared_authors() -> None:
                 merged[name]["death_date"] = d["death_date"]
             if not existing.get("death_place") and d.get("death_place"):
                 merged[name]["death_place"] = d["death_place"]
+            if not existing.get("canonical_author") and d.get("canonical_author"):
+                merged[name]["canonical_author"] = d["canonical_author"]
 
     db.execute("DROP TABLE IF EXISTS authors")
     db.execute("""
@@ -1539,20 +1544,23 @@ def migrate_shared_authors() -> None:
             death_place TEXT NOT NULL DEFAULT '',
             biography   TEXT NOT NULL DEFAULT '',
             photo_hash  TEXT NOT NULL DEFAULT '',
-            photo_thumb BLOB DEFAULT NULL
+            photo_thumb BLOB DEFAULT NULL,
+            gender      TEXT NOT NULL DEFAULT 'unknown',
+            canonical_author TEXT NOT NULL DEFAULT ''
         )
     """)
 
     for name, d in merged.items():
         db.execute(
             "INSERT INTO authors (name, photo, has_photo, birth_date, birth_place, "
-            "death_date, death_place, biography, photo_hash, photo_thumb) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "death_date, death_place, biography, photo_hash, photo_thumb, gender, canonical_author) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (name, d.get("photo"), d.get("has_photo", 0),
              d.get("birth_date", ""), d.get("birth_place", ""),
              d.get("death_date", ""), d.get("death_place", ""),
              d.get("biography", ""), d.get("photo_hash", ""),
-             d.get("photo_thumb")),
+             d.get("photo_thumb"), d.get("gender", "unknown"),
+             d.get("canonical_author", "")),
         )
 
     db.commit()
@@ -1629,6 +1637,24 @@ def migrate_add_author_gender() -> None:
     db.commit()
     db.close()
     print(">> Migration complete - gender column added to authors.")
+
+
+# ── Migration: Add canonical_author column to authors ──────────────────
+def migrate_add_author_canonical_author() -> None:
+    """Add canonical_author column to authors for pen name support."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
+    if "canonical_author" in cols:
+        db.close()
+        return
+    print(">> Migrating: adding canonical_author column to authors ...")
+    db.execute("ALTER TABLE authors ADD COLUMN canonical_author TEXT NOT NULL DEFAULT ''")
+    db.commit()
+    db.close()
+    print(">> Migration complete - canonical_author column added to authors.")
 
 
 # ── Migration: Add tags column to books ─────────────────────────────────
@@ -2078,6 +2104,81 @@ def _lib_filter(lib_ids: list[int], col: str = "library_id") -> tuple[str, tuple
     return (f"{col} IN ({placeholders})", tuple(lib_ids))
 
 
+def _split_book_authors(raw_author: str) -> list[str]:
+    """Return the individual author names stored in a book row."""
+    authors = [a.strip() for a in (raw_author or "").split(";") if a.strip()]
+    return authors or ["Unknown"]
+
+
+def _parse_pen_name_list(raw_value: str) -> list[str]:
+    """Parse a semicolon/newline separated pen-name list from a form field."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for part in re.split(r"[;\r\n]+", raw_value or ""):
+        name = part.strip()
+        if not name:
+            continue
+        lowered = name.casefold()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        names.append(name)
+    return names
+
+
+def _get_author_canonical_map(db: sqlite3.Connection | None = None) -> dict[str, str]:
+    """Return {author_name: canonical_author_name} for pen-name redirects."""
+    cached = getattr(g, "_author_canonical_map", None)
+    if cached is not None:
+        return cached
+
+    if db is None:
+        db = get_db()
+
+    try:
+        cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
+        if "canonical_author" not in cols:
+            g._author_canonical_map = {}
+            return g._author_canonical_map
+        mapping = {
+            row["name"]: (row["canonical_author"] or "").strip()
+            for row in db.execute("SELECT name, canonical_author FROM authors").fetchall()
+            if (row["canonical_author"] or "").strip()
+        }
+    except sqlite3.Error:
+        mapping = {}
+
+    g._author_canonical_map = mapping
+    return mapping
+
+
+def _resolve_author_page_name(author_name: str, canonical_map: dict[str, str] | None = None) -> str:
+    """Resolve an author or pen name to the canonical author page name."""
+    current = (author_name or "").strip() or "Unknown"
+    if canonical_map is None:
+        canonical_map = _get_author_canonical_map()
+
+    seen: set[str] = set()
+    while True:
+        target = (canonical_map.get(current) or "").strip()
+        if not target or target == current or target in seen:
+            return current
+        seen.add(current)
+        current = target
+
+
+def _get_author_pen_names(author_name: str, canonical_map: dict[str, str] | None = None) -> list[str]:
+    """Return all pen names that resolve to the given canonical author."""
+    if canonical_map is None:
+        canonical_map = _get_author_canonical_map()
+    pen_names = [
+        name for name in canonical_map
+        if name != author_name and _resolve_author_page_name(name, canonical_map) == author_name
+    ]
+    pen_names.sort(key=str.lower)
+    return pen_names
+
+
 @app.context_processor
 def inject_library_context():
     """Make selected_library_ids and all_libraries available in every template."""
@@ -2091,6 +2192,11 @@ def inject_library_context():
         all_lib_ids = [l["id"] for l in all_libs]
         # When nothing is explicitly selected, all libraries are active
         sel_ids = lib_ids if lib_ids else all_lib_ids
+        author_canonical_map = _get_author_canonical_map(db)
+
+        def author_page_name(author_name: str) -> str:
+            return _resolve_author_page_name(author_name, author_canonical_map)
+
         current_user = _get_valid_current_user()
         backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
         return {
@@ -2101,8 +2207,12 @@ def inject_library_context():
             "backup_dir": backup_dir,
             "db_path": str(DB_PATH),
             "dropbox_connected": _is_authenticated(),
+            "author_page_name": author_page_name,
         }
     except Exception:
+        def author_page_name(author_name: str) -> str:
+            return author_name
+
         return {
             "selected_library_ids": [],
             "all_libraries": [],
@@ -2111,6 +2221,7 @@ def inject_library_context():
             "backup_dir": str(BACKUP_DIR),
             "db_path": str(DB_PATH),
             "dropbox_connected": _is_authenticated(),
+            "author_page_name": author_page_name,
         }
 
 
@@ -3462,15 +3573,20 @@ def dashboard():
 
     # ── Author spotlight (4 random authors) ──────────────────────────────
     spotlight_authors: list[dict] = []
-    if author_counts:
-        all_author_names = list(author_counts.keys())
+    spotlight_author_counts: Counter[str] = Counter()
+    author_canonical_map = _get_author_canonical_map(db)
+    for author_name, count in author_counts.items():
+        spotlight_author_counts[_resolve_author_page_name(author_name, author_canonical_map)] += count
+
+    if spotlight_author_counts:
+        all_author_names = list(spotlight_author_counts.keys())
         chosen = random.sample(all_author_names, min(4, len(all_author_names)))
         for author_name in chosen:
             author_row = db.execute("SELECT name, has_photo, photo_hash FROM authors WHERE name = ?",
                                      (author_name,)).fetchone()
             spotlight_authors.append({
                 "name": author_name,
-                "count": author_counts[author_name],
+                "count": spotlight_author_counts[author_name],
                 "has_photo": bool(author_row["has_photo"]) if author_row else False,
                 "photo_hash": (author_row["photo_hash"] or "") if author_row else "",
             })
@@ -5117,26 +5233,20 @@ def activity():
 
 @app.route("/authors")
 def authors_list():
-    """Display a list of all authors with their book counts."""
+    """Display canonical authors with book counts aggregated across pen names."""
     db = get_db()
     lib_ids = _get_selected_library_ids()
     lf, lp = _lib_filter(lib_ids)
-    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
     rows = db.execute(f"SELECT id, name, author, has_cover, cover_hash, status FROM books WHERE {lf}", lp).fetchall()
+    author_canonical_map = _get_author_canonical_map(db)
 
     # Build a map of author names that have photos → photo_hash
     author_photo_info: dict[str, str] = {}
     for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall():
         author_photo_info[ar["name"]] = ar["photo_hash"] or ""
 
-    author_map: dict[str, list[dict]] = {}
+    author_map: dict[str, dict] = {}
     for r in rows:
-        raw_author = (r["author"] or "").strip()
-        if not raw_author:
-            raw_author = "Unknown"
-        individual_authors = [a.strip() for a in raw_author.split(";") if a.strip()]
-        if not individual_authors:
-            individual_authors = ["Unknown"]
         book_entry = {
             "id": r["id"],
             "name": r["name"],
@@ -5144,17 +5254,32 @@ def authors_list():
             "cover_hash": r["cover_hash"] or "",
             "status": r["status"],
         }
-        for author in individual_authors:
+        for author in _split_book_authors(r["author"] or ""):
             if author.lower() == "anonymous":
                 continue
-            author_map.setdefault(author, []).append(book_entry)
+            canonical_name = _resolve_author_page_name(author, author_canonical_map)
+            author_group = author_map.setdefault(canonical_name, {
+                "books": [],
+                "book_ids": set(),
+                "pen_names": set(),
+            })
+            if r["id"] not in author_group["book_ids"]:
+                author_group["books"].append(book_entry)
+                author_group["book_ids"].add(r["id"])
+            if author != canonical_name:
+                author_group["pen_names"].add(author)
 
     sort = request.args.get("sort", "name")
     authors = [
-        {"name": name, "books": bks, "book_count": len(bks),
-         "has_photo": name in author_photo_info,
-         "photo_hash": author_photo_info.get(name, "")}
-        for name, bks in author_map.items()
+        {
+            "name": name,
+            "books": data["books"],
+            "book_count": len(data["books"]),
+            "pen_names": sorted(data["pen_names"], key=str.lower),
+            "has_photo": name in author_photo_info,
+            "photo_hash": author_photo_info.get(name, ""),
+        }
+        for name, data in author_map.items()
     ]
     if sort == "books":
         authors.sort(key=lambda a: (-a["book_count"], a["name"].lower()))
@@ -5165,11 +5290,15 @@ def authors_list():
 
 @app.route("/authors/<path:author_name>")
 def author_detail(author_name: str):
-    """Display all books by a given author, plus author metadata."""
+    """Display all books by a canonical author, including pen-name books."""
     db = get_db()
     lib_ids = _get_selected_library_ids()
     lf, lp = _lib_filter(lib_ids)
-    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    author_canonical_map = _get_author_canonical_map(db)
+    canonical_author = _resolve_author_page_name(author_name, author_canonical_map)
+    if canonical_author != author_name:
+        return redirect(url_for("author_detail", author_name=canonical_author, **request.args.to_dict()))
+
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_author_show_editions", "0")
     edition_filter = " AND (work_id IS NULL OR is_primary_edition = 1)" if show_editions != "1" else ""
     rows = db.execute(
@@ -5181,9 +5310,12 @@ def author_detail(author_name: str):
 
     books = []
     for r in rows:
-        raw_author = (r["author"] or "").strip()
-        individual = [a.strip() for a in raw_author.split(";") if a.strip()] or ["Unknown"]
-        if author_name not in individual:
+        matched_author = None
+        for candidate in _split_book_authors(r["author"] or ""):
+            if _resolve_author_page_name(candidate, author_canonical_map) == canonical_author:
+                matched_author = candidate
+                break
+        if not matched_author:
             continue
         ratings = _load_ratings(r["id"])
         avg = _calc_avg_rating(ratings)
@@ -5196,6 +5328,7 @@ def author_detail(author_name: str):
             "status": r["status"],
             "original_publication_date": r["original_publication_date"] or "",
             "rating": avg or 0,
+            "matched_author": matched_author,
         })
 
     if sort == "alpha":
@@ -5206,12 +5339,14 @@ def author_detail(author_name: str):
         books.sort(key=lambda b: (b["original_publication_date"] or "9999", b["name"].lower()))
 
     # Load author metadata (if exists)
-    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
+    author_row = db.execute("SELECT * FROM authors WHERE name = ?", (canonical_author,)).fetchone()
     author_info = dict(author_row) if author_row else {
-        "name": author_name, "has_photo": 0, "photo_hash": "", "birth_date": "",
+        "name": canonical_author, "has_photo": 0, "photo_hash": "", "birth_date": "",
         "birth_place": "", "death_date": "", "death_place": "", "biography": "",
         "gender": "unknown",
+        "canonical_author": "",
     }
+    pen_names = _get_author_pen_names(canonical_author, author_canonical_map)
 
     # Load all quotes from this author's books
     book_ids = [b["id"] for b in books]
@@ -5225,9 +5360,10 @@ def author_detail(author_name: str):
             book_ids,
         ).fetchall()]
 
-    resp = make_response(render_template("author_detail.html", author=author_name,
+    resp = make_response(render_template("author_detail.html", author=canonical_author,
                            books=books, author_info=author_info, sort=sort,
-                           show_editions=show_editions, author_quotes=author_quotes))
+                           show_editions=show_editions, author_quotes=author_quotes,
+                           pen_names=pen_names))
     resp.set_cookie("librarium_author_show_editions", show_editions, max_age=365*24*3600, samesite="Lax")
     return resp
 
@@ -5311,7 +5447,7 @@ def author_photo_thumb(author_name: str):
 
 @app.route("/authors/<path:author_name>/edit", methods=["GET", "POST"])
 def edit_author(author_name: str):
-    """Edit author metadata (photo, dates, places, biography)."""
+    """Edit author metadata and pen-name relationships."""
     db = get_db()
 
     # Ensure author row exists
@@ -5323,6 +5459,9 @@ def edit_author(author_name: str):
         author_row = db.execute("SELECT * FROM authors WHERE name = ?", (author_name,)).fetchone()
 
     author_info = dict(author_row)
+    author_info.setdefault("canonical_author", "")
+    author_canonical_map = _get_author_canonical_map(db)
+    pen_names = _get_author_pen_names(author_name, author_canonical_map)
 
     if request.method == "POST":
         author_info["birth_date"] = request.form.get("birth_date", "").strip()
@@ -5331,16 +5470,53 @@ def edit_author(author_name: str):
         author_info["death_place"] = request.form.get("death_place", "").strip()
         author_info["biography"] = sanitize_html(request.form.get("biography", "").strip())
         author_info["gender"] = request.form.get("gender", "unknown").strip()
+        canonical_author = request.form.get("canonical_author", "").strip()
+        if canonical_author == author_name:
+            canonical_author = ""
+        if canonical_author:
+            resolved_canonical = _resolve_author_page_name(canonical_author, author_canonical_map)
+            if resolved_canonical == author_name:
+                flash("A pen name cannot point to itself or create a loop.", "error")
+                author_info["canonical_author"] = canonical_author
+                return render_template("edit_author.html", author_name=author_name,
+                                       author_info=author_info, pen_names=pen_names)
+            canonical_author = resolved_canonical
+            if not db.execute("SELECT 1 FROM authors WHERE name = ?", (canonical_author,)).fetchone():
+                db.execute("INSERT INTO authors (name) VALUES (?)", (canonical_author,))
+        author_info["canonical_author"] = canonical_author
 
         db.execute("""
             UPDATE authors SET
-                birth_date=?, birth_place=?, death_date=?, death_place=?, biography=?, gender=?
+                birth_date=?, birth_place=?, death_date=?, death_place=?, biography=?, gender=?, canonical_author=?
             WHERE name=?
         """, (
             author_info["birth_date"], author_info["birth_place"],
             author_info["death_date"], author_info["death_place"],
-            author_info["biography"], author_info["gender"], author_name,
+            author_info["biography"], author_info["gender"], author_info["canonical_author"], author_name,
         ))
+
+        if author_info["canonical_author"]:
+            db.execute(
+                "UPDATE authors SET canonical_author = '' WHERE canonical_author = ? AND name != ?",
+                (author_name, author_name),
+            )
+        else:
+            requested_pen_names = _parse_pen_name_list(request.form.get("pen_names", ""))
+            requested_pen_names = [name for name in requested_pen_names if name != author_name]
+            existing_pen_rows = db.execute(
+                "SELECT name FROM authors WHERE canonical_author = ? AND name != ?",
+                (author_name, author_name),
+            ).fetchall()
+            existing_pen_names = {row["name"] for row in existing_pen_rows}
+
+            for name in sorted(existing_pen_names - set(requested_pen_names)):
+                db.execute("UPDATE authors SET canonical_author = '' WHERE name = ?", (name,))
+
+            for name in requested_pen_names:
+                if not db.execute("SELECT 1 FROM authors WHERE name = ?", (name,)).fetchone():
+                    db.execute("INSERT INTO authors (name) VALUES (?)", (name,))
+                db.execute("UPDATE authors SET canonical_author = ? WHERE name = ?", (author_name, name))
+
         db.commit()
 
         # Handle photo upload
@@ -5362,10 +5538,10 @@ def edit_author(author_name: str):
             _delete_image_file(_author_photo_path(author_name))
 
         flash("Author details updated.", "success")
-        return redirect(url_for("author_detail", author_name=author_name))
+        return redirect(url_for("author_detail", author_name=author_info["canonical_author"] or author_name))
 
     return render_template("edit_author.html", author_name=author_name,
-                           author_info=author_info)
+                           author_info=author_info, pen_names=pen_names)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

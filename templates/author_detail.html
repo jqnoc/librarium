@@ -20,6 +20,12 @@
 
     <div>
         <div class="meta-grid">
+            {% if pen_names %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="authorDetail.penNames">Pen Names</div>
+                <div class="meta-value">{{ pen_names | join(', ') }}</div>
+            </div>
+            {% endif %}
             {% if author_info.birth_date %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="authorDetail.born">Born</div>
@@ -100,6 +106,11 @@
             <div>
                 <div class="book-title" style="font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0;">{{ book.name }}</div>
                 {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
+                {% if book.matched_author and book.matched_author != author %}
+                <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.25rem;">
+                    <span data-i18n="authorDetail.publishedAs">Published as</span> {{ book.matched_author }}
+                </div>
+                {% endif %}
                 {% if book.original_publication_date %}
                 <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.25rem;">{{ book.original_publication_date | display_date }}</div>
                 {% endif %}

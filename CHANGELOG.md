@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auth login, waiting, success, and startup-sync templates for the Dropbox OAuth and initial sync flows
 - Full i18n support (EN / ES) for all Dropbox auth and sync strings
 - CSS styles for auth pages, Dropbox account bar, and sync badge
+- Author pen-name support: books can keep showing the pen name while author links resolve to a canonical author page, and canonical author pages now aggregate books published under linked pen names
 - Product opportunity review document in `OPPORTUNITIES.md` capturing future feature and improvement ideas for later prioritisation
 
 ### Changed

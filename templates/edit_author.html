@@ -12,6 +12,28 @@
 <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_author', author_name=author_name) }}">
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="editAuthor.identity">Identity</h3>
+            <div class="form-group">
+                <label for="canonical_author" data-i18n="editAuthor.penNameOf">Pen name of</label>
+                <input type="text" id="canonical_author" name="canonical_author" class="form-control"
+                       value="{{ author_info.canonical_author or '' }}"
+                       placeholder="Stephen King">
+                <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.35rem;" data-i18n="editAuthor.penNameOfHint">Leave empty if this is the main author identity.</div>
+            </div>
+            {% if not author_info.canonical_author %}
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="pen_names" data-i18n="editAuthor.penNames">Pen names</label>
+                <input type="text" id="pen_names" name="pen_names" class="form-control"
+                       value="{{ pen_names | join('; ') }}"
+                       placeholder="Richard Bachman; Robert Galbraith">
+                <div style="font-size: 0.85rem; color: var(--lb-text-light); margin-top: 0.35rem;" data-i18n="editAuthor.penNamesHint">Separate multiple pen names with semicolons.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
             <h3 style="margin-top:0;" data-i18n="editAuthor.photo">Photo</h3>
             {% if author_info.has_photo %}
             <div style="margin-bottom: 1rem;">

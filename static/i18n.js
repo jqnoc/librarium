@@ -276,6 +276,7 @@
         'authors.sortBy':    { en: 'Sort by:',      es: 'Ordenar por:' },
         'authors.sortName':  { en: 'Name',          es: 'Nombre' },
         'authors.sortBooks': { en: 'Number of Books', es: 'Número de Libros' },
+        'authors.penNames':  { en: 'Pen names:',    es: 'Seudónimos:' },
         'authors.empty':     { en: 'No authors found. Add some books to your library first.', es: 'No se encontraron autores. Añade libros a tu biblioteca primero.' },
 
         // ── Series page ────────────────────────────────────────────────────────
@@ -309,6 +310,8 @@
         'authorDetail.sortRating':    { en: 'Rating',             es: 'Valoración' },
         'authorDetail.showAllEditions': { en: 'Show All Editions', es: 'Mostrar Todas las Ediciones' },
         'authorDetail.gender':        { en: 'Gender',              es: 'Género' },
+        'authorDetail.penNames':      { en: 'Pen Names',           es: 'Seudónimos' },
+        'authorDetail.publishedAs':   { en: 'Published as',        es: 'Publicado como' },
         'authorDetail.empty':         { en: 'No books found for this author.', es: 'No se encontraron libros de este autor.' },
         'authorDetail.quotes':        { en: 'Quotes',              es: 'Citas' },
 
@@ -319,6 +322,11 @@
         'editAuthor.removePhoto':   { en: 'Remove current photo', es: 'Eliminar foto actual' },
         'editAuthor.replacePhoto':  { en: 'Replace Photo',        es: 'Reemplazar Foto' },
         'editAuthor.uploadPhoto':   { en: 'Upload Photo',         es: 'Subir Foto' },
+        'editAuthor.identity':      { en: 'Identity',             es: 'Identidad' },
+        'editAuthor.penNameOf':     { en: 'Pen name of',          es: 'Seudónimo de' },
+        'editAuthor.penNameOfHint': { en: 'Leave empty if this is the main author identity.', es: 'Déjalo vacío si esta es la identidad principal del autor.' },
+        'editAuthor.penNames':      { en: 'Pen names',            es: 'Seudónimos' },
+        'editAuthor.penNamesHint':  { en: 'Separate multiple pen names with semicolons.', es: 'Separa varios seudónimos con punto y coma.' },
         'editAuthor.lifeDetails':   { en: 'Life Details',         es: 'Datos Biográficos' },
         'editAuthor.born':          { en: 'Born',                 es: 'Nacimiento' },
         'editAuthor.birthplace':    { en: 'Birthplace',           es: 'Lugar de Nacimiento' },
