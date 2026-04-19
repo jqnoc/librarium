@@ -133,11 +133,25 @@
         function librariumQuit() {
             var overlay = document.getElementById('shutdownOverlay');
             if (overlay) overlay.style.display = 'flex';
+            if (window.librarium && window.librarium.quit) {
+                window.librarium.quit();
+                return;
+            }
             fetch('{{ url_for("shutdown_backup") }}', { method: 'POST' })
-                .finally(function() {
-                    if (window.librarium && window.librarium.quit) {
-                        window.librarium.quit();
-                    }
+                .then(function(response) {
+                    if (response.ok) return response;
+                    return response.json()
+                        .catch(function() { return { error: 'Backup could not be completed.' }; })
+                        .then(function(data) {
+                            throw new Error(data.error || 'Backup could not be completed.');
+                        });
+                })
+                .then(function() {
+                    window.close();
+                })
+                .catch(function(error) {
+                    if (overlay) overlay.style.display = 'none';
+                    window.alert(error.message || 'Backup could not be completed.');
                 });
         }
     </script>

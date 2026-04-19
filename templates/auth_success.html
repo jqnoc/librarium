@@ -20,11 +20,17 @@
         <div class="user-select-section" style="text-align: center;">
             <div class="auth-success-icon">✓</div>
             <h2 data-i18n="auth.connected">Dropbox Connected</h2>
-            <p class="auth-description" data-i18n="auth.successMessage">Your Dropbox account has been connected successfully. You can close this tab and return to Librarium.</p>
-            <a href="{{ url_for('user_select') }}" class="btn btn-primary" data-i18n="auth.continue" style="margin-top: 1.5rem; display: inline-block;">Continue to Librarium</a>
+            <p class="auth-description" data-i18n="auth.successMessage">Your Dropbox account has been connected successfully. Librarium will continue in the desktop app.</p>
+            <p class="auth-note" data-i18n="auth.closeTabHint">This browser tab can now be closed. Librarium will continue in the desktop app.</p>
+            <button type="button" class="btn btn-primary" data-i18n="auth.closeTab" style="margin-top: 1.5rem; display: inline-block;" onclick="window.close()">Close Tab</button>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+    <script>
+    setTimeout(function() {
+        window.close();
+    }, 1500);
+    </script>
 </body>
 </html>

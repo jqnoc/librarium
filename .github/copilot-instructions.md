@@ -11,9 +11,10 @@ single-file architecture maintainable.
 Librarium is a **self-contained Electron desktop application** for tracking
 personal book reading statistics. The backend is a monolithic single-file
 Flask app (`app.py`, ~5 000+ lines) with raw SQLite queries, Jinja2
-templates, vanilla JS, and Chart.js for charts. Electron spawns the Flask
-server as a child process and displays it in a native window. There is
-**no test suite** — all verification is manual.
+templates, vanilla JS, and Chart.js for charts. In development Electron
+spawns `python app.py`; in packaged Windows builds it spawns a bundled
+standalone backend executable created with PyInstaller. There is **no test
+suite** — all verification is manual.
 
 ### Key facts
 
@@ -21,13 +22,16 @@ server as a child process and displays it in a native window. There is
 |--------|-------|
 | Entry point (Electron) | `main.js` |
 | Entry point (Backend) | `app.py` |
+| Packaged backend | `build/backend/librarium-backend.exe` |
 | Version | Defined in `APP_VERSION` (`app.py`) and `package.json` |
 | Database | SQLite per-user DBs in AppData (WAL mode) |
 | Python | 3.12+ |
 | Node.js | 18+ |
-| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16, dropbox ≥ 12.0 |
-| Port | Dynamic (free port at startup) |
-| Startup | `npm start` or `run-librarium.bat` |
+| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16, pdfplumber ≥ 0.11, markdown ≥ 3.5, dropbox ≥ 12.0 |
+| Build tooling | PyInstaller + electron-builder |
+| Flask port | Dynamic, prefers `48720` |
+| OAuth callback port | Fixed `48721` |
+| Startup | `npm start`, `run-librarium.bat`, or packaged portable `.exe` |
 
 ---
 
@@ -37,15 +41,18 @@ server as a child process and displays it in a native window. There is
 
 `main.js` is the Electron main process. It:
 
-1. Finds a free TCP port (`findFreePort()` via `net.createServer`).
-2. Spawns `python app.py` with `LIBRARIUM_PORT` and `LIBRARIUM_ELECTRON=1`
-   environment variables.
+1. Finds a free TCP port, preferring `48720` for stable renderer storage.
+2. Spawns `python app.py` in development or the bundled
+  `librarium-backend.exe` when packaged, passing `LIBRARIUM_PORT` and
+  `LIBRARIUM_ELECTRON=1`.
 3. Polls the port until Flask accepts connections.
 4. Opens a `BrowserWindow` pointing at `http://127.0.0.1:<port>`.
-5. Kills the Flask child process on quit.
+5. Intercepts app quit, waits for `/api/shutdown-backup`, and only exits
+  immediately once backup/sync succeeds or the user explicitly chooses to
+  quit anyway.
 
 `preload.js` exposes `window.librarium.isElectron` to the renderer
-(sandboxed, `contextIsolation: true`).
+(sandboxed, `contextIsolation: true`) plus `quit()` and `minimize()` helpers.
 
 ### 2.2 Monolithic Flask backend
 
@@ -55,14 +62,17 @@ are no blueprints, no ORM, and no separate model files.
 
 ### 2.3 Database
 
-- **11 tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
-  `authors`, `series`, `book_series`, `sources`, `libraries`
-  (plus a SQLite-internal `sqlite_sequence`).
+- **13 app tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
+  `authors`, `series`, `book_series`, `sources`, `libraries`, `quotes`,
+  `thoughts`, and `words` (plus SQLite-internal `sqlite_sequence`).
 - All queries are **raw SQL** via `sqlite3`. There is no ORM.
 - `get_db()` returns a per-request `sqlite3.Connection` stored in
   Flask's `g` object. Row factory is `sqlite3.Row`.
 - Primary keys: `books.id` uses UUID strings; most other tables use
   INTEGER autoincrement.
+- Full-size cover and author-photo files are stored on disk under
+  `DATA_DIR/images/<user>/...`; legacy `cover` / `photo` BLOB columns are
+  retained for migration fallback and thumbnails remain in SQLite.
 
 ### 2.4 Dropbox Cloud Storage
 
@@ -74,6 +84,8 @@ access type).
 - OAuth2 PKCE (no client secret) → system browser → callback to
   `http://127.0.0.1:48721/auth/callback`.
 - Refresh token + access token persisted in `DATA_DIR/auth.json`.
+- The browser callback shows a close-tab page; the main app continues in
+  Electron via polling on `/auth/status`.
 - `check_user_selected()` middleware redirects to `/auth/login` if not
   authenticated.
 
@@ -81,8 +93,8 @@ access type).
 - **Startup**: download all `.db` files and `users.json` from Dropbox.
 - **Periodic**: every 5 minutes, upload modified DBs (content-hash
   change detection via `_file_content_hash()`).
-- **Shutdown**: Electron calls `/api/shutdown-backup` and waits up to
-  30 s for Flask to finish backup + upload before killing the process.
+- **Shutdown**: Electron calls `/api/shutdown-backup`, validates the JSON
+  response, and can cancel quitting if backup/sync fails.
 - WAL checkpoint (`PRAGMA wal_checkpoint(TRUNCATE)`) before every upload.
 
 #### Key helpers
@@ -97,6 +109,7 @@ access type).
 | `sync_users_json_to_dropbox()` | Upload `users.json` |
 | `_download_all_from_dropbox()` | Startup bulk download |
 | `_upload_all_to_dropbox()` | Shutdown bulk upload |
+| `_start_oauth_callback_server()` | One-shot local callback server on `48721` |
 | `_start_periodic_sync()` | Start background sync thread |
 
 #### Dropbox folder layout
@@ -136,6 +149,8 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 20. `migrate_add_tags` — tags column on books
 21. `migrate_normalize_genres` — normalise genre strings
 22. `migrate_merge_genres_into_tags` — merge genres into the tags column
+23. `migrate_add_annotations` — quotes, thoughts, and words tables
+24. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
 
 When adding a new migration:
 
@@ -235,8 +250,8 @@ When adding UI text:
 
 ### 3.4 View modes
 
-The library index (`/`) supports three view modes: **card**, **cover**,
-and **list** — toggled by the user and stored in a cookie.
+The library page (`/library`) supports three view modes: **card**,
+**cover**, and **list** — toggled by the user and stored in a cookie.
 
 ---
 
@@ -246,7 +261,8 @@ and **list** — toggled by the user and stored in a cookie.
 
 | URL | Method | Purpose |
 |-----|--------|---------|
-| `/` | GET | Library index (card / cover / list views) |
+| `/` | GET | Dashboard landing page |
+| `/library` | GET | Library index (card / cover / list views) |
 | `/book/new` | GET, POST | Add a new book |
 | `/book/<id>` | GET | Book detail (sessions, periods, ratings, editions) |
 | `/book/<id>/edit` | GET, POST | Edit book metadata |
@@ -261,17 +277,29 @@ and **list** — toggled by the user and stored in a cookie.
 | `/book/<id>/periods/<idx>/edit` | POST | Edit a period |
 | `/book/<id>/periods/<idx>/delete` | POST | Delete a period |
 | `/book/<id>/ratings` | POST | Save ratings |
+| `/book/<id>/quotes/add` | POST | Add a quote annotation |
+| `/book/<id>/quotes/<qid>/edit` | POST | Edit a quote annotation |
+| `/book/<id>/quotes/<qid>/delete` | POST | Delete a quote annotation |
+| `/book/<id>/thoughts/add` | POST | Add a thought annotation |
+| `/book/<id>/thoughts/<tid>/edit` | POST | Edit a thought annotation |
+| `/book/<id>/thoughts/<tid>/delete` | POST | Delete a thought annotation |
+| `/book/<id>/words/add` | POST | Add a word annotation |
+| `/book/<id>/words/<wid>/edit` | POST | Edit a word annotation |
+| `/book/<id>/words/<wid>/delete` | POST | Delete a word annotation |
+| `/book/<id>/import-bookly` | POST | Import Bookly PDF annotations |
 | `/book/<id>/link-edition` | POST | Link two books as editions of the same work |
 | `/book/<id>/unlink-edition` | POST | Unlink an edition |
 | `/book/<id>/set-primary-edition` | POST | Set this edition as primary |
 | `/stats` | GET | Global statistics dashboard |
 | `/stats/year/<year>` | GET | Yearly stats with Gantt charts |
 | `/stats/year/<year>/books` | GET | Books finished in a specific year |
+| `/stats/year/<year>/bought` | GET | Books bought in a specific year |
+| `/calendar` | GET | Monthly calendar view |
 | `/activity` | GET | Activity dashboard |
 | `/authors` | GET | Authors list |
 | `/authors/<name>` | GET | Author detail page |
 | `/authors/<name>/edit` | GET, POST | Edit author info and photo |
-| `/author_photo/<name>` | GET | Serve author photo from DB |
+| `/author_photo/<name>` | GET | Serve author photo from filesystem (DB fallback) |
 | `/author_photo_thumb/<name>` | GET | Serve author photo thumbnail from DB |
 | `/series` | GET | Series list |
 | `/series/<id>` | GET | Series detail |
@@ -285,7 +313,7 @@ and **list** — toggled by the user and stored in a cookie.
 | `/library/create` | POST | Create a new library |
 | `/library/<id>/rename` | POST | Rename a library |
 | `/library/<id>/delete` | POST | Delete a library |
-| `/cover/<id>` | GET | Serve book cover image from DB |
+| `/cover/<id>` | GET | Serve book cover image from filesystem (DB fallback) |
 | `/cover_thumb/<id>` | GET | Serve book cover thumbnail from DB |
 | `/backup/create` | POST | Trigger a manual backup |
 | `/users` | GET | User selection / creation screen |
@@ -307,10 +335,15 @@ and **list** — toggled by the user and stored in a cookie.
 | `/api/status_timeline` | GET | Status-over-time data for stacked area chart |
 | `/api/isbn_lookup` | GET | Look up book metadata by ISBN via Open Library |
 | `/api/shutdown-backup` | POST | Trigger a backup before shutdown |
+| `/api/startup-status` | GET | Startup Dropbox-sync progress for the loading page |
 
 ---
 
 ## 5. Database Schema Quick Reference
+
+Full-size covers and author photos are externalized to `DATA_DIR/images/`
+for new writes, but the legacy `cover` / `photo` BLOB columns still exist
+for migration fallback.
 
 ```
 books       (id TEXT PK, name, subtitle, author, slug, language,
@@ -338,6 +371,12 @@ ratings     (book_id FK, dimension_key, value,
 authors     (name TEXT PK, photo BLOB, has_photo, birth_date,
              birth_place, death_date, death_place, biography,
              photo_hash, photo_thumb BLOB, gender)
+
+quotes      (id INTEGER PK, book_id FK, text, page)
+
+thoughts    (id INTEGER PK, book_id FK, text, page)
+
+words       (id INTEGER PK, book_id FK, word, definition)
 
 series      (id INTEGER PK, name, library_id FK,
              UNIQUE(name, library_id))
@@ -396,11 +435,14 @@ Key helper patterns in `app.py`:
 | `_calc_avg_rating()` | Grouped average |
 | `_compute_status_timeline()` | Reconstruct status history from dates |
 | `_load_users()` / `_save_users()` | Read / write `users.json` |
+| `_get_valid_current_user()` | Validate the user cookie against `users.json` |
 | `_set_active_user_db()` | Switch global `DB_PATH` and `BACKUP_DIR` for a user |
 | `_get_user_db_path()` | Resolve DB file path for a username |
+| `_cover_path()` / `_author_photo_path()` | Resolve full-size media file paths |
 | `_run_all_migrations()` | Execute all migrations sequentially |
 | `validate_and_restore_db()` | Integrity check + backup restore |
 | `backup_database()` | Daily backup with pruning |
+| `_start_oauth_callback_server()` | Start the one-shot OAuth callback server |
 | `sanitize_html()` | Allowlist-based HTML sanitiser for notes |
 
 ---
@@ -417,6 +459,9 @@ There is **no automated test suite**. After any change, verify manually:
 
 Alternatively, for backend-only changes you can still run Flask
 directly: `python app.py` → open `http://127.0.0.1:5000`.
+
+For packaging changes, also verify `npm run build` completes and the
+portable executable launches without relying on a system Python install.
 
 ### Subsystem-specific checks
 
@@ -440,12 +485,14 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `preload.js` | Electron preload script (sandboxed renderer bridge) |
 | `package.json` | Node.js manifest (Electron dep, version, build config) |
 | `app.py` | Entire Flask application |
-| `requirements.txt` | Python dependencies |
+| `requirements.txt` | Python runtime + build dependencies |
+| `scripts/build_backend.py` | Build helper that freezes `app.py` into `librarium-backend.exe` |
 | `run-librarium.bat` | Windows launcher (`npm start`) |
 | `CHANGELOG.md` | Version history (Keep a Changelog format) |
 | `static/style.css` | Stylesheet (layout, components) |
 | `static/i18n.js` | EN/ES translations |
 | `templates/base.html` | Base layout (navbar, Chart.js CDN) |
+| `templates/dashboard.html` | Dashboard landing page |
 | `templates/index.html` | Library page (card/cover/list views, filters) |
 | `templates/book_detail.html` | Book detail (sessions, periods, ratings, editions) |
 | `templates/edit_metadata.html` | Edit book metadata form |
@@ -453,6 +500,8 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/stats.html` | Global statistics dashboard |
 | `templates/stats_year.html` | Yearly stats with Gantt charts |
 | `templates/stats_year_books.html` | Books finished in a year |
+| `templates/stats_year_bought.html` | Books bought in a year |
+| `templates/calendar.html` | Calendar view |
 | `templates/activity.html` | Activity dashboard |
 | `templates/authors.html` | Authors list |
 | `templates/author_detail.html` | Author detail |
@@ -464,6 +513,7 @@ directly: `python app.py` → open `http://127.0.0.1:5000`.
 | `templates/auth_login.html` | Dropbox login / connect page |
 | `templates/auth_waiting.html` | OAuth polling page (shown in Electron while user authorizes in browser) |
 | `templates/auth_success.html` | OAuth callback success page |
+| `templates/startup_sync.html` | Startup Dropbox sync loading page |
 
 ---
 
@@ -536,14 +586,18 @@ Every response that modifies code **must** update `CHANGELOG.md`:
    it and write a better one) instead of adding a separate "Fixed …"
    entry. Fixes to unreleased features are not changelog-worthy on their
    own — the user has never seen the broken state.
-5. When the user requests a release:
+5. **Keep exactly one subsection per change type inside `## [Unreleased]`**:
+  there must be at most one `### Added`, one `### Changed`, one `### Fixed`,
+  and one `### Removed`. If duplicates already exist, merge them before adding
+  new bullets.
+6. When the user requests a release:
    - Determine the new version (feat → minor bump, fix/refactor/chore →
      patch bump, major → only on explicit request).
    - Replace `## [Unreleased]` with `## [x.y.z] — YYYY-MM-DD` and add a
      fresh empty `## [Unreleased]` above it.
    - Update `APP_VERSION` in `app.py` and `version` in `package.json`
      to match.
-6. **No artificial line breaks**: each changelog bullet must be a single
+7. **No artificial line breaks**: each changelog bullet must be a single
    line — do **not** hard-wrap at 72 or 80 columns. Word wrap in the
    editor and on GitHub handles long lines correctly.
 

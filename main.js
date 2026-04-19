@@ -5,25 +5,34 @@
  * ready, then opens the app in a frameless fullscreen BrowserWindow.
  */
 
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const net = require("net");
+
+const { resolvePythonCommand } = require("./scripts/python_command");
 
 // ── State ────────────────────────────────────────────────────────────────
 let mainWindow = null;
 let splashWindow = null;
 let flaskProcess = null;
 let flaskPort = 0;
+let isQuitting = false;
+let quitRequest = null;
 
 // ── Resolve paths (works both in dev and when packaged) ─────────────────
 const isPackaged = app.isPackaged;
-const appRoot = isPackaged
-  ? path.join(process.resourcesPath, "app")
-  : __dirname;
+const assetRoot = __dirname;
+const backendPath = isPackaged
+  ? path.join(
+      process.resourcesPath,
+      "backend",
+      process.platform === "win32" ? "librarium-backend.exe" : "librarium-backend",
+    )
+  : path.join(__dirname, "app.py");
 
 // ── Port discovery ──────────────────────────────────────────────────────
-const PREFERRED_PORT = 48721;
+const PREFERRED_PORT = 48720;
 
 /**
  * Try to bind to PREFERRED_PORT first (keeps localStorage across restarts).
@@ -56,10 +65,12 @@ function startFlask(port) {
     PYTHONIOENCODING: "utf-8",
   };
 
-  const pythonCmd = process.platform === "win32" ? "python" : "python3";
+  const command = isPackaged ? backendPath : resolvePythonCommand(__dirname);
+  const args = isPackaged ? [] : [backendPath];
+  const cwd = isPackaged ? path.dirname(backendPath) : __dirname;
 
-  flaskProcess = spawn(pythonCmd, [path.join(appRoot, "app.py")], {
-    cwd: appRoot,
+  flaskProcess = spawn(command, args, {
+    cwd,
     env,
     stdio: "pipe",
     windowsHide: true,
@@ -97,11 +108,21 @@ function killFlask() {
   flaskProcess = null;
 }
 
+function hideShutdownOverlay() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents
+    .executeJavaScript(
+      "var overlay = document.getElementById('shutdownOverlay'); if (overlay) overlay.style.display = 'none';",
+      true,
+    )
+    .catch(() => {});
+}
+
 /**
  * Poll the Flask port until it accepts a TCP connection.
  * Retries up to `retries` times with `interval` ms between attempts.
  */
-function waitForFlask(port, retries = 60, interval = 250) {
+function waitForFlask(port, retries = 120, interval = 250) {
   return new Promise((resolve, reject) => {
     let attempt = 0;
     const check = () => {
@@ -134,14 +155,14 @@ async function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: false,
     title: "Librarium",
-    icon: path.join(appRoot, "static", "logo.png"),
+    icon: path.join(assetRoot, "static", "logo.png"),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   });
-  splashWindow.loadFile(path.join(appRoot, "static", "splash.html"));
+  splashWindow.loadFile(path.join(assetRoot, "static", "splash.html"));
   splashWindow.once("ready-to-show", () => splashWindow.show());
 
   try {
@@ -161,7 +182,7 @@ async function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: "Librarium",
-    icon: path.join(appRoot, "static", "logo.png"),
+    icon: path.join(assetRoot, "static", "logo.png"),
     backgroundColor: "#2a4a5a",
     show: false,
     frame: false,
@@ -195,6 +216,13 @@ async function createWindow() {
     return { action: "allow" };
   });
 
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      app.quit();
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -202,6 +230,10 @@ async function createWindow() {
 
 // ── IPC handlers ────────────────────────────────────────────────────────
 ipcMain.on("app-quit", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+    return;
+  }
   app.quit();
 });
 
@@ -212,44 +244,94 @@ ipcMain.on("app-minimize", () => {
 // ── App lifecycle ───────────────────────────────────────────────────────
 app.whenReady().then(createWindow);
 
-let isQuitting = false;
-
-app.on("window-all-closed", async () => {
+app.on("window-all-closed", () => {
   if (!isQuitting) {
-    isQuitting = true;
-    await shutdownAndSync();
+    app.quit();
   }
-  killFlask();
-  app.quit();
 });
 
-app.on("before-quit", async (event) => {
+app.on("before-quit", (event) => {
   if (!isQuitting) {
-    isQuitting = true;
     event.preventDefault();
-    await shutdownAndSync();
-    killFlask();
-    app.exit();
+    void requestQuit();
   } else {
     killFlask();
   }
 });
+
+async function requestQuit() {
+  if (quitRequest) return quitRequest;
+
+  quitRequest = (async () => {
+    const result = await shutdownAndSync();
+    if (result.ok) {
+      isQuitting = true;
+      killFlask();
+      app.exit(0);
+      return true;
+    }
+
+    const response = await dialog.showMessageBox({
+      type: "warning",
+      buttons: ["Cancel", "Quit Anyway"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      title: "Librarium",
+      message: "Backup or Dropbox sync did not finish.",
+      detail:
+        `${result.error}\n\nChoose \"Cancel\" to keep Librarium open and try again, or \"Quit Anyway\" to exit without a confirmed sync.`,
+    });
+
+    if (response.response === 1) {
+      isQuitting = true;
+      killFlask();
+      app.exit(0);
+    }
+
+    hideShutdownOverlay();
+    return false;
+  })();
+
+  try {
+    return await quitRequest;
+  } finally {
+    quitRequest = null;
+  }
+}
 
 /**
  * Call the Flask shutdown-backup endpoint to create a backup and sync
  * all data to Dropbox before the app quits.  Times out after 30 seconds.
  */
 async function shutdownAndSync() {
-  if (!flaskPort) return;
+  if (!flaskPort) return { ok: true };
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    await fetch(`http://127.0.0.1:${flaskPort}/api/shutdown-backup`, {
+    const response = await fetch(`http://127.0.0.1:${flaskPort}/api/shutdown-backup`, {
       method: "POST",
       signal: controller.signal,
     });
     clearTimeout(timeout);
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok || !payload || payload.ok !== true) {
+      return {
+        ok: false,
+        error:
+          payload?.error ||
+          `Shutdown sync returned an unexpected response (${response.status}).`,
+      };
+    }
+
+    return { ok: true };
   } catch (e) {
-    console.log(`[shutdown] Sync request failed: ${e.message}`);
+    return { ok: false, error: `Shutdown sync request failed: ${e.message}` };
   }
 }

@@ -1,8 +1,8 @@
 """Librarium – a local Flask app for tracking reading statistics.
 
-All data (including cover images) is stored in per-user SQLite databases
-inside the platform's application data directory (e.g. %APPDATA%/Librarium
-on Windows).
+User databases live in the platform application data directory and sync to
+Dropbox. Full-size covers and author photos are externalized to per-user
+image folders, while thumbnails remain in SQLite.
 """
 
 import hashlib
@@ -50,7 +50,10 @@ from flask import (
 )
 
 # ── Paths ────────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", SOURCE_DIR))
+APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else SOURCE_DIR
+BASE_DIR = BUNDLE_DIR
 
 
 def _get_data_dir() -> Path:
@@ -98,6 +101,7 @@ CACHE_DIR = DATA_DIR / "cache"
 _dbx_client: dropbox.Dropbox | None = None
 _dbx_lock = threading.Lock()
 _sync_thread: threading.Thread | None = None
+_sync_thread_lock = threading.Lock()
 _last_download_hash: dict[str, str] = {}   # remote path → content_hash at download time
 _startup_sync_done = threading.Event()      # set when initial download + migrations finish
 _startup_sync_progress: str = ""            # human-readable status for the loading page
@@ -460,6 +464,9 @@ def _start_periodic_sync() -> None:
     """Start a daemon thread that uploads modified DBs every 5 minutes."""
     global _sync_thread
 
+    if not _is_authenticated():
+        return
+
     def _sync_loop():
         import time
         while True:
@@ -472,8 +479,11 @@ def _start_periodic_sync() -> None:
             except Exception as e:
                 print(f"[dropbox] Periodic sync error: {e}")
 
-    _sync_thread = threading.Thread(target=_sync_loop, daemon=True, name="dropbox-sync")
-    _sync_thread.start()
+    with _sync_thread_lock:
+        if _sync_thread is not None and _sync_thread.is_alive():
+            return
+        _sync_thread = threading.Thread(target=_sync_loop, daemon=True, name="dropbox-sync")
+        _sync_thread.start()
 
 
 # ── HTML sanitiser (allowlist-based) ───────────────────────────────────
@@ -726,6 +736,34 @@ def _load_users() -> dict:
         except (json.JSONDecodeError, OSError):
             pass
     return {"users": [], "last_user": ""}
+
+
+def _find_user(username: str) -> dict | None:
+    """Return the stored user entry matching *username*, or None."""
+    for user in _load_users().get("users", []):
+        if user.get("name") == username:
+            return user
+    return None
+
+
+def _get_default_user(users_data: dict | None = None) -> str:
+    """Return the best default user name from users.json."""
+    data = users_data or _load_users()
+    users = data.get("users", [])
+    if not users:
+        return ""
+    last = data.get("last_user", "")
+    if last and any(u.get("name") == last for u in users):
+        return last
+    return users[0].get("name", "")
+
+
+def _get_valid_current_user() -> str:
+    """Return the current user cookie only when it matches a registered user."""
+    current_user = request.cookies.get("librarium_user", "").strip()
+    if not current_user:
+        return ""
+    return current_user if _find_user(current_user) else ""
 
 
 def _save_users(data: dict) -> None:
@@ -1937,7 +1975,7 @@ def get_db() -> sqlite3.Connection:
     """Return a per-request database connection (cached on ``g``)."""
     if "db" not in g:
         # Determine the DB path for the current user
-        current_user = request.cookies.get("librarium_user", "")
+        current_user = _get_valid_current_user()
         if current_user:
             db_path = _get_user_db_path(current_user)
         else:
@@ -2007,7 +2045,7 @@ def inject_library_context():
         all_lib_ids = [l["id"] for l in all_libs]
         # When nothing is explicitly selected, all libraries are active
         sel_ids = lib_ids if lib_ids else all_lib_ids
-        current_user = request.cookies.get("librarium_user", "")
+        current_user = _get_valid_current_user()
         backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
         return {
             "selected_library_ids": sel_ids,
@@ -2023,7 +2061,7 @@ def inject_library_context():
             "selected_library_ids": [],
             "all_libraries": [],
             "app_version": APP_VERSION,
-            "current_user": request.cookies.get("librarium_user", "") if request else "",
+            "current_user": _get_valid_current_user() if request else "",
             "backup_dir": str(BACKUP_DIR),
             "db_path": str(DB_PATH),
             "dropbox_connected": _is_authenticated(),
@@ -6900,6 +6938,8 @@ def create_backup():
 @app.route("/api/shutdown-backup", methods=["POST"])
 def shutdown_backup():
     """Create a backup and sync to Dropbox before the Electron shell quits."""
+    errors: list[str] = []
+
     # Sync all user DBs to Dropbox first (single upload per user)
     if _is_authenticated():
         try:
@@ -6927,8 +6967,18 @@ def shutdown_backup():
                 pass
         except Exception as e:
             print(f"[dropbox] Shutdown sync failed: {e}")
+            errors.append(f"Dropbox sync failed: {e}")
     # Create local backup (skip Dropbox — already handled above)
-    name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
+    try:
+        name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
+    except Exception as e:
+        print(f"[backup] Local shutdown backup failed: {e}")
+        errors.append(f"Local backup failed: {e}")
+        name = None
+
+    if errors:
+        return jsonify({"ok": False, "backup": name, "error": "; ".join(errors)}), 500
+
     return jsonify({"ok": True, "backup": name})
 
 
@@ -7030,7 +7080,6 @@ def delete_library(lib_id: int):
 # Module-level state shared between the main Flask server and the
 # temporary OAuth callback server running on port 48721.
 _oauth_session: dict = {}        # stores CSRF + PKCE verifier across requests
-_oauth_result_ready = False      # set to True once callback finishes
 
 _CALLBACK_PORT = int(DROPBOX_REDIRECT_URI.rsplit(":", 1)[-1].split("/")[0])  # 48721
 
@@ -7040,7 +7089,6 @@ def _complete_oauth(query_params: dict) -> bool:
 
     Called from the temporary callback server.  Returns True on success.
     """
-    global _oauth_result_ready
     flow = dropbox.DropboxOAuth2Flow(
         consumer_key=DROPBOX_APP_KEY,
         consumer_secret="",
@@ -7094,11 +7142,45 @@ def _complete_oauth(query_params: dict) -> bool:
         print(f"[dropbox] Initial sync error: {e}")
 
     _start_periodic_sync()
-    _oauth_result_ready = True
     return True
 
 
-def _start_oauth_callback_server() -> None:
+def _oauth_callback_html(ok: bool) -> bytes:
+        """Return a small browser page for the OAuth callback tab."""
+        if ok:
+                title = "Dropbox connected"
+                message = "Librarium will continue in the desktop app. This browser tab can now be closed."
+                button = "Close tab"
+        else:
+                title = "Authentication failed"
+                message = "Please close this tab and try again from Librarium."
+                button = "Close tab"
+
+        html = f"""<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: system-ui, sans-serif; text-align: center; padding: 3rem 1.5rem; background: #f7f3ef; color: #2a4a5a; }}
+        .wrap {{ max-width: 32rem; margin: 0 auto; }}
+        button {{ border: 0; border-radius: 999px; padding: 0.8rem 1.4rem; background: #ec8f8d; color: white; cursor: pointer; font: inherit; }}
+    </style>
+</head>
+<body>
+    <div class=\"wrap\">
+        <h2>{title}</h2>
+        <p>{message}</p>
+        <button type=\"button\" onclick=\"window.close()\">{button}</button>
+    </div>
+    <script>setTimeout(function() {{ window.close(); }}, 1500);</script>
+</body>
+</html>"""
+        return html.encode("utf-8")
+
+
+def _start_oauth_callback_server() -> bool:
     """Start a one-shot HTTP server on port 48721 to receive the OAuth callback.
 
     Runs in a daemon thread.  Shuts itself down after handling one request.
@@ -7117,22 +7199,7 @@ def _start_oauth_callback_server() -> None:
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            if ok:
-                self.wfile.write(
-                    b"<!DOCTYPE html><html><body style='font-family:sans-serif;"
-                    b"text-align:center;padding:3rem'>"
-                    b"<h2>Dropbox connected</h2>"
-                    b"<p>You can close this tab and return to Librarium.</p>"
-                    b"</body></html>"
-                )
-            else:
-                self.wfile.write(
-                    b"<!DOCTYPE html><html><body style='font-family:sans-serif;"
-                    b"text-align:center;padding:3rem'>"
-                    b"<h2>Authentication failed</h2>"
-                    b"<p>Please close this tab and try again from Librarium.</p>"
-                    b"</body></html>"
-                )
+            self.wfile.write(_oauth_callback_html(ok))
             # Shut down the server after handling the callback
             threading.Thread(target=self.server.shutdown, daemon=True).start()
 
@@ -7143,10 +7210,11 @@ def _start_oauth_callback_server() -> None:
         server = http.server.HTTPServer(("127.0.0.1", _CALLBACK_PORT), _Handler)
     except OSError as e:
         print(f"[auth] Cannot start callback server on port {_CALLBACK_PORT}: {e}")
-        return
+        return False
     t = threading.Thread(target=server.serve_forever, daemon=True, name="oauth-cb")
     t.start()
     print(f"[auth] Callback server listening on port {_CALLBACK_PORT}")
+    return True
 
 
 @app.route("/auth/login")
@@ -7165,9 +7233,8 @@ def auth_start():
     3. Opens the Dropbox auth URL in the **system browser**.
     4. Returns a waiting page to the Electron window that polls /auth/status.
     """
-    global _oauth_session, _oauth_result_ready
+    global _oauth_session
     _oauth_session = {}
-    _oauth_result_ready = False
 
     flow = dropbox.DropboxOAuth2Flow(
         consumer_key=DROPBOX_APP_KEY,
@@ -7186,7 +7253,14 @@ def auth_start():
     _oauth_session["_pkce_verifier"] = flow.code_verifier
 
     # Start the temporary callback server
-    _start_oauth_callback_server()
+    if not _start_oauth_callback_server():
+        return render_template(
+            "auth_login.html",
+            error=(
+                f"Dropbox sign-in could not start because port {_CALLBACK_PORT} is already in use. "
+                "Close the conflicting app and try again."
+            ),
+        )
 
     # Open the auth URL in the system browser
     import webbrowser
@@ -7198,7 +7272,7 @@ def auth_start():
 
 @app.route("/auth/callback")
 def auth_callback():
-    """Fallback callback for when Flask happens to be on port 48721."""
+    """Fallback callback if the browser reaches Flask directly."""
     params = dict(request.args)
     ok = _complete_oauth(params)
     if ok:
@@ -7325,7 +7399,7 @@ def user_switch():
 @app.route("/users/update-backup-dir", methods=["POST"])
 def user_update_backup_dir():
     """Update the backup directory for the current user."""
-    current_user = request.cookies.get("librarium_user", "")
+    current_user = _get_valid_current_user()
     if not current_user:
         abort(400)
     new_dir = request.form.get("backup_dir", "").strip()
@@ -7344,7 +7418,7 @@ def user_update_backup_dir():
 @app.before_request
 def check_user_selected():
     """Redirect to Dropbox auth if not authenticated, then to user selection if no user is set."""
-    exempt = ("/auth/", "/static", "/api/startup-status")
+    exempt = ("/auth/", "/static", "/api/startup-status", "/api/shutdown-backup")
     if any(request.path.startswith(p) for p in exempt):
         return
     # Check Dropbox authentication first
@@ -7360,13 +7434,12 @@ def check_user_selected():
     users_data = _load_users()
     if not users_data["users"]:
         return redirect(url_for("user_select"))
-    current_user = request.cookies.get("librarium_user", "")
+    current_user = _get_valid_current_user()
     if not current_user:
-        # Auto-select last user if available
-        last = users_data.get("last_user", "")
-        if last and any(u["name"] == last for u in users_data["users"]):
-            _set_active_user_db(last)
-            g._pending_user_cookie = last
+        default_user = _get_default_user(users_data)
+        if default_user:
+            _set_active_user_db(default_user)
+            g._pending_user_cookie = default_user
         else:
             return redirect(url_for("user_select"))
 
@@ -7629,7 +7702,7 @@ if __name__ == "__main__":
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── Migrate legacy data/ folder to AppData ──────────────────────────
-    _legacy_data = BASE_DIR / "data"
+    _legacy_data = APP_DIR / "data"
     if _legacy_data.is_dir() and _legacy_data != DATA_DIR:
         _legacy_users = _legacy_data / "users.json"
         if _legacy_users.exists() and not USERS_FILE.exists():

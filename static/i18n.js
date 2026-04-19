@@ -18,6 +18,7 @@
         'nav.calendar':     { en: 'Calendar',     es: 'Calendario' },
         'nav.sources':      { en: 'Sources',      es: 'Fuentes' },
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
+        'nav.minimize':     { en: 'Minimize Librarium', es: 'Minimizar Librarium' },
         'nav.close':        { en: 'Close Librarium', es: 'Cerrar Librarium' },
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
 
@@ -63,8 +64,10 @@
         'auth.connectButton':    { en: 'Connect with Dropbox',  es: 'Conectar con Dropbox' },
         'auth.note':             { en: 'Your data is stored in the Apps/LibrariumApp folder in your Dropbox. Librarium cannot access any other files.', es: 'Tus datos se almacenan en la carpeta Apps/LibrariumApp de tu Dropbox. Librarium no puede acceder a otros archivos.' },
         'auth.connected':        { en: 'Dropbox Connected',     es: 'Dropbox Conectado' },
-        'auth.successMessage':   { en: 'Your Dropbox account has been connected successfully. You can close this tab and return to Librarium.', es: 'Tu cuenta de Dropbox se ha conectado correctamente. Puedes cerrar esta pestaña y volver a Librarium.' },
+        'auth.successMessage':   { en: 'Your Dropbox account has been connected successfully. Librarium will continue in the desktop app.', es: 'Tu cuenta de Dropbox se ha conectado correctamente. Librarium continuará en la aplicación de escritorio.' },
         'auth.continue':         { en: 'Continue to Librarium', es: 'Continuar a Librarium' },
+        'auth.closeTab':         { en: 'Close Tab', es: 'Cerrar pestaña' },
+        'auth.closeTabHint':     { en: 'This browser tab can now be closed. Librarium will continue in the desktop app.', es: 'Esta pestaña del navegador ya puede cerrarse. Librarium continuará en la aplicación de escritorio.' },
         'auth.disconnect':       { en: 'Disconnect',            es: 'Desconectar' },
         'auth.waitingTitle':     { en: 'Waiting for Dropbox…',   es: 'Esperando a Dropbox…' },
         'auth.waitingMessage':   { en: 'A browser window has been opened for you to authorize Librarium. Please complete the login in your browser and return here.', es: 'Se ha abierto una ventana del navegador para que autorices Librarium. Completa el inicio de sesión en tu navegador y vuelve aquí.' },
@@ -75,7 +78,7 @@
         // ── Error pages ─────────────────────────────────────────────────
         'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },
         'error.notFoundHint':    { en: 'The page you are looking for does not exist or has been moved.', es: 'La página que buscas no existe o ha sido movida.' },
-        'error.backHome':        { en: 'Back to library',       es: 'Volver a la biblioteca' },
+        'error.backHome':        { en: 'Back to dashboard',     es: 'Volver al panel' },
 
         // ── Add Book dialog ─────────────────────────────────────────────
         'addBook.title':         { en: 'Add Book',              es: 'Añadir Libro' },
@@ -231,6 +234,7 @@
         'book.colReading':      { en: 'Reading',             es: 'Lectura' },
         'book.colDate':         { en: 'Date',                es: 'Fecha' },
         'book.colPages':        { en: 'Pages',               es: 'Páginas' },
+        'book.colTime':         { en: 'Time',                es: 'Tiempo' },
         'book.colProgress':     { en: 'Progress',            es: 'Progreso' },
         'book.colDuration':     { en: 'Duration',            es: 'Duración' },
         'book.colActions':      { en: 'Actions',             es: 'Acciones' },
@@ -1067,5 +1071,5 @@
     }
 
     // Expose for usage in inline scripts
-    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar, initMarkdownToolbar: initMarkdownToolbar, formatDisplayDate: formatDisplayDate, formatDates: formatDates };
+    window.librariumI18n = { t: t, getLang: getLang, setLang: setLang, apply: applyTranslations, applyTranslations: applyTranslations, initRichTextToolbar: initRichTextToolbar, initMarkdownToolbar: initMarkdownToolbar, formatDisplayDate: formatDisplayDate, formatDates: formatDates };
 })();

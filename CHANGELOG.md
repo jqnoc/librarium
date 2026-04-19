@@ -7,39 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Mandatory Dropbox integration: app now requires Dropbox authentication at startup; all user databases, `users.json`, and backups are synced to the `Apps/LibrariumApp` folder in the user's Dropbox account
+- OAuth2 PKCE flow for Dropbox authentication with refresh token persistence; auth tokens stored in local `auth.json`; the browser callback now stays a close-tab confirmation page instead of turning into a second Librarium surface
+- New routes: `/auth/login`, `/auth/start`, `/auth/callback`, `/auth/logout`, `/auth/status` for the Dropbox OAuth flow
+- Periodic background sync (every 5 minutes) uploads modified databases to Dropbox using content-hash change detection
+- Startup sync: on launch, the app downloads the latest databases and `users.json` from Dropbox before presenting the user selection screen
+- Dropbox sync indicator (small Dropbox icon) in the navigation bar when connected
+- Dropbox account info bar on the users page showing display name, email, and a disconnect button
+- Auth login, waiting, success, and startup-sync templates for the Dropbox OAuth and initial sync flows
+- Full i18n support (EN / ES) for all Dropbox auth and sync strings
+- CSS styles for auth pages, Dropbox account bar, and sync badge
+
 ### Changed
+- Portable Windows builds now bundle the Flask backend as a standalone executable via PyInstaller, so the packaged app no longer depends on a system Python installation
+- Development startup and backend packaging now prefer the repository `.venv` interpreter when available before falling back to the system `python`
 - Thoughts editor now uses Markdown instead of raw HTML; a dedicated Markdown toolbar provides formatting buttons for bold, italic, strikethrough, headings, lists, blockquotes, links, code, and horizontal rules
 - Books Bought page: card view now shows a 📅 calendar emoji before the purchase date; person sources always show 👤 regardless of gift status; gifts display "🎁 Gift" in the price slot (with price appended if available) instead of only showing the price with a gift emoji
 - Books Bought page now shows source-type-aware emojis (🏪 physical store, 🌐 web store, 🏛️ library, 🎁 gift, 👤 person) instead of a generic "Location:" label, removes the redundant "Date:" prefix, and shows 🎁 instead of 💰 on the price when the book was a gift
 - Calendar view no longer limits visible book covers to 4 per cell; all covers are shown using the existing flex-wrap layout
 - Series list page now loads significantly faster by fetching all series covers in a single batched SQL query instead of one query per series
+- Backups are now uploaded to a `/backups/` folder in Dropbox alongside user databases; remote backups are pruned to keep 5 per user
+- `check_user_selected` middleware now validates the current user cookie against `users.json`, auto-recovers stale cookies, checks Dropbox authentication before user selection, and exempts `/api/shutdown-backup` so quitting still works before login completes
+- Electron shutdown now uses a single validated `/api/shutdown-backup` path, and quitting can be cancelled when backup or Dropbox sync fails instead of silently proceeding
+- Shutdown sync now uploads each user's database to Dropbox once, then creates backup copies via server-side Dropbox copy (`files_copy_v2`) instead of re-uploading the full database as a backup; startup backups no longer trigger a redundant Dropbox upload
+- Dropbox sync at startup now runs in a background thread so Flask starts immediately and Electron can connect; a "Syncing with Dropbox…" loading page is shown until the download and migrations finish
+- Dropbox file downloads now skip re-downloading when the local file's content hash already matches the remote, avoiding unnecessary 249 MB transfers on subsequent launches
+- Image externalization: book covers and author photos are now stored as individual files on disk (`DATA_DIR/images/<user>/covers/` and `authors/`) instead of SQLite BLOBs, reducing database size from ~244 MB to ~57 MB; thumbnails remain in the DB; images are synced individually to Dropbox; a one-time migration extracts existing BLOBs to files and VACUUMs the database
 
 ### Fixed
 - Quote of the Day on the Dashboard now renders curly quotes correctly instead of showing literal `\u201c` / `\u201d` escape sequences; also fixes HTML formatting within quotes being escaped
 - Library filter, sort, and tag controls now correctly stay on the `/library` page instead of redirecting to the Dashboard
 - Tag Cloud links in the Stats page now navigate to the Library filtered by that tag instead of the Dashboard
-
-### Added
-- Mandatory Dropbox integration: app now requires Dropbox authentication at startup; all user databases, `users.json`, and backups are synced to the `Apps/LibrariumApp` folder in the user's Dropbox account
-- OAuth2 PKCE flow for Dropbox authentication with refresh token persistence; auth tokens stored in local `auth.json`
-- New routes: `/auth/login`, `/auth/start`, `/auth/callback`, `/auth/logout`, `/auth/status` for the Dropbox OAuth flow
-- Periodic background sync (every 5 minutes) uploads modified databases to Dropbox using content-hash change detection
-- Startup sync: on launch, the app downloads the latest databases and `users.json` from Dropbox before presenting the user selection screen
-- Shutdown sync: Electron now waits for Flask to complete backup and Dropbox upload (with 30s timeout) before quitting
-- Dropbox sync indicator (small Dropbox icon) in the navigation bar when connected
-- Dropbox account info bar on the users page showing display name, email, and a disconnect button
-- Auth login page (`auth_login.html`) and success page (`auth_success.html`) templates
-- Full i18n support (EN / ES) for all Dropbox auth and sync strings
-- CSS styles for auth pages, Dropbox account bar, and sync badge
-
-### Changed
-- Backups are now uploaded to a `/backups/` folder in Dropbox alongside user databases; remote backups are pruned to keep 7 per user
-- `check_user_selected` middleware now checks Dropbox authentication before user selection; unauthenticated requests redirect to `/auth/login`
-- Electron `before-quit` and `window-all-closed` handlers now call `/api/shutdown-backup` and wait for sync completion before killing the Flask process
-- Shutdown sync now uploads each user's database to Dropbox once, then creates backup copies via server-side Dropbox copy (`files_copy_v2`) instead of re-uploading the full database as a backup; startup backups no longer trigger a redundant Dropbox upload
-- Dropbox sync at startup now runs in a background thread so Flask starts immediately and Electron can connect; a "Syncing with Dropbox…" loading page is shown until the download and migrations finish
-- Dropbox file downloads now skip re-downloading when the local file's content hash already matches the remote, avoiding unnecessary 249 MB transfers on subsequent launches
-- Image externalization: book covers and author photos are now stored as individual files on disk (`DATA_DIR/images/<user>/covers/` and `authors/`) instead of SQLite BLOBs, reducing database size from ~244 MB to ~57 MB; thumbnails remain in the DB; images are synced individually to Dropbox; a one-time migration extracts existing BLOBs to files and VACUUMs the database
+- New Book and Edit Metadata pages now support the legacy `window.librariumI18n.apply()` call path again, and missing translation keys for `nav.minimize`, `book.colTime`, and the 404 dashboard CTA are now defined consistently
 
 ## [1.2.0] — 2026-04-12
 
