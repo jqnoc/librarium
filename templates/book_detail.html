@@ -604,6 +604,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="annotation-body">
             <div class="annotation-word-term">{{ w.word }}</div>
             <div class="annotation-word-def">{{ w.definition | safe }}</div>
+            {% if w.translation %}
+            <div class="annotation-word-translation">
+                <div class="annotation-word-translation-label"><span data-i18n="book.translation">Translation</span>{% if w.translation_language %} · {{ w.translation_language }}{% endif %}</div>
+                <div class="annotation-word-translation-text">{{ w.translation }}</div>
+            </div>
+            {% endif %}
         </div>
         <div class="annotation-actions">
             <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})">✏️</button>
@@ -616,6 +622,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <form method="POST" action="{{ url_for('edit_word', book_id=book_id, wid=w.id) }}" class="annotation-edit-form">
                 <input type="text" name="word" value="{{ w.word }}" required placeholder="Word" style="width:150px;">
                 <textarea id="edit-word-{{ w.id }}" name="definition" rows="2" required>{{ w.definition }}</textarea>
+                <div class="annotation-word-extra-fields">
+                    <select name="translation_language" class="word-translation-language">
+                        <option value="" data-i18n="book.translationLanguagePlaceholder">Translation language</option>
+                        {% for lang in word_translation_languages %}
+                        <option value="{{ lang }}" {% if w.translation_language == lang %}selected{% endif %}>{{ lang }}</option>
+                        {% endfor %}
+                        {% if w.translation_language and w.translation_language not in word_translation_languages %}
+                        <option value="{{ w.translation_language }}" selected>{{ w.translation_language }}</option>
+                        {% endif %}
+                    </select>
+                    <input type="text" name="translation" class="word-translation-input" value="{{ w.translation or '' }}" placeholder="Translation..." data-i18n-placeholder="book.translationPlaceholder">
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('word', {{ w.id }})" data-i18n="form.cancel">Cancel</button>
             </form>
@@ -636,6 +654,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addWordBtn">+ Add Word</button>
         </div>
         <textarea id="add-word-def" name="definition" rows="2" required placeholder="Definition..." data-i18n-placeholder="book.definitionPlaceholder"></textarea>
+        <div class="annotation-word-extra-fields">
+            <select name="translation_language" class="word-translation-language">
+                <option value="" data-i18n="book.translationLanguagePlaceholder">Translation language</option>
+                {% for lang in word_translation_languages %}
+                <option value="{{ lang }}">{{ lang }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="translation" class="word-translation-input" placeholder="Translation..." data-i18n-placeholder="book.translationPlaceholder">
+        </div>
     </form>
 </div>
 
@@ -978,6 +1005,36 @@ function toggleAnnotationEdit(type, id) {
     row.classList.toggle('active');
 }
 
+function initWordTranslationLanguageControls() {
+    const storageKey = 'librarium.wordTranslationLanguage';
+    document.querySelectorAll('form.annotation-add-form, form.annotation-edit-form').forEach(function(form) {
+        const select = form.querySelector('.word-translation-language');
+        const input = form.querySelector('.word-translation-input');
+        if (!select || !input) return;
+
+        const savedLanguage = window.localStorage.getItem(storageKey);
+        const optionValues = Array.from(select.options).map(function(opt) { return opt.value; });
+        if (!select.value && savedLanguage && optionValues.indexOf(savedLanguage) !== -1) {
+            select.value = savedLanguage;
+        }
+
+        function syncRequirement() {
+            select.required = input.value.trim().length > 0;
+        }
+
+        select.addEventListener('change', function() {
+            if (select.value) {
+                window.localStorage.setItem(storageKey, select.value);
+            } else {
+                window.localStorage.removeItem(storageKey);
+            }
+            syncRequirement();
+        });
+        input.addEventListener('input', syncRequirement);
+        syncRequirement();
+    });
+}
+
 // ── Rich-text toolbars for annotation textareas ──────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     var irt = window.librariumI18n.initRichTextToolbar;
@@ -990,6 +1047,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('textarea[id^="edit-quote-"]').forEach(function(ta) { irt(ta.id); });
     document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { imt(ta.id); });
     document.querySelectorAll('textarea[id^="edit-word-"]').forEach(function(ta) { irt(ta.id); });
+    initWordTranslationLanguageControls();
 });
 
 // ── Build cumulative progress chart ──────────────────────────────────

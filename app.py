@@ -81,7 +81,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "2.0.0"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -968,7 +968,9 @@ def init_schema() -> None:
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
-            definition TEXT    NOT NULL DEFAULT ''
+            definition TEXT    NOT NULL DEFAULT '',
+            translation TEXT   NOT NULL DEFAULT '',
+            translation_language TEXT NOT NULL DEFAULT ''
         );
     """)
     # Insert the default "Books" library for fresh databases
@@ -1006,6 +1008,7 @@ def _run_all_migrations() -> None:
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
+    migrate_add_word_translations()
     migrate_externalize_images()
     migrate_add_performance_indexes()
 
@@ -1775,12 +1778,36 @@ def migrate_add_annotations() -> None:
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
-            definition TEXT    NOT NULL DEFAULT ''
+            definition TEXT    NOT NULL DEFAULT '',
+            translation TEXT   NOT NULL DEFAULT '',
+            translation_language TEXT NOT NULL DEFAULT ''
         );
     """)
     db.commit()
     db.close()
     print(">> Migration complete — annotations tables created.")
+
+
+def migrate_add_word_translations() -> None:
+    """Add optional translation fields to words."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(words)").fetchall()]
+    changed = False
+    if "translation" not in cols:
+        print(">> Migrating: adding translation column to words ...")
+        db.execute("ALTER TABLE words ADD COLUMN translation TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "translation_language" not in cols:
+        print(">> Migrating: adding translation_language column to words ...")
+        db.execute("ALTER TABLE words ADD COLUMN translation_language TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if changed:
+        db.commit()
+        print(">> Migration complete - translation fields added to words.")
+    db.close()
 
 
 def migrate_externalize_images() -> None:
@@ -3012,6 +3039,36 @@ def _collect_languages() -> list[str]:
     return sorted(langs)
 
 
+def _collect_word_translation_languages(*extra_languages: str) -> list[str]:
+    """Return language options for word translations."""
+    langs = {
+        "Arabic", "Basque", "Catalan", "Chinese", "Czech", "Danish",
+        "Dutch", "English", "Finnish", "French", "Galician", "German",
+        "Greek", "Hebrew", "Hindi", "Hungarian", "Italian", "Japanese",
+        "Korean", "Latin", "Norwegian", "Polish", "Portuguese", "Romanian",
+        "Russian", "Spanish", "Swedish", "Turkish", "Ukrainian",
+    }
+    langs.update(lang for lang in _collect_languages() if lang and lang.strip())
+    for value in extra_languages:
+        if value and value.strip():
+            langs.add(value.strip())
+
+    db = get_db()
+    try:
+        cols = [r[1] for r in db.execute("PRAGMA table_info(words)").fetchall()]
+        if "translation_language" in cols:
+            for row in db.execute(
+                "SELECT DISTINCT translation_language FROM words WHERE translation_language IS NOT NULL AND translation_language != ''"
+            ).fetchall():
+                value = (row["translation_language"] or "").strip()
+                if value:
+                    langs.add(value)
+    except sqlite3.Error:
+        pass
+
+    return sorted(langs, key=str.casefold)
+
+
 def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     """Scan books in the current library and return unique values per field."""
     db = get_db()
@@ -3634,7 +3691,7 @@ def dashboard():
     ).fetchall():
         lang = lang_row["language"]
         row = db.execute(
-            f"SELECT w.word, w.definition, b.name AS book_name, b.id AS book_id "
+            f"SELECT w.word, w.definition, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
             f"FROM words w JOIN books b ON b.id = w.book_id "
             f"WHERE {lf_b} AND b.language = ? ORDER BY RANDOM() LIMIT 1",
             (*lp_b, lang),
@@ -6235,6 +6292,10 @@ def book_detail(book_id: str):
         words=[dict(r) for r in db.execute(
             "SELECT * FROM words WHERE book_id = ? ORDER BY word COLLATE NOCASE", (book_id,)
         ).fetchall()],
+        word_translation_languages=_collect_word_translation_languages(
+            info.get("language", ""),
+            info.get("original_language", ""),
+        ),
     )
 
 
@@ -6420,9 +6481,18 @@ def add_word(book_id: str):
         abort(404)
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    translation = request.form.get("translation", "").strip()
+    translation_language = request.form.get("translation_language", "").strip()
+    if not translation:
+        translation_language = ""
+    elif not translation_language:
+        flash("Choose a translation language before saving a translated word.", "error")
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
-        db.execute("INSERT INTO words (book_id, word, definition) VALUES (?, ?, ?)",
-                   (book_id, word, definition))
+        db.execute(
+            "INSERT INTO words (book_id, word, definition, translation, translation_language) VALUES (?, ?, ?, ?, ?)",
+            (book_id, word, definition, translation, translation_language),
+        )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
 
@@ -6432,9 +6502,18 @@ def edit_word(book_id: str, wid: int):
     db = get_db()
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    translation = request.form.get("translation", "").strip()
+    translation_language = request.form.get("translation_language", "").strip()
+    if not translation:
+        translation_language = ""
+    elif not translation_language:
+        flash("Choose a translation language before saving a translated word.", "error")
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
-        db.execute("UPDATE words SET word = ?, definition = ? WHERE id = ? AND book_id = ?",
-                   (word, definition, wid, book_id))
+        db.execute(
+            "UPDATE words SET word = ?, definition = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
+            (word, definition, translation, translation_language, wid, book_id),
+        )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
 

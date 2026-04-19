@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-04-19
+
 ### Added
 - Mandatory Dropbox integration: app now requires Dropbox authentication at startup; all user databases, `users.json`, and backups are synced to the `Apps/LibrariumApp` folder in the user's Dropbox account
 - OAuth2 PKCE flow for Dropbox authentication with refresh token persistence; auth tokens stored in local `auth.json`; the browser callback now stays a close-tab confirmation page instead of turning into a second Librarium surface
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Portable Windows builds now bundle the Flask backend as a standalone executable via PyInstaller, so the packaged app no longer depends on a system Python installation
 - Development startup and backend packaging now prefer the repository `.venv` interpreter when available before falling back to the system `python`
 - Internal Copilot instructions now require staging newly created repository files with `git add` so intentional additions are not missed from commits
+- Book word annotations now support an optional translated term plus a translation-language selector, remember the last selected translation language in the word editor, and show translations on the book detail page and dashboard word spotlights
 - Thoughts editor now uses Markdown instead of raw HTML; a dedicated Markdown toolbar provides formatting buttons for bold, italic, strikethrough, headings, lists, blockquotes, links, code, and horizontal rules
 - Books Bought page: card view now shows a 📅 calendar emoji before the purchase date; person sources always show 👤 regardless of gift status; gifts display "🎁 Gift" in the price slot (with price appended if available) instead of only showing the price with a gift emoji
 - Books Bought page now shows source-type-aware emojis (🏪 physical store, 🌐 web store, 🏛️ library, 🎁 gift, 👤 person) instead of a generic "Location:" label, removes the redundant "Date:" prefix, and shows 🎁 instead of 💰 on the price when the book was a gift

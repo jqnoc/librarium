@@ -709,6 +709,9 @@
         'book.pagePlaceholder':     { en: 'Page',                  es: 'Página' },
         'book.wordPlaceholder':     { en: 'Word',                  es: 'Palabra' },
         'book.definitionPlaceholder': { en: 'Definition...',       es: 'Definición...' },
+        'book.translation':         { en: 'Translation',           es: 'Traducción' },
+        'book.translationPlaceholder': { en: 'Translation...',     es: 'Traducción...' },
+        'book.translationLanguagePlaceholder': { en: 'Translation language', es: 'Idioma de traducción' },
 
         // ── Dashboard spotlights ────────────────────────────────────────
         'dash.quoteOfTheDay':       { en: 'Quote of the Day',      es: 'Cita del Día' },

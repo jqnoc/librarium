@@ -2423,7 +2423,8 @@ select.form-control { cursor: pointer; }
 }
 
 .annotation-edit-form input[type="text"],
-.annotation-edit-form input[type="number"] {
+.annotation-edit-form input[type="number"],
+.annotation-edit-form select {
     font-family: inherit;
     font-size: 0.92rem;
     padding: 0.4rem 0.6rem;
@@ -2444,6 +2445,57 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text);
     line-height: 1.5;
     font-size: 0.95rem;
+}
+
+.annotation-word-translation,
+.spotlight-word-translation {
+    margin-top: 0.4rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--lb-border);
+}
+
+.annotation-word-translation-label,
+.spotlight-word-translation-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--lb-text-light);
+    margin-bottom: 0.2rem;
+}
+
+.annotation-word-translation-text,
+.spotlight-word-translation-text {
+    color: var(--lb-text);
+    line-height: 1.45;
+    font-size: 0.92rem;
+}
+
+.annotation-word-extra-fields {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.annotation-word-extra-fields select,
+.annotation-word-extra-fields input[type="text"] {
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
+.annotation-word-extra-fields select {
+    min-width: 180px;
+}
+
+.annotation-word-extra-fields input[type="text"] {
+    flex: 1;
+    min-width: 180px;
 }
 
 .annotations-words {
@@ -2482,7 +2534,8 @@ select.form-control { cursor: pointer; }
 }
 
 .annotation-add-row input[type="text"],
-.annotation-add-row input[type="number"] {
+.annotation-add-row input[type="number"],
+.annotation-add-row select {
     font-family: inherit;
     font-size: 0.92rem;
     padding: 0.4rem 0.6rem;

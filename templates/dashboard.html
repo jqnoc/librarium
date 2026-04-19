@@ -119,6 +119,12 @@
                 <div class="spotlight-word-lang">{{ lang }}</div>
                 <div class="spotlight-word-term">{{ w.word }}</div>
                 <div class="spotlight-word-def">{{ w.definition }}</div>
+                {% if w.translation %}
+                <div class="spotlight-word-translation">
+                    <div class="spotlight-word-translation-label"><span data-i18n="book.translation">Translation</span>{% if w.translation_language %} · {{ w.translation_language }}{% endif %}</div>
+                    <div class="spotlight-word-translation-text">{{ w.translation }}</div>
+                </div>
+                {% endif %}
                 <div class="spotlight-meta">
                     <a href="{{ url_for('book_detail', book_id=w.book_id) }}">{{ w.book_name }}</a>
                 </div>
