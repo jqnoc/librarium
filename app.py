@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -1005,6 +1005,7 @@ def _run_all_migrations() -> None:
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
     migrate_externalize_images()
+    migrate_add_performance_indexes()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1857,9 +1858,6 @@ def migrate_externalize_images() -> None:
         print("   Running VACUUM to reclaim space ...")
         db.execute("VACUUM")
 
-    db.close()
-    print(">> Migration complete — images externalized.")
-
     # Upload extracted images to Dropbox in background
     if _is_authenticated() and (cover_count > 0 or photo_count > 0):
         print("   Uploading extracted images to Dropbox ...")
@@ -1875,6 +1873,54 @@ def migrate_externalize_images() -> None:
                     except Exception as e:
                         print(f"[dropbox] Image upload failed ({img_file.name}): {e}")
         print("   Image upload to Dropbox complete.")
+
+    db.close()
+    print(">> Migration complete — images externalized.")
+
+
+def migrate_add_performance_indexes() -> None:
+    """Create secondary indexes for the most common stats and library queries."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    print(">> Migrating: adding performance indexes ...")
+    db.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_books_library_status
+            ON books(library_id, status);
+        CREATE INDEX IF NOT EXISTS idx_books_work_primary
+            ON books(work_id, is_primary_edition);
+        CREATE INDEX IF NOT EXISTS idx_books_purchase_date
+            ON books(purchase_date);
+        CREATE INDEX IF NOT EXISTS idx_books_borrowed_start
+            ON books(borrowed_start);
+        CREATE INDEX IF NOT EXISTS idx_books_source_type
+            ON books(source_type);
+
+        CREATE INDEX IF NOT EXISTS idx_readings_book_number
+            ON readings(book_id, reading_number);
+        CREATE INDEX IF NOT EXISTS idx_readings_status_book
+            ON readings(status, book_id);
+
+        CREATE INDEX IF NOT EXISTS idx_sessions_book_date
+            ON sessions(book_id, date);
+        CREATE INDEX IF NOT EXISTS idx_sessions_reading_date
+            ON sessions(reading_id, date);
+
+        CREATE INDEX IF NOT EXISTS idx_periods_book_range
+            ON periods(book_id, start_date, end_date);
+        CREATE INDEX IF NOT EXISTS idx_periods_reading_range
+            ON periods(reading_id, start_date, end_date);
+
+        CREATE INDEX IF NOT EXISTS idx_ratings_book_id
+            ON ratings(book_id);
+
+        CREATE INDEX IF NOT EXISTS idx_book_series_series_book
+            ON book_series(series_id, book_id);
+    """)
+    db.commit()
+    db.close()
+    print(">> Migration complete — performance indexes added.")
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -2227,6 +2273,296 @@ def _calc_avg_rating(ratings: dict) -> float | None:
     return math.floor(avg * 100 + 0.5) / 100  # round half-up (matches JS)
 
 
+def _load_avg_ratings_for_books(db, book_ids: list[str]) -> dict[str, float | None]:
+    """Load grouped average ratings for many books in a single query."""
+    unique_book_ids = list(dict.fromkeys(book_ids))
+    if not unique_book_ids:
+        return {}
+
+    placeholders = ",".join("?" * len(unique_book_ids))
+    ratings_by_book: dict[str, dict[str, int]] = {bid: {} for bid in unique_book_ids}
+    for row in db.execute(
+        f"SELECT book_id, dimension_key, value FROM ratings WHERE book_id IN ({placeholders})",
+        unique_book_ids,
+    ).fetchall():
+        ratings_by_book.setdefault(row["book_id"], {})[row["dimension_key"]] = row["value"]
+
+    return {
+        bid: _calc_avg_rating(ratings_by_book.get(bid, {}))
+        for bid in unique_book_ids
+    }
+
+
+def _load_edition_counts_for_work_ids(db, work_ids: list[str]) -> dict[str, int]:
+    """Return edition counts keyed by work_id."""
+    unique_work_ids = [wid for wid in dict.fromkeys(work_ids) if wid]
+    if not unique_work_ids:
+        return {}
+
+    placeholders = ",".join("?" * len(unique_work_ids))
+    return {
+        row["work_id"]: row["c"]
+        for row in db.execute(
+            f"SELECT work_id, COUNT(*) AS c FROM books WHERE work_id IN ({placeholders}) GROUP BY work_id",
+            unique_work_ids,
+        ).fetchall()
+    }
+
+
+def _load_reading_bounds(db, reading_ids: list[int]) -> dict[int, dict[str, str | None]]:
+    """Return first/last activity dates keyed by reading_id."""
+    unique_reading_ids = [rid for rid in dict.fromkeys(reading_ids) if rid is not None]
+    if not unique_reading_ids:
+        return {}
+
+    placeholders = ",".join("?" * len(unique_reading_ids))
+    bounds: dict[int, dict[str, str | None]] = {
+        rid: {"start": None, "end": None}
+        for rid in unique_reading_ids
+    }
+
+    def _merge_bounds(reading_id: int, start_value: str | None, end_value: str | None) -> None:
+        entry = bounds.setdefault(reading_id, {"start": None, "end": None})
+        if start_value and (entry["start"] is None or start_value < entry["start"]):
+            entry["start"] = start_value
+        if end_value and (entry["end"] is None or end_value > entry["end"]):
+            entry["end"] = end_value
+
+    for row in db.execute(
+        f"SELECT reading_id, MIN(date) AS start_date, MAX(date) AS end_date "
+        f"FROM sessions WHERE reading_id IN ({placeholders}) AND date != '' GROUP BY reading_id",
+        unique_reading_ids,
+    ).fetchall():
+        _merge_bounds(row["reading_id"], row["start_date"], row["end_date"])
+
+    for row in db.execute(
+        f"SELECT reading_id, MIN(start_date) AS start_date, "
+        f"MAX(CASE WHEN end_date != '' THEN end_date ELSE start_date END) AS end_date "
+        f"FROM periods WHERE reading_id IN ({placeholders}) AND start_date != '' GROUP BY reading_id",
+        unique_reading_ids,
+    ).fetchall():
+        _merge_bounds(row["reading_id"], row["start_date"], row["end_date"])
+
+    return bounds
+
+
+def _load_book_session_totals(db, lf_b: str, lp_b: tuple) -> dict[str, dict[str, int]]:
+    """Return total tracked session pages/time keyed by book_id."""
+    return {
+        row["book_id"]: {
+            "pages": row["pages"] or 0,
+            "seconds": row["seconds"] or 0,
+        }
+        for row in db.execute(
+            "SELECT s.book_id, COALESCE(SUM(s.pages), 0) AS pages, "
+            "COALESCE(SUM(s.duration_seconds), 0) AS seconds "
+            "FROM sessions s JOIN books b ON b.id = s.book_id "
+            f"WHERE {lf_b} GROUP BY s.book_id",
+            lp_b,
+        ).fetchall()
+    }
+
+
+def _estimate_period_seconds(
+    *,
+    period_pages: int = 0,
+    explicit_period_seconds: int = 0,
+    is_pct_format: bool = False,
+    session_pages: int = 0,
+    session_seconds: int = 0,
+    fallback_pages: int = 0,
+    fallback_seconds: int = 0,
+) -> int:
+    """Resolve total period time, preferring stored duration and falling back to page ratios."""
+    explicit_period_seconds = int(explicit_period_seconds or 0)
+    if is_pct_format:
+        return explicit_period_seconds
+    if explicit_period_seconds > 0:
+        return explicit_period_seconds
+
+    period_pages = int(period_pages or 0)
+    if period_pages <= 0:
+        return 0
+
+    for pages, seconds in (
+        (int(session_pages or 0), int(session_seconds or 0)),
+        (int(fallback_pages or 0), int(fallback_seconds or 0)),
+    ):
+        if pages > 0 and seconds > 0:
+            return int(period_pages * (seconds / pages))
+    return 0
+
+
+def _resolve_date_span(start_raw: str | None, end_raw: str | None) -> tuple[date, date] | tuple[None, None]:
+    """Parse and normalize a date span."""
+    start_value = (start_raw or end_raw or "").strip()
+    end_value = (end_raw or start_raw or "").strip()
+    if not start_value or not end_value:
+        return None, None
+
+    try:
+        start_day = date.fromisoformat(start_value)
+        end_day = date.fromisoformat(end_value)
+    except (TypeError, ValueError):
+        return None, None
+
+    if end_day < start_day:
+        start_day, end_day = end_day, start_day
+    return start_day, end_day
+
+
+def _iter_date_span(
+    start_raw: str | None,
+    end_raw: str | None,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    """Yield every ISO day covered by a date span, optionally clipped to a range."""
+    start_day, end_day = _resolve_date_span(start_raw, end_raw)
+    if not start_day or not end_day:
+        return
+
+    if date_from:
+        try:
+            start_day = max(start_day, date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end_day = min(end_day, date.fromisoformat(date_to))
+        except ValueError:
+            pass
+    if end_day < start_day:
+        return
+
+    current = start_day
+    while current <= end_day:
+        yield current.isoformat()
+        current += timedelta(days=1)
+
+
+def _distribute_total_across_days(
+    start_raw: str | None,
+    end_raw: str | None,
+    total: int,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[tuple[str, int]]:
+    """Evenly distribute a total across a span while preserving exact sums."""
+    total = int(total or 0)
+    if total == 0:
+        return []
+
+    start_day, end_day = _resolve_date_span(start_raw, end_raw)
+    if not start_day or not end_day:
+        return []
+
+    full_days = (end_day - start_day).days + 1
+    if full_days <= 0:
+        return []
+
+    clipped_days = list(_iter_date_span(start_raw, end_raw, date_from=date_from, date_to=date_to))
+    if not clipped_days:
+        return []
+
+    base, remainder = divmod(total, full_days)
+    distributed: list[tuple[str, int]] = []
+    for day_str in clipped_days:
+        day_offset = (date.fromisoformat(day_str) - start_day).days
+        value = base + (1 if day_offset < remainder else 0)
+        if value:
+            distributed.append((day_str, value))
+    return distributed
+
+
+def _build_daily_activity_data(
+    db,
+    lf_b: str,
+    lp_b: tuple,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[dict]:
+    """Build per-day pages/time totals with period contributions spread across their span."""
+    daily_totals: dict[str, dict[str, int]] = {}
+    session_totals_by_book = _load_book_session_totals(db, lf_b, lp_b)
+
+    def _ensure(date_str: str) -> dict[str, int]:
+        return daily_totals.setdefault(date_str, {"pages": 0, "seconds": 0})
+
+    session_filters = []
+    session_params: list[str] = []
+    if date_from:
+        session_filters.append("s.date >= ?")
+        session_params.append(date_from)
+    if date_to:
+        session_filters.append("s.date <= ?")
+        session_params.append(date_to)
+    session_where = f" AND {' AND '.join(session_filters)}" if session_filters else ""
+
+    for row in db.execute(
+        "SELECT s.date, COALESCE(SUM(s.pages), 0) AS pages, COALESCE(SUM(s.duration_seconds), 0) AS seconds "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND {lf_b}{session_where} GROUP BY s.date",
+        lp_b + tuple(session_params),
+    ).fetchall():
+        day = _ensure(row["date"])
+        day["pages"] += row["pages"] or 0
+        day["seconds"] += row["seconds"] or 0
+
+    period_filters = []
+    period_params: list[str] = []
+    if date_from:
+        period_filters.append("COALESCE(p.end_date, p.start_date) >= ?")
+        period_params.append(date_from)
+    if date_to:
+        period_filters.append("p.start_date <= ?")
+        period_params.append(date_to)
+    period_where = f" AND {' AND '.join(period_filters)}" if period_filters else ""
+
+    for row in db.execute(
+        "SELECT p.book_id, p.start_date, p.end_date, p.pages, COALESCE(p.duration_seconds, 0) AS duration_seconds, b.format "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.start_date != '' AND {lf_b} "
+        "AND (p.pages > 0 OR COALESCE(p.duration_seconds, 0) > 0)"
+        f"{period_where}",
+        lp_b + tuple(period_params),
+    ).fetchall():
+        book_totals = session_totals_by_book.get(row["book_id"], {"pages": 0, "seconds": 0})
+        is_pct_format = (row["format"] or "paper") in ("audiobook", "ebook")
+        total_period_seconds = _estimate_period_seconds(
+            period_pages=row["pages"] or 0,
+            explicit_period_seconds=row["duration_seconds"] or 0,
+            is_pct_format=is_pct_format,
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
+
+        for day_str, pages_value in _distribute_total_across_days(
+            row["start_date"],
+            row["end_date"],
+            row["pages"] or 0,
+            date_from=date_from,
+            date_to=date_to,
+        ):
+            _ensure(day_str)["pages"] += pages_value
+        for day_str, seconds_value in _distribute_total_across_days(
+            row["start_date"],
+            row["end_date"],
+            total_period_seconds,
+            date_from=date_from,
+            date_to=date_to,
+        ):
+            _ensure(day_str)["seconds"] += seconds_value
+
+    return [
+        {"date": day_str, "pages": values["pages"], "seconds": values["seconds"]}
+        for day_str, values in sorted(daily_totals.items())
+    ]
+
+
 def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
                              date_from: str | None = None,
                              date_to: str | None = None) -> list[dict]:
@@ -2235,6 +2571,7 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
     are given (YYYY-MM-DD strings) only events within that range are included.
     """
     _raw: list[dict] = []
+    session_totals_by_book = _load_book_session_totals(db, lf_b, lp_b)
 
     # Optional date-range SQL fragments
     def _dr(col: str) -> str:
@@ -2255,10 +2592,13 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
 
     # Sessions
     for rs in db.execute(
-        "SELECT s.date, s.pages, s.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "SELECT s.date, COALESCE(SUM(s.pages), 0) AS pages, COALESCE(SUM(s.duration_seconds), 0) AS duration_seconds, "
+        "b.id AS book_id, b.name AS book_name, "
         "b.has_cover, b.cover_hash "
         "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b}{_dr('s.date')} ORDER BY s.date DESC, s.id DESC",
+        f"WHERE s.date != '' AND {lf_b}{_dr('s.date')} "
+        "GROUP BY s.date, b.id, b.name, b.has_cover, b.cover_hash "
+        "ORDER BY s.date DESC, b.name COLLATE NOCASE",
         lp_b + _dp(),
     ).fetchall():
         _raw.append({"date": rs["date"], "type": "session", "pages": rs["pages"],
@@ -2268,53 +2608,72 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
 
     # Periods
     for rp in db.execute(
-        "SELECT p.end_date, p.pages, p.duration_seconds, b.id AS book_id, b.name AS book_name, "
+        "SELECT p.start_date, p.end_date, p.pages, COALESCE(p.duration_seconds, 0) AS duration_seconds, "
+        "b.id AS book_id, b.name AS book_name, b.format, "
         "b.has_cover, b.cover_hash "
         "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b}{_dr('p.end_date')} "
-        f"ORDER BY p.end_date DESC, p.id DESC",
+        f"WHERE p.start_date != '' AND {lf_b} "
+        "AND (p.pages > 0 OR COALESCE(p.duration_seconds, 0) > 0)"
+        f"{' AND COALESCE(p.end_date, p.start_date) >= ?' if date_from else ''}"
+        f"{' AND p.start_date <= ?' if date_to else ''} "
+        "ORDER BY COALESCE(p.end_date, p.start_date) DESC, p.id DESC",
         lp_b + _dp(),
     ).fetchall():
-        _raw.append({"date": rp["end_date"], "type": "period", "pages": rp["pages"],
-                      "seconds": rp["duration_seconds"], "book_id": rp["book_id"],
-                      "book_name": rp["book_name"], "has_cover": bool(rp["has_cover"]),
-                      "cover_hash": rp["cover_hash"] or ""})
+        book_totals = session_totals_by_book.get(rp["book_id"], {"pages": 0, "seconds": 0})
+        is_pct_format = (rp["format"] or "paper") in ("audiobook", "ebook")
+        total_period_seconds = _estimate_period_seconds(
+            period_pages=rp["pages"] or 0,
+            explicit_period_seconds=rp["duration_seconds"] or 0,
+            is_pct_format=is_pct_format,
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
 
-    # Finished
-    for fr in db.execute(
-        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
-        "FROM readings r JOIN books b ON b.id = r.book_id "
-        f"WHERE r.status = 'finished' AND {lf_b}", lp_b
-    ).fetchall():
-        candidates = []
-        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (fr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (fr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates:
-            d = max(candidates)
-            if (not date_from or d >= date_from) and (not date_to or d <= date_to):
-                _raw.append({"date": d, "type": "finished", "book_id": fr["book_id"],
-                              "book_name": fr["book_name"], "has_cover": bool(fr["has_cover"]),
-                              "cover_hash": fr["cover_hash"] or ""})
+        day_pages = dict(_distribute_total_across_days(
+            rp["start_date"],
+            rp["end_date"],
+            rp["pages"] or 0,
+            date_from=date_from,
+            date_to=date_to,
+        ))
+        day_seconds = dict(_distribute_total_across_days(
+            rp["start_date"],
+            rp["end_date"],
+            total_period_seconds,
+            date_from=date_from,
+            date_to=date_to,
+        ))
+        for day_str in sorted(set(day_pages) | set(day_seconds)):
+            _raw.append({
+                "date": day_str,
+                "type": "period",
+                "pages": day_pages.get(day_str, 0),
+                "seconds": day_seconds.get(day_str, 0),
+                "book_id": rp["book_id"],
+                "book_name": rp["book_name"],
+                "has_cover": bool(rp["has_cover"]),
+                "cover_hash": rp["cover_hash"] or "",
+            })
 
-    # Started
-    for sr in db.execute(
-        "SELECT r.id, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
+    reading_rows = db.execute(
+        "SELECT r.id, r.status, r.book_id, b.name AS book_name, b.has_cover, b.cover_hash "
         "FROM readings r JOIN books b ON b.id = r.book_id "
         f"WHERE {lf_b}", lp_b
-    ).fetchall():
-        candidates = []
-        r = db.execute("SELECT MIN(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (sr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MIN(start_date) AS d FROM periods WHERE reading_id = ? AND start_date != ''", (sr["id"],)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates:
-            d = min(candidates)
-            if (not date_from or d >= date_from) and (not date_to or d <= date_to):
-                _raw.append({"date": d, "type": "started", "book_id": sr["book_id"],
-                              "book_name": sr["book_name"], "has_cover": bool(sr["has_cover"]),
-                              "cover_hash": sr["cover_hash"] or ""})
+    ).fetchall()
+    reading_bounds = _load_reading_bounds(db, [row["id"] for row in reading_rows])
+
+    for rr in reading_rows:
+        bounds = reading_bounds.get(rr["id"], {})
+        start_date_value = bounds.get("start")
+        end_date_value = bounds.get("end")
+        if start_date_value and (not date_from or start_date_value >= date_from) and (not date_to or start_date_value <= date_to):
+            _raw.append({"date": start_date_value, "type": "started", "book_id": rr["book_id"],
+                          "book_name": rr["book_name"], "has_cover": bool(rr["has_cover"]),
+                          "cover_hash": rr["cover_hash"] or ""})
+        if rr["status"] == "finished" and end_date_value and (not date_from or end_date_value >= date_from) and (not date_to or end_date_value <= date_to):
+            _raw.append({"date": end_date_value, "type": "finished", "book_id": rr["book_id"],
+                          "book_name": rr["book_name"], "has_cover": bool(rr["has_cover"]),
+                          "cover_hash": rr["cover_hash"] or ""})
 
     # Purchased
     dr_buy = ""
@@ -2644,6 +3003,14 @@ def _build_index_per_reading(db, lib_ids):
     if not bids:
         return []
 
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    rating_avgs = _load_avg_ratings_for_books(db, bids)
+    edition_counts = _load_edition_counts_for_work_ids(
+        db,
+        [book["work_id"] for book in bk_map.values() if book["work_id"]],
+    )
+    book_session_totals = _load_book_session_totals(db, lf_b, lp_b)
+
     ph = ",".join("?" * len(bids))
     all_readings = db.execute(
         f"SELECT id, book_id, reading_number, status FROM readings "
@@ -2687,8 +3054,8 @@ def _build_index_per_reading(db, lib_ids):
         ).fetchall():
             sess_map[row["reading_id"]] = dict(row)
         for row in db.execute(
-            f"SELECT reading_id, SUM(pages) AS pp, "
-            f"MIN(start_date) AS p0, MAX(end_date) AS p1 "
+            f"SELECT reading_id, SUM(pages) AS pp, SUM(COALESCE(duration_seconds, 0)) AS ps, "
+            f"MIN(start_date) AS p0, MAX(CASE WHEN end_date != '' THEN end_date ELSE start_date END) AS p1 "
             f"FROM periods WHERE reading_id IN ({rph}) "
             f"GROUP BY reading_id", rids
         ).fetchall():
@@ -2716,13 +3083,23 @@ def _build_index_per_reading(db, lib_ids):
         first_date = sm.get("d0", "") or ""
         last_date = sm.get("d1", "") or ""
         period_pages = pm.get("pp", 0) or 0
+        explicit_period_seconds = pm.get("ps", 0) or 0
         first_period_start = pm.get("p0", "") or ""
         last_period_end = pm.get("p1", "") or ""
         max_pct = pct_map.get(rid, 0) if rid else 0
 
-        period_seconds = 0
-        if period_pages > 0 and session_pages > 0:
-            period_seconds = int(period_pages * (session_seconds / session_pages))
+        book_fmt = bk.get("format", "paper") or "paper"
+        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+        book_totals = book_session_totals.get(bid, {"pages": 0, "seconds": 0})
+        period_seconds = _estimate_period_seconds(
+            period_pages=period_pages,
+            explicit_period_seconds=explicit_period_seconds,
+            is_pct_format=is_pct_fmt,
+            session_pages=session_pages,
+            session_seconds=session_seconds,
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
         total_pages_display = session_pages + period_pages
         total_seconds_display = session_seconds + period_seconds
 
@@ -2735,15 +3112,7 @@ def _build_index_per_reading(db, lib_ids):
         first_activity = min(first_candidates) if first_candidates else None
         last_activity = max(last_candidates) if last_candidates else None
 
-        ratings = _load_ratings(bid)
-
-        edition_count = 1
-        if bk["work_id"]:
-            ec_row = db.execute("SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (bk["work_id"],)).fetchone()
-            edition_count = ec_row["c"] if ec_row else 1
-
-        book_fmt = bk.get("format", "paper") or "paper"
-        is_pct_fmt = book_fmt in ("audiobook", "ebook")
+        edition_count = edition_counts.get(bk["work_id"], 1) if bk["work_id"] else 1
 
         books.append({
             "id": bid,
@@ -2765,7 +3134,7 @@ def _build_index_per_reading(db, lib_ids):
             "cover_hash": bk.get("cover_hash", "") or "",
             "first_session_date": first_activity or "0000-00-00",
             "last_session_date": last_activity or "0000-00-00",
-            "avg_rating": _calc_avg_rating(ratings),
+            "avg_rating": rating_avgs.get(bid),
             "publisher": bk.get("publisher", "") or "",
             "language": bk.get("language", "") or "",
             "publication_date": bk.get("publication_date", "") or "",
@@ -2794,7 +3163,6 @@ def page_not_found(e):
 def dashboard():
     """Dashboard – overview of reading stats, currently reading, streaks, etc."""
     from collections import Counter
-    from datetime import date, timedelta
     import random
 
     db = get_db()
@@ -2804,22 +3172,42 @@ def dashboard():
     today = date.today()
     today_str = today.isoformat()
     current_year = str(today.year)
+    prev_year = str(today.year - 1)
+    prev_year_start = f"{prev_year}-01-01"
+    same_day_prev_year = f"{prev_year}-{today_str[5:]}"
+
+    primary_books = [
+        dict(row)
+        for row in db.execute(
+            "SELECT id, name, author, pages, starting_page, status, source_type, work_id, "
+            "has_cover, cover_hash, format, tags, language, is_gift "
+            f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
+            lp,
+        ).fetchall()
+    ]
+    primary_book_ids = [book["id"] for book in primary_books]
+    avg_ratings = _load_avg_ratings_for_books(db, primary_book_ids)
+    daily_data = _build_daily_activity_data(db, lf_b, lp_b)
 
     # ── Hero stats ribbon ────────────────────────────────────────────────
-    all_rows = db.execute(
-        "SELECT author, pages, starting_page, status, source_type, work_id FROM books "
-        f"WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchall()
     unique_authors: set[str] = set()
     total_library_pages = 0
     reading_count = 0
     not_started_count = 0
-    for br in all_rows:
+    format_counts: dict[str, int] = Counter()
+    source_counts: dict[str, int] = Counter()
+    tag_counts: dict[str, int] = Counter()
+    author_counts: dict[str, int] = Counter()
+    language_counts: dict[str, int] = Counter()
+    rated_values: list[float] = []
+
+    for br in primary_books:
         if br["author"]:
             for a in br["author"].split(";"):
                 a = a.strip()
                 if a:
                     unique_authors.add(a)
+                    author_counts[a] += 1
         bp = br["pages"] or 0
         sp = br["starting_page"] or 0
         total_library_pages += (bp - sp) if sp > 0 else bp
@@ -2827,64 +3215,59 @@ def dashboard():
             reading_count += 1
         elif br["status"] == "not-started":
             not_started_count += 1
-    total_books_count = len(all_rows)
+
+        book_fmt = br["format"] or "paper"
+        format_counts[book_fmt] += 1
+        if br["is_gift"]:
+            source_counts["gift"] += 1
+        elif br["source_type"]:
+            source_counts[br["source_type"]] += 1
+        else:
+            source_counts["unknown"] += 1
+
+        if br["language"]:
+            language_counts[br["language"]] += 1
+
+        if br["tags"]:
+            for tag in br["tags"].split(";"):
+                tag = tag.strip()
+                if tag:
+                    tag_counts[tag] += 1
+
+        avg_value = avg_ratings.get(br["id"])
+        if avg_value is not None and avg_value > 0:
+            rated_values.append(avg_value)
+
+    total_books_count = len(primary_books)
     finished_count = db.execute(
         "SELECT COUNT(DISTINCT COALESCE(b.work_id, b.id)) FROM books b "
         "JOIN readings r ON r.book_id = b.id "
         f"WHERE {lf_b} AND r.status = 'finished'", lp_b
     ).fetchone()[0]
-    owned_count = db.execute(
-        f"SELECT COUNT(*) FROM books WHERE {lf} AND source_type = 'owned'", lp
-    ).fetchone()[0]
+    owned_count = sum(1 for book in primary_books if book["source_type"] == "owned")
 
-    # Total time: must compute from sessions+periods across all books
-    time_row = db.execute(
-        "SELECT COALESCE(SUM(s.duration_seconds),0) AS sec "
-        f"FROM sessions s JOIN books b ON b.id = s.book_id WHERE {lf_b}", lp_b
-    ).fetchone()
-    total_session_seconds = time_row["sec"]
-    total_session_pages = db.execute(
-        "SELECT COALESCE(SUM(s.pages),0) AS p "
-        f"FROM sessions s JOIN books b ON b.id = s.book_id WHERE {lf_b}", lp_b
-    ).fetchone()["p"]
-    total_period_pages = db.execute(
-        "SELECT COALESCE(SUM(p.pages),0) AS p "
-        f"FROM periods p JOIN books b ON b.id = p.book_id WHERE {lf_b}", lp_b
-    ).fetchone()["p"]
-    # Estimate period time proportionally
-    period_seconds = int(total_period_pages * (total_session_seconds / total_session_pages)) if total_session_pages > 0 else 0
-    total_all_seconds = total_session_seconds + period_seconds
+    total_all_seconds = sum(day["seconds"] for day in daily_data)
     total_library_time = _format_duration_long(total_all_seconds)
     total_library_time_hms = _format_duration_hms(total_all_seconds)
 
-    # Average rating across all rated finished books
-    avg_rating = None
-    rated_sum = 0.0
-    rated_count_val = 0
-    all_book_ids = db.execute(
-        f"SELECT id FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchall()
-    for bid_row in all_book_ids:
-        ratings = _load_ratings(bid_row["id"])
-        avg = _calc_avg_rating(ratings)
-        if avg is not None and avg > 0:
-            rated_sum += avg
-            rated_count_val += 1
-    avg_rating = round(rated_sum / rated_count_val, 2) if rated_count_val > 0 else None
+    avg_rating = round(sum(rated_values) / len(rated_values), 2) if rated_values else None
 
     # ── Currently reading books ──────────────────────────────────────────
+    book_session_totals = _load_book_session_totals(db, lf_b, lp_b)
     reading_books: list[dict] = []
     for row in db.execute(f"""
         SELECT b.id, b.name, b.author, b.pages, b.starting_page, b.has_cover, b.cover_hash,
                b.format,
                COALESCE(s.tp, 0) AS session_pages,
+               COALESCE(s.ts, 0) AS session_seconds,
                COALESCE(p.pp, 0) AS period_pages,
+               COALESCE(p.ps, 0) AS period_seconds,
                s.last_date, p.last_period,
                COALESCE(pct.max_pct, 0) AS max_pct
         FROM books b
-        LEFT JOIN (SELECT book_id, SUM(pages) AS tp, MAX(date) AS last_date
+        LEFT JOIN (SELECT book_id, SUM(pages) AS tp, SUM(duration_seconds) AS ts, MAX(date) AS last_date
                    FROM sessions WHERE date != '' GROUP BY book_id) s ON s.book_id = b.id
-        LEFT JOIN (SELECT book_id, SUM(pages) AS pp, MAX(end_date) AS last_period
+        LEFT JOIN (SELECT book_id, SUM(pages) AS pp, SUM(COALESCE(duration_seconds, 0)) AS ps, MAX(end_date) AS last_period
                    FROM periods GROUP BY book_id) p ON p.book_id = b.id
         LEFT JOIN (
             SELECT book_id, MAX(pct) AS max_pct FROM (
@@ -2900,6 +3283,16 @@ def dashboard():
         eff = tp - sp if sp > 0 else tp
         book_fmt = row["format"] or "paper"
         is_pct_fmt = book_fmt in ("audiobook", "ebook")
+        book_totals = book_session_totals.get(row["id"], {"pages": 0, "seconds": 0})
+        total_seconds_display = row["session_seconds"] + _estimate_period_seconds(
+            period_pages=row["period_pages"] or 0,
+            explicit_period_seconds=row["period_seconds"] or 0,
+            is_pct_format=is_pct_fmt,
+            session_pages=row["session_pages"] or 0,
+            session_seconds=row["session_seconds"] or 0,
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
         if is_pct_fmt:
             total_read = 0
             remaining = 0
@@ -2923,96 +3316,29 @@ def dashboard():
             "progress_pct": prog_pct,
             "last_activity": last_activity,
             "format": book_fmt,
+            "total_time": _format_duration(total_seconds_display),
         })
     reading_books.sort(key=lambda b: b["last_activity"] or "0000-00-00", reverse=True)
 
-    # ── Daily data for streaks & heatmap ─────────────────────────────────
-    daily_sessions: dict[str, dict] = {}
-    for row in db.execute(
-        "SELECT s.date, SUM(s.pages) AS pages, SUM(s.duration_seconds) AS seconds "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} GROUP BY s.date", lp_b
-    ).fetchall():
-        daily_sessions[row["date"]] = {"pages": row["pages"], "seconds": row["seconds"]}
-    daily_periods: dict[str, int] = {}
-    for row in db.execute(
-        "SELECT p.end_date, SUM(p.pages) AS pages "
-        "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date", lp_b
-    ).fetchall():
-        daily_periods[row["end_date"]] = row["pages"]
-    all_dates = sorted(set(daily_sessions) | set(daily_periods))
-    daily_data = []
-    for d in all_dates:
-        s = daily_sessions.get(d, {"pages": 0, "seconds": 0})
-        p = daily_periods.get(d, 0)
-        daily_data.append({"date": d, "pages": s["pages"] + p, "seconds": s["seconds"]})
-
     # ── This Year at a Glance ────────────────────────────────────────────
-    year_start = f"{current_year}-01-01"
-    books_finished_this_year = 0
-    pages_this_year = 0
-    time_this_year = 0
     finished_readings_yr = db.execute(
         "SELECT r.id FROM readings r JOIN books b ON b.id = r.book_id "
         f"WHERE r.status = 'finished' AND {lf_b}", lp_b
     ).fetchall()
-    for fr in finished_readings_yr:
-        rid = fr["id"]
-        candidates = []
-        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (rid,)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (rid,)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates and max(candidates) >= year_start:
-            books_finished_this_year += 1
+    reading_bounds = _load_reading_bounds(db, [row["id"] for row in finished_readings_yr])
+    finished_dates = [reading_bounds.get(row["id"], {}).get("end") for row in finished_readings_yr]
+    books_finished_this_year = sum(1 for finish_date in finished_dates if finish_date and finish_date[:4] == current_year)
+    books_finished_prev_ytd = sum(
+        1 for finish_date in finished_dates
+        if finish_date and prev_year_start <= finish_date <= same_day_prev_year
+    )
 
-    for row in db.execute(
-        "SELECT SUM(s.pages) AS p, SUM(s.duration_seconds) AS t "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE SUBSTR(s.date, 1, 4) = ? AND {lf_b}", (current_year, *lp_b)
-    ).fetchall():
-        pages_this_year += row["p"] or 0
-        time_this_year += row["t"] or 0
-    for row in db.execute(
-        "SELECT SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE SUBSTR(p.end_date, 1, 4) = ? AND {lf_b}", (current_year, *lp_b)
-    ).fetchall():
-        pages_this_year += row["p"] or 0
+    pages_this_year = sum(day["pages"] for day in daily_data if day["date"][:4] == current_year)
+    time_this_year = sum(day["seconds"] for day in daily_data if day["date"][:4] == current_year)
+    pages_prev_ytd = sum(day["pages"] for day in daily_data if prev_year_start <= day["date"] <= same_day_prev_year)
+    time_prev_ytd = sum(day["seconds"] for day in daily_data if prev_year_start <= day["date"] <= same_day_prev_year)
 
-    # Year-over-year comparison
-    prev_year = str(today.year - 1)
-    prev_year_start = f"{prev_year}-01-01"
-    same_day_prev_year = f"{prev_year}-{today_str[5:]}"
-    books_finished_prev_ytd = 0
-    for fr in finished_readings_yr:
-        rid = fr["id"]
-        candidates = []
-        r = db.execute("SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (rid,)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        r = db.execute("SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (rid,)).fetchone()
-        if r and r["d"]: candidates.append(r["d"])
-        if candidates:
-            finish_date = max(candidates)
-            if finish_date >= prev_year_start and finish_date <= same_day_prev_year:
-                books_finished_prev_ytd += 1
     yoy_diff = books_finished_this_year - books_finished_prev_ytd
-
-    # Pages and time for previous year YTD
-    pages_prev_ytd = 0
-    time_prev_ytd = 0
-    for row in db.execute(
-        "SELECT COALESCE(SUM(s.pages),0) AS p, COALESCE(SUM(s.duration_seconds),0) AS t "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date >= ? AND s.date <= ? AND {lf_b}", (prev_year_start, same_day_prev_year, *lp_b)
-    ).fetchall():
-        pages_prev_ytd += row["p"] or 0
-        time_prev_ytd += row["t"] or 0
-    for row in db.execute(
-        "SELECT COALESCE(SUM(p.pages),0) AS p FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date >= ? AND p.end_date <= ? AND {lf_b}", (prev_year_start, same_day_prev_year, *lp_b)
-    ).fetchall():
-        pages_prev_ytd += row["p"] or 0
     yoy_pages_diff = pages_this_year - pages_prev_ytd
     yoy_time_diff = time_this_year - time_prev_ytd
 
@@ -3044,19 +3370,18 @@ def dashboard():
         })
 
     # ── Top-rated books ──────────────────────────────────────────────────
-    top_rated: list[dict] = []
-    for bid_row in all_book_ids:
-        ratings = _load_ratings(bid_row["id"])
-        avg = _calc_avg_rating(ratings)
-        if avg is not None and avg > 0:
-            bk = db.execute("SELECT id, name, author, has_cover, cover_hash FROM books WHERE id = ?",
-                            (bid_row["id"],)).fetchone()
-            if bk:
-                top_rated.append({
-                    "id": bk["id"], "name": bk["name"], "author": bk["author"] or "",
-                    "has_cover": bool(bk["has_cover"]), "cover_hash": bk["cover_hash"] or "",
-                    "rating": round(avg, 2),
-                })
+    top_rated = [
+        {
+            "id": book["id"],
+            "name": book["name"],
+            "author": book["author"] or "",
+            "has_cover": bool(book["has_cover"]),
+            "cover_hash": book["cover_hash"] or "",
+            "rating": round(avg_ratings[book["id"]], 2),
+        }
+        for book in primary_books
+        if avg_ratings.get(book["id"]) is not None and avg_ratings[book["id"]] > 0
+    ]
     top_rated.sort(key=lambda x: x["rating"], reverse=True)
     top_rated = top_rated[:5]
 
@@ -3097,57 +3422,31 @@ def dashboard():
             most_reread = {"name": rbk["name"], "id": rbk["id"], "count": reread_row["cnt"],
                            "has_cover": bool(rbk["has_cover"]), "cover_hash": rbk["cover_hash"] or ""}
 
-    # ── Format & source breakdown ────────────────────────────────────────
-    format_counts: dict[str, int] = Counter()
-    source_counts: dict[str, int] = Counter()
-    for bk in db.execute(
-        f"SELECT format, source_type, is_gift FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchall():
-        fmt = bk["format"] or "paper"
-        format_counts[fmt] += 1
-        if bk["is_gift"]:
-            source_counts["gift"] += 1
-        elif bk["source_type"]:
-            source_counts[bk["source_type"]] += 1
-        else:
-            source_counts["unknown"] += 1
-
-    # ── Tag cloud (top 20) ───────────────────────────────────────────────
-    tag_counts: dict[str, int] = Counter()
-    for bk in db.execute(
-        f"SELECT tags FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1) AND tags IS NOT NULL AND tags != ''", lp
-    ).fetchall():
-        for t in bk["tags"].split(";"):
-            t = t.strip()
-            if t:
-                tag_counts[t] += 1
     top_tags = dict(Counter(tag_counts).most_common(20))
 
     # ── Series progress ──────────────────────────────────────────────────
-    series_progress: list[dict] = []
-    all_series = db.execute(
-        "SELECT s.id, s.name FROM series s WHERE s.library_id IN (SELECT id FROM libraries)" if not lib_ids
-        else f"SELECT s.id, s.name FROM series s WHERE s.library_id IN ({','.join('?' * len(lib_ids))})",
-        tuple(lib_ids) if lib_ids else ()
-    ).fetchall()
-    for sr in all_series:
-        books_in_series = db.execute(
-            "SELECT b.id, b.status FROM books b "
-            "JOIN book_series bs ON bs.book_id = b.id "
-            "WHERE bs.series_id = ?", (sr["id"],)
-        ).fetchall()
-        total_in_series = len(books_in_series)
-        if total_in_series == 0:
+    series_progress = []
+    series_query = (
+        "SELECT s.id, s.name, COUNT(DISTINCT b.id) AS total, "
+        "COUNT(DISTINCT CASE WHEN r.status = 'finished' THEN b.id END) AS finished "
+        "FROM series s "
+        "JOIN book_series bs ON bs.series_id = s.id "
+        "JOIN books b ON b.id = bs.book_id "
+        "LEFT JOIN readings r ON r.book_id = b.id AND r.status = 'finished' "
+        + ("WHERE s.library_id IN (SELECT id FROM libraries) " if not lib_ids else f"WHERE s.library_id IN ({','.join('?' * len(lib_ids))}) ")
+        + "GROUP BY s.id, s.name"
+    )
+    for row in db.execute(series_query, tuple(lib_ids) if lib_ids else ()).fetchall():
+        total_in_series = row["total"] or 0
+        if total_in_series <= 0:
             continue
-        finished_in_series = sum(1 for bk in books_in_series
-                                  if db.execute("SELECT 1 FROM readings WHERE book_id = ? AND status = 'finished' LIMIT 1",
-                                                (bk["id"],)).fetchone())
+        finished_in_series = row["finished"] or 0
         series_progress.append({
-            "name": sr["name"],
-            "id": sr["id"],
+            "name": row["name"],
+            "id": row["id"],
             "total": total_in_series,
             "finished": finished_in_series,
-            "pct": round(finished_in_series / total_in_series * 100) if total_in_series > 0 else 0,
+            "pct": round(finished_in_series / total_in_series * 100),
         })
     series_progress.sort(key=lambda s: (s["pct"] == 100, -s["pct"], s["name"]))
     series_progress = series_progress[:8]
@@ -3162,14 +3461,6 @@ def dashboard():
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
 
     # ── Author spotlight (4 random authors) ──────────────────────────────
-    author_counts: dict[str, int] = Counter()
-    for bk in db.execute(
-        f"SELECT author FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1) AND author IS NOT NULL AND author != ''", lp
-    ).fetchall():
-        for a in bk["author"].split(";"):
-            a = a.strip()
-            if a:
-                author_counts[a] += 1
     spotlight_authors: list[dict] = []
     if author_counts:
         all_author_names = list(author_counts.keys())
@@ -3183,13 +3474,6 @@ def dashboard():
                 "has_photo": bool(author_row["has_photo"]) if author_row else False,
                 "photo_hash": (author_row["photo_hash"] or "") if author_row else "",
             })
-
-    # ── Language diversity ───────────────────────────────────────────────
-    language_counts: dict[str, int] = Counter()
-    for bk in db.execute(
-        f"SELECT language FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1) AND language IS NOT NULL AND language != ''", lp
-    ).fetchall():
-        language_counts[bk["language"]] += 1
 
     # ── Library health nudges ────────────────────────────────────────────
     books_without_cover = db.execute(
@@ -3361,6 +3645,7 @@ def index():
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
             COALESCE(per.period_pages, 0)   AS period_pages,
+            COALESCE(per.period_seconds, 0) AS period_seconds,
             sess.first_date,
             sess.last_date,
             per.first_period_start,
@@ -3390,8 +3675,9 @@ def index():
             SELECT
                 book_id,
                 SUM(pages) AS period_pages,
+                SUM(COALESCE(duration_seconds, 0)) AS period_seconds,
                 MIN(start_date) AS first_period_start,
-                MAX(end_date)   AS last_period_end
+                MAX(CASE WHEN end_date != '' THEN end_date ELSE start_date END) AS last_period_end
             FROM periods
             GROUP BY book_id
         ) per ON per.book_id = b.id
@@ -3406,9 +3692,9 @@ def index():
         LEFT JOIN (
             SELECT
                 reading_id,
-                MAX(end_date) AS lr_last_period_end
+                MAX(CASE WHEN end_date != '' THEN end_date ELSE start_date END) AS lr_last_period_end
             FROM periods
-            WHERE end_date != ''
+            WHERE start_date != ''
             GROUP BY reading_id
         ) lr_per ON lr_per.reading_id = lr.lr_id
         LEFT JOIN (
@@ -3421,14 +3707,31 @@ def index():
         WHERE {lf_b}{edition_filter}
     """, lp_b).fetchall()
 
+        rating_avgs = _load_avg_ratings_for_books(db, [row["id"] for row in rows])
+        edition_counts = _load_edition_counts_for_work_ids(
+            db,
+            [row["work_id"] for row in rows if row["work_id"]],
+        )
+        book_session_totals = _load_book_session_totals(db, lf_b, lp_b)
+
         books = []
         for r in rows:
             total_pages_tracked = r["session_pages"]
             total_seconds_tracked = r["session_seconds"]
             period_pages = r["period_pages"]
-            period_seconds = 0
-            if period_pages > 0 and total_pages_tracked > 0:
-                period_seconds = int(period_pages * (total_seconds_tracked / total_pages_tracked))
+
+            book_fmt = r["format"] or "paper"
+            is_pct_fmt = book_fmt in ("audiobook", "ebook")
+            book_totals = book_session_totals.get(r["id"], {"pages": 0, "seconds": 0})
+            period_seconds = _estimate_period_seconds(
+                period_pages=period_pages,
+                explicit_period_seconds=r["period_seconds"] or 0,
+                is_pct_format=is_pct_fmt,
+                session_pages=total_pages_tracked,
+                session_seconds=total_seconds_tracked,
+                fallback_pages=book_totals["pages"],
+                fallback_seconds=book_totals["seconds"],
+            )
 
             total_pages_display = total_pages_tracked + period_pages
             total_seconds_display = total_seconds_tracked + period_seconds
@@ -3443,19 +3746,7 @@ def index():
             lr_candidates = [d for d in (r["lr_last_date"], r["lr_last_period_end"]) if d]
             first_activity = min(first_candidates) if first_candidates else None
             last_activity = max(lr_candidates) if lr_candidates else None
-
-            ratings = _load_ratings(r["id"])
-
-            # Edition count (how many editions share this work_id)
-            edition_count = 1
-            if r["work_id"]:
-                ec_row = db.execute(
-                    "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (r["work_id"],)
-                ).fetchone()
-                edition_count = ec_row["c"] if ec_row else 1
-
-            book_fmt = r["format"] or "paper"
-            is_pct_fmt = book_fmt in ("audiobook", "ebook")
+            edition_count = edition_counts.get(r["work_id"], 1) if r["work_id"] else 1
 
             books.append({
                 "id": r["id"],
@@ -3477,7 +3768,7 @@ def index():
                 "cover_hash": r["cover_hash"] or "",
                 "first_session_date": first_activity or "0000-00-00",
                 "last_session_date": last_activity or "0000-00-00",
-                "avg_rating": _calc_avg_rating(ratings),
+                "avg_rating": rating_avgs.get(r["id"]),
                 "publisher": r["publisher"] or "",
                 "language": r["language"] or "",
                 "publication_date": r["publication_date"] or "",
@@ -3744,59 +4035,28 @@ def global_stats():
     lf, lp = _lib_filter(lib_ids)
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
-    # Pages by year: sessions + periods
+    daily_data = _build_daily_activity_data(db, lf_b, lp_b)
+
     pages_by_year: dict[str, int] = {}
-    for row in db.execute(
-        "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.pages) AS p "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} GROUP BY yr", lp_b
-    ).fetchall():
-        pages_by_year[row["yr"]] = row["p"]
-    for row in db.execute(
-        f"SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.pages) AS p "
-        f"FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY yr", lp_b
-    ).fetchall():
-        pages_by_year[row["yr"]] = pages_by_year.get(row["yr"], 0) + row["p"]
+    time_by_year: dict[str, int] = {}
+    for day in daily_data:
+        year = day["date"][:4]
+        pages_by_year[year] = pages_by_year.get(year, 0) + (day["pages"] or 0)
+        time_by_year[year] = time_by_year.get(year, 0) + (day["seconds"] or 0)
 
     # Books finished by year – count ALL finished readings across all editions
     books_finished_by_year: dict[str, int] = {}
     finished_readings = db.execute(
-        "SELECT r.id, r.book_id FROM readings r "
+        "SELECT r.id FROM readings r "
         "JOIN books b ON b.id = r.book_id "
         f"WHERE r.status = 'finished' AND {lf_b}", lp_b
     ).fetchall()
-    for fr in finished_readings:
-        rid = fr["id"]
-        candidates = []
-        r = db.execute(
-            "SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (rid,)
-        ).fetchone()
-        if r and r["d"]:
-            candidates.append(r["d"])
-        r = db.execute(
-            "SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (rid,)
-        ).fetchone()
-        if r and r["d"]:
-            candidates.append(r["d"])
-        if candidates:
-            finish_year = max(candidates)[:4]
+    reading_bounds = _load_reading_bounds(db, [row["id"] for row in finished_readings])
+    for row in finished_readings:
+        finish_date = reading_bounds.get(row["id"], {}).get("end")
+        if finish_date:
+            finish_year = finish_date[:4]
             books_finished_by_year[finish_year] = books_finished_by_year.get(finish_year, 0) + 1
-
-    # Time read by year: sessions + periods (duration_seconds)
-    time_by_year: dict[str, int] = {}
-    for row in db.execute(
-        "SELECT SUBSTR(s.date, 1, 4) AS yr, SUM(s.duration_seconds) AS t "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND s.duration_seconds > 0 AND {lf_b} GROUP BY yr", lp_b
-    ).fetchall():
-        time_by_year[row["yr"]] = row["t"]
-    for row in db.execute(
-        f"SELECT SUBSTR(p.end_date, 1, 4) AS yr, SUM(p.duration_seconds) AS t "
-        f"FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.duration_seconds > 0 AND {lf_b} GROUP BY yr", lp_b
-    ).fetchall():
-        time_by_year[row["yr"]] = time_by_year.get(row["yr"], 0) + row["t"]
 
     all_years = sorted(set(pages_by_year.keys()) | set(books_finished_by_year.keys()) | set(time_by_year.keys()))
     pages_data = [pages_by_year.get(y, 0) for y in all_years]
@@ -3804,10 +4064,15 @@ def global_stats():
     time_data = [time_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
-    all_lib_books = db.execute(
-        "SELECT id, name, status, tags, language, original_language, pages, publisher, has_cover, cover_hash "
-        f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchall()
+    all_lib_books = [
+        dict(row)
+        for row in db.execute(
+            "SELECT id, name, status, tags, language, original_language, pages, publisher, has_cover, cover_hash, author "
+            f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
+            lp,
+        ).fetchall()
+    ]
+    avg_ratings = _load_avg_ratings_for_books(db, [book["id"] for book in all_lib_books])
 
     status_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
@@ -3840,16 +4105,14 @@ def global_stats():
             publisher_counts["Unknown"] += 1
 
         # Author split
-        author_row = db.execute("SELECT author FROM books WHERE id = ?", (bk["id"],)).fetchone()
-        if author_row and author_row["author"]:
-            for a in author_row["author"].split(";"):
+        if bk["author"]:
+            for a in bk["author"].split(";"):
                 a = a.strip()
                 if a:
                     author_counts[a] += 1
 
         # Rating
-        ratings = _load_ratings(bk["id"])
-        avg = _calc_avg_rating(ratings)
+        avg = avg_ratings.get(bk["id"])
         if avg is not None and avg > 0:
             rated_sum += avg
             rated_count += 1
@@ -3933,38 +4196,100 @@ def api_cumulative_pages():
     book_id = request.args.get('book_id')
     year = request.args.get('year')
 
-    if book_id:
-        q = (
-            "SELECT d AS date, SUM(p) AS pages FROM ("
-            "SELECT date AS d, SUM(pages) AS p FROM sessions WHERE date != '' AND book_id = ? GROUP BY date "
-            "UNION ALL "
-            "SELECT end_date AS d, SUM(pages) AS p FROM periods WHERE end_date != '' AND pages > 0 AND book_id = ? GROUP BY end_date"
-            ") GROUP BY d ORDER BY d"
-        )
-        params = (book_id, book_id)
-    else:
-        q = (
-            "SELECT d AS date, SUM(p) AS pages FROM ("
-            f"SELECT s.date AS d, SUM(s.pages) AS p FROM sessions s JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b} GROUP BY s.date "
-            "UNION ALL "
-            f"SELECT p.end_date AS d, SUM(p.pages) AS p FROM periods p JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date"
-            ") GROUP BY d ORDER BY d"
-        )
-        params = lp_b * 2
+    date_from = f"{year}-01-01" if year else None
+    date_to = f"{year}-12-31" if year else None
+    pages_by_date: dict[str, int] = {}
 
-    rows = db.execute(q, params).fetchall()
+    def _add_pages(day_str: str, pages: int) -> None:
+        pages_by_date[day_str] = pages_by_date.get(day_str, 0) + int(pages or 0)
+
+    if book_id:
+        session_filters = []
+        session_params: list[str] = [book_id]
+        if date_from:
+            session_filters.append("date >= ?")
+            session_params.append(date_from)
+        if date_to:
+            session_filters.append("date <= ?")
+            session_params.append(date_to)
+        session_where = f" AND {' AND '.join(session_filters)}" if session_filters else ""
+        for row in db.execute(
+            "SELECT date, SUM(pages) AS pages FROM sessions "
+            f"WHERE date != '' AND book_id = ?{session_where} GROUP BY date",
+            tuple(session_params),
+        ).fetchall():
+            _add_pages(row["date"], row["pages"] or 0)
+
+        period_filters = []
+        period_params: list[str] = [book_id]
+        if date_from:
+            period_filters.append("COALESCE(end_date, start_date) >= ?")
+            period_params.append(date_from)
+        if date_to:
+            period_filters.append("start_date <= ?")
+            period_params.append(date_to)
+        period_where = f" AND {' AND '.join(period_filters)}" if period_filters else ""
+        for row in db.execute(
+            "SELECT start_date, end_date, pages FROM periods "
+            f"WHERE start_date != '' AND pages > 0 AND book_id = ?{period_where}",
+            tuple(period_params),
+        ).fetchall():
+            for day_str, pages in _distribute_total_across_days(
+                row["start_date"],
+                row["end_date"],
+                row["pages"] or 0,
+                date_from=date_from,
+                date_to=date_to,
+            ):
+                _add_pages(day_str, pages)
+    else:
+        session_filters = []
+        session_params: list[str] = []
+        if date_from:
+            session_filters.append("s.date >= ?")
+            session_params.append(date_from)
+        if date_to:
+            session_filters.append("s.date <= ?")
+            session_params.append(date_to)
+        session_where = f" AND {' AND '.join(session_filters)}" if session_filters else ""
+        for row in db.execute(
+            "SELECT s.date, SUM(s.pages) AS pages FROM sessions s JOIN books b ON b.id = s.book_id "
+            f"WHERE s.date != '' AND {lf_b}{session_where} GROUP BY s.date",
+            lp_b + tuple(session_params),
+        ).fetchall():
+            _add_pages(row["date"], row["pages"] or 0)
+
+        period_filters = []
+        period_params: list[str] = []
+        if date_from:
+            period_filters.append("COALESCE(p.end_date, p.start_date) >= ?")
+            period_params.append(date_from)
+        if date_to:
+            period_filters.append("p.start_date <= ?")
+            period_params.append(date_to)
+        period_where = f" AND {' AND '.join(period_filters)}" if period_filters else ""
+        for row in db.execute(
+            "SELECT p.start_date, p.end_date, p.pages FROM periods p JOIN books b ON b.id = p.book_id "
+            f"WHERE p.start_date != '' AND p.pages > 0 AND {lf_b}{period_where}",
+            lp_b + tuple(period_params),
+        ).fetchall():
+            for day_str, pages in _distribute_total_across_days(
+                row["start_date"],
+                row["end_date"],
+                row["pages"] or 0,
+                date_from=date_from,
+                date_to=date_to,
+            ):
+                _add_pages(day_str, pages)
 
     out = []
     cum = 0
-    for r in rows:
-        d = r['date']
-        if not d:
+    for day_str in sorted(pages_by_date):
+        pages = pages_by_date[day_str]
+        if not pages:
             continue
-        if year and not str(d).startswith(str(year)):
-            continue
-        pages = int(r['pages'] or 0)
         cum += pages
-        out.append({ 'date': d, 'pages': pages, 'cumulative': cum })
+        out.append({'date': day_str, 'pages': pages, 'cumulative': cum})
 
     return jsonify(out)
 
@@ -3996,51 +4321,70 @@ def api_cumulative_pages_per_book():
     if not year:
         return jsonify({"error": "year query parameter required"}), 400
 
-    q = (
-        "SELECT s.book_id, d AS date, SUM(p) AS pages FROM ("
-        "SELECT s.book_id, s.date AS d, s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND SUBSTR(s.date,1,4) = ? AND {lf_b} "
-        "UNION ALL "
-        "SELECT p.book_id, p.end_date AS d, p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND SUBSTR(p.end_date,1,4) = ? AND {lf_b} "
-        ") s GROUP BY s.book_id, d ORDER BY s.book_id, d"
-    )
-    rows = db.execute(q, (year,) + lp_b + (year,) + lp_b).fetchall()
+    year_start = f"{year}-01-01"
+    year_end = f"{year}-12-31"
+    year_int = int(year)
+
+    book_info = {
+        row["id"]: {
+            "name": row["name"],
+            "color": (row["cover_color"] or "").strip() or "#888888",
+        }
+        for row in db.execute(
+            f"SELECT id, name, cover_color FROM books WHERE {lf}",
+            lp,
+        ).fetchall()
+    }
 
     book_map: dict[str, dict] = {}
     all_dates: set[str] = set()
-    for r in rows:
-        bid = r['book_id']
-        d = r['date']
-        p = int(r['pages'] or 0)
-        all_dates.add(d)
-        if bid not in book_map:
-            bk = db.execute('SELECT name, cover_color FROM books WHERE id = ?', (bid,)).fetchone()
-            color = (bk['cover_color'] or '').strip() if bk else ''
-            if not color:
-                color = '#888888'
-            book_map[bid] = {'name': bk['name'] if bk else bid, 'color': color, 'dates': {}}
-        book_map[bid]['dates'][d] = book_map[bid]['dates'].get(d, 0) + p
 
+    def _ensure_book(book_id_value: str) -> dict:
+        if book_id_value not in book_map:
+            info = book_info.get(book_id_value, {"name": book_id_value, "color": "#888888"})
+            book_map[book_id_value] = {
+                "name": info["name"],
+                "color": info["color"],
+                "dates": {},
+                "carry_over": 0,
+            }
+        return book_map[book_id_value]
+
+    for row in db.execute(
+        "SELECT s.book_id, s.date, SUM(s.pages) AS pages FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND s.date <= ? AND {lf_b} GROUP BY s.book_id, s.date",
+        (year_end,) + lp_b,
+    ).fetchall():
+        book_entry = _ensure_book(row["book_id"])
+        day_str = row["date"]
+        pages = int(row["pages"] or 0)
+        if day_str < year_start:
+            book_entry["carry_over"] += pages
+        else:
+            book_entry["dates"][day_str] = book_entry["dates"].get(day_str, 0) + pages
+            all_dates.add(day_str)
+
+    for row in db.execute(
+        "SELECT p.book_id, p.start_date, p.end_date, p.pages FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.start_date != '' AND p.pages > 0 AND p.start_date <= ? AND {lf_b}",
+        (year_end,) + lp_b,
+    ).fetchall():
+        book_entry = _ensure_book(row["book_id"])
+        for day_str, pages in _distribute_total_across_days(
+            row["start_date"],
+            row["end_date"],
+            row["pages"] or 0,
+            date_to=year_end,
+        ):
+            if day_str < year_start:
+                book_entry["carry_over"] += pages
+            else:
+                book_entry["dates"][day_str] = book_entry["dates"].get(day_str, 0) + pages
+                all_dates.add(day_str)
+
+    book_map = {bid: info for bid, info in book_map.items() if info["dates"]}
     if not book_map:
         return jsonify({'labels': [], 'datasets': []})
-
-    # Get carry-over pages for each book (total pages read before this year)
-    from datetime import timedelta
-    year_start = f"{year}-01-01"
-    year_int = int(year)
-    for bid in book_map:
-        carry_q = (
-            "SELECT COALESCE(SUM(p), 0) AS total FROM ("
-            "SELECT s.pages AS p FROM sessions s JOIN books b ON b.id = s.book_id "
-            f"WHERE s.book_id = ? AND s.date != '' AND s.date < ? AND {lf_b} "
-            "UNION ALL "
-            "SELECT p.pages AS p FROM periods p JOIN books b ON b.id = p.book_id "
-            f"WHERE p.book_id = ? AND p.end_date != '' AND p.pages > 0 AND p.end_date < ? AND {lf_b} "
-            ") s"
-        )
-        carry = db.execute(carry_q, (bid, year_start) + lp_b + (bid, year_start) + lp_b).fetchone()
-        book_map[bid]['carry_over'] = int(carry['total']) if carry else 0
 
     # Build per-book anchor points so the chart shows a step pattern:
     # - For each reading day, also add the day before with the previous
@@ -4133,47 +4477,52 @@ def stats_year(year: str):
     lf, lp = _lib_filter(lib_ids)
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
-    year_sessions = []
-    for row in db.execute(f"""
-        SELECT s.date, s.pages, s.duration_seconds, b.name AS book_name
-        FROM sessions s
-        JOIN books b ON b.id = s.book_id
-        WHERE SUBSTR(s.date, 1, 4) = ? AND {lf_b}
-        ORDER BY s.date
-    """, (year,) + lp_b).fetchall():
-        year_sessions.append(dict(row))
-
-    year_periods = []
-    total_period_pages = 0
-    for row in db.execute(f"""
-        SELECT p.start_date, p.end_date, p.pages, p.note,
-               b.name AS book_name, p.book_id
-        FROM periods p
-        JOIN books b ON b.id = p.book_id
-        WHERE SUBSTR(p.end_date, 1, 4) = ? AND {lf_b}
-        ORDER BY p.end_date
-    """, (year,) + lp_b).fetchall():
-        d = dict(row)
-        d["book_id"] = row["book_id"]
-        year_periods.append(d)
-        total_period_pages += row["pages"]
-
-    total_pages_tracked = sum(s["pages"] for s in year_sessions)
-    total_seconds_tracked = sum(s["duration_seconds"] for s in year_sessions)
-
-    period_seconds = 0
-    if total_period_pages > 0 and total_pages_tracked > 0:
-        period_seconds = int(total_period_pages * (total_seconds_tracked / total_pages_tracked))
-
-    total_pages = total_pages_tracked + total_period_pages
-    total_seconds = total_seconds_tracked + period_seconds
-
-    # ── Gantt chart data ───────────────────────────────────────────────
-    from datetime import timedelta
-
     year_int = int(year)
     year_start = date(year_int, 1, 1)
     year_end = date(year_int, 12, 31)
+    date_from = year_start.isoformat()
+    date_to = year_end.isoformat()
+    daily_year_data = _build_daily_activity_data(db, lf_b, lp_b, date_from=date_from, date_to=date_to)
+    book_session_totals = _load_book_session_totals(db, lf_b, lp_b)
+
+    year_sessions = []
+    for row in db.execute(f"""
+        SELECT s.date, s.pages, s.duration_seconds, s.book_id, b.name AS book_name
+        FROM sessions s
+        JOIN books b ON b.id = s.book_id
+        WHERE s.date >= ? AND s.date <= ? AND {lf_b}
+        ORDER BY s.date
+    """, (date_from, date_to) + lp_b).fetchall():
+        year_sessions.append(dict(row))
+
+    year_periods = []
+    for row in db.execute(f"""
+        SELECT p.start_date, p.end_date, p.pages, p.note,
+               COALESCE(p.duration_seconds, 0) AS duration_seconds,
+               b.name AS book_name, p.book_id, b.format
+        FROM periods p
+        JOIN books b ON b.id = p.book_id
+        WHERE p.start_date != '' AND COALESCE(p.end_date, p.start_date) >= ? AND p.start_date <= ? AND {lf_b}
+        ORDER BY COALESCE(p.end_date, p.start_date)
+    """, (date_from, date_to) + lp_b).fetchall():
+        d = dict(row)
+        d["book_id"] = row["book_id"]
+        book_totals = book_session_totals.get(row["book_id"], {"pages": 0, "seconds": 0})
+        d["duration_seconds"] = _estimate_period_seconds(
+            period_pages=row["pages"] or 0,
+            explicit_period_seconds=row["duration_seconds"] or 0,
+            is_pct_format=(row["format"] or "paper") in ("audiobook", "ebook"),
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
+        year_periods.append(d)
+
+    total_pages = sum(day["pages"] for day in daily_year_data)
+    total_seconds = sum(day["seconds"] for day in daily_year_data)
+    total_pages_tracked = sum(s["pages"] for s in year_sessions)
+    total_period_pages = max(total_pages - total_pages_tracked, 0)
+
+    # ── Gantt chart data ───────────────────────────────────────────────
     total_days = (year_end - year_start).days + 1  # 365 or 366
 
     # (book_id, reading_id) → {name, color, active_dates, …}
@@ -4226,21 +4575,18 @@ def stats_year(year: str):
         FROM periods p
         JOIN books b ON b.id = p.book_id
         LEFT JOIN readings r ON r.id = p.reading_id
-        WHERE p.end_date >= ? AND p.start_date <= ? AND {lf_b}
+        WHERE p.start_date != '' AND COALESCE(p.end_date, p.start_date) >= ? AND p.start_date <= ? AND {lf_b}
     """, (f"{year}-01-01", f"{year}-12-31") + lp_b).fetchall():
         bid = row["book_id"]
         rid = row["reading_id"] or "__none__"
         _ensure_gantt_entry(bid, rid, row["name"], row["cover_color"], row["status"], row["subtitle"], row["reading_number"], row["has_cover"], row["cover_hash"])
-        try:
-            sd = date.fromisoformat(row["start_date"])
-            ed = date.fromisoformat(row["end_date"])
-            d = max(sd, year_start)
-            end_clamp = min(ed, year_end)
-            while d <= end_clamp:
-                gantt_books[(bid, rid)]["active_dates"].add(d)
-                d += timedelta(days=1)
-        except (ValueError, TypeError):
-            pass
+        for day_str in _iter_date_span(row["start_date"], row["end_date"]):
+            try:
+                day_value = date.fromisoformat(day_str)
+            except (ValueError, TypeError):
+                continue
+            if year_start <= day_value <= year_end:
+                gantt_books[(bid, rid)]["active_dates"].add(day_value)
 
     # Check for activity before / after the year for each entry
     for (bid, rid), info in list(gantt_books.items()):
@@ -4422,17 +4768,7 @@ def stats_year(year: str):
         gd["activity"] = gantt_events.get(bid, {})
 
     # Determine prev/next years with data
-    data_years = set()
-    for row in db.execute(
-        "SELECT DISTINCT SUBSTR(s.date, 1, 4) AS yr FROM sessions s "
-        f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
-    ).fetchall():
-        data_years.add(row["yr"])
-    for row in db.execute(
-        "SELECT DISTINCT SUBSTR(p.end_date, 1, 4) AS yr FROM periods p "
-        f"JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND {lf_b}", lp_b
-    ).fetchall():
-        data_years.add(row["yr"])
+    data_years = {day["date"][:4] for day in _build_daily_activity_data(db, lf_b, lp_b)}
     sorted_years = sorted(data_years)
     prev_year = None
     next_year = None
@@ -4481,33 +4817,18 @@ def stats_year_books(year: str):
     for fr in finished_readings:
         readings_per_book[fr["book_id"]] = readings_per_book.get(fr["book_id"], 0) + 1
 
+    reading_bounds = _load_reading_bounds(db, [row["reading_id"] for row in finished_readings])
+    rating_avgs = _load_avg_ratings_for_books(db, list({row["book_id"] for row in finished_readings}))
+
     books_finished = []
     all_finish_years: set[str] = set()
     for fr in finished_readings:
-        rid = fr["reading_id"]
-        candidates = []
-        r = db.execute(
-            "SELECT MAX(date) AS d FROM sessions WHERE reading_id = ? AND date != ''", (rid,)
-        ).fetchone()
-        if r and r["d"]:
-            candidates.append(r["d"])
-        r = db.execute(
-            "SELECT MAX(end_date) AS d FROM periods WHERE reading_id = ? AND end_date != ''", (rid,)
-        ).fetchone()
-        if r and r["d"]:
-            candidates.append(r["d"])
-        if candidates:
-            finish_date = max(candidates)
+        finish_date = reading_bounds.get(fr["reading_id"], {}).get("end")
+        if finish_date:
             finish_yr = finish_date[:4]
             all_finish_years.add(finish_yr)
             if finish_yr == year:
                 book_id = fr["book_id"]
-                ratings_rows = db.execute(
-                    "SELECT dimension_key, value FROM ratings WHERE book_id = ?", (book_id,)
-                ).fetchall()
-                ratings = {r["dimension_key"]: r["value"] for r in ratings_rows}
-                avg_rating = _calc_avg_rating(ratings)
-
                 rnum = fr["reading_number"]
                 show_rnum = readings_per_book.get(book_id, 1) > 1
 
@@ -4519,7 +4840,7 @@ def stats_year_books(year: str):
                     "has_cover": bool(fr["has_cover"]),
                     "cover_hash": fr["cover_hash"] or "",
                     "finish_date": finish_date,
-                    "rating": avg_rating or 0,
+                    "rating": rating_avgs.get(book_id) or 0,
                     "reading_number": rnum if show_rnum else None,
                 })
 
@@ -4705,12 +5026,9 @@ def calendar_view():
             avail_years.add(int(row["yr"]))
         except (ValueError, TypeError):
             pass
-    for row in db.execute(
-        "SELECT DISTINCT SUBSTR(p.end_date, 1, 4) AS yr FROM periods p "
-        f"JOIN books b ON b.id = p.book_id WHERE p.end_date != '' AND {lf_b}", lp_b
-    ).fetchall():
+    for day in _build_daily_activity_data(db, lf_b, lp_b):
         try:
-            avail_years.add(int(row["yr"]))
+            avail_years.add(int(day["date"][:4]))
         except (ValueError, TypeError):
             pass
     for row in db.execute(
@@ -4754,49 +5072,31 @@ def activity():
     lf, lp = _lib_filter(lib_ids)
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
-    # 1. Daily session aggregates (all time)
-    daily_sessions: dict[str, dict] = {}
-    for row in db.execute(
-        "SELECT s.date, SUM(s.pages) AS pages, SUM(s.duration_seconds) AS seconds "
-        "FROM sessions s JOIN books b ON b.id = s.book_id "
-        f"WHERE s.date != '' AND {lf_b} GROUP BY s.date", lp_b
-    ).fetchall():
-        daily_sessions[row["date"]] = {"pages": row["pages"], "seconds": row["seconds"]}
-
-    # 2. Period pages (attributed to end_date; periods have no time granularity)
-    daily_periods: dict[str, int] = {}
-    for row in db.execute(
-        "SELECT p.end_date, SUM(p.pages) AS pages "
-        "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b} GROUP BY p.end_date", lp_b
-    ).fetchall():
-        daily_periods[row["end_date"]] = row["pages"]
-
-    # Merge into daily_data list
-    all_dates = sorted(set(daily_sessions) | set(daily_periods))
-    daily_data = []
-    for d in all_dates:
-        s = daily_sessions.get(d, {"pages": 0, "seconds": 0})
-        p = daily_periods.get(d, 0)
-        daily_data.append({
-            "date": d,
-            "pages": s["pages"] + p,
-            "seconds": s["seconds"],
-        })
+    daily_data = _build_daily_activity_data(db, lf_b, lp_b)
 
     # 3. Book activity by date (for "active books in period")
     session_book_dates: list[dict] = []
+    seen_book_dates: set[tuple[str, str]] = set()
     for row in db.execute(
         "SELECT DISTINCT s.date, s.book_id FROM sessions s "
         f"JOIN books b ON b.id = s.book_id WHERE s.date != '' AND {lf_b}", lp_b
     ).fetchall():
-        session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
+        key = (row["date"], row["book_id"])
+        if key not in seen_book_dates:
+            seen_book_dates.add(key)
+            session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
     for row in db.execute(
-        "SELECT DISTINCT p.end_date AS date, p.book_id "
+        "SELECT p.start_date, p.end_date, p.book_id "
         "FROM periods p JOIN books b ON b.id = p.book_id "
-        f"WHERE p.end_date != '' AND p.pages > 0 AND {lf_b}", lp_b
+        f"WHERE p.start_date != '' AND {lf_b} "
+        "AND (p.pages > 0 OR COALESCE(p.duration_seconds, 0) > 0 OR p.progress_pct IS NOT NULL)",
+        lp_b,
     ).fetchall():
-        session_book_dates.append({"date": row["date"], "book_id": row["book_id"]})
+        for day_str in _iter_date_span(row["start_date"], row["end_date"]):
+            key = (day_str, row["book_id"])
+            if key not in seen_book_dates:
+                seen_book_dates.add(key)
+                session_book_dates.append({"date": day_str, "book_id": row["book_id"]})
 
     # 4. Book lookup (id → {name, has_cover})
     all_books: dict[str, dict] = {}
@@ -5381,6 +5681,30 @@ def book_detail(book_id: str):
     ).fetchall()
     all_periods_data = [dict(pr) for pr in periods_rows]
 
+    book_fmt = info.get("format", "paper") or "paper"
+    is_pct_format = book_fmt in ("audiobook", "ebook")
+
+    reading_session_totals: dict[int, dict[str, int]] = {}
+    book_session_totals = {"pages": 0, "seconds": 0}
+    for session in all_sessions_data:
+        rid = session["reading_id"]
+        reading_session_totals.setdefault(rid, {"pages": 0, "seconds": 0})
+        reading_session_totals[rid]["pages"] += session["pages"] or 0
+        reading_session_totals[rid]["seconds"] += session["duration_seconds"] or 0
+        book_session_totals["pages"] += session["pages"] or 0
+        book_session_totals["seconds"] += session["duration_seconds"] or 0
+
+    for period in all_periods_data:
+        fallback_totals = reading_session_totals.get(period.get("reading_id")) or book_session_totals
+        period["duration_seconds"] = _estimate_period_seconds(
+            period_pages=period.get("pages") or 0,
+            explicit_period_seconds=period.get("duration_seconds") or 0,
+            is_pct_format=is_pct_format,
+            fallback_pages=fallback_totals["pages"],
+            fallback_seconds=fallback_totals["seconds"],
+        )
+        period["duration_display"] = _format_duration(period["duration_seconds"])
+
     # ── Build per-reading summary ──
     def _fmt_date(iso: str) -> str:
         try:
@@ -5388,9 +5712,6 @@ def book_detail(book_id: str):
             return f"{dt.strftime('%b')} {dt.day}, {dt.year}"
         except ValueError:
             return iso
-
-    book_fmt = info.get("format", "paper") or "paper"
-    is_pct_format = book_fmt in ("audiobook", "ebook")
 
     readings_data = []
     for rr in readings_rows:
@@ -5403,20 +5724,18 @@ def book_detail(book_id: str):
             r_pcts += [p["progress_pct"] for p in r_periods if p.get("progress_pct") is not None]
             r_total_pages = max(r_pcts) if r_pcts else 0  # stores % for display
             r_sess_secs = sum(s["duration_seconds"] for s in r_sessions)
-            r_total_secs = r_sess_secs
+            r_total_secs = r_sess_secs + sum(p["duration_seconds"] for p in r_periods)
         else:
             r_sess_pages = sum(s["pages"] for s in r_sessions)
             r_sess_secs  = sum(s["duration_seconds"] for s in r_sessions)
             r_per_pages  = sum(p["pages"] for p in r_periods)
-            r_per_secs   = 0
-            if r_per_pages > 0 and r_sess_pages > 0:
-                r_per_secs = int(r_per_pages * (r_sess_secs / r_sess_pages))
+            r_per_secs   = sum(p["duration_seconds"] for p in r_periods)
             r_total_pages = r_sess_pages + r_per_pages
             r_total_secs  = r_sess_secs + r_per_secs
 
         sess_dates   = [s["date"] for s in r_sessions if s["date"]]
         per_starts   = [p["start_date"] for p in r_periods if p.get("start_date")]
-        per_ends     = [p["end_date"]   for p in r_periods if p.get("end_date")]
+        per_ends     = [(p.get("end_date") or p.get("start_date")) for p in r_periods if p.get("start_date")]
         first_raw    = min(sess_dates + per_starts) if (sess_dates + per_starts) else None
         last_raw     = max(sess_dates + per_ends)   if (sess_dates + per_ends)   else None
 
@@ -5437,21 +5756,19 @@ def book_detail(book_id: str):
     cur_periods  = [p for p in all_periods_data  if p["reading_id"] == current_reading_id]
 
     tracked_seconds = sum(s["duration_seconds"] for s in cur_sessions)
+    period_seconds = sum(p["duration_seconds"] for p in cur_periods)
 
     if is_pct_format:
         cur_pcts = [s["progress_pct"] for s in cur_sessions if s.get("progress_pct") is not None]
         cur_pcts += [p["progress_pct"] for p in cur_periods if p.get("progress_pct") is not None]
         max_pct = max(cur_pcts) if cur_pcts else 0.0
         total_pages = max_pct  # stores % value
-        total_seconds = tracked_seconds
         tracked_pages = 0
         period_pages = 0
+        total_seconds = tracked_seconds + period_seconds
     else:
         tracked_pages = sum(s["pages"] for s in cur_sessions)
         period_pages = sum(p["pages"] for p in cur_periods)
-        period_seconds = 0
-        if period_pages > 0 and tracked_pages > 0:
-            period_seconds = int(period_pages * (tracked_seconds / tracked_pages))
         total_pages = tracked_pages + period_pages
         total_seconds = tracked_seconds + period_seconds
 
@@ -5466,24 +5783,51 @@ def book_detail(book_id: str):
     ).fetchone()
     last_date = last_session_row["date"] if last_session_row else ""
 
-    unique_dates = set(s["date"] for s in cur_sessions if s["date"])
+    daily_activity: dict[str, dict[str, int]] = {}
+
+    def _add_daily_activity(day_str: str, pages: int = 0, seconds: int = 0) -> None:
+        if not day_str:
+            return
+        entry = daily_activity.setdefault(day_str, {"pages": 0, "seconds": 0})
+        entry["pages"] += int(pages or 0)
+        entry["seconds"] += int(seconds or 0)
+
+    for session in cur_sessions:
+        if session["date"]:
+            _add_daily_activity(
+                session["date"],
+                pages=0 if is_pct_format else session["pages"],
+                seconds=session["duration_seconds"],
+            )
+    for period in cur_periods:
+        for day_str, seconds in _distribute_total_across_days(
+            period.get("start_date"),
+            period.get("end_date"),
+            period.get("duration_seconds") or 0,
+        ):
+            _add_daily_activity(day_str, seconds=seconds)
+        if not is_pct_format:
+            for day_str, pages in _distribute_total_across_days(
+                period.get("start_date"),
+                period.get("end_date"),
+                period.get("pages") or 0,
+            ):
+                _add_daily_activity(day_str, pages=pages)
+
+    unique_dates = set(daily_activity)
     reading_days = len(unique_dates)
-    avg_pages_per_day = (tracked_pages / reading_days) if (reading_days > 0 and not is_pct_format) else 0
+    avg_pages_per_day = (total_pages / reading_days) if (reading_days > 0 and not is_pct_format) else 0
 
     # Max pages and minutes on any single day (current reading)
-    pages_by_date: dict[str, int] = {}
-    seconds_by_date: dict[str, int] = {}
-    for s in cur_sessions:
-        if s["date"]:
-            pages_by_date[s["date"]] = pages_by_date.get(s["date"], 0) + s["pages"]
-            seconds_by_date[s["date"]] = seconds_by_date.get(s["date"], 0) + s["duration_seconds"]
+    pages_by_date = {day: values["pages"] for day, values in daily_activity.items()}
+    seconds_by_date = {day: values["seconds"] for day, values in daily_activity.items()}
     max_pages_per_day = (max(pages_by_date.values()) if pages_by_date else 0) if not is_pct_format else 0
     _max_seconds_per_day = max(seconds_by_date.values()) if seconds_by_date else 0
     max_time_per_day = _format_duration(_max_seconds_per_day) if _max_seconds_per_day > 0 else ""
 
     avg_pages_per_hour = 0.0
-    if tracked_seconds > 0 and not is_pct_format:
-        avg_pages_per_hour = tracked_pages / (tracked_seconds / 3600)
+    if total_seconds > 0 and not is_pct_format:
+        avg_pages_per_hour = total_pages / (total_seconds / 3600)
 
     status = info.get("status", "")
     progress_pct = 0.0
@@ -5512,7 +5856,7 @@ def book_detail(book_id: str):
     # Date Started and Date Finished (current reading)
     cur_sess_dates   = [s["date"]       for s in cur_sessions if s["date"]]
     cur_per_starts   = [p["start_date"] for p in cur_periods  if p.get("start_date")]
-    cur_per_ends     = [p["end_date"]   for p in cur_periods  if p.get("end_date")]
+    cur_per_ends     = [(p.get("end_date") or p.get("start_date")) for p in cur_periods if p.get("start_date")]
     _ds_raw = min(cur_sess_dates + cur_per_starts) if (cur_sess_dates + cur_per_starts) else None
     _df_raw = max(cur_sess_dates + cur_per_ends)   if (cur_sess_dates + cur_per_ends)   else None
     date_started  = _fmt_date(_ds_raw)  if _ds_raw  else None
@@ -5539,17 +5883,13 @@ def book_detail(book_id: str):
         sd_str = p.get("start_date", "")
         ed_str = p.get("end_date", "")
         rid = p.get("reading_id")
-        if sd_str and ed_str and rid:
+        if sd_str and rid:
             reading_active_dates.setdefault(rid, set())
-            try:
-                sd = date.fromisoformat(sd_str)
-                ed = date.fromisoformat(ed_str)
-                d = sd
-                while d <= ed:
-                    reading_active_dates[rid].add(d)
-                    d += _td(days=1)
-            except (ValueError, TypeError):
-                pass
+            for day_str in _iter_date_span(sd_str, ed_str):
+                try:
+                    reading_active_dates[rid].add(date.fromisoformat(day_str))
+                except (ValueError, TypeError):
+                    pass
 
     # Only include the currently selected reading in the Gantt
     current_gantt_dates = reading_active_dates.get(current_reading_id, set())

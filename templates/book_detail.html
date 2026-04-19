@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 
 <!-- ── Cumulative progress chart ─────────────────────────────────────── -->
-{% if sessions %}
+{% if sessions or reading_periods %}
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-body">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
@@ -993,8 +993,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ── Build cumulative progress chart ──────────────────────────────────
-{% if sessions %}
+{% if sessions or reading_periods %}
 const sessions = {{ sessions | tojson }};
+const readingPeriods = {{ reading_periods | tojson }};
 const effectivePages = {{ effective_pages }};
 const isPctFormat = {{ 'true' if is_pct_format else 'false' }};
 
@@ -1011,20 +1012,78 @@ function hexToRgba(hex, a) {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-// Group sessions by date
+function parseIsoDate(dateStr) {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split('-').map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function formatIsoDate(dateObj) {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function iterateDateSpan(startDateStr, endDateStr) {
+    const start = parseIsoDate(startDateStr);
+    const end = parseIsoDate(endDateStr || startDateStr);
+    if (!start || !end) return [];
+    if (end < start) return [formatIsoDate(start)];
+    const out = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        out.push(formatIsoDate(d));
+    }
+    return out;
+}
+
+function distributeTotalAcrossDays(startDateStr, endDateStr, total) {
+    const span = iterateDateSpan(startDateStr, endDateStr);
+    if (!span.length) return [];
+    const numericTotal = Number(total || 0);
+    const base = Math.floor(numericTotal / span.length);
+    const remainder = numericTotal % span.length;
+    return span.map((day, index) => [day, base + (index < remainder ? 1 : 0)]);
+}
+
+// Group sessions and periods by date using the same normalization as the backend
 const dateMap = new Map();
+function ensureDay(day) {
+    if (!dateMap.has(day)) {
+        dateMap.set(day, { pages: 0, pct: null, seconds: 0 });
+    }
+    return dateMap.get(day);
+}
+
 sessions.forEach(s => {
-    if (!dateMap.has(s.date)) {
-        dateMap.set(s.date, { pages: 0, pct: 0, seconds: 0 });
-    }
-    const current = dateMap.get(s.date);
+    if (!s.date) return;
+    const current = ensureDay(s.date);
     if (isPctFormat) {
-        // For % format: take the max progress_pct for each date (absolute value)
-        current.pct = Math.max(current.pct, s.progress_pct || 0);
+        const progressPct = Number(s.progress_pct || 0);
+        current.pct = current.pct == null ? progressPct : Math.max(current.pct, progressPct);
     } else {
-        current.pages += s.pages;
+        current.pages += Number(s.pages || 0);
     }
-    current.seconds += s.duration_seconds || 0;
+    current.seconds += Number(s.duration_seconds || 0);
+});
+
+readingPeriods.forEach(period => {
+    if (isPctFormat) {
+        const progressDate = period.end_date || period.start_date;
+        if (progressDate) {
+            const current = ensureDay(progressDate);
+            const progressPct = Number(period.progress_pct || 0);
+            current.pct = current.pct == null ? progressPct : Math.max(current.pct, progressPct);
+        }
+    } else {
+        distributeTotalAcrossDays(period.start_date, period.end_date, period.pages || 0).forEach(([day, pages]) => {
+            ensureDay(day).pages += pages;
+        });
+    }
+    distributeTotalAcrossDays(period.start_date, period.end_date, period.duration_seconds || 0).forEach(([day, seconds]) => {
+        ensureDay(day).seconds += seconds;
+    });
 });
 
 // Sort by date and build cumulative array
@@ -1035,10 +1094,10 @@ const chartData = [];
 
 // Add starting point (previous day with 0 pages) for better visualization
 if (sortedDates.length > 0) {
-    const firstDate = new Date(sortedDates[0]);
+    const firstDate = parseIsoDate(sortedDates[0]);
     const prevDate = new Date(firstDate);
     prevDate.setDate(prevDate.getDate() - 1);
-    const prevDateStr = prevDate.toISOString().split('T')[0];
+    const prevDateStr = formatIsoDate(prevDate);
     chartData.push({
         date: prevDateStr,
         pages: 0,
@@ -1054,8 +1113,9 @@ for (let i = 0; i < sortedDates.length; i++) {
     const date = sortedDates[i];
     const dayData = dateMap.get(date);
     if (isPctFormat) {
-        // For % format: dayData.pct is already the absolute progress
-        cumulative = dayData.pct;
+        if (dayData.pct != null) {
+            cumulative = Math.max(cumulative, dayData.pct);
+        }
     } else {
         cumulative += dayData.pages;
     }
@@ -1063,19 +1123,19 @@ for (let i = 0; i < sortedDates.length; i++) {
     
     // Fill in missing dates if there's a gap
     if (i > 0) {
-        const prevDate = new Date(sortedDates[i - 1]);
-        const currentDate = new Date(date);
+        const prevDate = parseIsoDate(sortedDates[i - 1]);
+        const currentDate = parseIsoDate(date);
         const daysBetween = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
         
         // Previous cumulative value (before this day's data)
-        const prevCumulative = isPctFormat ? (dateMap.get(sortedDates[i - 1])?.pct || 0) : (cumulative - dayData.pages);
+        const prevCumulative = isPctFormat ? chartData[chartData.length - 1]?.pages || 0 : (cumulative - dayData.pages);
         const prevCumulativeSeconds = cumulativeSeconds - dayData.seconds;
         
         // Add intermediate dates with same cumulative value (before the new reading)
         for (let d = 1; d < daysBetween; d++) {
             const intermDate = new Date(prevDate);
             intermDate.setDate(intermDate.getDate() + d);
-            const intermDateStr = intermDate.toISOString().split('T')[0];
+            const intermDateStr = formatIsoDate(intermDate);
             chartData.push({
                 date: intermDateStr,
                 pages: prevCumulative,
@@ -1101,17 +1161,18 @@ for (let i = 0; i < sortedDates.length; i++) {
 // Build per-day data (all dates from first to last, 0 for non-reading days, no invisible start)
 const perDayData = [];
 if (sortedDates.length > 0) {
-    const firstDate = new Date(sortedDates[0]);
-    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    const firstDate = parseIsoDate(sortedDates[0]);
+    const lastDate = parseIsoDate(sortedDates[sortedDates.length - 1]);
     let prevPct = 0;
     for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = formatIsoDate(d);
         const dayData = dateMap.get(dateStr);
         if (dayData) {
             let dayPages;
             if (isPctFormat) {
-                dayPages = dayData.pct - prevPct;
-                prevPct = dayData.pct;
+                const nextPct = dayData.pct != null ? Math.max(prevPct, dayData.pct) : prevPct;
+                dayPages = nextPct - prevPct;
+                prevPct = nextPct;
             } else {
                 dayPages = dayData.pages;
             }

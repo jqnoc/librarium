@@ -90,7 +90,7 @@
 {% endif %}
 
 <!-- ── Cumulative progress chart ─────────────────────────────────────── -->
-{% if sessions %}
+{% if sessions or periods %}
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
@@ -221,8 +221,11 @@
 </div>
 {% endif %}
 
+{% endif %}
+
 <!-- ── Reading sessions table ────────────────────────────────────────── -->
 <h2 data-i18n="yearStats.sessions">Reading Sessions</h2>
+{% if sessions %}
 <div class="table-wrap">
     <table>
         <thead>
@@ -245,12 +248,9 @@
         </tbody>
     </table>
 </div>
-
 {% else %}
 <div class="empty-state">
-    <div class="icon">📊</div>
     <p><span data-i18n="yearStats.noSessions">No reading sessions in</span> {{ year }}.</p>
-    <a href="{{ url_for('global_stats') }}" class="btn btn-secondary" data-i18n="yearStats.backToGlobal">← Back to Global Stats</a>
 </div>
 {% endif %}
 
@@ -287,18 +287,73 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-{% if sessions %}
+{% if sessions or periods %}
 const sessions = {{ sessions | tojson }};
+const periods = {{ periods | tojson }};
+const yearStart = '{{ year }}-01-01';
+const yearEnd = '{{ year }}-12-31';
 
-// Group sessions by date and calculate cumulative totals
-const dateMap = new Map();
-sessions.forEach(s => {
-    if (!dateMap.has(s.date)) {
-        dateMap.set(s.date, { pages: 0, seconds: 0 });
+function parseIsoDate(dateStr) {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split('-').map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function formatIsoDate(dateObj) {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function iterateDateSpan(startDateStr, endDateStr) {
+    const start = parseIsoDate(startDateStr);
+    const end = parseIsoDate(endDateStr || startDateStr);
+    if (!start || !end) return [];
+    if (end < start) return [formatIsoDate(start)];
+    const out = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        out.push(formatIsoDate(d));
     }
-    const current = dateMap.get(s.date);
-    current.pages += s.pages;
-    current.seconds += s.duration_seconds || 0;
+    return out;
+}
+
+function distributeTotalAcrossDays(startDateStr, endDateStr, total, clipStartStr, clipEndStr) {
+    const span = iterateDateSpan(startDateStr, endDateStr).filter(day => {
+        if (clipStartStr && day < clipStartStr) return false;
+        if (clipEndStr && day > clipEndStr) return false;
+        return true;
+    });
+    if (!span.length) return [];
+    const numericTotal = Number(total || 0);
+    const base = Math.floor(numericTotal / span.length);
+    const remainder = numericTotal % span.length;
+    return span.map((day, index) => [day, base + (index < remainder ? 1 : 0)]);
+}
+
+const dateMap = new Map();
+function ensureDay(day) {
+    if (!dateMap.has(day)) {
+        dateMap.set(day, { pages: 0, seconds: 0 });
+    }
+    return dateMap.get(day);
+}
+
+sessions.forEach(s => {
+    if (!s.date) return;
+    const current = ensureDay(s.date);
+    current.pages += Number(s.pages || 0);
+    current.seconds += Number(s.duration_seconds || 0);
+});
+
+periods.forEach(period => {
+    distributeTotalAcrossDays(period.start_date, period.end_date, period.pages || 0, yearStart, yearEnd).forEach(([day, pages]) => {
+        ensureDay(day).pages += pages;
+    });
+    distributeTotalAcrossDays(period.start_date, period.end_date, period.duration_seconds || 0, yearStart, yearEnd).forEach(([day, seconds]) => {
+        ensureDay(day).seconds += seconds;
+    });
 });
 
 // Sort by date and build cumulative array
@@ -309,10 +364,10 @@ const chartData = [];
 
 // Add starting point (previous day with 0 pages) for better visualization
 if (sortedDates.length > 0) {
-    const firstDate = new Date(sortedDates[0]);
+    const firstDate = parseIsoDate(sortedDates[0]);
     const prevDate = new Date(firstDate);
     prevDate.setDate(prevDate.getDate() - 1);
-    const prevDateStr = prevDate.toISOString().split('T')[0];
+    const prevDateStr = formatIsoDate(prevDate);
     chartData.push({
         date: prevDateStr,
         pages: 0,
@@ -332,15 +387,15 @@ for (let i = 0; i < sortedDates.length; i++) {
     
     // Fill in missing dates if there's a gap
     if (i > 0) {
-        const prevDate = new Date(sortedDates[i - 1]);
-        const currentDate = new Date(date);
+        const prevDate = parseIsoDate(sortedDates[i - 1]);
+        const currentDate = parseIsoDate(date);
         const daysBetween = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
         
         // Add intermediate dates with same cumulative value (before the new reading)
         for (let d = 1; d < daysBetween; d++) {
             const intermDate = new Date(prevDate);
             intermDate.setDate(intermDate.getDate() + d);
-            const intermDateStr = intermDate.toISOString().split('T')[0];
+            const intermDateStr = formatIsoDate(intermDate);
             chartData.push({
                 date: intermDateStr,
                 pages: cumulative - dayData.pages, // Use previous cumulative
@@ -366,10 +421,10 @@ for (let i = 0; i < sortedDates.length; i++) {
 // Build per-day data (all dates from first to last, 0 for non-reading days, no invisible start)
 const perDayData = [];
 if (sortedDates.length > 0) {
-    const firstDate = new Date(sortedDates[0]);
-    const lastDate = new Date(sortedDates[sortedDates.length - 1]);
+    const firstDate = parseIsoDate(sortedDates[0]);
+    const lastDate = parseIsoDate(sortedDates[sortedDates.length - 1]);
     for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = formatIsoDate(d);
         const dayData = dateMap.get(dateStr);
         if (dayData) {
             perDayData.push({ date: dateStr, pages: dayData.pages, seconds: dayData.seconds, isReading: true });
