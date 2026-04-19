@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dropbox file downloads now skip re-downloading when the local file's content hash already matches the remote, avoiding unnecessary 249 MB transfers on subsequent launches
 - Image externalization: book covers and author photos are now stored as individual files on disk (`DATA_DIR/images/<user>/covers/` and `authors/`) instead of SQLite BLOBs, reducing database size from ~244 MB to ~57 MB; thumbnails remain in the DB; images are synced individually to Dropbox; a one-time migration extracts existing BLOBs to files and VACUUMs the database
 - Dashboard, library, activity, and yearly stats routes now share normalized daily-activity helpers, bulk rating/edition lookups, and new SQLite indexes so period-aware summaries render with fewer repeated queries
+- The shared UI now keeps the original font stack, restores full-width viewport layouts, and retains the more distinctive header/surface treatment plus the redesigned dashboard/library toolbars and stat cards while keeping the existing Librarium color palette
 
 ### Fixed
 - Quote of the Day on the Dashboard now renders curly quotes correctly instead of showing literal `\u201c` / `\u201d` escape sequences; also fixes HTML formatting within quotes being escaped
