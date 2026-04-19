@@ -7,21 +7,21 @@
     <span class="library-epigraph" data-i18n="index.epigraph">&ldquo;Domus sine librario, sicut castrum sine armamentario.&rdquo;</span>
 </div>
 
-<div class="library-toolbar">
-    <div class="library-toolbar-controls">
+<div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
         <!-- Search -->
-        <input type="text" id="librarySearch" class="toolbar-search" placeholder="Search..." data-i18n-placeholder="index.searchPlaceholder">
+        <input type="text" id="librarySearch" placeholder="Search..." data-i18n-placeholder="index.searchPlaceholder" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; width: 180px; font-size: 0.9rem;">
 
         <!-- View switcher -->
-        <span class="toolbar-label" data-i18n="index.view">View:</span>
+        <span style="color: var(--lb-text-light); font-size: 0.9rem;" data-i18n="index.view">View:</span>
         <div class="view-switcher">
             <button class="view-btn active" data-view="card" data-i18n-title="index.btnCardView" title="Card view">🃏</button>
             <button class="view-btn" data-view="cover" data-i18n-title="index.btnCoverView" title="Cover view">🖼️</button>
             <button class="view-btn" data-view="list" data-i18n-title="index.btnListView" title="List view">📋</button>
         </div>
 
-        <span class="toolbar-label toolbar-label-spaced" data-i18n="index.filter">Filter:</span>
-        <select id="statusFilter" class="toolbar-select" onchange="updateSort()">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.filter">Filter:</span>
+        <select id="statusFilter" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="all" {{ 'selected' if status_filter == 'all' else '' }} data-i18n="index.filterAll">All</option>
             <option value="reading" {{ 'selected' if status_filter == 'reading' else '' }} data-i18n="index.filterReading">Reading</option>
             <option value="finished" {{ 'selected' if status_filter == 'finished' else '' }} data-i18n="index.filterFinished">Finished</option>
@@ -30,16 +30,16 @@
             <option value="draft" {{ 'selected' if status_filter == 'draft' else '' }} data-i18n="index.filterDraft">Draft</option>
         </select>
 
-        <label class="col-check toolbar-check toolbar-check-spaced">
+        <label class="col-check" style="margin-left: 0.75rem;">
             <input type="checkbox" id="showEditions" onchange="updateSort()" {{ 'checked' if show_editions == '1' else '' }}>
             <span data-i18n="index.showAllEditions">Show All Editions</span>
         </label>
-        <label class="col-check toolbar-check" id="showReadingsLabel">
+        <label class="col-check" id="showReadingsLabel">
             <input type="checkbox" id="showReadings" onchange="updateSort()" {{ 'checked' if show_readings == '1' else '' }} {{ '' if show_editions == '1' else 'disabled' }}>
             <span data-i18n="index.showAllReadings">Show All Readings</span>
         </label>
-        <span class="toolbar-label toolbar-label-spaced" data-i18n="index.sortBy">Sort by:</span>
-        <select id="sort1" class="toolbar-select" onchange="updateSort()">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem; margin-left: 0.5rem;" data-i18n="index.sortBy">Sort by:</span>
+        <select id="sort1" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="name" {{ 'selected' if sort1 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
             <option value="author" {{ 'selected' if sort1 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
             <option value="last_session" {{ 'selected' if sort1 == 'last_session' else '' }} data-i18n="index.sortLastSession">Last Reading Session/Period</option>
@@ -47,8 +47,8 @@
             <option value="status" {{ 'selected' if sort1 == 'status' else '' }} data-i18n="index.sortStatus">Status</option>
             <option value="time_read" {{ 'selected' if sort1 == 'time_read' else '' }} data-i18n="index.sortTimeRead">Time Read</option>
         </select>
-        <span class="toolbar-label" data-i18n="index.thenBy">then by:</span>
-        <select id="sort2" class="toolbar-select" onchange="updateSort()">
+        <span style="color: var(--lb-text-light); font-size: 0.9rem;" data-i18n="index.thenBy">then by:</span>
+        <select id="sort2" onchange="updateSort()" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border); background: white; cursor: pointer;">
             <option value="" {{ 'selected' if sort2 == '' else '' }} data-i18n="index.sortNone">— None —</option>
             <option value="name" {{ 'selected' if sort2 == 'name' else '' }} data-i18n="index.sortAlpha">Alphabetically</option>
             <option value="author" {{ 'selected' if sort2 == 'author' else '' }} data-i18n="index.sortAuthor">Author</option>
@@ -61,10 +61,10 @@
 </div>
 
 {% if tag_filter %}
-<div class="tag-filter-banner">
+<div style="margin: 0.75rem 0; padding: 0.5rem 1rem; background: var(--lb-accent-glow); border-radius: var(--lb-radius); display: inline-flex; align-items: center; gap: 0.5rem;">
     <span data-i18n="index.filteringByTag">Filtering by tag:</span>
     <span class="tag-bubble" style="cursor: default;">{{ tag_filter }}</span>
-    <a href="{{ url_for('index') }}" class="tag-filter-clear" data-i18n="index.clearTagFilter">✕ Clear</a>
+    <a href="{{ url_for('index') }}" style="color: var(--lb-deep-orange); font-weight: 600; text-decoration: none;" data-i18n="index.clearTagFilter">✕ Clear</a>
 </div>
 {% endif %}
 

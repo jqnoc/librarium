@@ -13,7 +13,7 @@
         // No palette switching needed — single Librarium theme
     </script>
 </head>
-<body class="page-{{ (request.endpoint or 'app') | replace('.', '-') | replace('_', '-') }}">
+<body>
     <!-- ── Header ────────────────────────────────────────────────────── -->
     <header class="site-header">
         <div class="header-inner">
@@ -157,7 +157,7 @@
     </script>
 
     <!-- ── Flash messages ────────────────────────────────────────────── -->
-    <main class="main-content">
+    <div class="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
@@ -167,7 +167,7 @@
         {% endwith %}
 
         {% block content %}{% endblock %}
-    </main>
+    </div>
 
     <!-- ── Footer ────────────────────────────────────────────────────── -->
     <footer class="site-footer">

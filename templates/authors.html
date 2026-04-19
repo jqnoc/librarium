@@ -9,19 +9,20 @@
     if (!params.has('sort')) {
         var saved = localStorage.getItem('librarium_authors_sort');
         if (saved && saved !== 'name') {
-            window.location.replace('{{ url_for("authors_list") }}?sort=' + saved);
+            window.location.replace('{{ url_for('authors_list') }}?sort=' + saved);
         }
     }
 })();
 </script>
-<div class="page-toolbar">
-    <div class="page-toolbar-main">
-        <h1 style="margin: 0;" data-i18n="authors.title">Authors</h1>
-        <span class="page-toolbar-count">{{ authors | length }} author{{ 's' if authors | length != 1 else '' }}</span>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <h1 style="margin: 0; color: var(--lb-text-dark);" data-i18n="authors.title">Authors</h1>
+        <span style="color: var(--lb-text-light); font-size: 1rem;">{{ authors | length }} author{{ 's' if authors | length != 1 else '' }}</span>
     </div>
-    <label class="page-toolbar-actions">
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
         <span data-i18n="authors.sortBy">Sort by:</span>
-        <select id="authorSort" class="toolbar-select" onchange="updateAuthorSort()">
+        <select id="authorSort" onchange="updateAuthorSort()"
+                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
             <option value="name"  {% if sort == 'name'  %}selected{% endif %} data-i18n="authors.sortName">Name</option>
             <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="authors.sortBooks">Number of Books</option>
         </select>
@@ -32,7 +33,7 @@
 function updateAuthorSort() {
     var value = document.getElementById('authorSort').value;
     localStorage.setItem('librarium_authors_sort', value);
-    window.location.href = '{{ url_for("authors_list") }}?sort=' + value;
+    window.location.href = '{{ url_for('authors_list') }}?sort=' + value;
 }
 </script>
 
