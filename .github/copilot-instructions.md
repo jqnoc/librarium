@@ -384,7 +384,7 @@ series      (id INTEGER PK, name, library_id FK,
 book_series (book_id FK, series_id FK, series_index,
              PRIMARY KEY (book_id, series_id))
 
-sources     (id TEXT PK, type, name, short_name, location, url, notes)
+sources     (id TEXT PK, type, name, location, url, notes)
 
 libraries   (id INTEGER PK, name, slug UNIQUE)
 ```

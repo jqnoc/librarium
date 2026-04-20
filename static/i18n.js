@@ -444,8 +444,6 @@
         // ── Sources page ────────────────────────────────────────────────
         'sources.title':      { en: 'Sources',    es: 'Fuentes' },
         'sources.desc':       { en: 'Manage places and people from where you acquire or borrow books.', es: 'Gestiona los lugares y personas de donde adquieres o tomas prestados libros.' },
-        'sources.shortName':  { en: 'Short Name',  es: 'Nombre Corto' },
-        'sources.fullName':   { en: 'Full Name',   es: 'Nombre Completo' },
         'sources.type':       { en: 'Type',        es: 'Tipo' },
         'sources.locationUrl':{ en: 'Location / URL', es: 'Ubicación / URL' },
         'sources.notes':      { en: 'Notes',       es: 'Notas' },
@@ -454,7 +452,6 @@
         'sources.addBtn':     { en: '+ Add Source',   es: '+ Añadir Fuente' },
         'sources.name':       { en: 'Name',       es: 'Nombre' },
         'sources.nameReq':    { en: 'Name *',     es: 'Nombre *' },
-        'sources.short':      { en: 'Short Name',  es: 'Nombre Corto' },
         'sources.location':   { en: 'Location',    es: 'Ubicación' },
         'sources.url':        { en: 'URL',          es: 'URL' },
         'sources.notesLabel': { en: 'Notes',        es: 'Notas' },

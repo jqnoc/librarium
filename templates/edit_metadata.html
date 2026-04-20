@@ -338,13 +338,13 @@
                         <select id="source_id_owned" name="source_id" class="form-control">
                             <option value="">— Select —</option>
                             {% for s in purchase_sources %}
-                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id and not info.get('is_gift') }}>{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id and not info.get('is_gift') }}>{{ s.name }} ({{ s.type | source_type_label }})</option>
                             {% endfor %}
                         </select>
                         <select id="source_id_gift" name="source_id" class="form-control" style="display: none;">
                             <option value="">— Select —</option>
                             {% for s in gift_sources %}
-                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id and info.get('is_gift') }}>{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id and info.get('is_gift') }}>{{ s.name }} ({{ s.type | source_type_label }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -364,7 +364,7 @@
                         <select id="source_id_borrowed" name="source_id" class="form-control">
                             <option value="">— Select —</option>
                             {% for s in borrow_sources %}
-                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id }}>{{ s.short_name or s.name }} ({{ s.type | source_type_label }})</option>
+                            <option value="{{ s.id }}" {{ 'selected' if info.get('source_id') == s.id }}>{{ s.name }} ({{ s.type | source_type_label }})</option>
                             {% endfor %}
                         </select>
                     </div>

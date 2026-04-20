@@ -831,7 +831,6 @@ def init_schema() -> None:
             id          TEXT    PRIMARY KEY,
             type        TEXT    NOT NULL DEFAULT '',
             name        TEXT    NOT NULL DEFAULT '',
-            short_name  TEXT    NOT NULL DEFAULT '',
             location    TEXT    NOT NULL DEFAULT '',
             url         TEXT    NOT NULL DEFAULT '',
             notes       TEXT    NOT NULL DEFAULT ''
@@ -1011,6 +1010,7 @@ def _run_all_migrations() -> None:
     migrate_add_word_translations()
     migrate_externalize_images()
     migrate_add_performance_indexes()
+    migrate_remove_source_short_name()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1604,7 +1604,6 @@ def migrate_shared_sources() -> None:
             id          TEXT    PRIMARY KEY,
             type        TEXT    NOT NULL DEFAULT '',
             name        TEXT    NOT NULL DEFAULT '',
-            short_name  TEXT    NOT NULL DEFAULT '',
             location    TEXT    NOT NULL DEFAULT '',
             url         TEXT    NOT NULL DEFAULT '',
             notes       TEXT    NOT NULL DEFAULT ''
@@ -1612,10 +1611,11 @@ def migrate_shared_sources() -> None:
     """)
 
     for s in unique_sources:
+        name = (s.get("name") or "").strip() or (s.get("short_name") or "").strip()
         db.execute(
-            "INSERT INTO sources (id, type, name, short_name, location, url, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (s["id"], s.get("type", ""), s.get("name", ""), s.get("short_name", ""),
+            "INSERT INTO sources (id, type, name, location, url, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (s["id"], s.get("type", ""), name,
              s.get("location", ""), s.get("url", ""), s.get("notes", "")),
         )
 
@@ -1974,6 +1974,55 @@ def migrate_add_performance_indexes() -> None:
     db.commit()
     db.close()
     print(">> Migration complete — performance indexes added.")
+
+
+def migrate_remove_source_short_name() -> None:
+    """Drop the legacy short_name column from sources."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=OFF")
+
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    if "short_name" not in cols:
+        db.close()
+        return
+
+    print(">> Migrating: removing legacy source short names ...")
+    all_sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
+
+    db.execute("DROP TABLE IF EXISTS sources")
+    db.execute("""
+        CREATE TABLE sources (
+            id          TEXT    PRIMARY KEY,
+            type        TEXT    NOT NULL DEFAULT '',
+            name        TEXT    NOT NULL DEFAULT '',
+            location    TEXT    NOT NULL DEFAULT '',
+            url         TEXT    NOT NULL DEFAULT '',
+            notes       TEXT    NOT NULL DEFAULT ''
+        )
+    """)
+
+    for row in all_sources:
+        source = dict(row)
+        name = (source.get("name") or "").strip() or (source.get("short_name") or "").strip()
+        db.execute(
+            "INSERT INTO sources (id, type, name, location, url, notes) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                source["id"],
+                source.get("type", ""),
+                name,
+                source.get("location", ""),
+                source.get("url", ""),
+                source.get("notes", ""),
+            ),
+        )
+
+    db.commit()
+    db.close()
+    print(">> Migration complete — sources now use a single name field.")
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -7434,18 +7483,16 @@ def sources_list():
 def add_source():
     db = get_db()
     name = request.form.get("name", "").strip()
-    short_name = request.form.get("short_name", "").strip()
     if not name:
         flash("Source name is required.", "error")
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, short_name, location, url, notes) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, location, url, notes) VALUES (?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
             request.form.get("source_type", "").strip(),
             name,
-            short_name or name,
             request.form.get("location", "").strip(),
             request.form.get("url", "").strip(),
             request.form.get("notes", "").strip(),
@@ -7464,13 +7511,16 @@ def edit_source(source_id: str):
         abort(404)
 
     name = request.form.get("name", "").strip()
-    short_name = request.form.get("short_name", "").strip() or name
+    if not name:
+        flash("Source name is required.", "error")
+        return redirect(url_for("sources_list"))
+
     db.execute("""
-        UPDATE sources SET type=?, name=?, short_name=?, location=?, url=?, notes=?
+        UPDATE sources SET type=?, name=?, location=?, url=?, notes=?
         WHERE id=?
     """, (
         request.form.get("source_type", "").strip(),
-        name, short_name,
+        name,
         request.form.get("location", "").strip(),
         request.form.get("url", "").strip(),
         request.form.get("notes", "").strip(),

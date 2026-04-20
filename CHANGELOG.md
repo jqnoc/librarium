@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty
+
 ## [2.0.0] — 2026-04-19
 
 ### Added
