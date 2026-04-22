@@ -512,7 +512,7 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Language Diversity + TBR Pile                                           -->
+<!-- Language Diversity + TBR / Wishlist                                    -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="dash-two-col">
     <!-- Language Diversity -->
@@ -548,6 +548,30 @@
                         <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
                         {% else %}
                         <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if wishlist_count > 0 %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.wishlistPile">Wishlist</h2>
+        <div class="card">
+            <div class="card-body">
+                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
+                    <strong>{{ wishlist_count }}</strong> <span data-i18n="dash.booksToBuy">books you want to buy</span>
+                </p>
+                <div class="dash-tbr-covers" id="dashWishlistCovers">
+                    {% for book in wishlist_list %}
+                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
+                        {% if book.has_cover %}
+                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                        {% else %}
+                        <div class="cover-placeholder" style="width:100%;height:100%;">📚</div>
                         {% endif %}
                     </a>
                     {% endfor %}
@@ -882,23 +906,23 @@ makeDonut('sourceDonut', sourceCounts);
 {% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TBR Pile Dynamic Sizing
+// Dashboard cover strips dynamic sizing
 // ═══════════════════════════════════════════════════════════════════════════
 (function() {
-    const container = document.getElementById('dashTbrCovers');
-    if (!container) return;
-    const items = Array.from(container.children);
-    if (items.length === 0) return;
-    function fitTbr() {
-        const containerWidth = container.offsetWidth;
-        const itemWidth = 60 + 8; // width + gap
-        const maxVisible = Math.max(1, Math.floor(containerWidth / itemWidth));
-        items.forEach(function(item, i) {
-            item.style.display = i < maxVisible ? '' : 'none';
-        });
-    }
-    fitTbr();
-    window.addEventListener('resize', fitTbr);
+    document.querySelectorAll('.dash-tbr-covers').forEach(function(container) {
+        const items = Array.from(container.children);
+        if (items.length === 0) return;
+        function fitStrip() {
+            const containerWidth = container.offsetWidth;
+            const itemWidth = 60 + 8; // width + gap
+            const maxVisible = Math.max(1, Math.floor(containerWidth / itemWidth));
+            items.forEach(function(item, i) {
+                item.style.display = i < maxVisible ? '' : 'none';
+            });
+        }
+        fitStrip();
+        window.addEventListener('resize', fitStrip);
+    });
 })();
 </script>
 {% endblock %}

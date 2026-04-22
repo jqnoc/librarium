@@ -23,6 +23,7 @@
     --lb-finished:      #10B981;
     --lb-not-started:   #8B5CF6;
     --lb-abandoned:     #DC2626;
+    --lb-wishlist:      #F59E0B;
     --lb-draft:          #6B7280;
 
     --lb-gradient:      linear-gradient(135deg, #537D96 0%, #44A194 50%, #EC8F8D 100%);
@@ -758,6 +759,7 @@ h3 {
 .badge.status-finished   { background: #ECFDF5; color: var(--lb-finished);    border-color: #A7F3D0; }
 .badge.status-not-started{ background: #F3E8FF; color: var(--lb-not-started); border-color: #DDD6FE; }
 .badge.status-abandoned  { background: #FEF2F2; color: var(--lb-abandoned);   border-color: #FECACA; }
+.badge.status-wishlist   { background: #FFFBEB; color: var(--lb-wishlist);    border-color: #FDE68A; }
 .badge.status-draft      { background: #F3F4F6; color: var(--lb-draft);       border-color: #D1D5DB; }
 
 /* ── Book detail layout ────────────────────────────────────────────────── */

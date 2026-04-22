@@ -3206,7 +3206,7 @@ def _build_index_per_reading(db, lib_ids):
     - 1 reading  → show it
     - >1 readings, some finished → show each finished one
     - >1 readings, none finished → show the one with highest priority
-      (reading > abandoned > not-started > draft)
+            (reading > abandoned > not-started > wishlist > draft)
     """
     lf, lp = _lib_filter(lib_ids)
     book_rows = db.execute(
@@ -3237,7 +3237,7 @@ def _build_index_per_reading(db, lib_ids):
     for r in all_readings:
         readings_by_book.setdefault(r["book_id"], []).append(dict(r))
 
-    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "draft": 3, "finished": 4}
+    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "wishlist": 3, "draft": 4, "finished": 5}
     selected: list[tuple] = []  # (book_id, reading_id, reading_number, status)
     for bid in bids:
         rlist = readings_by_book.get(bid, [])
@@ -3411,6 +3411,7 @@ def dashboard():
     total_library_pages = 0
     reading_count = 0
     not_started_count = 0
+    wishlist_count = 0
     format_counts: dict[str, int] = Counter()
     source_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
@@ -3432,6 +3433,8 @@ def dashboard():
             reading_count += 1
         elif br["status"] == "not-started":
             not_started_count += 1
+        elif br["status"] == "wishlist":
+            wishlist_count += 1
 
         book_fmt = br["format"] or "paper"
         format_counts[book_fmt] += 1
@@ -3677,6 +3680,15 @@ def dashboard():
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
 
+    # ── Wishlist (to-buy) pile ──────────────────────────────────────────
+    wishlist_books = db.execute(
+        f"SELECT id, name, has_cover, cover_hash, author FROM books "
+        f"WHERE {lf} AND status = 'wishlist' AND (work_id IS NULL OR is_primary_edition = 1) "
+        f"ORDER BY RANDOM() LIMIT 15", lp
+    ).fetchall()
+    wishlist_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
+                      "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in wishlist_books]
+
     # ── Author spotlight (4 random authors) ──────────────────────────────
     spotlight_authors: list[dict] = []
     spotlight_author_counts: Counter[str] = Counter()
@@ -3768,6 +3780,7 @@ def dashboard():
         finished_count=finished_count,
         reading_count=reading_count,
         not_started_count=not_started_count,
+        wishlist_count=wishlist_count,
         owned_count=owned_count,
         avg_rating=avg_rating,
         # Currently reading
@@ -3800,6 +3813,7 @@ def dashboard():
         series_progress=series_progress,
         # TBR
         tbr_list=tbr_list,
+        wishlist_list=wishlist_list,
         # Author spotlight
         spotlight_authors=spotlight_authors,
         # Language
@@ -4009,7 +4023,7 @@ def index():
         def __ge__(self, o): return self.v <= o.v
         def __eq__(self, o): return self.v == o.v
 
-    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4, "draft": 5}
+    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4, "wishlist": 5, "draft": 6}
 
     def _sort_key_for(criterion, b):
         if criterion == "last_session":
@@ -4017,7 +4031,7 @@ def index():
         elif criterion == "rating":
             return (_Rev(b["avg_rating"] or 0),)
         elif criterion == "status":
-            return (STATUS_ORDER.get(b["status"], 5),)
+            return (STATUS_ORDER.get(b["status"], 6),)
         elif criterion == "author":
             return (b["author"],)
         elif criterion == "time_read":
@@ -4081,9 +4095,9 @@ def _compute_status_timeline(db, lib_ids):
     today = _date.today()
     today_s = today.isoformat()
     lf, lp = _lib_filter(lib_ids)
-    STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
+    STATUSES = ["reading", "finished", "not-started", "abandoned", "wishlist", "draft"]
     # Sort key: lower = processed first on the same date
-    _STATUS_ORDER = {"not-started": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
+    _STATUS_ORDER = {"not-started": 0, "wishlist": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
 
     # ── 1. Representative books (primary or standalone) ──────────────────
     books = db.execute(
@@ -4193,7 +4207,7 @@ def _compute_status_timeline(db, lib_ids):
             st = bk["status"] or "not-started"
             transitions.append((entry or today_s, _STATUS_ORDER.get(st, 0), st))
         elif entry and first_start and entry < first_start:
-            initial = "draft" if bk["status"] == "draft" else "not-started"
+            initial = bk["status"] if bk["status"] in ("draft", "wishlist") else "not-started"
             transitions.insert(0, (entry, _STATUS_ORDER.get(initial, 0), initial))
 
         transitions.sort()
@@ -4344,7 +4358,7 @@ def global_stats():
     top_authors = author_counts.most_common(10)
 
     # Format status labels
-    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned", "draft": "Draft"}
+    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned", "wishlist": "Wishlist", "draft": "Draft"}
     status_chart = {status_labels_map.get(k, k.title()): v for k, v in status_counts.items()}
 
     # Remove 'Unknown' entries from all count maps — they don't represent a real value

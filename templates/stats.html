@@ -490,6 +490,8 @@ const STATUS_COLORS = {
     'Finished':    cssVar('--lb-finished'),
     'Not Started': cssVar('--lb-not-started'),
     'Abandoned':   cssVar('--lb-abandoned'),
+    'Wishlist':    cssVar('--lb-wishlist'),
+    'Draft':       cssVar('--lb-draft'),
 };
 
 const TOOLTIP_OPTS = {
@@ -856,8 +858,9 @@ const FULL_AUTHOR_COUNTS = {{ author_counts | tojson }};
             { key: 'finished',    label: 'Finished',    color: cssVar('--lb-finished')    || '#10B981' },
             { key: 'reading',     label: 'Reading',     color: cssVar('--lb-reading')     || '#3B82F6' },
             { key: 'not-started', label: 'Not Started', color: cssVar('--lb-not-started') || '#8B5CF6' },
-            { key: 'draft',       label: 'Draft',       color: cssVar('--lb-draft')       || '#6B7280' },
             { key: 'abandoned',   label: 'Abandoned',   color: cssVar('--lb-abandoned')   || '#DC2626' },
+            { key: 'wishlist',    label: 'Wishlist',    color: cssVar('--lb-wishlist')    || '#F59E0B' },
+            { key: 'draft',       label: 'Draft',       color: cssVar('--lb-draft')       || '#6B7280' },
         ];
 
         let isRelative = false;
