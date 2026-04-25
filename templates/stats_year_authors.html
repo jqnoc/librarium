@@ -65,52 +65,35 @@ function updateYearAuthorsSort() {
 }
 </script>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+<div class="book-grid year-author-grid" style="margin-top: 0;">
     {% for author in authors %}
-    <a href="{{ url_for('author_detail', author_name=author.name) }}" style="text-decoration: none; color: inherit;">
-        <div class="card" style="height: 100%; transition: box-shadow 0.15s;">
-            <div class="card-body" style="display: flex; align-items: flex-start; gap: 1rem; height: 100%;">
-                <div style="flex-shrink: 0; width: 56px; height: 78px; overflow: hidden; border-radius: 6px; background: var(--lb-surface-alt, #f3f4f6);">
-                    {% if author.has_photo %}
-                    <img src="{{ url_for('author_photo_thumb', author_name=author.name, v=author.photo_hash) }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
-                    {% else %}
-                    {% set ns = namespace(cover_book=none) %}
-                    {% for book in author.books %}
-                        {% if book.has_cover and ns.cover_book is none %}
-                            {% set ns.cover_book = book %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if ns.cover_book %}
-                    <img src="{{ url_for('book_cover_thumb', book_id=ns.cover_book.id, v=ns.cover_book.cover_hash) }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
-                    {% else %}
-                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">✍️</div>
-                    {% endif %}
-                    {% endif %}
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; flex: 1;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 1rem; line-height: 1.3; color: var(--lb-text-dark);">{{ author.name }}</div>
-                        {% if author.pen_names %}
-                        <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.2rem;">
-                            <span data-i18n="authors.penNames">Pen names:</span> {{ author.pen_names | join(', ') }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-top: auto;">
-                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
-                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.booksLabel">Number of Books</div>
-                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.book_count }}</div>
-                        </div>
-                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
-                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.readingDaysLabel">Reading Days</div>
-                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.reading_days }}</div>
-                        </div>
-                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
-                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.timeReadLabel">Time Read</div>
-                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.total_time }}</div>
-                        </div>
-                    </div>
-                </div>
+    <a href="{{ url_for('author_detail', author_name=author.name) }}" class="card book-card year-author-card" style="text-decoration: none; color: inherit;">
+        <div class="cover-wrap">
+            {% if author.has_photo %}
+            <img src="{{ url_for('author_photo_thumb', author_name=author.name, v=author.photo_hash) }}" alt="{{ author.name }}" loading="lazy" style="object-position: center top;">
+            {% else %}
+            {% set ns = namespace(cover_book=none) %}
+            {% for book in author.books %}
+                {% if book.has_cover and ns.cover_book is none %}
+                    {% set ns.cover_book = book %}
+                {% endif %}
+            {% endfor %}
+            {% if ns.cover_book %}
+            <img src="{{ url_for('book_cover_thumb', book_id=ns.cover_book.id, v=ns.cover_book.cover_hash) }}" alt="{{ author.name }}" loading="lazy">
+            {% else %}
+            <span class="cover-placeholder">✍️</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="book-title">{{ author.name }}</div>
+            {% if author.pen_names %}
+            <div class="book-subtitle"><span data-i18n="authors.penNames">Pen names:</span> {{ author.pen_names | join(', ') }}</div>
+            {% endif %}
+            <div class="book-stats">
+                <span class="badge"><span data-i18n="yearAuthors.sortBooks">Number of Books</span>: {{ author.book_count }}</span>
+                <span class="badge"><span data-i18n="yearAuthors.sortDays">Reading Days</span>: {{ author.reading_days }}</span>
+                <span class="badge"><span data-i18n="yearAuthors.sortTime">Time Read</span>: {{ author.total_time }}</span>
             </div>
         </div>
     </a>

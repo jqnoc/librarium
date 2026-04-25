@@ -742,6 +742,18 @@ h3 {
     flex-wrap: wrap;
 }
 
+.year-author-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.year-author-card .cover-wrap {
+    height: 220px;
+}
+
+.year-author-card .book-subtitle {
+    margin-bottom: .75rem;
+}
+
 /* ── Badges ────────────────────────────────────────────────────────────── */
 .badge {
     display: inline-flex;
