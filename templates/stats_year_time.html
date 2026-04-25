@@ -43,8 +43,8 @@
             {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
             <div class="book-author">{{ book.author | format_authors }}</div>
             <div class="book-stats">
-                <span class="badge"><span data-i18n="yearTime.timeRead">Time Read</span>: {{ book.total_time }}</span>
-                <span class="badge"><span data-i18n="yearTime.readingDays">Reading Days</span>: {{ book.reading_days }}</span>
+                <span class="badge">{{ book.total_time }}</span>
+                <span class="badge">{{ book.reading_days }} <span data-i18n="{{ 'activity.day' if book.reading_days == 1 else 'activity.days' }}">{{ 'day' if book.reading_days == 1 else 'days' }}</span></span>
             </div>
         </div>
     </a>

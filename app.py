@@ -5177,7 +5177,7 @@ def stats_year_time(year: str):
             "cover_hash": book["cover_hash"],
             "reading_days": len(book["reading_days"]),
             "total_seconds": total_seconds,
-            "total_time": _format_duration_long(total_seconds),
+            "total_time": _format_duration(total_seconds),
         })
 
     year_books.sort(key=lambda book: (-book["total_seconds"], book["name"].lower()))
@@ -5201,7 +5201,7 @@ def stats_year_time(year: str):
         year=year,
         books=year_books,
         total_seconds=total_seconds,
-        total_time=_format_duration_long(total_seconds),
+        total_time=_format_duration(total_seconds),
         prev_year=prev_year,
         next_year=next_year,
     )
@@ -5266,7 +5266,7 @@ def stats_year_authors(year: str):
             "book_count": len(data["book_ids"]),
             "reading_days": len(data["reading_days"]),
             "total_seconds": data["total_seconds"],
-            "total_time": _format_duration_long(data["total_seconds"]),
+            "total_time": _format_duration(data["total_seconds"]),
             "books": data["books"],
             "pen_names": sorted(data["pen_names"], key=str.lower),
             "has_photo": name in author_photo_info,
