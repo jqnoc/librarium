@@ -466,6 +466,7 @@
         'stats.pagesRead':          { en: 'Pages Read by Year',        es: 'Páginas Leídas por Año' },
         'stats.clickDetails':       { en: '(click to view details)',    es: '(clic para ver detalles)' },
         'stats.timeReadByYear':     { en: 'Time Read by Year',         es: 'Tiempo Leído por Año' },
+        'stats.authorsReadByYear':  { en: 'Authors Read by Year',      es: 'Autores Leídos por Año' },
         'stats.libraryStats':       { en: 'Library Stats 📊',           es: 'Estadísticas de la Biblioteca 📊' },
         'stats.highestRated':       { en: 'Highest Rated Book',        es: 'Libro Mejor Valorado' },
         'stats.avgRating':          { en: 'Average Rating (Finished)', es: 'Valoración Promedio (Terminados)' },
@@ -528,6 +529,31 @@
         'yearBooks.sortRating':    { en: 'Rating',                     es: 'Valoración' },
         'yearBooks.finishedLabel': { en: 'Finished:',                  es: 'Terminado:' },
         'yearBooks.empty':         { en: 'No books were finished in',  es: 'No se terminaron libros en' },
+
+        // ── Year time ──────────────────────────────────────────────────
+        'yearTime.backToGlobal':   { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },
+        'yearTime.title':          { en: 'Time Read in',               es: 'Tiempo Leído en' },
+        'yearTime.booksLabel':     { en: 'with tracked or inferred time', es: 'con tiempo registrado o inferido' },
+        'yearTime.totalTime':      { en: 'Total Time:',                es: 'Tiempo Total:' },
+        'yearTime.timeRead':       { en: 'Time Read',                  es: 'Tiempo Leído' },
+        'yearTime.readingDays':    { en: 'Reading Days',               es: 'Días de Lectura' },
+        'yearTime.empty':          { en: 'No tracked reading time was found in', es: 'No se encontró tiempo de lectura registrado en' },
+
+        // ── Year authors ───────────────────────────────────────────────
+        'yearAuthors.backToGlobal': { en: '← Back to Global Stats',    es: '← Volver a Estadísticas Globales' },
+        'yearAuthors.title':        { en: 'Authors Read in',           es: 'Autores Leídos en' },
+        'yearAuthors.sortBy':       { en: 'Sort by:',                  es: 'Ordenar por:' },
+        'yearAuthors.sortName':     { en: 'Name',                      es: 'Nombre' },
+        'yearAuthors.sortBooks':    { en: 'Number of Books',           es: 'Número de Libros' },
+        'yearAuthors.sortDays':     { en: 'Reading Days',              es: 'Días de Lectura' },
+        'yearAuthors.sortTime':     { en: 'Time Read',                 es: 'Tiempo Leído' },
+        'yearAuthors.orderBy':      { en: 'Order:',                    es: 'Orden:' },
+        'yearAuthors.orderAsc':     { en: 'Ascending',                 es: 'Ascendente' },
+        'yearAuthors.orderDesc':    { en: 'Descending',                es: 'Descendente' },
+        'yearAuthors.booksLabel':   { en: 'Number of Books',           es: 'Número de Libros' },
+        'yearAuthors.readingDaysLabel': { en: 'Reading Days',          es: 'Días de Lectura' },
+        'yearAuthors.timeReadLabel': { en: 'Time Read',                es: 'Tiempo Leído' },
+        'yearAuthors.empty':        { en: 'No authors were read in',   es: 'No se leyeron autores en' },
 
         // ── Year bought ─────────────────────────────────────────────────
         'yearBought.backToGlobal': { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },

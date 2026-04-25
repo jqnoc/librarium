@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Authors Read {{ year }} – Librarium{% endblock %}
+
+{% block content %}
+<script>
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var savedSort = localStorage.getItem('librarium_year_authors_sort') || 'time';
+    var savedOrder = localStorage.getItem('librarium_year_authors_order') || 'desc';
+    if ((!params.has('sort') && savedSort !== 'time') || (!params.has('order') && savedOrder !== 'desc')) {
+        window.location.replace('{{ url_for("stats_year_authors", year=year) }}?sort=' + encodeURIComponent(params.get('sort') || savedSort) + '&order=' + encodeURIComponent(params.get('order') || savedOrder));
+    }
+})();
+</script>
+
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--lb-orange); font-weight: 500;" data-i18n="yearAuthors.backToGlobal">← Back to Global Stats</a>
+        <h1 style="margin: 0; color: var(--lb-text-dark);"><span data-i18n="yearAuthors.title">Authors Read in</span> {{ year }}</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        {% if prev_year %}
+        <a href="{{ url_for('stats_year_authors', year=prev_year, sort=sort, order=order) }}" class="btn btn-secondary" style="font-size: 0.9rem;">← {{ prev_year }}</a>
+        {% endif %}
+        {% if next_year %}
+        <a href="{{ url_for('stats_year_authors', year=next_year, sort=sort, order=order) }}" class="btn btn-secondary" style="font-size: 0.9rem;">{{ next_year }} →</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if authors %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <p style="color: var(--lb-text-light); margin: 0;">
+        {{ authors | length }} author{{ 's' if authors | length != 1 else '' }}
+    </p>
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
+            <span data-i18n="yearAuthors.sortBy">Sort by:</span>
+            <select id="yearAuthorsSort" onchange="updateYearAuthorsSort()"
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
+                <option value="name" {% if sort == 'name' %}selected{% endif %} data-i18n="yearAuthors.sortName">Name</option>
+                <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="yearAuthors.sortBooks">Number of Books</option>
+                <option value="days" {% if sort == 'days' %}selected{% endif %} data-i18n="yearAuthors.sortDays">Reading Days</option>
+                <option value="time" {% if sort == 'time' %}selected{% endif %} data-i18n="yearAuthors.sortTime">Time Read</option>
+            </select>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
+            <span data-i18n="yearAuthors.orderBy">Order:</span>
+            <select id="yearAuthorsOrder" onchange="updateYearAuthorsSort()"
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
+                <option value="asc" {% if order == 'asc' %}selected{% endif %} data-i18n="yearAuthors.orderAsc">Ascending</option>
+                <option value="desc" {% if order == 'desc' %}selected{% endif %} data-i18n="yearAuthors.orderDesc">Descending</option>
+            </select>
+        </label>
+    </div>
+</div>
+
+<script>
+function updateYearAuthorsSort() {
+    var sort = document.getElementById('yearAuthorsSort').value;
+    var order = document.getElementById('yearAuthorsOrder').value;
+    localStorage.setItem('librarium_year_authors_sort', sort);
+    localStorage.setItem('librarium_year_authors_order', order);
+    window.location.href = '{{ url_for("stats_year_authors", year=year) }}?sort=' + encodeURIComponent(sort) + '&order=' + encodeURIComponent(order);
+}
+</script>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+    {% for author in authors %}
+    <a href="{{ url_for('author_detail', author_name=author.name) }}" style="text-decoration: none; color: inherit;">
+        <div class="card" style="height: 100%; transition: box-shadow 0.15s;">
+            <div class="card-body" style="display: flex; align-items: flex-start; gap: 1rem; height: 100%;">
+                <div style="flex-shrink: 0; width: 56px; height: 78px; overflow: hidden; border-radius: 6px; background: var(--lb-surface-alt, #f3f4f6);">
+                    {% if author.has_photo %}
+                    <img src="{{ url_for('author_photo_thumb', author_name=author.name, v=author.photo_hash) }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    {% set ns = namespace(cover_book=none) %}
+                    {% for book in author.books %}
+                        {% if book.has_cover and ns.cover_book is none %}
+                            {% set ns.cover_book = book %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if ns.cover_book %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=ns.cover_book.id, v=ns.cover_book.cover_hash) }}" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">✍️</div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; flex: 1;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 1rem; line-height: 1.3; color: var(--lb-text-dark);">{{ author.name }}</div>
+                        {% if author.pen_names %}
+                        <div style="font-size: 0.8rem; color: var(--lb-text-light); margin-top: 0.2rem;">
+                            <span data-i18n="authors.penNames">Pen names:</span> {{ author.pen_names | join(', ') }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-top: auto;">
+                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
+                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.booksLabel">Number of Books</div>
+                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.book_count }}</div>
+                        </div>
+                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
+                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.readingDaysLabel">Reading Days</div>
+                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.reading_days }}</div>
+                        </div>
+                        <div style="padding: 0.7rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
+                            <div style="font-size: 0.72rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearAuthors.timeReadLabel">Time Read</div>
+                            <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ author.total_time }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">✍️</div>
+    <p><span data-i18n="yearAuthors.empty">No authors were read in</span> {{ year }}.</p>
+    <a href="{{ url_for('global_stats') }}" class="btn btn-secondary" data-i18n="yearAuthors.backToGlobal">← Back to Global Stats</a>
+</div>
+{% endif %}
+{% endblock %}

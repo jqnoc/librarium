@@ -25,8 +25,18 @@
 {% if time_data and time_data|sum > 0 %}
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.timeReadByYear">Time Read by Year</h3>
-        <canvas id="timeChart" style="max-height: 350px;"></canvas>
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.timeReadByYear">Time Read by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <canvas id="timeChart" style="max-height: 350px; cursor: pointer;"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Authors read by year ──────────────────────────────────────────── -->
+{% if authors_read_data and authors_read_data|sum > 0 %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.authorsReadByYear">Authors Read by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <canvas id="authorsChart" style="max-height: 350px; cursor: pointer;"></canvas>
     </div>
 </div>
 {% endif %}
@@ -375,6 +385,13 @@ if (timeData.some(v => v > 0)) {
             responsive: true,
             maintainAspectRatio: true,
             aspectRatio: 2.5,
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const year = years[index];
+                    window.location.href = `/stats/year/${year}/time`;
+                }
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -399,6 +416,74 @@ if (timeData.some(v => v > 0)) {
                     ticks: {
                         color: '#6B7280',
                         callback: function(value) { return value.toLocaleString() + 'h'; }
+                    },
+                    grid: { color: 'rgba(229, 231, 235, 0.5)' }
+                },
+                x: {
+                    ticks: { color: '#6B7280', font: { size: 14, weight: 600 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ── Authors Read by Year Chart ────────────────────────────────────────
+const authorsReadData = {{ authors_read_data | tojson }};
+if (authorsReadData.some(v => v > 0)) {
+    const authorsCtx = document.getElementById('authorsChart').getContext('2d');
+    new Chart(authorsCtx, {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Authors Read',
+                data: authorsReadData,
+                backgroundColor: cssVar('--lb-chart-bar2'),
+                borderColor: cssVar('--lb-chart-tooltip-border'),
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const year = years[index];
+                    window.location.href = `/stats/year/${year}/authors`;
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
+                    bodyColor: '#fff',
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            const count = context.parsed.y;
+                            return `${count} author${count !== 1 ? 's' : ''} read`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#6B7280',
+                        stepSize: 1,
+                        callback: function(value) {
+                            return Number.isInteger(value) ? value : null;
+                        }
                     },
                     grid: { color: 'rgba(229, 231, 235, 0.5)' }
                 },

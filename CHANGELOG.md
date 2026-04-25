@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Wishlist book status for books you want to buy, including form/filter support, badge and chart styling, and a dashboard cover shelf so planned purchases stay visible
+- Global stats now include clickable Time Read and Authors Read yearly charts with new `/stats/year/<year>/time` and `/stats/year/<year>/authors` detail pages; the author detail page adds persisted sort/order controls plus book-count, reading-day, and time-read summaries
 
 ### Changed
 - Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty

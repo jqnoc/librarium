@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Time Read {{ year }} – Librarium{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="{{ url_for('global_stats') }}" style="text-decoration: none; color: var(--lb-orange); font-weight: 500;" data-i18n="yearTime.backToGlobal">← Back to Global Stats</a>
+        <h1 style="margin: 0; color: var(--lb-text-dark);"><span data-i18n="yearTime.title">Time Read in</span> {{ year }}</h1>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        {% if prev_year %}
+        <a href="{{ url_for('stats_year_time', year=prev_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">← {{ prev_year }}</a>
+        {% endif %}
+        {% if next_year %}
+        <a href="{{ url_for('stats_year_time', year=next_year) }}" class="btn btn-secondary" style="font-size: 0.9rem;">{{ next_year }} →</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if books %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <p style="color: var(--lb-text-light); margin: 0;">
+        {{ books | length }} book{{ 's' if books | length != 1 else '' }} <span data-i18n="yearTime.booksLabel">with tracked or inferred time</span>
+    </p>
+    <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--lb-text-light); font-size: 0.95rem;">
+        <span data-i18n="yearTime.totalTime">Total Time:</span>
+        <strong style="color: var(--lb-text-dark);">{{ total_time }}</strong>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.25rem;">
+    {% for book in books %}
+    <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+        <div class="card" style="height: 100%;">
+            <div class="card-body" style="display: flex; flex-direction: column; gap: 0.85rem; height: 100%;">
+                <div class="book-cover-large">
+                    {% if book.has_cover %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=book.id, v=book.cover_hash) }}" alt="{{ book.name }}" style="width: 100%; height: auto; display: block;">
+                    {% else %}
+                    <div class="cover-placeholder">📖</div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="book-title" style="font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0;">{{ book.name }}</div>
+                    {% if book.subtitle %}<div class="book-subtitle">{{ book.subtitle }}</div>{% endif %}
+                    <div class="book-author" style="font-size: 0.9rem; color: var(--lb-text-light); margin: 0.25rem 0 0 0;">{{ book.author | format_authors }}</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-top: auto;">
+                    <div style="padding: 0.75rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
+                        <div style="font-size: 0.75rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearTime.timeRead">Time Read</div>
+                        <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ book.total_time }}</div>
+                    </div>
+                    <div style="padding: 0.75rem; border-radius: 10px; background: var(--lb-surface-alt, #f3f4f6);">
+                        <div style="font-size: 0.75rem; color: var(--lb-text-light); text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="yearTime.readingDays">Reading Days</div>
+                        <div style="margin-top: 0.2rem; font-weight: 600; color: var(--lb-text-dark);">{{ book.reading_days }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">⏱️</div>
+    <p><span data-i18n="yearTime.empty">No tracked reading time was found in</span> {{ year }}.</p>
+    <a href="{{ url_for('global_stats') }}" class="btn btn-secondary" data-i18n="yearTime.backToGlobal">← Back to Global Stats</a>
+</div>
+{% endif %}
+{% endblock %}

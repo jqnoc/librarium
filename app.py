@@ -2750,6 +2750,110 @@ def _build_daily_activity_data(
     ]
 
 
+def _build_yearly_book_activity(
+    db,
+    lf_b: str,
+    lp_b: tuple,
+) -> dict[str, dict[str, dict]]:
+    """Aggregate per-book yearly activity with distinct reading days and inferred time."""
+    activity_by_year: dict[str, dict[str, dict]] = {}
+    session_totals_by_book = _load_book_session_totals(db, lf_b, lp_b)
+
+    def _ensure_entry(row, day_str: str) -> dict:
+        year = (day_str or "")[:4]
+        year_map = activity_by_year.setdefault(year, {})
+        book_id = row["book_id"]
+        if book_id not in year_map:
+            year_map[book_id] = {
+                "id": book_id,
+                "name": row["name"],
+                "subtitle": row["subtitle"] or "",
+                "author": row["author"] or "",
+                "has_cover": bool(row["has_cover"]),
+                "cover_hash": row["cover_hash"] or "",
+                "total_pages": 0,
+                "total_seconds": 0,
+                "reading_days": set(),
+            }
+        return year_map[book_id]
+
+    def _add_day(
+        row,
+        day_str: str,
+        *,
+        pages: int = 0,
+        seconds: int = 0,
+        has_activity: bool = False,
+    ) -> None:
+        if not day_str or len(day_str) < 4 or not day_str[:4].isdigit():
+            return
+        entry = _ensure_entry(row, day_str)
+        entry["total_pages"] += int(pages or 0)
+        entry["total_seconds"] += int(seconds or 0)
+        if has_activity or pages or seconds:
+            entry["reading_days"].add(day_str)
+
+    for row in db.execute(
+        "SELECT s.book_id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, "
+        "s.date, COALESCE(s.pages, 0) AS pages, COALESCE(s.duration_seconds, 0) AS seconds "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND {lf_b}",
+        lp_b,
+    ).fetchall():
+        _add_day(
+            row,
+            row["date"],
+            pages=row["pages"] or 0,
+            seconds=row["seconds"] or 0,
+            has_activity=True,
+        )
+
+    for row in db.execute(
+        "SELECT p.book_id, p.start_date, p.end_date, p.pages, "
+        "COALESCE(p.duration_seconds, 0) AS duration_seconds, "
+        "b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, b.format "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.start_date != '' AND {lf_b} "
+        "AND (p.pages > 0 OR COALESCE(p.duration_seconds, 0) > 0 OR p.progress_pct IS NOT NULL)",
+        lp_b,
+    ).fetchall():
+        book_totals = session_totals_by_book.get(row["book_id"], {"pages": 0, "seconds": 0})
+        total_period_seconds = _estimate_period_seconds(
+            period_pages=row["pages"] or 0,
+            explicit_period_seconds=row["duration_seconds"] or 0,
+            is_pct_format=(row["format"] or "paper") in ("audiobook", "ebook"),
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
+        day_pages = dict(_distribute_total_across_days(
+            row["start_date"],
+            row["end_date"],
+            row["pages"] or 0,
+        ))
+        day_seconds = dict(_distribute_total_across_days(
+            row["start_date"],
+            row["end_date"],
+            total_period_seconds,
+        ))
+
+        span_days = list(_iter_date_span(row["start_date"], row["end_date"]))
+        if not span_days:
+            fallback_day = (row["end_date"] or row["start_date"] or "").strip()
+            if fallback_day:
+                span_days = [fallback_day]
+
+        for day_str in span_days:
+            _add_day(
+                row,
+                day_str,
+                pages=day_pages.get(day_str, 0),
+                seconds=day_seconds.get(day_str, 0),
+                has_activity=True,
+            )
+
+    return activity_by_year
+
+
 def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
                              date_from: str | None = None,
                              date_to: str | None = None) -> list[dict]:
@@ -4272,13 +4376,28 @@ def global_stats():
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     daily_data = _build_daily_activity_data(db, lf_b, lp_b)
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    author_canonical_map = _get_author_canonical_map(db)
 
     pages_by_year: dict[str, int] = {}
-    time_by_year: dict[str, int] = {}
     for day in daily_data:
         year = day["date"][:4]
         pages_by_year[year] = pages_by_year.get(year, 0) + (day["pages"] or 0)
-        time_by_year[year] = time_by_year.get(year, 0) + (day["seconds"] or 0)
+
+    time_by_year: dict[str, int] = {}
+    authors_read_by_year: dict[str, int] = {}
+    for year, books in yearly_book_activity.items():
+        time_by_year[year] = sum(book["total_seconds"] for book in books.values())
+        year_authors: set[str] = set()
+        for book in books.values():
+            if not book["reading_days"]:
+                continue
+            for author_name in _split_book_authors(book["author"] or ""):
+                if author_name.lower() == "anonymous":
+                    continue
+                year_authors.add(_resolve_author_page_name(author_name, author_canonical_map))
+        if year_authors:
+            authors_read_by_year[year] = len(year_authors)
 
     # Books finished by year – count ALL finished readings across all editions
     books_finished_by_year: dict[str, int] = {}
@@ -4294,10 +4413,16 @@ def global_stats():
             finish_year = finish_date[:4]
             books_finished_by_year[finish_year] = books_finished_by_year.get(finish_year, 0) + 1
 
-    all_years = sorted(set(pages_by_year.keys()) | set(books_finished_by_year.keys()) | set(time_by_year.keys()))
+    all_years = sorted(
+        set(pages_by_year.keys())
+        | set(books_finished_by_year.keys())
+        | set(time_by_year.keys())
+        | set(authors_read_by_year.keys())
+    )
     pages_data = [pages_by_year.get(y, 0) for y in all_years]
     books_data = [books_finished_by_year.get(y, 0) for y in all_years]
     time_data = [time_by_year.get(y, 0) for y in all_years]
+    authors_read_data = [authors_read_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = [
@@ -4401,6 +4526,7 @@ def global_stats():
         pages_data=pages_data,
         books_data=books_data,
         time_data=time_data,
+        authors_read_data=authors_read_data,
         bought_years=bought_years,
         bought_data=bought_data,
         status_chart=status_chart_clean,
@@ -5024,6 +5150,167 @@ def stats_year(year: str):
         total_seconds=total_seconds,
         period_pages=total_period_pages,
         gantt_data=gantt_data,
+        prev_year=prev_year,
+        next_year=next_year,
+    )
+
+
+@app.route("/stats/year/<year>/time")
+def stats_year_time(year: str):
+    """Display all books contributing tracked or inferred reading time in a year."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    year_books = []
+    for book in yearly_book_activity.get(year, {}).values():
+        total_seconds = book["total_seconds"] or 0
+        if total_seconds <= 0:
+            continue
+        year_books.append({
+            "id": book["id"],
+            "name": book["name"],
+            "subtitle": book["subtitle"],
+            "author": book["author"],
+            "has_cover": book["has_cover"],
+            "cover_hash": book["cover_hash"],
+            "reading_days": len(book["reading_days"]),
+            "total_seconds": total_seconds,
+            "total_time": _format_duration_long(total_seconds),
+        })
+
+    year_books.sort(key=lambda book: (-book["total_seconds"], book["name"].lower()))
+    years_with_time = sorted(
+        year_key
+        for year_key, books in yearly_book_activity.items()
+        if any((book["total_seconds"] or 0) > 0 for book in books.values())
+    )
+    prev_year = None
+    next_year = None
+    if year in years_with_time:
+        idx = years_with_time.index(year)
+        if idx > 0:
+            prev_year = years_with_time[idx - 1]
+        if idx < len(years_with_time) - 1:
+            next_year = years_with_time[idx + 1]
+
+    total_seconds = sum(book["total_seconds"] for book in year_books)
+    return render_template(
+        "stats_year_time.html",
+        year=year,
+        books=year_books,
+        total_seconds=total_seconds,
+        total_time=_format_duration_long(total_seconds),
+        prev_year=prev_year,
+        next_year=next_year,
+    )
+
+
+@app.route("/stats/year/<year>/authors")
+def stats_year_authors(year: str):
+    """Display canonical authors read in a year with book/day/time summaries."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    sort = request.args.get("sort", "time")
+    order = request.args.get("order", "desc")
+    if sort not in ("name", "books", "days", "time"):
+        sort = "time"
+    if order not in ("asc", "desc"):
+        order = "desc"
+
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    author_canonical_map = _get_author_canonical_map(db)
+    author_photo_info = {
+        row["name"]: row["photo_hash"] or ""
+        for row in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall()
+    }
+
+    author_map: dict[str, dict] = {}
+    for book in yearly_book_activity.get(year, {}).values():
+        if not book["reading_days"]:
+            continue
+        book_entry = {
+            "id": book["id"],
+            "name": book["name"],
+            "subtitle": book["subtitle"],
+            "author": book["author"],
+            "has_cover": book["has_cover"],
+            "cover_hash": book["cover_hash"],
+            "total_seconds": book["total_seconds"],
+        }
+        for author_name in _split_book_authors(book["author"] or ""):
+            if author_name.lower() == "anonymous":
+                continue
+            canonical_name = _resolve_author_page_name(author_name, author_canonical_map)
+            author_group = author_map.setdefault(canonical_name, {
+                "name": canonical_name,
+                "book_ids": set(),
+                "books": [],
+                "reading_days": set(),
+                "total_seconds": 0,
+                "pen_names": set(),
+            })
+            if book["id"] not in author_group["book_ids"]:
+                author_group["book_ids"].add(book["id"])
+                author_group["books"].append(book_entry)
+            author_group["reading_days"].update(book["reading_days"])
+            author_group["total_seconds"] += book["total_seconds"]
+            if author_name != canonical_name:
+                author_group["pen_names"].add(author_name)
+
+    authors = [
+        {
+            "name": name,
+            "book_count": len(data["book_ids"]),
+            "reading_days": len(data["reading_days"]),
+            "total_seconds": data["total_seconds"],
+            "total_time": _format_duration_long(data["total_seconds"]),
+            "books": data["books"],
+            "pen_names": sorted(data["pen_names"], key=str.lower),
+            "has_photo": name in author_photo_info,
+            "photo_hash": author_photo_info.get(name, ""),
+        }
+        for name, data in author_map.items()
+    ]
+
+    def _author_sort_key(author: dict):
+        if sort == "name":
+            return (author["name"].lower(),)
+        primary_value = {
+            "books": author["book_count"],
+            "days": author["reading_days"],
+            "time": author["total_seconds"],
+        }[sort]
+        if order == "desc":
+            primary_value = -primary_value
+        return (primary_value, author["name"].lower())
+
+    authors.sort(key=_author_sort_key)
+    if sort == "name" and order == "desc":
+        authors.reverse()
+
+    years_with_authors = sorted(
+        year_key
+        for year_key, books in yearly_book_activity.items()
+        if any(book["reading_days"] for book in books.values())
+    )
+    prev_year = None
+    next_year = None
+    if year in years_with_authors:
+        idx = years_with_authors.index(year)
+        if idx > 0:
+            prev_year = years_with_authors[idx - 1]
+        if idx < len(years_with_authors) - 1:
+            next_year = years_with_authors[idx + 1]
+
+    return render_template(
+        "stats_year_authors.html",
+        year=year,
+        authors=authors,
+        sort=sort,
+        order=order,
         prev_year=prev_year,
         next_year=next_year,
     )
