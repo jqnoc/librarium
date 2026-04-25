@@ -91,9 +91,9 @@ function updateYearAuthorsSort() {
             <div class="book-subtitle"><span data-i18n="authors.penNames">Pen names:</span> {{ author.pen_names | join(', ') }}</div>
             {% endif %}
             <div class="book-stats">
-                <span class="badge"><span data-i18n="yearAuthors.sortBooks">Number of Books</span>: {{ author.book_count }}</span>
-                <span class="badge"><span data-i18n="yearAuthors.sortDays">Reading Days</span>: {{ author.reading_days }}</span>
-                <span class="badge"><span data-i18n="yearAuthors.sortTime">Time Read</span>: {{ author.total_time }}</span>
+                <span class="badge">{{ author.total_time }}</span>
+                <span class="badge">{{ author.reading_days }} day{{ 's' if author.reading_days != 1 else '' }}</span>
+                <span class="badge">{{ author.book_count }} book{{ 's' if author.book_count != 1 else '' }}</span>
             </div>
         </div>
     </a>
