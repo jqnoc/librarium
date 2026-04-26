@@ -132,6 +132,7 @@
     const _YEAR         = {{ year         | tojson }};
     const _VERSION      = {{ app_version  | tojson }};
     const _YEAR_PAGES   = {{ year_pages   | tojson }};
+    const _YEAR_READING_DAYS = {{ year_reading_days | tojson }};
     const _YEAR_SECONDS = {{ year_seconds | tojson }};
 
     /* ── Helpers ──────────────────────────────────────────────────────── */
@@ -279,6 +280,7 @@
         /* Stat badges (right-aligned) */
         const statItems = [`${N} book${N !== 1 ? 's' : ''}`];
         if (_YEAR_PAGES > 0) statItems.push(`${_YEAR_PAGES.toLocaleString()} pages`);
+        if (_YEAR_READING_DAYS > 0) statItems.push(`${_YEAR_READING_DAYS} reading day${_YEAR_READING_DAYS !== 1 ? 's' : ''}`);
         if (_YEAR_SECONDS > 0) {
             const _h = Math.floor(_YEAR_SECONDS / 3600);
             const _m = Math.floor((_YEAR_SECONDS % 3600) / 60);

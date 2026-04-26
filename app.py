@@ -5333,6 +5333,7 @@ def stats_year_books(year: str):
     date_from  = year_start.isoformat()
     date_to    = year_end.isoformat()
     daily_year_data = _build_daily_activity_data(db, lf_b, lp_b, date_from=date_from, date_to=date_to)
+    year_reading_days = len(daily_year_data)
     year_pages   = sum(day["pages"]   for day in daily_year_data)
     year_seconds = sum(day["seconds"] for day in daily_year_data)
 
@@ -5397,7 +5398,8 @@ def stats_year_books(year: str):
 
     return render_template("stats_year_books.html", year=year, books=books_finished, sort=sort,
                            prev_year=prev_year, next_year=next_year,
-                           year_pages=year_pages, year_seconds=year_seconds)
+                           year_pages=year_pages, year_seconds=year_seconds,
+                           year_reading_days=year_reading_days)
 
 
 @app.route("/stats/year/<year>/bought")
