@@ -537,6 +537,14 @@
         'yearBooks.infographic.autoHeightHint': { en: 'Leave this empty to set height manually. Fill it in to infer height from the width.', es: 'Déjalo vacío para fijar la altura manualmente. Complétalo para inferir la altura a partir del ancho.' },
         'yearBooks.infographic.cancel':     { en: 'Cancel',                 es: 'Cancelar' },
         'yearBooks.infographic.generate':   { en: 'Generate & Download',    es: 'Generar y Descargar' },
+        'yearBooks.infographic.header':     { en: 'Books Read',             es: 'Libros Leídos' },
+        'yearBooks.infographic.bookSingular': { en: 'book',                 es: 'libro' },
+        'yearBooks.infographic.bookPlural':   { en: 'books',                es: 'libros' },
+        'yearBooks.infographic.pageSingular': { en: 'page',                 es: 'página' },
+        'yearBooks.infographic.pagePlural':   { en: 'pages',                es: 'páginas' },
+        'yearBooks.infographic.readingDaySingular': { en: 'reading day',    es: 'día de lectura' },
+        'yearBooks.infographic.readingDayPlural':   { en: 'reading days',   es: 'días de lectura' },
+        'yearBooks.infographic.generatedWith': { en: 'Generated with Librarium v{version}', es: 'Generado con Librarium v{version}' },
 
         // ── Year time ──────────────────────────────────────────────────
         'yearTime.backToGlobal':   { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },

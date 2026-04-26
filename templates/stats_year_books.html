@@ -164,6 +164,29 @@
         return text.slice(0, lo) + '\u2026';
     }
 
+    function _getI18n() {
+        return window.librariumI18n;
+    }
+
+    function _getLang() {
+        const i18n = _getI18n();
+        return i18n && typeof i18n.getLang === 'function' ? i18n.getLang() : 'en';
+    }
+
+    function _getLocale() {
+        return _getLang() === 'es' ? 'es-ES' : 'en-US';
+    }
+
+    function _t(key) {
+        const i18n = _getI18n();
+        return i18n && typeof i18n.t === 'function' ? i18n.t(key) : key;
+    }
+
+    function _formatCount(count, singularKey, pluralKey) {
+        const label = count === 1 ? _t(singularKey) : _t(pluralKey);
+        return `${count.toLocaleString(_getLocale())} ${label}`;
+    }
+
     function _inferInfographicHeight(width, columns, bookCount) {
         const count = Math.max(1, bookCount || 1);
         const cols = Math.max(1, Math.min(count, columns || 1));
@@ -281,14 +304,14 @@
         ctx.font         = `300 ${lblFS}px system-ui,-apple-system,sans-serif`;
         ctx.fillStyle    = TEXT;
         ctx.globalAlpha  = 0.72;
-        ctx.fillText('Books Read', PAD, Math.round(HDR_H * 0.90));
+        ctx.fillText(_t('yearBooks.infographic.header'), PAD, Math.round(HDR_H * 0.90));
         ctx.globalAlpha  = 1;
         ctx.restore();
 
         /* Stat badges (right-aligned) */
-        const statItems = [`${N} book${N !== 1 ? 's' : ''}`];
-        if (_YEAR_PAGES > 0) statItems.push(`${_YEAR_PAGES.toLocaleString()} pages`);
-        if (_YEAR_READING_DAYS > 0) statItems.push(`${_YEAR_READING_DAYS} reading day${_YEAR_READING_DAYS !== 1 ? 's' : ''}`);
+        const statItems = [_formatCount(N, 'yearBooks.infographic.bookSingular', 'yearBooks.infographic.bookPlural')];
+        if (_YEAR_PAGES > 0) statItems.push(_formatCount(_YEAR_PAGES, 'yearBooks.infographic.pageSingular', 'yearBooks.infographic.pagePlural'));
+        if (_YEAR_READING_DAYS > 0) statItems.push(_formatCount(_YEAR_READING_DAYS, 'yearBooks.infographic.readingDaySingular', 'yearBooks.infographic.readingDayPlural'));
         if (_YEAR_SECONDS > 0) {
             const _h = Math.floor(_YEAR_SECONDS / 3600);
             const _m = Math.floor((_YEAR_SECONDS % 3600) / 60);
@@ -450,7 +473,7 @@
         ctx.font = `300 ${ftrFS}px system-ui,-apple-system,sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        ctx.fillText(`Generated with Librarium v${_VERSION}`, W / 2, H - FTR_H / 2);
+        ctx.fillText(_t('yearBooks.infographic.generatedWith').replace('{version}', _VERSION), W / 2, H - FTR_H / 2);
 
         /* ── Download ───────────────────────────────────────────────────── */
         canvas.toBlob(blob => {
