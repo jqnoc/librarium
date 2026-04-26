@@ -5327,6 +5327,15 @@ def stats_year_books(year: str):
     if sort not in ("alpha", "author", "date", "rating"):
         sort = "date"
 
+    year_int = int(year)
+    year_start = date(year_int, 1, 1)
+    year_end   = date(year_int, 12, 31)
+    date_from  = year_start.isoformat()
+    date_to    = year_end.isoformat()
+    daily_year_data = _build_daily_activity_data(db, lf_b, lp_b, date_from=date_from, date_to=date_to)
+    year_pages   = sum(day["pages"]   for day in daily_year_data)
+    year_seconds = sum(day["seconds"] for day in daily_year_data)
+
     finished_readings = db.execute(f"""
         SELECT r.id AS reading_id, r.book_id, r.reading_number,
                b.name, b.subtitle, b.author, b.has_cover, b.cover_hash
@@ -5387,7 +5396,8 @@ def stats_year_books(year: str):
             next_year = sorted_years[idx + 1]
 
     return render_template("stats_year_books.html", year=year, books=books_finished, sort=sort,
-                           prev_year=prev_year, next_year=next_year)
+                           prev_year=prev_year, next_year=next_year,
+                           year_pages=year_pages, year_seconds=year_seconds)
 
 
 @app.route("/stats/year/<year>/bought")
