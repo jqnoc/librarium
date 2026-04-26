@@ -1147,6 +1147,66 @@ select.form-control { cursor: pointer; }
 }
 .modal-box p { margin-bottom: 1.5rem; }
 
+.infographic-modal-overlay {
+    z-index: 99999;
+}
+
+.infographic-modal-box {
+    width: min(440px, 92vw);
+    max-width: none;
+    text-align: left;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+
+.infographic-modal-title {
+    margin: 0 0 1.25rem;
+    border-left: none;
+    padding-left: 0;
+    color: var(--lb-dark);
+    font-size: 1.2rem;
+}
+
+.infographic-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.infographic-modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--lb-text-light);
+}
+
+.infographic-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--lb-border);
+    border-radius: 6px;
+    background: var(--lb-white);
+    color: var(--lb-text);
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.infographic-modal-input:focus {
+    outline: none;
+    border-color: var(--lb-orange);
+    box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
+
+.infographic-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
 /* ── Source radio group ─────────────────────────────────────────────────────────── */
 .source-radio-group {
     display: flex;

@@ -61,7 +61,7 @@
 
 <!-- ── Generate Infographic ───────────────────────────────────────────── -->
 <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--lb-border); display: flex; justify-content: center;">
-    <button onclick="document.getElementById('infographicModal').style.display='flex'"
+    <button onclick="openInfographicModal()"
             class="btn btn-primary"
             style="font-size: 1rem; padding: 0.7rem 2rem; display: flex; align-items: center; gap: 0.5rem;">
         🎨 <span data-i18n="yearBooks.generateInfographic">Generate Infographic</span>
@@ -69,25 +69,24 @@
 </div>
 
 <!-- Infographic modal (appended to body via JS to avoid stacking-context issues) -->
-<div id="infographicModal"
-     style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.65); z-index:99999; align-items:center; justify-content:center;"
-     onclick="if(event.target===this)this.style.display='none'">
-    <div style="background:var(--lb-bg); border-radius:12px; padding:2rem; width:400px; max-width:92vw; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-        <h2 style="margin:0 0 1.5rem; color:var(--lb-text-dark);" data-i18n="yearBooks.infographic.title">Generate Infographic</h2>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
-            <label style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.9rem; color:var(--lb-text-light);">
+<div id="infographicModal" class="modal-overlay infographic-modal-overlay"
+     onclick="if(event.target===this)closeInfographicModal()">
+    <div class="modal-box infographic-modal-box">
+        <h3 class="infographic-modal-title" data-i18n="yearBooks.infographic.title">Generate Infographic</h3>
+        <div class="infographic-modal-grid">
+            <label class="infographic-modal-label">
                 <span data-i18n="yearBooks.infographic.width">Width (px)</span>
                 <input type="number" id="infW" value="1920" min="800" max="8000" step="10"
-                       style="padding:0.5rem; border:1px solid var(--lb-border); border-radius:6px; background:var(--lb-bg); color:var(--lb-text-dark); font-size:1rem; width:100%; box-sizing:border-box;">
+                       class="infographic-modal-input">
             </label>
-            <label style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.9rem; color:var(--lb-text-light);">
+            <label class="infographic-modal-label">
                 <span data-i18n="yearBooks.infographic.height">Height (px)</span>
                 <input type="number" id="infH" value="1080" min="600" max="8000" step="10"
-                       style="padding:0.5rem; border:1px solid var(--lb-border); border-radius:6px; background:var(--lb-bg); color:var(--lb-text-dark); font-size:1rem; width:100%; box-sizing:border-box;">
+                       class="infographic-modal-input">
             </label>
         </div>
-        <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
-            <button onclick="document.getElementById('infographicModal').style.display='none'"
+        <div class="infographic-modal-actions">
+            <button onclick="closeInfographicModal()"
                     class="btn btn-secondary" data-i18n="yearBooks.infographic.cancel">Cancel</button>
             <button onclick="generateYearBooksInfographic()" id="infGenerateBtn"
                     class="btn btn-primary"
@@ -105,6 +104,16 @@
         var m = document.getElementById('infographicModal');
         if (m && m.parentNode !== document.body) document.body.appendChild(m);
     });
+
+    window.openInfographicModal = function () {
+        var modal = document.getElementById('infographicModal');
+        if (modal) modal.classList.add('active');
+    };
+
+    window.closeInfographicModal = function () {
+        var modal = document.getElementById('infographicModal');
+        if (modal) modal.classList.remove('active');
+    };
 
     const _BOOKS        = {{ books        | tojson }};
     const _YEAR         = {{ year         | tojson }};
@@ -372,7 +381,7 @@
 
         if (btnLabel) btnLabel.textContent = origText;
         btn.disabled = false;
-        document.getElementById('infographicModal').style.display = 'none';
+        closeInfographicModal();
     };
 })();
 </script>
