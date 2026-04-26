@@ -105,6 +105,8 @@
 
 <script>
 (function () {
+    var INFOGRAPHIC_COLS_STORAGE_KEY = 'librarium_year_books_infographic_cols';
+
     /* Move modal to document.body to escape any stacking-context from the content wrapper */
     document.addEventListener('DOMContentLoaded', function () {
         var m = document.getElementById('infographicModal');
@@ -112,6 +114,10 @@
 
         var wInput = document.getElementById('infW');
         var colsInput = document.getElementById('infCols');
+        try {
+            var savedCols = localStorage.getItem(INFOGRAPHIC_COLS_STORAGE_KEY);
+            if (colsInput && savedCols) colsInput.value = savedCols;
+        } catch (e) {}
         if (wInput) wInput.addEventListener('input', updateInfographicSizingFields);
         if (colsInput) colsInput.addEventListener('input', updateInfographicSizingFields);
         updateInfographicSizingFields();
@@ -201,9 +207,11 @@
         if (Number.isFinite(cols) && cols > 0) {
             cols = Math.max(1, Math.min(_BOOKS.length, cols));
             if (String(cols) !== colsInput.value) colsInput.value = String(cols);
+            try { localStorage.setItem(INFOGRAPHIC_COLS_STORAGE_KEY, String(cols)); } catch (e) {}
             heightInput.value = String(_inferInfographicHeight(width, cols, _BOOKS.length));
             heightInput.disabled = true;
         } else {
+            try { localStorage.removeItem(INFOGRAPHIC_COLS_STORAGE_KEY); } catch (e) {}
             heightInput.disabled = false;
         }
     }
