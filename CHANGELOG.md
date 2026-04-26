@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty
-- Authors tab cards now use the same cover-card layout as the Authors Read in YYYY page, with a single "N books" badge and no pen-name line
+- Authors tab cards now use the same cover-card layout as the Authors Read in YYYY page, with a single "N books" badge and no pen-name line; author card images use a 4:5 portrait aspect ratio
 
 ## [2.0.0] — 2026-04-19
 
