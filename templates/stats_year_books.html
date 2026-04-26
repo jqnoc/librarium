@@ -100,8 +100,9 @@
 
 <script>
 (function () {
-    const _BOOKS = {{ books | tojson }};
-    const _YEAR  = {{ year  | tojson }};
+    const _BOOKS   = {{ books       | tojson }};
+    const _YEAR    = {{ year        | tojson }};
+    const _VERSION = {{ app_version | tojson }};
 
     /* ── Helpers ──────────────────────────────────────────────────────── */
     function _rrect(ctx, x, y, w, h, r) {
@@ -190,12 +191,7 @@
         ctx.restore();
 
         /* Stat badges (right-aligned) */
-        const withRating = _BOOKS.filter(b => b.rating > 0);
-        const avgRating  = withRating.length
-            ? (withRating.reduce((s, b) => s + b.rating, 0) / withRating.length).toFixed(2)
-            : null;
         const statItems = [`${N} book${N !== 1 ? 's' : ''}`];
-        if (avgRating) statItems.push(`\u2605 ${avgRating}`);
 
         ctx.save();
         ctx.font = `600 ${stFS}px system-ui,-apple-system,sans-serif`;
@@ -296,6 +292,37 @@
                 ctx.restore();
             }
 
+            /* Rating pill (bottom-right corner of cover) */
+            if (book.rating > 0) {
+                const rtFS  = Math.max(7, Math.min(Math.round(CELL_W * 0.085), 14));
+                const rtTxt = `\u2605 ${book.rating.toFixed(2)}`;
+                ctx.save();
+                ctx.font = `700 ${rtFS}px system-ui,-apple-system,sans-serif`;
+                const rtW = ctx.measureText(rtTxt).width;
+                const rtPH = Math.round(rtFS * 0.55), rtPV = Math.round(rtFS * 0.38);
+                const rtBW = rtW + rtPH * 2, rtBH = rtFS + rtPV * 2;
+                const rtX = cx + CELL_W - rtBW - Math.round(CELL_W * 0.04);
+                const rtY = cy + CVR_H  - rtBH - Math.round(CVR_H  * 0.04);
+                /* Shadow for legibility */
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur  = 6;
+                /* Pill background */
+                ctx.fillStyle = 'rgba(12,22,28,0.78)';
+                _rrect(ctx, rtX, rtY, rtBW, rtBH, rtBH / 2); ctx.fill();
+                ctx.shadowBlur = 0;
+                /* Pill border in GOLD */
+                ctx.strokeStyle = 'rgba(236,143,141,0.65)'; ctx.lineWidth = 1;
+                _rrect(ctx, rtX, rtY, rtBW, rtBH, rtBH / 2); ctx.stroke();
+                /* Star in GOLD, number in TEXT */
+                ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+                const starW = ctx.measureText('\u2605 ').width;
+                ctx.fillStyle = GOLD;
+                ctx.fillText('\u2605 ', rtX + rtPH, rtY + rtBH / 2);
+                ctx.fillStyle = TEXT;
+                ctx.fillText(book.rating.toFixed(2), rtX + rtPH + starW, rtY + rtBH / 2);
+                ctx.restore();
+            }
+
             /* Title */
             const titleLabel = book.name + (book.reading_number ? ` #${book.reading_number}` : '');
             ctx.font = `600 ${titFS}px system-ui,-apple-system,sans-serif`;
@@ -318,7 +345,7 @@
         ctx.font = `300 ${ftrFS}px system-ui,-apple-system,sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        ctx.fillText('Generated with Librarium', W / 2, H - FTR_H / 2);
+        ctx.fillText(`Generated with Librarium v${_VERSION}`, W / 2, H - FTR_H / 2);
 
         /* ── Download ───────────────────────────────────────────────────── */
         canvas.toBlob(blob => {
