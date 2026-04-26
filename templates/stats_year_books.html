@@ -336,11 +336,12 @@
                 /* Pill border — #FFE082 matching .rating-badge */
                 ctx.strokeStyle = '#FFE082'; ctx.lineWidth = 1;
                 _rrect(ctx, rtX, rtY, rtBW, rtBH, rtBH / 2); ctx.stroke();
-                /* Star + number in --lb-deep-orange (#537D96) matching .rating-badge */
+                /* Star in border-yellow, number in --lb-deep-orange */
                 ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
                 const starW = ctx.measureText('\u2605 ').width;
-                ctx.fillStyle = '#537D96';
+                ctx.fillStyle = '#FFE082';
                 ctx.fillText('\u2605 ', rtX + rtPH, rtY + rtBH / 2);
+                ctx.fillStyle = '#537D96';
                 ctx.fillText(book.rating.toFixed(2), rtX + rtPH + starW, rtY + rtBH / 2);
                 ctx.restore();
             }
