@@ -1183,6 +1183,10 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text-light);
 }
 
+.infographic-modal-label-full {
+    grid-column: 1 / -1;
+}
+
 .infographic-modal-input {
     width: 100%;
     box-sizing: border-box;
@@ -1199,6 +1203,19 @@ select.form-control { cursor: pointer; }
     outline: none;
     border-color: var(--lb-orange);
     box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
+
+.infographic-modal-input:disabled {
+    background: var(--lb-light-bg);
+    color: var(--lb-text-light);
+    cursor: not-allowed;
+}
+
+.infographic-modal-note {
+    margin: -0.5rem 0 1.5rem;
+    font-size: 0.82rem;
+    color: var(--lb-text-light);
+    line-height: 1.45;
 }
 
 .infographic-modal-actions {

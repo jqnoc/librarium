@@ -84,7 +84,13 @@
                 <input type="number" id="infH" value="1080" min="600" max="8000" step="10"
                        class="infographic-modal-input">
             </label>
+            <label class="infographic-modal-label infographic-modal-label-full">
+                <span data-i18n="yearBooks.infographic.booksPerRow">Books per row (optional)</span>
+                <input type="number" id="infCols" value="" min="1" max="30" step="1"
+                       class="infographic-modal-input">
+            </label>
         </div>
+        <p class="infographic-modal-note" data-i18n="yearBooks.infographic.autoHeightHint">Leave this empty to set height manually. Fill it in to infer height from the width.</p>
         <div class="infographic-modal-actions">
             <button onclick="closeInfographicModal()"
                     class="btn btn-secondary" data-i18n="yearBooks.infographic.cancel">Cancel</button>
@@ -103,10 +109,17 @@
     document.addEventListener('DOMContentLoaded', function () {
         var m = document.getElementById('infographicModal');
         if (m && m.parentNode !== document.body) document.body.appendChild(m);
+
+        var wInput = document.getElementById('infW');
+        var colsInput = document.getElementById('infCols');
+        if (wInput) wInput.addEventListener('input', updateInfographicSizingFields);
+        if (colsInput) colsInput.addEventListener('input', updateInfographicSizingFields);
+        updateInfographicSizingFields();
     });
 
     window.openInfographicModal = function () {
         var modal = document.getElementById('infographicModal');
+        updateInfographicSizingFields();
         if (modal) modal.classList.add('active');
     };
 
@@ -144,10 +157,66 @@
         return text.slice(0, lo) + '\u2026';
     }
 
+    function _inferInfographicHeight(width, columns, bookCount) {
+        const count = Math.max(1, bookCount || 1);
+        const cols = Math.max(1, Math.min(count, columns || 1));
+        const rows = Math.ceil(count / cols);
+        const W = Math.max(800, Math.min(8000, width || 1920));
+        const PAD = Math.round(W * 0.025);
+        const GW = W - PAD * 2;
+        const GAP = Math.round(W * 0.01);
+        const CELL_W = (GW - GAP * (cols - 1)) / cols;
+        const TARGET_COVER_H = CELL_W * 1.5;
+        const gapTotal = GAP * (rows + 1);
+
+        // Most layouts use the 24% label-height branch: cover = 76% of cell height.
+        const CELL_H_A = TARGET_COVER_H / 0.76;
+        const H_A = (rows * CELL_H_A + gapTotal) / 0.803;
+        if (0.24 * CELL_H_A <= 0.075 * H_A) {
+            return Math.round(Math.max(600, Math.min(8000, H_A)));
+        }
+
+        // For very short exports, the label cap switches to 7.5% of total height.
+        const denom = 0.803 - rows * 0.075;
+        if (denom > 0) {
+            const H_B = (rows * TARGET_COVER_H + gapTotal) / denom;
+            return Math.round(Math.max(600, Math.min(8000, H_B)));
+        }
+
+        return Math.round(Math.max(600, Math.min(8000, H_A)));
+    }
+
+    function updateInfographicSizingFields() {
+        var widthInput = document.getElementById('infW');
+        var heightInput = document.getElementById('infH');
+        var colsInput = document.getElementById('infCols');
+        if (!widthInput || !heightInput || !colsInput) return;
+
+        var width = parseInt(widthInput.value, 10);
+        if (!Number.isFinite(width)) width = 1920;
+        width = Math.max(800, Math.min(8000, width));
+
+        var cols = parseInt(colsInput.value, 10);
+        if (Number.isFinite(cols) && cols > 0) {
+            cols = Math.max(1, Math.min(_BOOKS.length, cols));
+            if (String(cols) !== colsInput.value) colsInput.value = String(cols);
+            heightInput.value = String(_inferInfographicHeight(width, cols, _BOOKS.length));
+            heightInput.disabled = true;
+        } else {
+            heightInput.disabled = false;
+        }
+    }
+
     /* ── Main generator ───────────────────────────────────────────────── */
     window.generateYearBooksInfographic = async function () {
+        const requestedColsRaw = parseInt(document.getElementById('infCols').value, 10);
+        const requestedCols = Number.isFinite(requestedColsRaw) && requestedColsRaw > 0
+            ? Math.max(1, Math.min(_BOOKS.length, requestedColsRaw))
+            : 0;
         const W = Math.max(800,  Math.min(8000, parseInt(document.getElementById('infW').value)  || 1920));
-        const H = Math.max(600,  Math.min(8000, parseInt(document.getElementById('infH').value)  || 1080));
+        const H = requestedCols
+            ? _inferInfographicHeight(W, requestedCols, _BOOKS.length)
+            : Math.max(600,  Math.min(8000, parseInt(document.getElementById('infH').value)  || 1080));
 
         const btn      = document.getElementById('infGenerateBtn');
         const btnLabel = btn.querySelector('span');
@@ -243,17 +312,20 @@
         ctx.fillRect(PAD, HDR_H - 2, GW, 2);
 
         /* ── Find best column count ──────────────────────────────────────── */
-        let COLS = 1, bestDiff = Infinity;
-        for (let c = 1; c <= Math.min(N, 30); c++) {
-            const rows  = Math.ceil(N / c);
-            const cw    = (GW - GAP * (c - 1)) / c;
-            const ch    = (GH - GAP * (rows + 1)) / rows;
-            if (cw < 30 || ch < 40) continue;
-            const labH  = Math.min(ch * 0.24, H * 0.075);
-            const cvrH  = ch - labH;
-            if (cvrH < 20) continue;
-            const diff  = Math.abs(cvrH / cw - 1.5);
-            if (diff < bestDiff) { bestDiff = diff; COLS = c; }
+        let COLS = requestedCols || 1;
+        if (!requestedCols) {
+            let bestDiff = Infinity;
+            for (let c = 1; c <= Math.min(N, 30); c++) {
+                const rows  = Math.ceil(N / c);
+                const cw    = (GW - GAP * (c - 1)) / c;
+                const ch    = (GH - GAP * (rows + 1)) / rows;
+                if (cw < 30 || ch < 40) continue;
+                const labH  = Math.min(ch * 0.24, H * 0.075);
+                const cvrH  = ch - labH;
+                if (cvrH < 20) continue;
+                const diff  = Math.abs(cvrH / cw - 1.5);
+                if (diff < bestDiff) { bestDiff = diff; COLS = c; }
+            }
         }
         const ROWS   = Math.ceil(N / COLS);
         const CELL_W = (GW - GAP * (COLS - 1)) / COLS;

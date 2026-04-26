@@ -533,6 +533,8 @@
         'yearBooks.infographic.title':      { en: 'Generate Infographic',   es: 'Generar Infografía' },
         'yearBooks.infographic.width':      { en: 'Width (px)',             es: 'Ancho (px)' },
         'yearBooks.infographic.height':     { en: 'Height (px)',            es: 'Alto (px)' },
+        'yearBooks.infographic.booksPerRow': { en: 'Books per row (optional)', es: 'Libros por fila (opcional)' },
+        'yearBooks.infographic.autoHeightHint': { en: 'Leave this empty to set height manually. Fill it in to infer height from the width.', es: 'Déjalo vacío para fijar la altura manualmente. Complétalo para inferir la altura a partir del ancho.' },
         'yearBooks.infographic.cancel':     { en: 'Cancel',                 es: 'Cancelar' },
         'yearBooks.infographic.generate':   { en: 'Generate & Download',    es: 'Generar y Descargar' },
 
