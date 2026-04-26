@@ -310,13 +310,13 @@
                 ctx.fillStyle = 'rgba(12,22,28,0.78)';
                 _rrect(ctx, rtX, rtY, rtBW, rtBH, rtBH / 2); ctx.fill();
                 ctx.shadowBlur = 0;
-                /* Pill border in GOLD */
-                ctx.strokeStyle = 'rgba(236,143,141,0.65)'; ctx.lineWidth = 1;
+                /* Pill border in deep-orange (#537D96) */
+                ctx.strokeStyle = 'rgba(83,125,150,0.65)'; ctx.lineWidth = 1;
                 _rrect(ctx, rtX, rtY, rtBW, rtBH, rtBH / 2); ctx.stroke();
-                /* Star in GOLD, number in TEXT */
+                /* Star in deep-orange, number in TEXT */
                 ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
                 const starW = ctx.measureText('\u2605 ').width;
-                ctx.fillStyle = GOLD;
+                ctx.fillStyle = '#537D96';
                 ctx.fillText('\u2605 ', rtX + rtPH, rtY + rtBH / 2);
                 ctx.fillStyle = TEXT;
                 ctx.fillText(book.rating.toFixed(2), rtX + rtPH + starW, rtY + rtBH / 2);
