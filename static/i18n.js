@@ -529,6 +529,12 @@
         'yearBooks.sortRating':    { en: 'Rating',                     es: 'Valoración' },
         'yearBooks.finishedLabel': { en: 'Finished:',                  es: 'Terminado:' },
         'yearBooks.empty':         { en: 'No books were finished in',  es: 'No se terminaron libros en' },
+        'yearBooks.generateInfographic':    { en: 'Generate Infographic',   es: 'Generar Infografía' },
+        'yearBooks.infographic.title':      { en: 'Generate Infographic',   es: 'Generar Infografía' },
+        'yearBooks.infographic.width':      { en: 'Width (px)',             es: 'Ancho (px)' },
+        'yearBooks.infographic.height':     { en: 'Height (px)',            es: 'Alto (px)' },
+        'yearBooks.infographic.cancel':     { en: 'Cancel',                 es: 'Cancelar' },
+        'yearBooks.infographic.generate':   { en: 'Generate & Download',    es: 'Generar y Descargar' },
 
         // ── Year time ──────────────────────────────────────────────────
         'yearTime.backToGlobal':   { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },

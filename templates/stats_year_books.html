@@ -59,6 +59,284 @@
     {% endfor %}
 </div>
 
+<!-- ── Generate Infographic ───────────────────────────────────────────── -->
+<div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--lb-border); display: flex; justify-content: center;">
+    <button onclick="document.getElementById('infographicModal').style.display='flex'"
+            class="btn btn-primary"
+            style="font-size: 1rem; padding: 0.7rem 2rem; display: flex; align-items: center; gap: 0.5rem;">
+        🎨 <span data-i18n="yearBooks.generateInfographic">Generate Infographic</span>
+    </button>
+</div>
+
+<!-- Infographic modal -->
+<div id="infographicModal"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;"
+     onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:var(--lb-bg); border-radius:12px; padding:2rem; width:400px; max-width:92vw; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <h2 style="margin:0 0 1.5rem; color:var(--lb-text-dark);" data-i18n="yearBooks.infographic.title">Generate Infographic</h2>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
+            <label style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.9rem; color:var(--lb-text-light);">
+                <span data-i18n="yearBooks.infographic.width">Width (px)</span>
+                <input type="number" id="infW" value="1920" min="800" max="8000" step="10"
+                       style="padding:0.5rem; border:1px solid var(--lb-border); border-radius:6px; background:var(--lb-bg); color:var(--lb-text-dark); font-size:1rem; width:100%; box-sizing:border-box;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:0.4rem; font-size:0.9rem; color:var(--lb-text-light);">
+                <span data-i18n="yearBooks.infographic.height">Height (px)</span>
+                <input type="number" id="infH" value="1080" min="600" max="8000" step="10"
+                       style="padding:0.5rem; border:1px solid var(--lb-border); border-radius:6px; background:var(--lb-bg); color:var(--lb-text-dark); font-size:1rem; width:100%; box-sizing:border-box;">
+            </label>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+            <button onclick="document.getElementById('infographicModal').style.display='none'"
+                    class="btn btn-secondary" data-i18n="yearBooks.infographic.cancel">Cancel</button>
+            <button onclick="generateYearBooksInfographic()" id="infGenerateBtn"
+                    class="btn btn-primary"
+                    style="display:flex; align-items:center; gap:0.4rem;">
+                🎨 <span data-i18n="yearBooks.infographic.generate">Generate &amp; Download</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const _BOOKS = {{ books | tojson }};
+    const _YEAR  = {{ year  | tojson }};
+
+    /* ── Helpers ──────────────────────────────────────────────────────── */
+    function _rrect(ctx, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y,     x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x,     y + h, r);
+        ctx.arcTo(x,     y + h, x,     y,     r);
+        ctx.arcTo(x,     y,     x + w, y,     r);
+        ctx.closePath();
+    }
+
+    function _trunc(ctx, text, maxW) {
+        if (!text) return '';
+        if (ctx.measureText(text).width <= maxW) return text;
+        let lo = 0, hi = text.length;
+        while (lo < hi - 1) {
+            const mid = (lo + hi) >> 1;
+            ctx.measureText(text.slice(0, mid) + '\u2026').width <= maxW ? (lo = mid) : (hi = mid);
+        }
+        return text.slice(0, lo) + '\u2026';
+    }
+
+    /* ── Main generator ───────────────────────────────────────────────── */
+    window.generateYearBooksInfographic = async function () {
+        const W = Math.max(800,  Math.min(8000, parseInt(document.getElementById('infW').value)  || 1920));
+        const H = Math.max(600,  Math.min(8000, parseInt(document.getElementById('infH').value)  || 1080));
+
+        const btn      = document.getElementById('infGenerateBtn');
+        const btnLabel = btn.querySelector('span');
+        const origText = btnLabel ? btnLabel.textContent : '';
+        if (btnLabel) btnLabel.textContent = '\u2026';
+        btn.disabled = true;
+
+        const canvas  = document.createElement('canvas');
+        canvas.width  = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        /* Palette (matching app theme) */
+        const BG1    = '#1b303d', BG2 = '#0d1d25';
+        const ACCENT = '#44A194', GOLD = '#EC8F8D';
+        const TEXT   = '#e8f4f8', SUB  = '#7eaab8', CARD = '#1e2e38';
+
+        /* Geometry */
+        const PAD   = Math.round(W * 0.025);
+        const HDR_H = Math.round(H * 0.13);
+        const FTR_H = Math.round(H * 0.055);
+        const GW    = W - PAD * 2;
+        const GT    = HDR_H + Math.round(H * 0.012);
+        const GH    = H - GT - FTR_H;
+        const GAP   = Math.round(W * 0.01);
+        const N     = _BOOKS.length;
+
+        /* ── Background ────────────────────────────────────────────────── */
+        const bgGrad = ctx.createLinearGradient(0, 0, W * 0.6, H);
+        bgGrad.addColorStop(0, BG1);
+        bgGrad.addColorStop(1, BG2);
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        /* Dot-grid texture */
+        const step = Math.round(W / 72);
+        ctx.fillStyle = 'rgba(255,255,255,0.022)';
+        for (let x = PAD; x < W - PAD; x += step)
+            for (let y = GT; y < H - FTR_H; y += step)
+                ctx.fillRect(x, y, 1.5, 1.5);
+
+        /* ── Header ─────────────────────────────────────────────────────── */
+        const yrFS  = Math.round(H * 0.072);
+        const lblFS = Math.round(H * 0.029);
+        const stFS  = Math.round(H * 0.021);
+
+        ctx.save();
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign    = 'left';
+        ctx.font      = `800 ${yrFS}px system-ui,-apple-system,sans-serif`;
+        ctx.fillStyle = GOLD;
+        ctx.fillText(_YEAR, PAD, Math.round(HDR_H * 0.60));
+        ctx.font         = `300 ${lblFS}px system-ui,-apple-system,sans-serif`;
+        ctx.fillStyle    = TEXT;
+        ctx.globalAlpha  = 0.72;
+        ctx.fillText('Books Read', PAD, Math.round(HDR_H * 0.90));
+        ctx.globalAlpha  = 1;
+        ctx.restore();
+
+        /* Stat badges (right-aligned) */
+        const withRating = _BOOKS.filter(b => b.rating > 0);
+        const avgRating  = withRating.length
+            ? (withRating.reduce((s, b) => s + b.rating, 0) / withRating.length).toFixed(2)
+            : null;
+        const statItems = [`${N} book${N !== 1 ? 's' : ''}`];
+        if (avgRating) statItems.push(`\u2605 ${avgRating}`);
+
+        ctx.save();
+        ctx.font = `600 ${stFS}px system-ui,-apple-system,sans-serif`;
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        let bxR = W - PAD;
+        const bcy = Math.round(HDR_H * 0.5);
+        const bph = Math.round(stFS * 0.6), bpv = Math.round(stFS * 0.45);
+        for (const st of [...statItems].reverse()) {
+            const tw = ctx.measureText(st).width;
+            const bw = tw + bph * 2, bh = stFS + bpv * 2;
+            const bL = bxR - bw;
+            ctx.fillStyle = 'rgba(68,161,148,0.18)';
+            _rrect(ctx, bL, bcy - bh / 2, bw, bh, bh / 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(68,161,148,0.5)'; ctx.lineWidth = 1;
+            _rrect(ctx, bL, bcy - bh / 2, bw, bh, bh / 2); ctx.stroke();
+            ctx.fillStyle = TEXT;
+            ctx.fillText(st, bxR - bph, bcy);
+            bxR = bL - GAP;
+        }
+        ctx.restore();
+
+        /* Accent separator */
+        const sepG = ctx.createLinearGradient(PAD, 0, PAD + GW * 0.55, 0);
+        sepG.addColorStop(0, ACCENT); sepG.addColorStop(1, 'rgba(68,161,148,0)');
+        ctx.fillStyle = sepG;
+        ctx.fillRect(PAD, HDR_H - 2, GW, 2);
+
+        /* ── Find best column count ──────────────────────────────────────── */
+        let COLS = 1, bestDiff = Infinity;
+        for (let c = 1; c <= Math.min(N, 30); c++) {
+            const rows  = Math.ceil(N / c);
+            const cw    = (GW - GAP * (c - 1)) / c;
+            const ch    = (GH - GAP * (rows + 1)) / rows;
+            if (cw < 30 || ch < 40) continue;
+            const labH  = Math.min(ch * 0.24, H * 0.075);
+            const cvrH  = ch - labH;
+            if (cvrH < 20) continue;
+            const diff  = Math.abs(cvrH / cw - 1.5);
+            if (diff < bestDiff) { bestDiff = diff; COLS = c; }
+        }
+        const ROWS   = Math.ceil(N / COLS);
+        const CELL_W = (GW - GAP * (COLS - 1)) / COLS;
+        const CELL_H = (GH - GAP * (ROWS + 1)) / ROWS;
+        const LAB_H  = Math.min(CELL_H * 0.24, H * 0.075);
+        const CVR_H  = Math.max(20, CELL_H - LAB_H);
+        const titFS  = Math.max(8, Math.min(Math.round(CELL_W * 0.087), Math.round(LAB_H * 0.40)));
+        const autFS  = Math.max(7, Math.min(Math.round(CELL_W * 0.073), Math.round(LAB_H * 0.33)));
+
+        /* ── Load cover images ───────────────────────────────────────────── */
+        const imgs = await Promise.all(_BOOKS.map(b => new Promise(resolve => {
+            if (!b.has_cover) { resolve(null); return; }
+            const img = new Image();
+            img.onload  = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = `/cover_thumb/${b.id}${b.cover_hash ? '?v=' + b.cover_hash : ''}`;
+        })));
+
+        /* ── Draw each book cell ─────────────────────────────────────────── */
+        _BOOKS.forEach((book, i) => {
+            const col  = i % COLS;
+            const row  = Math.floor(i / COLS);
+            /* Centre the last (possibly short) row */
+            const rowN = (row === ROWS - 1) ? N - row * COLS : COLS;
+            const rOff = (row === ROWS - 1)
+                ? Math.round((GW - rowN * CELL_W - GAP * (rowN - 1)) / 2)
+                : 0;
+            const cx = PAD + rOff + col * (CELL_W + GAP);
+            const cy = GT  + GAP  + row * (CELL_H + GAP);
+
+            /* Cover card with shadow */
+            ctx.save();
+            ctx.shadowColor   = 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur    = Math.round(CELL_W * 0.07);
+            ctx.shadowOffsetY = Math.round(CELL_W * 0.035);
+            ctx.fillStyle = CARD;
+            _rrect(ctx, cx, cy, CELL_W, CVR_H, 5); ctx.fill();
+            ctx.restore();
+
+            const img = imgs[i];
+            if (img && img.naturalWidth > 0) {
+                ctx.save();
+                _rrect(ctx, cx, cy, CELL_W, CVR_H, 5); ctx.clip();
+                const iR = img.naturalWidth / img.naturalHeight;
+                const cR = CELL_W / CVR_H;
+                let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+                if (iR > cR) { sw = sh * cR; sx = (img.naturalWidth  - sw) / 2; }
+                else         { sh = sw / cR; sy = (img.naturalHeight - sh) / 2; }
+                ctx.drawImage(img, sx, sy, sw, sh, cx, cy, CELL_W, CVR_H);
+                ctx.restore();
+            } else {
+                /* No-cover placeholder */
+                ctx.save();
+                _rrect(ctx, cx, cy, CELL_W, CVR_H, 5); ctx.clip();
+                ctx.font = `${Math.round(CVR_H * 0.28)}px system-ui`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(255,255,255,0.10)';
+                ctx.fillText('\uD83D\uDCD6', cx + CELL_W / 2, cy + CVR_H / 2);
+                ctx.restore();
+            }
+
+            /* Title */
+            const titleLabel = book.name + (book.reading_number ? ` #${book.reading_number}` : '');
+            ctx.font = `600 ${titFS}px system-ui,-apple-system,sans-serif`;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = TEXT;
+            ctx.fillText(_trunc(ctx, titleLabel, CELL_W), cx, cy + CVR_H + Math.round(titFS * 1.2));
+
+            /* Author */
+            ctx.font = `400 ${autFS}px system-ui,-apple-system,sans-serif`;
+            ctx.fillStyle = SUB;
+            ctx.fillText(
+                _trunc(ctx, book.author, CELL_W),
+                cx,
+                cy + CVR_H + Math.round(titFS * 1.2) + Math.round(autFS * 1.35)
+            );
+        });
+
+        /* ── Footer ─────────────────────────────────────────────────────── */
+        const ftrFS = Math.round(H * 0.017);
+        ctx.font = `300 ${ftrFS}px system-ui,-apple-system,sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillText('Generated with Librarium', W / 2, H - FTR_H / 2);
+
+        /* ── Download ───────────────────────────────────────────────────── */
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a   = document.createElement('a');
+            a.download = `librarium-${_YEAR}-books.png`;
+            a.href = url;
+            a.click();
+            URL.revokeObjectURL(url);
+        }, 'image/png');
+
+        if (btnLabel) btnLabel.textContent = origText;
+        btn.disabled = false;
+        document.getElementById('infographicModal').style.display = 'none';
+    };
+})();
+</script>
+
 {% else %}
 <div class="empty-state">
     <div class="icon">📚</div>
