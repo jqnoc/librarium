@@ -592,19 +592,18 @@ present anywhere in `## [Unreleased]`:
 
 | Unreleased contains | Bump |
 |---------------------|------|
-| `### Added` or `### Changed` | **minor** (e.g. `2.0.0 → 2.1.0-beta.1`) |
-| Only `### Fixed` or `### Removed` | **patch** (e.g. `2.0.0 → 2.0.1-beta.1`) |
+| `### Added` or `### Changed` | **minor** (e.g. `2.0.0 → 2.1.0-beta`) |
+| Only `### Fixed` or `### Removed` | **patch** (e.g. `2.0.0 → 2.0.1-beta`) |
 
 **When to bump:**
 
 - **When the first entry is added to a previously empty `## [Unreleased]`
   section**: determine the bump type and set `APP_VERSION` / `package.json`
-  to `x.y.z-beta.1`.
+  to `x.y.z-beta`.
 - **On subsequent changes to the same `## [Unreleased]` section**: keep
-  the current `-beta.N` version unless the bump type escalates (e.g. the
+  the current `-beta` version unless the bump type escalates (e.g. the
   section only had `Fixed` items and a new `Added` item is introduced) —
-  in that case upgrade from a patch-beta to a minor-beta and reset to
-  `-beta.1`.
+  in that case upgrade from a patch-beta to a minor-beta.
 - **When `## [Unreleased]` is empty** (right after a release): leave
   `APP_VERSION` and `package.json` at the just-released clean version.
 
@@ -645,8 +644,8 @@ Every response that modifies code **must** update `CHANGELOG.md`:
 
 | File | Field |
 |------|-------|
-| `app.py` | `APP_VERSION = "x.y.z"` (or `"x.y.z-beta.N"` during dev) |
-| `package.json` | `"version": "x.y.z"` (or `"x.y.z-beta.N"` during dev) |
+| `app.py` | `APP_VERSION = "x.y.z"` (or `"x.y.z-beta"` during dev) |
+| `package.json` | `"version": "x.y.z"` (or `"x.y.z-beta"` during dev) |
 | `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` (only at release time) |
 
 All three **must** stay in sync at all times — both during development
