@@ -577,9 +577,36 @@ stage that file with `git add <path>` before finishing the task.
 ## 11. Versioning & Changelog
 
 The project uses semantic versioning. Development happens on the `dev`
-branch; releases are merged to `main` and tagged. Version bumps happen
-**only when the user explicitly requests a release** — never
-automatically.
+branch; releases are merged to `main` and tagged.
+
+### Beta versioning during development (MANDATORY)
+
+The running app must always display the correct in-development version,
+not the last released one. The rule is simple: **as soon as
+`## [Unreleased]` has at least one entry, the version must be bumped
+to a pre-release (`-beta.1`) string** so the app displays it correctly
+everywhere.
+
+**Bump type logic** — determined by the highest-priority change type
+present anywhere in `## [Unreleased]`:
+
+| Unreleased contains | Bump |
+|---------------------|------|
+| `### Added` or `### Changed` | **minor** (e.g. `2.0.0 → 2.1.0-beta.1`) |
+| Only `### Fixed` or `### Removed` | **patch** (e.g. `2.0.0 → 2.0.1-beta.1`) |
+
+**When to bump:**
+
+- **When the first entry is added to a previously empty `## [Unreleased]`
+  section**: determine the bump type and set `APP_VERSION` / `package.json`
+  to `x.y.z-beta.1`.
+- **On subsequent changes to the same `## [Unreleased]` section**: keep
+  the current `-beta.N` version unless the bump type escalates (e.g. the
+  section only had `Fixed` items and a new `Added` item is introduced) —
+  in that case upgrade from a patch-beta to a minor-beta and reset to
+  `-beta.1`.
+- **When `## [Unreleased]` is empty** (right after a release): leave
+  `APP_VERSION` and `package.json` at the just-released clean version.
 
 ### Changelog rules (MANDATORY)
 
@@ -589,9 +616,9 @@ Every response that modifies code **must** update `CHANGELOG.md`:
    file, using the appropriate sub-heading (`Added`, `Fixed`, `Changed`,
    `Removed`).
 2. **Do NOT create a new version entry** — only add to `[Unreleased]`.
-3. **Do NOT bump `APP_VERSION`** in `app.py` or `version` in
-   `package.json`. Version bumps are performed only when the user
-   explicitly asks to cut a release.
+3. **After adding an entry, apply the beta versioning rules above** and
+   update `APP_VERSION` in `app.py` and `version` in `package.json` if
+   a bump is required.
 4. **Avoid redundancy**: before adding a new bullet, check the existing
    `[Unreleased]` entries. If a previous bullet already covers the same
    feature or area and the current change is a fix or refinement of that
@@ -604,25 +631,26 @@ Every response that modifies code **must** update `CHANGELOG.md`:
   and one `### Removed`. If duplicates already exist, merge them before adding
   new bullets.
 6. When the user requests a release:
-   - Determine the new version (feat → minor bump, fix/refactor/chore →
-     patch bump, major → only on explicit request).
+   - Strip the `-beta.N` suffix from the current version to get the
+     final release version string.
    - Replace `## [Unreleased]` with `## [x.y.z] — YYYY-MM-DD` and add a
      fresh empty `## [Unreleased]` above it.
    - Update `APP_VERSION` in `app.py` and `version` in `package.json`
-     to match.
+     to the clean release version (no suffix).
 7. **No artificial line breaks**: each changelog bullet must be a single
    line — do **not** hard-wrap at 72 or 80 columns. Word wrap in the
    editor and on GitHub handles long lines correctly.
 
-### Version locations (kept in sync only at release time)
+### Version locations (always kept in sync)
 
 | File | Field |
 |------|-------|
-| `app.py` | `APP_VERSION = "x.y.z"` |
-| `package.json` | `"version": "x.y.z"` |
-| `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` |
+| `app.py` | `APP_VERSION = "x.y.z"` (or `"x.y.z-beta.N"` during dev) |
+| `package.json` | `"version": "x.y.z"` (or `"x.y.z-beta.N"` during dev) |
+| `CHANGELOG.md` | `## [x.y.z] — YYYY-MM-DD` (only at release time) |
 
-All three **must** stay in sync after each release.
+All three **must** stay in sync at all times — both during development
+(beta suffix) and at release (clean version).
 
 ### Release badge (MANDATORY)
 

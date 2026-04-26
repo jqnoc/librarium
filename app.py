@@ -81,7 +81,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0-beta.1"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
