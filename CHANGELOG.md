@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty
 - Authors tab cards now use the same cover-card layout as the Authors Read in YYYY page, with a single "N books" badge and no pen-name line; author card images use a 4:5 portrait aspect ratio
 - Versioning paradigm updated: `APP_VERSION` and `package.json` are now bumped to `x.y.z-beta` as soon as the Unreleased changelog section contains any entry (minor bump for `Added`/`Changed`, patch bump for `Fixed`/`Removed` only); the beta suffix is stripped when a release is cut
+- Dashboard rows now render in the order: Recent Activity / Last Books Owned / Top Rated, Author Spotlight / Records, Format & Source / Languages, Wishlist / To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
 
 ## [2.0.0] — 2026-04-19
 

@@ -219,9 +219,12 @@
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Recent Activity Feed + Last Books Owned                                -->
+<!-- Recent Activity + Last Books Owned + Top Rated                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-two-col">
+{% set activity_row_count = (1 if recent_activity else 0) + (1 if last_books_owned else 0) + (1 if top_rated else 0) %}
+{% if activity_row_count > 0 %}
+{% set activity_row_class = 'dash-three-col' if activity_row_count == 3 else 'dash-two-col' if activity_row_count == 2 else 'dash-single-col' %}
+<div class="{{ activity_row_class }}">
     {% if recent_activity %}
     <div class="dash-section">
         <h2 class="dash-heading" data-i18n="dash.recentActivity">Recent Activity</h2>
@@ -357,12 +360,7 @@
         </div>
     </div>
     {% endif %}
-</div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Top Rated + Records                                                    -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-two-col">
     <!-- Top Rated Books -->
     {% if top_rated %}
     <div class="dash-section">
@@ -382,6 +380,36 @@
                     <div class="dash-rated-author">{{ book.author }}</div>
                     <div class="dash-rated-score">⭐ {{ "%.2f" | format(book.rating) }}</div>
                 </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Author Spotlight + Records                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% set author_records_count = (1 if spotlight_authors else 0) + 1 %}
+{% set author_records_class = 'dash-two-col' if author_records_count == 2 else 'dash-single-col' %}
+<div class="{{ author_records_class }}">
+    <!-- Author Spotlight -->
+    {% if spotlight_authors %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.authorSpotlight">Author Spotlight</h2>
+        <div class="dash-spotlight-grid">
+            {% for auth in spotlight_authors %}
+            <a href="{{ url_for('author_detail', author_name=auth.name) }}" class="dash-spotlight-card">
+                <div class="dash-spotlight-photo">
+                    {% if auth.has_photo %}
+                    <img src="{{ url_for('author_photo_thumb', author_name=auth.name) }}?v={{ auth.photo_hash }}" alt="{{ auth.name }}">
+                    {% else %}
+                    <div class="cover-placeholder dash-spotlight-ph">✍️</div>
+                    {% endif %}
+                </div>
+                <div class="dash-spotlight-name">{{ auth.name }}</div>
+                <div class="dash-spotlight-count">{{ auth.count }} <span data-i18n="dash.booksInLibrary">books</span></div>
             </a>
             {% endfor %}
         </div>
@@ -429,9 +457,11 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Format/Source + Tag Cloud                                              -->
+<!-- Format/Source + Languages                                               -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-two-col">
+{% set format_languages_count = 1 + (1 if language_counts else 0) %}
+{% set format_languages_class = 'dash-two-col' if format_languages_count == 2 else 'dash-single-col' %}
+<div class="{{ format_languages_class }}">
     <!-- Format & Source -->
     <div class="dash-section">
         <h2 class="dash-heading" data-i18n="dash.formatSource">Format & Source</h2>
@@ -451,70 +481,6 @@
         </div>
     </div>
 
-    <!-- Tag Cloud -->
-    {% if top_tags %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.tagCloud">Tag Cloud</h2>
-        <div class="card">
-            <div class="card-body">
-                <div id="dashTagCloud" class="word-cloud"></div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Author Spotlight + Series Progress                                     -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-two-col">
-    <!-- Author Spotlight -->
-    {% if spotlight_authors %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.authorSpotlight">Author Spotlight</h2>
-        <div class="dash-spotlight-grid">
-            {% for auth in spotlight_authors %}
-            <a href="{{ url_for('author_detail', author_name=auth.name) }}" class="dash-spotlight-card">
-                <div class="dash-spotlight-photo">
-                    {% if auth.has_photo %}
-                    <img src="{{ url_for('author_photo_thumb', author_name=auth.name) }}?v={{ auth.photo_hash }}" alt="{{ auth.name }}">
-                    {% else %}
-                    <div class="cover-placeholder dash-spotlight-ph">✍️</div>
-                    {% endif %}
-                </div>
-                <div class="dash-spotlight-name">{{ auth.name }}</div>
-                <div class="dash-spotlight-count">{{ auth.count }} <span data-i18n="dash.booksInLibrary">books</span></div>
-            </a>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Series Progress -->
-    {% if series_progress %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.seriesProgress">Series Progress</h2>
-        <div class="card">
-            <div class="card-body">
-                {% for sp in series_progress %}
-                <div class="dash-series-item">
-                    <a href="{{ url_for('series_detail', series_id=sp.id) }}" class="dash-series-name">{{ sp.name }}</a>
-                    <div class="dash-series-bar-wrap">
-                        <div class="progress-bar-wrap" style="flex: 1;"><div class="progress-bar" style="width:{{ sp.pct }}%"></div></div>
-                        <span class="dash-series-count">{{ sp.finished }}/{{ sp.total }}</span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Language Diversity + TBR / Wishlist                                    -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-two-col">
     <!-- Language Diversity -->
     {% if language_counts %}
     <div class="dash-section">
@@ -527,6 +493,38 @@
                     <strong>{{ language_counts|length }}</strong>
                     <span data-i18n="dash.languages2">languages</span>
                 </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Wishlist + TBR Pile                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% set collection_row_count = (1 if wishlist_count > 0 else 0) + (1 if not_started_count > 0 else 0) %}
+{% if collection_row_count > 0 %}
+{% set collection_row_class = 'dash-two-col' if collection_row_count == 2 else 'dash-single-col' %}
+<div class="{{ collection_row_class }}">
+    {% if wishlist_count > 0 %}
+    <div class="dash-section">
+        <h2 class="dash-heading" data-i18n="dash.wishlistPile">Wishlist</h2>
+        <div class="card">
+            <div class="card-body">
+                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
+                    <strong>{{ wishlist_count }}</strong> <span data-i18n="dash.booksToBuy">books you want to buy</span>
+                </p>
+                <div class="dash-tbr-covers" id="dashWishlistCovers">
+                    {% for book in wishlist_list %}
+                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
+                        {% if book.has_cover %}
+                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                    {% else %}
+                        <div class="cover-placeholder" style="width:100%;height:100%;">📚</div>
+                    {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
@@ -556,31 +554,30 @@
         </div>
     </div>
     {% endif %}
+</div>
+{% endif %}
 
-    {% if wishlist_count > 0 %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.wishlistPile">Wishlist</h2>
-        <div class="card">
-            <div class="card-body">
-                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
-                    <strong>{{ wishlist_count }}</strong> <span data-i18n="dash.booksToBuy">books you want to buy</span>
-                </p>
-                <div class="dash-tbr-covers" id="dashWishlistCovers">
-                    {% for book in wishlist_list %}
-                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
-                        {% if book.has_cover %}
-                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
-                        {% else %}
-                        <div class="cover-placeholder" style="width:100%;height:100%;">📚</div>
-                        {% endif %}
-                    </a>
-                    {% endfor %}
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Series Progress                                                        -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if series_progress %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.seriesProgress">Series Progress</h2>
+    <div class="card">
+        <div class="card-body">
+            {% for sp in series_progress %}
+            <div class="dash-series-item">
+                <a href="{{ url_for('series_detail', series_id=sp.id) }}" class="dash-series-name">{{ sp.name }}</a>
+                <div class="dash-series-bar-wrap">
+                    <div class="progress-bar-wrap" style="flex: 1;"><div class="progress-bar" style="width:{{ sp.pct }}%"></div></div>
+                    <span class="dash-series-count">{{ sp.finished }}/{{ sp.total }}</span>
                 </div>
             </div>
+            {% endfor %}
         </div>
     </div>
-    {% endif %}
 </div>
+{% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Health                                                         -->
@@ -637,6 +634,20 @@
             <span><strong>{{ books_without_author }}</strong> <span data-i18n="dash.noAuthor">books without author</span></span>
         </div>
         {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Tag Cloud                                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if top_tags %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.tagCloud">Tag Cloud</h2>
+    <div class="card">
+        <div class="card-body">
+            <div id="dashTagCloud" class="word-cloud"></div>
+        </div>
     </div>
 </div>
 {% endif %}

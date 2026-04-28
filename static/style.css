@@ -1851,17 +1851,34 @@ select.form-control { cursor: pointer; }
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* Dashboard                                                                  */
 /* ═══════════════════════════════════════════════════════════════════════════ */
-.dash-section { margin-bottom: 2rem; }
+.dash-section {
+    margin-bottom: 2rem;
+    min-width: 0;
+}
 .dash-heading {
     color: var(--lb-deep-orange);
     margin: 0 0 1rem;
     font-size: 1.2rem;
 }
+.dash-single-col,
 .dash-two-col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 2rem;
     margin-bottom: 0.5rem;
+    align-items: start;
+}
+.dash-single-col {
+    grid-template-columns: minmax(0, 1fr);
+}
+.dash-two-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dash-three-col {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+    margin-bottom: 0.5rem;
+    align-items: start;
 }
 
 /* Currently reading grid */
@@ -2365,7 +2382,8 @@ select.form-control { cursor: pointer; }
 
 /* Dashboard responsiveness */
 @media (max-width: 768px) {
-    .dash-two-col { grid-template-columns: 1fr; }
+    .dash-two-col,
+    .dash-three-col { grid-template-columns: 1fr; }
     .dash-reading-grid { grid-template-columns: 1fr; }
 }
 
