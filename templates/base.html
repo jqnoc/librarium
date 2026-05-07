@@ -21,27 +21,37 @@
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium logo" class="site-logo">
                 <a href="{{ url_for('dashboard') }}">Librarium</a>
                 <div class="library-multi-select" id="libraryMultiSelect">
-                    <button type="button" class="library-multi-btn" id="libraryMultiBtn" onclick="toggleLibraryDropdown()" title="Select libraries" data-i18n-title="library.select">
-                        <span id="libraryMultiLabel">
-                            {%- set sel_count = selected_library_ids|length -%}
-                            {%- set all_count = all_libraries|length -%}
-                            {%- if sel_count == all_count or sel_count == 0 -%}
-                                <span data-i18n="library.allLibraries">All libraries</span>
-                            {%- elif sel_count == 1 -%}
-                                {%- for lib in all_libraries if lib.id == selected_library_ids[0] -%}{{ lib.name }}{%- endfor -%}
+                    <button type="button" class="library-multi-btn" id="libraryMultiBtn" title="Select libraries" data-i18n-title="library.select">
+                        {% set selected_names = [] %}
+                        {% for lib in all_libraries %}
+                            {% if (not selected_library_ids) or (lib.id in selected_library_ids) %}
+                                {% if selected_names.append(lib.name) %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        <span id="libraryMultiLabel" class="library-multi-label">
+                            {%- if selected_names and selected_names|length != all_libraries|length -%}
+                                {{ selected_names | join(', ') }}
                             {%- else -%}
-                                {{ sel_count }} / {{ all_count }}
+                                <span data-i18n="library.allLibraries">All libraries</span>
                             {%- endif -%}
                         </span>
                         <span class="library-multi-caret">▾</span>
                     </button>
                     <div class="library-multi-dropdown" id="libraryMultiDropdown">
+                        <button type="button" class="library-multi-item library-multi-item-all" id="selectAllLibraries">
+                            <span class="library-multi-name" data-i18n="library.allLibraries">All libraries</span>
+                        </button>
+                        <div class="library-multi-divider"></div>
                         {% for lib in all_libraries %}
-                        <div class="library-multi-item">
-                            <input type="checkbox" value="{{ lib.id }}" {% if lib.id in selected_library_ids %}checked{% endif %} onchange="onLibraryCheckboxChange()">
-                            <span class="library-multi-name" data-lib-id="{{ lib.id }}" onclick="onLibraryNameClick(this, event)">{{ lib.name }}</span>
-                        </div>
+                        <label class="library-multi-item" data-lib-id="{{ lib.id }}">
+                            <input type="checkbox" value="{{ lib.id }}" data-library-checkbox="1" data-library-name="{{ lib.name }}" {% if (not selected_library_ids) or (lib.id in selected_library_ids) %}checked{% endif %}>
+                            <span class="library-multi-name">{{ lib.name }}</span>
+                        </label>
                         {% endfor %}
+                        <div class="library-multi-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" id="cancelLibrarySelection" data-i18n="form.cancel">Cancel</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="applyLibrarySelection" data-i18n="form.apply">Apply</button>
+                        </div>
                     </div>
                 </div>
                 <button type="button" class="library-manage-btn" onclick="document.getElementById('libraryModal').style.display='flex'" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
@@ -79,41 +89,117 @@
         /* ── Library multi-select dropdown ──────────────────────────────── */
         function toggleLibraryDropdown() {
             var dd = document.getElementById('libraryMultiDropdown');
-            dd.classList.toggle('open');
+            if (dd) dd.classList.toggle('open');
         }
-        function onLibraryCheckboxChange() {
-            var boxes = document.querySelectorAll('#libraryMultiDropdown input[type=checkbox]');
-            var checked = Array.from(boxes).filter(function(cb) { return cb.checked; });
-            if (checked.length === 0) {
-                boxes.forEach(function(cb) { cb.checked = true; });
-                checked = Array.from(boxes);
+
+        (function() {
+            var selector = document.getElementById('libraryMultiSelect');
+            if (!selector) return;
+
+            var btn = document.getElementById('libraryMultiBtn');
+            var label = document.getElementById('libraryMultiLabel');
+            var dropdown = document.getElementById('libraryMultiDropdown');
+            var checkboxes = Array.from(dropdown.querySelectorAll('input[data-library-checkbox="1"]'));
+            var selectAllBtn = document.getElementById('selectAllLibraries');
+            var applyBtn = document.getElementById('applyLibrarySelection');
+            var cancelBtn = document.getElementById('cancelLibrarySelection');
+            var initialSelected = checkboxes.filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+
+            function getSelectedValues() {
+                return checkboxes.filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
             }
-            var ids = checked.map(function(cb) { return cb.value; }).join(',');
-            submitLibrarySwitch(ids);
-        }
-        function onLibraryNameClick(el, event) {
-            event.stopPropagation();
-            var id = el.getAttribute('data-lib-id');
-            submitLibrarySwitch(id);
-        }
-        function submitLibrarySwitch(ids) {
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '{{ url_for("switch_library") }}';
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'library_ids';
-            input.value = ids;
-            form.appendChild(input);
-            document.body.appendChild(form);
-            form.submit();
-        }
-        document.addEventListener('click', function(e) {
-            var ms = document.getElementById('libraryMultiSelect');
-            if (ms && !ms.contains(e.target)) {
-                document.getElementById('libraryMultiDropdown').classList.remove('open');
+
+            function translate(key, fallback) {
+                if (window.librariumI18n && typeof window.librariumI18n.t === 'function') {
+                    return window.librariumI18n.t(key);
+                }
+                return fallback;
             }
-        });
+
+            function hasSelectionChanged() {
+                var selected = getSelectedValues();
+                if (selected.length !== initialSelected.length) return true;
+                return selected.some(function(value) { return initialSelected.indexOf(value) === -1; });
+            }
+
+            function updateLibrarySummary() {
+                var selected = checkboxes.filter(function(cb) { return cb.checked; });
+                var summary = '';
+                if (selected.length === 0) {
+                    summary = translate('library.select', 'Select libraries');
+                } else if (selected.length === checkboxes.length) {
+                    summary = translate('library.allLibraries', 'All libraries');
+                } else {
+                    summary = selected.map(function(cb) { return cb.dataset.libraryName; }).join(', ');
+                }
+                label.textContent = summary;
+                label.title = summary;
+                applyBtn.disabled = selected.length === 0 || !hasSelectionChanged();
+            }
+
+            function resetLibrarySelection() {
+                checkboxes.forEach(function(cb) {
+                    cb.checked = initialSelected.indexOf(cb.value) !== -1;
+                });
+                updateLibrarySummary();
+            }
+
+            function submitLibrarySwitch(ids) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{{ url_for("switch_library") }}';
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'library_ids';
+                input.value = ids;
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+
+            checkboxes.forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    updateLibrarySummary();
+                });
+            });
+
+            selectAllBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                checkboxes.forEach(function(cb) { cb.checked = true; });
+                updateLibrarySummary();
+            });
+
+            applyBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var selected = getSelectedValues();
+                if (selected.length === 0) return;
+                applyBtn.disabled = true;
+                submitLibrarySwitch(selected.join(','));
+            });
+
+            cancelBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetLibrarySelection();
+                dropdown.classList.remove('open');
+            });
+
+            dropdown.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+
+            document.addEventListener('click', function() {
+                resetLibrarySelection();
+                dropdown.classList.remove('open');
+            });
+
+            applyBtn.disabled = true;
+            window.addEventListener('load', updateLibrarySummary);
+        })();
 
         function undoDelete(event) {
             event.preventDefault();

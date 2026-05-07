@@ -122,9 +122,16 @@ img { max-width: 100%; height: auto; }
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
+    max-width: 260px;
     white-space: nowrap;
+    overflow: hidden;
 }
 .library-multi-btn:hover { background: rgba(255,255,255,.2); }
+.library-multi-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .library-multi-caret { font-size: .7rem; opacity: .7; }
 .library-multi-dropdown {
     display: none;
@@ -134,8 +141,9 @@ img { max-width: 100%; height: auto; }
     background: var(--lb-dark);
     border: 1px solid rgba(255,255,255,.22);
     border-radius: 6px;
-    padding: 0.35rem 0;
-    min-width: 170px;
+    padding: 0.35rem 0 0;
+    min-width: 230px;
+    max-width: 320px;
     z-index: 1100;
     box-shadow: 0 4px 16px rgba(0,0,0,.35);
 }
@@ -155,6 +163,18 @@ img { max-width: 100%; height: auto; }
 .library-multi-name {
     flex: 1;
     cursor: pointer;
+}
+.library-multi-item-all {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font-weight: 600;
+}
+.library-multi-divider {
+    height: 1px;
+    margin: 0.25rem 0;
+    background: rgba(255,255,255,.14);
 }
 .library-multi-item input[type="checkbox"] {
     -webkit-appearance: none;
@@ -184,6 +204,33 @@ img { max-width: 100%; height: auto; }
     border: solid #fff;
     border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
+}
+.library-multi-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.7rem 0.75rem 0.75rem;
+    margin-top: 0.35rem;
+    border-top: 1px solid rgba(255,255,255,.14);
+}
+.library-multi-actions .btn-secondary {
+    background: rgba(255,255,255,.08);
+    color: var(--lb-white);
+    border: 1px solid rgba(255,255,255,.18);
+}
+.library-multi-actions .btn-secondary:hover {
+    background: rgba(255,255,255,.14);
+}
+.library-multi-actions .btn-primary {
+    background: var(--lb-accent);
+}
+.library-multi-actions .btn-primary:hover {
+    background: var(--lb-orange);
+}
+.library-multi-actions .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 .library-manage-btn {
     background: none;

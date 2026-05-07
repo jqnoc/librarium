@@ -270,6 +270,7 @@
         'form.end':      { en: 'End',      es: 'Fin' },
         'form.note':     { en: 'Note',     es: 'Nota' },
         'form.save':     { en: 'Save',     es: 'Guardar' },
+        'form.apply':    { en: 'Apply',    es: 'Aplicar' },
         'form.cancel':   { en: 'Cancel',   es: 'Cancelar' },
 
         // ── Authors page ────────────────────────────────────────────────
