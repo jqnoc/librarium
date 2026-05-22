@@ -3669,29 +3669,53 @@ def dashboard():
     # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
-    # ── Last books owned (50 most recent) ─────────────────────────────
-    last_books_owned: list[dict] = []
+    # ── Last books acquired (50 most recent owned / gifted / borrowed) ──
+    last_books_acquired: list[dict] = []
     for row in db.execute(
         f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.purchase_date, "
         f"b.purchase_price, b.source_type, b.is_gift, "
         f"s.name AS source_name "
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
-        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"WHERE {lf} AND b.source_type = 'owned' "
+        f"AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
         f"ORDER BY b.purchase_date DESC LIMIT 50", lp
     ).fetchall():
-        last_books_owned.append({
+        last_books_acquired.append({
             "id": row["id"],
             "name": row["name"],
             "author": row["author"] or "",
             "has_cover": bool(row["has_cover"]),
             "cover_hash": row["cover_hash"] or "",
-            "purchase_date": row["purchase_date"],
+            "acquired_date": row["purchase_date"],
             "purchase_price": row["purchase_price"] or "",
             "source_name": row["source_name"] or "",
             "source_type": row["source_type"] or "",
             "is_gift": bool(row["is_gift"]),
         })
+    for row in db.execute(
+        f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.borrowed_start, "
+        f"b.source_type, s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.source_type = 'borrowed' "
+        f"AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
+        f"ORDER BY b.borrowed_start DESC LIMIT 50", lp
+    ).fetchall():
+        last_books_acquired.append({
+            "id": row["id"],
+            "name": row["name"],
+            "author": row["author"] or "",
+            "has_cover": bool(row["has_cover"]),
+            "cover_hash": row["cover_hash"] or "",
+            "acquired_date": row["borrowed_start"],
+            "purchase_price": "",
+            "source_name": row["source_name"] or "",
+            "source_type": row["source_type"] or "",
+            "is_gift": False,
+        })
+    last_books_acquired.sort(key=lambda book: book["acquired_date"] or "0000-00-00", reverse=True)
+    last_books_acquired = last_books_acquired[:50]
 
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated = [
@@ -3899,8 +3923,8 @@ def dashboard():
         yoy_diff=yoy_diff,
         # Recent activity
         recent_activity=recent_activity,
-        # Last books owned
-        last_books_owned=last_books_owned,
+        # Last books acquired
+        last_books_acquired=last_books_acquired,
         # Top rated
         top_rated=top_rated,
         # Records

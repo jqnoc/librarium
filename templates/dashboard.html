@@ -219,9 +219,9 @@
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Recent Activity + Last Books Owned + Top Rated                         -->
+<!-- Recent Activity + Last Books Acquired + Top Rated                     -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% set activity_row_count = (1 if recent_activity else 0) + (1 if last_books_owned else 0) + (1 if top_rated else 0) %}
+{% set activity_row_count = (1 if recent_activity else 0) + (1 if last_books_acquired else 0) + (1 if top_rated else 0) %}
 {% if activity_row_count > 0 %}
 {% set activity_row_class = 'dash-three-col' if activity_row_count == 3 else 'dash-two-col' if activity_row_count == 2 else 'dash-single-col' %}
 <div class="{{ activity_row_class }}">
@@ -320,11 +320,11 @@
     </div>
     {% endif %}
 
-    {% if last_books_owned %}
+    {% if last_books_acquired %}
     <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.lastBooksOwned">Last Books Owned</h2>
+        <h2 class="dash-heading" data-i18n="dash.lastBooksAcquired">Last Books Acquired</h2>
         <div class="dash-bought-list">
-            {% for book in last_books_owned %}
+            {% for book in last_books_acquired %}
             <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-rated-card">
                 <div class="dash-rated-cover">
                     {% if book.has_cover %}
@@ -337,15 +337,21 @@
                     <div class="dash-rated-title">{{ book.name }}</div>
                     <div class="dash-rated-author">{{ book.author }}</div>
                     <div class="dash-bought-meta">
-                        {% if book.is_gift %}
+                        {% if book.source_type == 'borrowed' %}
+                        <span data-i18n="dash.actBorrowed">Borrowed</span>
+                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.acquired_date }}">{{ book.acquired_date }}</span></strong>
+                        {% if book.source_name %}
+                        <span data-i18n="dash.actFrom">from</span> <strong>{{ book.source_name }}</strong>
+                        {% endif %}
+                        {% elif book.is_gift %}
                         <span data-i18n="dash.ownedGift">Received as a gift</span>
                         {% if book.source_name %}
                         <span data-i18n="dash.actFrom">from</span> <strong>{{ book.source_name }}</strong>
                         {% endif %}
-                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.purchase_date }}">{{ book.purchase_date }}</span></strong>
+                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.acquired_date }}">{{ book.acquired_date }}</span></strong>
                         {% else %}
                         <span data-i18n="dash.ownedBought">Bought</span>
-                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.purchase_date }}">{{ book.purchase_date }}</span></strong>
+                        <span data-i18n="dash.ownedOn">on</span> <strong><span class="dash-feed-date" data-date="{{ book.acquired_date }}">{{ book.acquired_date }}</span></strong>
                         {% if book.source_name %}
                         <span data-i18n="dash.actAt">at</span> <strong>{{ book.source_name }}</strong>
                         {% endif %}

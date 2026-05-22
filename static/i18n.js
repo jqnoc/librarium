@@ -703,7 +703,7 @@
         'dash.ownedBought':         { en: 'Bought',                es: 'Comprado' },
         'dash.ownedGift':           { en: 'Received as a gift',    es: 'Recibido como regalo' },
         'dash.ownedOn':             { en: 'on',                    es: 'el' },
-        'dash.lastBooksOwned':      { en: 'Last Books Owned',      es: 'Últimos Libros Adquiridos' },
+        'dash.lastBooksAcquired':   { en: 'Last Books Acquired',   es: 'Últimos Libros Adquiridos' },
         'dash.topRated':            { en: 'Top Rated',             es: 'Mejor Valorados' },
         'dash.records':             { en: 'Records',               es: 'Récords' },
         'dash.formatSource':        { en: 'Format & Source',       es: 'Formato y Fuente' },
