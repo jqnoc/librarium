@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard's Last Books Acquired shelf now merges owned, gifted, and borrowed books and shows the acquisition date plus lender/source details for borrowed entries
 - Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
 
+### Fixed
+- Borrowed-book acquisitions now appear in the Dashboard Recent Activity feed and Calendar events, and calendar year navigation now includes years that only have borrowed-book dates
+
 ## [2.0.0] — 2026-04-19
 
 ### Added

@@ -3003,7 +3003,7 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
         f"s.name AS source_name "
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
         f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
-        f"AND b.source_type IN ('library','person') "
+        f"AND b.source_type = 'borrowed' "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_bor}",
         lp + tuple(dp_bor),
     ).fetchall():
@@ -5593,6 +5593,14 @@ def calendar_view():
     for row in db.execute(
         f"SELECT DISTINCT SUBSTR(purchase_date, 1, 4) AS yr FROM books "
         f"WHERE {lf} AND purchase_date IS NOT NULL AND purchase_date != ''", lp
+    ).fetchall():
+        try:
+            avail_years.add(int(row["yr"]))
+        except (ValueError, TypeError):
+            pass
+    for row in db.execute(
+        f"SELECT DISTINCT SUBSTR(borrowed_start, 1, 4) AS yr FROM books "
+        f"WHERE {lf} AND borrowed_start IS NOT NULL AND borrowed_start != ''", lp
     ).fetchall():
         try:
             avail_years.add(int(row["yr"]))
