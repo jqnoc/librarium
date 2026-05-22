@@ -5,11 +5,13 @@
 {% if not_started_count > 0 %}
 <script>
 (function() {
+    var scrollKey = 'librarium_dashboard_tbr_scroll_y';
     var allowed = { random: true, recent: true, oldest: true };
     var params = new URLSearchParams(window.location.search);
     var saved = localStorage.getItem('librarium_dashboard_tbr_sort') || 'random';
     if (!allowed[saved]) saved = 'random';
     if (!params.has('tbr_sort') && saved !== 'random') {
+        sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
         params.set('tbr_sort', saved);
         var query = params.toString();
         window.location.replace(query ? window.location.pathname + '?' + query : window.location.pathname);
@@ -701,12 +703,25 @@ const sourceCounts  = {{ source_counts | tojson }};
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
 (function() {
+    var scrollKey = 'librarium_dashboard_tbr_scroll_y';
+    var savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+        var restoreScroll = function() {
+            window.scrollTo(0, Number(savedScroll) || 0);
+            sessionStorage.removeItem(scrollKey);
+        };
+        window.addEventListener('load', function() {
+            window.requestAnimationFrame(restoreScroll);
+        }, { once: true });
+    }
+
     var select = document.getElementById('dashTbrSort');
     if (!select) return;
     localStorage.setItem('librarium_dashboard_tbr_sort', select.value || 'random');
     select.addEventListener('change', function() {
         var value = this.value || 'random';
         localStorage.setItem('librarium_dashboard_tbr_sort', value);
+        sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
         var params = new URLSearchParams(window.location.search);
         if (value === 'random') {
             params.delete('tbr_sort');
