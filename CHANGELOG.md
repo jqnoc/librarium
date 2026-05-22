@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Versioning paradigm updated: `APP_VERSION` and `package.json` are now bumped to `x.y.z-beta` as soon as the Unreleased changelog section contains any entry (minor bump for `Added`/`Changed`, patch bump for `Fixed`/`Removed` only); the beta suffix is stripped when a release is cut
 - Dashboard rows now render in the order: Recent Activity / Last Books Acquired / Top Rated, Author Spotlight / Records, Format & Source / Languages, Wishlist / To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
 - Dashboard's Last Books Acquired shelf now merges owned, gifted, and borrowed books and shows the acquisition date plus lender/source details for borrowed entries
-- Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, and sort changes now preserve the current scroll position across the reload
+- Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, and sort changes now update the shelf in place without reloading or resetting the page scroll
 - Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
 
 ### Fixed

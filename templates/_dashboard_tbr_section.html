@@ -1,0 +1,33 @@
+{% if not_started_count > 0 %}
+<div class="dash-section" id="dashTbrSection" data-tbr-sort="{{ tbr_sort }}">
+    <h2 class="dash-heading" data-i18n="dash.tbrPile">To Be Read</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="dash-tbr-toolbar">
+                <p class="dash-tbr-summary">
+                    <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
+                </p>
+                <label class="dash-tbr-sort" for="dashTbrSort">
+                    <span data-i18n="dash.show">Show:</span>
+                    <select id="dashTbrSort" class="dash-tbr-select">
+                        <option value="random" {{ 'selected' if tbr_sort == 'random' else '' }} data-i18n="dash.tbrSortRandom">Random Set</option>
+                        <option value="recent" {{ 'selected' if tbr_sort == 'recent' else '' }} data-i18n="dash.tbrSortRecent">Most Recently Acquired</option>
+                        <option value="oldest" {{ 'selected' if tbr_sort == 'oldest' else '' }} data-i18n="dash.tbrSortOldest">Least Recently Acquired</option>
+                    </select>
+                </label>
+            </div>
+            <div class="dash-tbr-covers" id="dashTbrCovers">
+                {% for book in tbr_list %}
+                <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
+                    {% if book.has_cover %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                    {% else %}
+                    <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

@@ -3817,6 +3817,14 @@ def dashboard():
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
 
+    if request.args.get("dashboard_fragment") == "tbr":
+        return render_template(
+            "_dashboard_tbr_section.html",
+            not_started_count=not_started_count,
+            tbr_sort=tbr_sort,
+            tbr_list=tbr_list,
+        )
+
     # ── Wishlist (to-buy) pile ──────────────────────────────────────────
     wishlist_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "

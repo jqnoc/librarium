@@ -2,23 +2,6 @@
 {% block title %}Librarium – Dashboard{% endblock %}
 
 {% block content %}
-{% if not_started_count > 0 %}
-<script>
-(function() {
-    var scrollKey = 'librarium_dashboard_tbr_scroll_y';
-    var allowed = { random: true, recent: true, oldest: true };
-    var params = new URLSearchParams(window.location.search);
-    var saved = localStorage.getItem('librarium_dashboard_tbr_sort') || 'random';
-    if (!allowed[saved]) saved = 'random';
-    if (!params.has('tbr_sort') && saved !== 'random') {
-        sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
-        params.set('tbr_sort', saved);
-        var query = params.toString();
-        window.location.replace(query ? window.location.pathname + '?' + query : window.location.pathname);
-    }
-})();
-</script>
-{% endif %}
 <div class="library-header">
     <h1 data-i18n="dash.title">Dashboard</h1>
 </div>
@@ -555,37 +538,7 @@
 
     <!-- TBR Pile -->
     {% if not_started_count > 0 %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.tbrPile">To Be Read</h2>
-        <div class="card">
-            <div class="card-body">
-                <div class="dash-tbr-toolbar">
-                    <p class="dash-tbr-summary">
-                        <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
-                    </p>
-                    <label class="dash-tbr-sort" for="dashTbrSort">
-                        <span data-i18n="dash.show">Show:</span>
-                        <select id="dashTbrSort" class="dash-tbr-select">
-                            <option value="random" {{ 'selected' if tbr_sort == 'random' else '' }} data-i18n="dash.tbrSortRandom">Random Set</option>
-                            <option value="recent" {{ 'selected' if tbr_sort == 'recent' else '' }} data-i18n="dash.tbrSortRecent">Most Recently Acquired</option>
-                            <option value="oldest" {{ 'selected' if tbr_sort == 'oldest' else '' }} data-i18n="dash.tbrSortOldest">Least Recently Acquired</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="dash-tbr-covers" id="dashTbrCovers">
-                    {% for book in tbr_list %}
-                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
-                        {% if book.has_cover %}
-                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
-                        {% else %}
-                        <div class="cover-placeholder" style="width:100%;height:100%;">📖</div>
-                        {% endif %}
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include "_dashboard_tbr_section.html" %}
     {% endif %}
 </div>
 {% endif %}
@@ -703,34 +656,127 @@ const sourceCounts  = {{ source_counts | tojson }};
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
 (function() {
-    var scrollKey = 'librarium_dashboard_tbr_scroll_y';
-    var savedScroll = sessionStorage.getItem(scrollKey);
-    if (savedScroll !== null) {
-        var restoreScroll = function() {
-            window.scrollTo(0, Number(savedScroll) || 0);
-            sessionStorage.removeItem(scrollKey);
-        };
-        window.addEventListener('load', function() {
-            window.requestAnimationFrame(restoreScroll);
-        }, { once: true });
+    var allowed = { random: true, recent: true, oldest: true };
+    var storageKey = 'librarium_dashboard_tbr_sort';
+    var requestNonce = 0;
+    var pendingController = null;
+
+    function sanitizeSort(value) {
+        return allowed[value] ? value : 'random';
     }
 
-    var select = document.getElementById('dashTbrSort');
-    if (!select) return;
-    localStorage.setItem('librarium_dashboard_tbr_sort', select.value || 'random');
-    select.addEventListener('change', function() {
-        var value = this.value || 'random';
-        localStorage.setItem('librarium_dashboard_tbr_sort', value);
-        sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
-        var params = new URLSearchParams(window.location.search);
+    function buildTbrUrl(value, includeFragment) {
+        var url = new URL(window.location.href);
+        value = sanitizeSort(value);
         if (value === 'random') {
-            params.delete('tbr_sort');
+            url.searchParams.delete('tbr_sort');
         } else {
-            params.set('tbr_sort', value);
+            url.searchParams.set('tbr_sort', value);
         }
-        var query = params.toString();
-        window.location.href = query ? window.location.pathname + '?' + query : window.location.pathname;
-    });
+        if (includeFragment) {
+            url.searchParams.set('dashboard_fragment', 'tbr');
+        } else {
+            url.searchParams.delete('dashboard_fragment');
+        }
+        return url.pathname + (url.search ? url.search : '') + (url.hash ? url.hash : '');
+    }
+
+    function getTbrSection() {
+        return document.getElementById('dashTbrSection');
+    }
+
+    function getCurrentSort() {
+        var section = getTbrSection();
+        return sanitizeSort(section ? section.getAttribute('data-tbr-sort') : 'random');
+    }
+
+    function setLoading(isLoading) {
+        var section = getTbrSection();
+        var select = document.getElementById('dashTbrSort');
+        if (section) {
+            section.classList.toggle('is-loading', isLoading);
+        }
+        if (select) {
+            select.disabled = isLoading;
+        }
+    }
+
+    function bindTbrSelect() {
+        var select = document.getElementById('dashTbrSort');
+        if (!select || select.dataset.bound === '1') return;
+        select.dataset.bound = '1';
+        select.addEventListener('change', function() {
+            loadTbrSection(this.value || 'random');
+        });
+    }
+
+    async function loadTbrSection(value, options) {
+        options = options || {};
+        value = sanitizeSort(value);
+
+        if (!options.force && value === getCurrentSort()) {
+            localStorage.setItem(storageKey, value);
+            history.replaceState(null, '', buildTbrUrl(value, false));
+            return;
+        }
+
+        if (pendingController) {
+            pendingController.abort();
+        }
+
+        pendingController = new AbortController();
+        var nonce = ++requestNonce;
+        setLoading(true);
+
+        try {
+            var response = await fetch(buildTbrUrl(value, true), {
+                headers: { 'X-Requested-With': 'fetch' },
+                signal: pendingController.signal,
+            });
+            if (!response.ok) {
+                throw new Error('Could not refresh the TBR section.');
+            }
+            var html = await response.text();
+            if (nonce !== requestNonce) return;
+
+            var container = document.createElement('div');
+            container.innerHTML = html.trim();
+            var nextSection = container.querySelector('#dashTbrSection');
+            var currentSection = getTbrSection();
+            if (!nextSection || !currentSection) {
+                throw new Error('TBR section markup missing.');
+            }
+
+            currentSection.replaceWith(nextSection);
+            bindTbrSelect();
+            if (window.librariumI18n && typeof window.librariumI18n.apply === 'function') {
+                window.librariumI18n.apply();
+            }
+            localStorage.setItem(storageKey, value);
+            history.replaceState(null, '', buildTbrUrl(value, false));
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            window.location.href = buildTbrUrl(value, false);
+        } finally {
+            if (nonce === requestNonce) {
+                pendingController = null;
+                setLoading(false);
+            }
+        }
+    }
+
+    bindTbrSelect();
+
+    var url = new URL(window.location.href);
+    var hasExplicitSort = url.searchParams.has('tbr_sort');
+    var currentSort = getCurrentSort();
+    var savedSort = sanitizeSort(localStorage.getItem(storageKey) || currentSort);
+    if (!hasExplicitSort && savedSort !== currentSort) {
+        loadTbrSection(savedSort, { force: true });
+        return;
+    }
+
+    localStorage.setItem(storageKey, currentSort);
 })();
 
 function dateStr(d) {

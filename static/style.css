@@ -2370,6 +2370,12 @@ select.form-control { cursor: pointer; }
     font-size: 0.85rem;
     cursor: pointer;
 }
+.dash-section.is-loading .dash-tbr-covers {
+    opacity: 0.55;
+}
+.dash-section.is-loading .dash-tbr-select {
+    cursor: progress;
+}
 .dash-tbr-covers {
     display: flex;
     gap: 0.5rem;
