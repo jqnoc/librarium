@@ -2,6 +2,21 @@
 {% block title %}Librarium – Dashboard{% endblock %}
 
 {% block content %}
+{% if not_started_count > 0 %}
+<script>
+(function() {
+    var allowed = { random: true, recent: true, oldest: true };
+    var params = new URLSearchParams(window.location.search);
+    var saved = localStorage.getItem('librarium_dashboard_tbr_sort') || 'random';
+    if (!allowed[saved]) saved = 'random';
+    if (!params.has('tbr_sort') && saved !== 'random') {
+        params.set('tbr_sort', saved);
+        var query = params.toString();
+        window.location.replace(query ? window.location.pathname + '?' + query : window.location.pathname);
+    }
+})();
+</script>
+{% endif %}
 <div class="library-header">
     <h1 data-i18n="dash.title">Dashboard</h1>
 </div>
@@ -542,9 +557,19 @@
         <h2 class="dash-heading" data-i18n="dash.tbrPile">To Be Read</h2>
         <div class="card">
             <div class="card-body">
-                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
-                    <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
-                </p>
+                <div class="dash-tbr-toolbar">
+                    <p class="dash-tbr-summary">
+                        <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
+                    </p>
+                    <label class="dash-tbr-sort" for="dashTbrSort">
+                        <span data-i18n="dash.show">Show:</span>
+                        <select id="dashTbrSort" class="dash-tbr-select">
+                            <option value="random" {{ 'selected' if tbr_sort == 'random' else '' }} data-i18n="dash.tbrSortRandom">Random Set</option>
+                            <option value="recent" {{ 'selected' if tbr_sort == 'recent' else '' }} data-i18n="dash.tbrSortRecent">Most Recently Acquired</option>
+                            <option value="oldest" {{ 'selected' if tbr_sort == 'oldest' else '' }} data-i18n="dash.tbrSortOldest">Least Recently Acquired</option>
+                        </select>
+                    </label>
+                </div>
                 <div class="dash-tbr-covers" id="dashTbrCovers">
                     {% for book in tbr_list %}
                     <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
@@ -674,6 +699,24 @@ const sourceCounts  = {{ source_counts | tojson }};
 {% if top_tags %}const topTags = {{ top_tags | tojson }};{% endif %}
 
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+(function() {
+    var select = document.getElementById('dashTbrSort');
+    if (!select) return;
+    localStorage.setItem('librarium_dashboard_tbr_sort', select.value || 'random');
+    select.addEventListener('change', function() {
+        var value = this.value || 'random';
+        localStorage.setItem('librarium_dashboard_tbr_sort', value);
+        var params = new URLSearchParams(window.location.search);
+        if (value === 'random') {
+            params.delete('tbr_sort');
+        } else {
+            params.set('tbr_sort', value);
+        }
+        var query = params.toString();
+        window.location.href = query ? window.location.pathname + '?' + query : window.location.pathname;
+    });
+})();
 
 function dateStr(d) {
     return d.getFullYear() + '-' +
