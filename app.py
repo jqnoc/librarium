@@ -1991,6 +1991,12 @@ def migrate_add_performance_indexes() -> None:
 
         CREATE INDEX IF NOT EXISTS idx_book_series_series_book
             ON book_series(series_id, book_id);
+
+        CREATE INDEX IF NOT EXISTS idx_books_library_has_cover
+            ON books(library_id, has_cover);
+
+        CREATE INDEX IF NOT EXISTS idx_readings_book_status
+            ON readings(book_id, status);
     """)
     db.commit()
     db.close()
@@ -2233,10 +2239,6 @@ def _get_author_canonical_map(db: sqlite3.Connection | None = None) -> dict[str,
         db = get_db()
 
     try:
-        cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
-        if "canonical_author" not in cols:
-            g._author_canonical_map = {}
-            return g._author_canonical_map
         mapping = {
             row["name"]: (row["canonical_author"] or "").strip()
             for row in db.execute("SELECT name, canonical_author FROM authors").fetchall()
@@ -2650,6 +2652,40 @@ def _iter_date_span(
         current += timedelta(days=1)
 
 
+def _iter_date_span_with_offset(
+    start_raw: str | None,
+    end_raw: str | None,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    """Yield tuples of (ISO day, offset from start_day) covered by a date span."""
+    start_day, end_day = _resolve_date_span(start_raw, end_raw)
+    if not start_day or not end_day:
+        return
+
+    orig_start = start_day
+    if date_from:
+        try:
+            start_day = max(start_day, date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end_day = min(end_day, date.fromisoformat(date_to))
+        except ValueError:
+            pass
+    if end_day < start_day:
+        return
+
+    current = start_day
+    offset = (current - orig_start).days
+    while current <= end_day:
+        yield current.isoformat(), offset
+        current += timedelta(days=1)
+        offset += 1
+
+
 def _distribute_total_across_days(
     start_raw: str | None,
     end_raw: str | None,
@@ -2671,14 +2707,9 @@ def _distribute_total_across_days(
     if full_days <= 0:
         return []
 
-    clipped_days = list(_iter_date_span(start_raw, end_raw, date_from=date_from, date_to=date_to))
-    if not clipped_days:
-        return []
-
     base, remainder = divmod(total, full_days)
     distributed: list[tuple[str, int]] = []
-    for day_str in clipped_days:
-        day_offset = (date.fromisoformat(day_str) - start_day).days
+    for day_str, day_offset in _iter_date_span_with_offset(start_raw, end_raw, date_from=date_from, date_to=date_to):
         value = base + (1 if day_offset < remainder else 0)
         if value:
             distributed.append((day_str, value))
@@ -2748,22 +2779,29 @@ def _build_daily_activity_data(
             fallback_seconds=book_totals["seconds"],
         )
 
-        for day_str, pages_value in _distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            row["pages"] or 0,
-            date_from=date_from,
-            date_to=date_to,
-        ):
-            _ensure(day_str)["pages"] += pages_value
-        for day_str, seconds_value in _distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            total_period_seconds,
-            date_from=date_from,
-            date_to=date_to,
-        ):
-            _ensure(day_str)["seconds"] += seconds_value
+        start_day, end_day = _resolve_date_span(row["start_date"], row["end_date"])
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                clipped_span = list(_iter_date_span_with_offset(
+                    row["start_date"],
+                    row["end_date"],
+                    date_from=date_from,
+                    date_to=date_to,
+                ))
+                if clipped_span:
+                    p_total = int(row["pages"] or 0)
+                    p_base, p_rem = divmod(p_total, full_days)
+                    s_total = int(total_period_seconds or 0)
+                    s_base, s_rem = divmod(s_total, full_days)
+                    for day_str, day_offset in clipped_span:
+                        p_val = p_base + (1 if day_offset < p_rem else 0)
+                        s_val = s_base + (1 if day_offset < s_rem else 0)
+                        day_obj = _ensure(day_str)
+                        if p_val:
+                            day_obj["pages"] += p_val
+                        if s_val:
+                            day_obj["seconds"] += s_val
 
     return [
         {"date": day_str, "pages": values["pages"], "seconds": values["seconds"]}
@@ -2846,18 +2884,33 @@ def _build_yearly_book_activity(
             fallback_pages=book_totals["pages"],
             fallback_seconds=book_totals["seconds"],
         )
-        day_pages = dict(_distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            row["pages"] or 0,
-        ))
-        day_seconds = dict(_distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            total_period_seconds,
-        ))
 
-        span_days = list(_iter_date_span(row["start_date"], row["end_date"]))
+        start_day, end_day = _resolve_date_span(row["start_date"], row["end_date"])
+        day_pages = {}
+        day_seconds = {}
+        span_days = []
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                p_total = int(row["pages"] or 0)
+                p_base, p_rem = divmod(p_total, full_days)
+                s_total = int(total_period_seconds or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+
+                current = start_day
+                offset = 0
+                while current <= end_day:
+                    ds = current.isoformat()
+                    span_days.append(ds)
+                    p_val = p_base + (1 if offset < p_rem else 0)
+                    s_val = s_base + (1 if offset < s_rem else 0)
+                    if p_val:
+                        day_pages[ds] = p_val
+                    if s_val:
+                        day_seconds[ds] = s_val
+                    current += timedelta(days=1)
+                    offset += 1
+
         if not span_days:
             fallback_day = (row["end_date"] or row["start_date"] or "").strip()
             if fallback_day:
@@ -2941,20 +2994,27 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
             fallback_seconds=book_totals["seconds"],
         )
 
-        day_pages = dict(_distribute_total_across_days(
-            rp["start_date"],
-            rp["end_date"],
-            rp["pages"] or 0,
-            date_from=date_from,
-            date_to=date_to,
-        ))
-        day_seconds = dict(_distribute_total_across_days(
-            rp["start_date"],
-            rp["end_date"],
-            total_period_seconds,
-            date_from=date_from,
-            date_to=date_to,
-        ))
+        start_day, end_day = _resolve_date_span(rp["start_date"], rp["end_date"])
+        day_pages = {}
+        day_seconds = {}
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                p_total = int(rp["pages"] or 0)
+                p_base, p_rem = divmod(p_total, full_days)
+                s_total = int(total_period_seconds or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+
+                for day_str, day_offset in _iter_date_span_with_offset(
+                    rp["start_date"], rp["end_date"], date_from=date_from, date_to=date_to
+                ):
+                    p_val = p_base + (1 if day_offset < p_rem else 0)
+                    s_val = s_base + (1 if day_offset < s_rem else 0)
+                    if p_val:
+                        day_pages[day_str] = p_val
+                    if s_val:
+                        day_seconds[day_str] = s_val
+
         for day_str in sorted(set(day_pages) | set(day_seconds)):
             _raw.append({
                 "date": day_str,
@@ -4279,20 +4339,19 @@ def _compute_status_timeline(db, lib_ids):
     book_map = {b["id"]: dict(b) for b in books}
 
     # ── 2. For works, find ALL edition IDs (including secondary) ─────────
-    work_ids = [b["work_id"] for b in books if b["work_id"]]
+    work_to_rep = {b["work_id"]: b["id"] for b in books if b["work_id"]}
     # Map: representative_bid → list of all edition book_ids
     editions_map: dict[str, list[str]] = {}
-    if work_ids:
+    if work_to_rep:
+        work_ids = list(work_to_rep.keys())
         wph = ",".join("?" * len(work_ids))
         for row in db.execute(
             f"SELECT id, work_id FROM books WHERE work_id IN ({wph})",
             work_ids,
         ).fetchall():
-            # Find the representative (primary) for this work
-            for bid, bk in book_map.items():
-                if bk.get("work_id") == row["work_id"]:
-                    editions_map.setdefault(bid, []).append(row["id"])
-                    break
+            rep_bid = work_to_rep.get(row["work_id"])
+            if rep_bid:
+                editions_map.setdefault(rep_bid, []).append(row["id"])
     # Standalone books map to themselves
     for bid in book_map:
         if bid not in editions_map:
@@ -5863,24 +5922,18 @@ def author_photo(author_name: str):
     """Serve the author's photo from the filesystem (or legacy DB BLOB)."""
     db = get_db()
 
-    # Lightweight hash-only check for conditional requests
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
-            (author_name,)
-        ).fetchone()
-        if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{ hash_row["photo_hash"] }"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute("SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
                      (author_name,)).fetchone()
     if not row:
         abort(404)
     photo_hash = row["photo_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and photo_hash == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
 
     # Serve from filesystem
     img_path = _author_photo_path(author_name)
@@ -5908,26 +5961,24 @@ def author_photo_thumb(author_name: str):
     """Serve a thumbnail of the author's photo from the database."""
     db = get_db()
 
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
-            (author_name,)
-        ).fetchone()
-        if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{ hash_row["photo_hash"] }"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute(
         "SELECT photo_thumb, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
         (author_name,)
     ).fetchone()
-    if not row or not row["photo_thumb"]:
+    if not row:
         abort(404)
 
     photo_hash = row["photo_hash"] or ""
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and photo_hash == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if not row["photo_thumb"]:
+        abort(404)
+
     resp = make_response(row["photo_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"{photo_hash}"'
@@ -6466,19 +6517,21 @@ def book_detail(book_id: str):
                 seconds=session["duration_seconds"],
             )
     for period in cur_periods:
-        for day_str, seconds in _distribute_total_across_days(
-            period.get("start_date"),
-            period.get("end_date"),
-            period.get("duration_seconds") or 0,
-        ):
-            _add_daily_activity(day_str, seconds=seconds)
-        if not is_pct_format:
-            for day_str, pages in _distribute_total_across_days(
-                period.get("start_date"),
-                period.get("end_date"),
-                period.get("pages") or 0,
-            ):
-                _add_daily_activity(day_str, pages=pages)
+        start_day, end_day = _resolve_date_span(period.get("start_date"), period.get("end_date"))
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                s_total = int(period.get("duration_seconds") or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+                p_total = int(period.get("pages") or 0) if not is_pct_format else 0
+                p_base, p_rem = divmod(p_total, full_days)
+
+                for day_str, day_offset in _iter_date_span_with_offset(
+                    period.get("start_date"), period.get("end_date")
+                ):
+                    s_val = s_base + (1 if day_offset < s_rem else 0)
+                    p_val = p_base + (1 if day_offset < p_rem else 0) if not is_pct_format else 0
+                    _add_daily_activity(day_str, pages=p_val, seconds=s_val)
 
     unique_dates = set(daily_activity)
     reading_days = len(unique_dates)
@@ -6736,22 +6789,17 @@ def book_detail(book_id: str):
 def book_cover(book_id: str):
     db = get_db()
 
-    # First try a lightweight hash-only check for conditional requests
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)
-        ).fetchone()
-        if hash_row and hash_row["cover_hash"] and hash_row["cover_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{hash_row["cover_hash"]}"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute("SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)).fetchone()
     if not row:
         abort(404)
     cover_hash = row["cover_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and etag_from_client == cover_hash:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
 
     # Serve from filesystem
     img_path = _cover_path(book_id)
@@ -6779,25 +6827,24 @@ def book_cover_thumb(book_id: str):
     """Serve a thumbnail version of a book cover (300 px wide)."""
     db = get_db()
 
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)
-        ).fetchone()
-        if hash_row and hash_row["cover_hash"] and ("t-" + hash_row["cover_hash"]) == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"t-{hash_row["cover_hash"]}"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute(
         "SELECT cover_thumb, cover_hash FROM books WHERE id = ? AND has_cover = 1",
         (book_id,),
     ).fetchone()
-    if not row or not row["cover_thumb"]:
+    if not row:
+        abort(404)
+    cover_hash = row["cover_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and ("t-" + cover_hash) == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"t-{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if not row["cover_thumb"]:
         abort(404)
 
-    cover_hash = row["cover_hash"] or ""
     resp = make_response(row["cover_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"t-{cover_hash}"'
