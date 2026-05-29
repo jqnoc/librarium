@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Book word annotations now support synonyms, allowing users to enter synonyms when adding or editing a word, displaying them between the definition and translation on both the book detail page and the dashboard's Word of the Day spotlight
 - Wishlist book status for books you want to buy, including form/filter support, badge and chart styling, and a dashboard cover shelf so planned purchases stay visible
 - Global stats now include clickable Time Read and Authors Read yearly charts with new `/stats/year/<year>/time` and `/stats/year/<year>/authors` detail pages that reuse the Library card-view layout; both pages show value-only badges (time in `h m s`, reading days, book/author count) without label prefixes, and the Authors Read page adds persisted sort/order controls
 - Edit Author Details page now shows sections in the order: Life Details, Biography, Photo, Identity

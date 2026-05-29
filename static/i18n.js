@@ -757,6 +757,8 @@
         'book.pagePlaceholder':     { en: 'Page',                  es: 'Página' },
         'book.wordPlaceholder':     { en: 'Word',                  es: 'Palabra' },
         'book.definitionPlaceholder': { en: 'Definition...',       es: 'Definición...' },
+        'book.synonyms':            { en: 'Synonyms',              es: 'Sinónimos' },
+        'book.synonymsPlaceholder': { en: 'Synonyms...',           es: 'Sinónimos...' },
         'book.translation':         { en: 'Translation',           es: 'Traducción' },
         'book.translationPlaceholder': { en: 'Translation...',     es: 'Traducción...' },
         'book.translationLanguagePlaceholder': { en: 'Translation language', es: 'Idioma de traducción' },

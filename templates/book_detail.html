@@ -604,6 +604,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="annotation-body">
             <div class="annotation-word-term">{{ w.word }}</div>
             <div class="annotation-word-def">{{ w.definition | safe }}</div>
+            {% if w.synonyms %}
+            <div class="annotation-word-synonyms">
+                <div class="annotation-word-synonyms-label" data-i18n="book.synonyms">Synonyms</div>
+                <div class="annotation-word-synonyms-text">{{ w.synonyms }}</div>
+            </div>
+            {% endif %}
             {% if w.translation %}
             <div class="annotation-word-translation">
                 <div class="annotation-word-translation-label"><span data-i18n="book.translation">Translation</span>{% if w.translation_language %} · {{ w.translation_language }}{% endif %}</div>
@@ -622,6 +628,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <form method="POST" action="{{ url_for('edit_word', book_id=book_id, wid=w.id) }}" class="annotation-edit-form">
                 <input type="text" name="word" value="{{ w.word }}" required placeholder="Word" style="width:150px;">
                 <textarea id="edit-word-{{ w.id }}" name="definition" rows="2" required>{{ w.definition }}</textarea>
+                <div class="annotation-word-synonyms-input-wrapper">
+                    <input type="text" name="synonyms" value="{{ w.synonyms or '' }}" placeholder="Synonyms..." data-i18n-placeholder="book.synonymsPlaceholder" class="word-synonyms-input">
+                </div>
                 <div class="annotation-word-extra-fields">
                     <select name="translation_language" class="word-translation-language">
                         <option value="" data-i18n="book.translationLanguagePlaceholder">Translation language</option>
@@ -654,6 +663,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addWordBtn">+ Add Word</button>
         </div>
         <textarea id="add-word-def" name="definition" rows="2" required placeholder="Definition..." data-i18n-placeholder="book.definitionPlaceholder"></textarea>
+        <input type="text" name="synonyms" placeholder="Synonyms..." data-i18n-placeholder="book.synonymsPlaceholder" class="word-synonyms-input">
         <div class="annotation-word-extra-fields">
             <select name="translation_language" class="word-translation-language">
                 <option value="" data-i18n="book.translationLanguagePlaceholder">Translation language</option>

@@ -2666,6 +2666,42 @@ select.form-control { cursor: pointer; }
     font-size: 0.92rem;
 }
 
+.annotation-word-synonyms,
+.spotlight-word-synonyms {
+    margin-top: 0.4rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--lb-border);
+}
+
+.annotation-word-synonyms-label,
+.spotlight-word-synonyms-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--lb-text-light);
+    margin-bottom: 0.2rem;
+}
+
+.annotation-word-synonyms-text,
+.spotlight-word-synonyms-text {
+    color: var(--lb-text);
+    line-height: 1.45;
+    font-size: 0.92rem;
+}
+
+.word-synonyms-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
 .annotation-word-extra-fields {
     display: flex;
     gap: 0.5rem;

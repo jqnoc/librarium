@@ -968,6 +968,7 @@ def init_schema() -> None:
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
             definition TEXT    NOT NULL DEFAULT '',
+            synonyms   TEXT    NOT NULL DEFAULT '',
             translation TEXT   NOT NULL DEFAULT '',
             translation_language TEXT NOT NULL DEFAULT ''
         );
@@ -1008,6 +1009,7 @@ def _run_all_migrations() -> None:
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
     migrate_add_word_translations()
+    migrate_add_word_synonyms()
     migrate_externalize_images()
     migrate_add_performance_indexes()
     migrate_remove_source_short_name()
@@ -1779,6 +1781,7 @@ def migrate_add_annotations() -> None:
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
             definition TEXT    NOT NULL DEFAULT '',
+            synonyms   TEXT    NOT NULL DEFAULT '',
             translation TEXT   NOT NULL DEFAULT '',
             translation_language TEXT NOT NULL DEFAULT ''
         );
@@ -1807,6 +1810,24 @@ def migrate_add_word_translations() -> None:
     if changed:
         db.commit()
         print(">> Migration complete - translation fields added to words.")
+    db.close()
+
+
+def migrate_add_word_synonyms() -> None:
+    """Add optional synonyms field to words."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(words)").fetchall()]
+    changed = False
+    if "synonyms" not in cols:
+        print(">> Migrating: adding synonyms column to words ...")
+        db.execute("ALTER TABLE words ADD COLUMN synonyms TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if changed:
+        db.commit()
+        print(">> Migration complete - synonyms field added to words.")
     db.close()
 
 
@@ -3897,7 +3918,7 @@ def dashboard():
     ).fetchall():
         lang = lang_row["language"]
         row = db.execute(
-            f"SELECT w.word, w.definition, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
+            f"SELECT w.word, w.definition, w.synonyms, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
             f"FROM words w JOIN books b ON b.id = w.book_id "
             f"WHERE {lf_b} AND b.language = ? ORDER BY RANDOM() LIMIT 1",
             (*lp_b, lang),
@@ -6893,6 +6914,7 @@ def add_word(book_id: str):
         abort(404)
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    synonyms = request.form.get("synonyms", "").strip()
     translation = request.form.get("translation", "").strip()
     translation_language = request.form.get("translation_language", "").strip()
     if not translation:
@@ -6902,8 +6924,8 @@ def add_word(book_id: str):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
         db.execute(
-            "INSERT INTO words (book_id, word, definition, translation, translation_language) VALUES (?, ?, ?, ?, ?)",
-            (book_id, word, definition, translation, translation_language),
+            "INSERT INTO words (book_id, word, definition, synonyms, translation, translation_language) VALUES (?, ?, ?, ?, ?, ?)",
+            (book_id, word, definition, synonyms, translation, translation_language),
         )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
@@ -6914,6 +6936,7 @@ def edit_word(book_id: str, wid: int):
     db = get_db()
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    synonyms = request.form.get("synonyms", "").strip()
     translation = request.form.get("translation", "").strip()
     translation_language = request.form.get("translation_language", "").strip()
     if not translation:
@@ -6923,8 +6946,8 @@ def edit_word(book_id: str, wid: int):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
         db.execute(
-            "UPDATE words SET word = ?, definition = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
-            (word, definition, translation, translation_language, wid, book_id),
+            "UPDATE words SET word = ?, definition = ?, synonyms = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
+            (word, definition, synonyms, translation, translation_language, wid, book_id),
         )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
