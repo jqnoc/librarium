@@ -48,6 +48,15 @@
     --lb-accent-faint:  rgba(68, 161, 148, 0.06);
     --lb-accent-glow:   rgba(68, 161, 148, 0.15);
 
+    --lb-source-physical-store-bg: #DBEAFE;
+    --lb-source-physical-store-fg: #1E40AF;
+    --lb-source-web-store-bg:      #FEF3C7;
+    --lb-source-web-store-fg:      #92400E;
+    --lb-source-library-bg:        #D1FAE5;
+    --lb-source-library-fg:        #065F46;
+    --lb-source-person-bg:         #EDE9FE;
+    --lb-source-person-fg:         #5B21B6;
+
     --lb-table-header:  var(--lb-dark-mid);
 }
 
@@ -1280,6 +1289,40 @@ select.form-control { cursor: pointer; }
     border: 1px solid var(--lb-border);
 }
 
+.source-map-div-icon {
+    background: transparent;
+    border: none;
+}
+
+.source-map-marker {
+    position: relative;
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid currentColor;
+    box-shadow: 0 6px 12px rgba(45, 45, 68, 0.18);
+}
+
+.source-map-marker::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.source-map-marker-physical_store {
+    background: var(--lb-source-physical-store-bg);
+    color: var(--lb-source-physical-store-fg);
+}
+
+.source-map-marker-library {
+    background: var(--lb-source-library-bg);
+    color: var(--lb-source-library-fg);
+}
+
 .sources-map-empty {
     display: flex;
     align-items: center;
@@ -1571,10 +1614,10 @@ select.form-control { cursor: pointer; }
 }
 
 /* ── Source type badges ───────────────────────────────────────────────────────── */
-.source-type-physical_store { background: #DBEAFE; color: #1E40AF; }
-.source-type-web_store      { background: #FEF3C7; color: #92400E; }
-.source-type-library         { background: #D1FAE5; color: #065F46; }
-.source-type-person          { background: #EDE9FE; color: #5B21B6; }
+.source-type-physical_store { background: var(--lb-source-physical-store-bg); color: var(--lb-source-physical-store-fg); }
+.source-type-web_store      { background: var(--lb-source-web-store-bg); color: var(--lb-source-web-store-fg); }
+.source-type-library        { background: var(--lb-source-library-bg); color: var(--lb-source-library-fg); }
+.source-type-person         { background: var(--lb-source-person-bg); color: var(--lb-source-person-fg); }
 .modal-box .btn-group { justify-content: center; }
 
 /* ── Ratings section ───────────────────────────────────────────────────── */

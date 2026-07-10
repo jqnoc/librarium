@@ -468,7 +468,6 @@
         'sources.mapUnavailable': { en: 'The map library could not be loaded.', es: 'No se pudo cargar la biblioteca del mapa.' },
         'sources.placeSectionHint': { en: 'Address, closure status, and map coordinates are available for place-based sources.', es: 'Las fuentes basadas en lugares admiten dirección, estado de cierre y coordenadas para el mapa.' },
         'sources.generalSectionHint': { en: 'Use these entries for online stores and people you buy from or borrow from.', es: 'Usa estas entradas para tiendas online y personas a las que compras o de quienes tomas prestado.' },
-        'sources.hasCoordinates': { en: 'Has map coordinates', es: 'Tiene coordenadas de mapa' },
         'sources.missingCoordinates': { en: 'missing coordinates', es: 'sin coordenadas' },
         'sources.mapLink':    { en: 'Map',         es: 'Mapa' },
         'sources.openInMap':  { en: 'Open in map', es: 'Abrir en el mapa' },

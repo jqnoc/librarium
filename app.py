@@ -3519,6 +3519,7 @@ def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], lis
                 if source["has_coordinates"]:
                     map_points.append({
                         "name": source.get("name", ""),
+                        "type_key": source.get("type", ""),
                         "type_label": type_label,
                         "location": source.get("location", ""),
                         "address": source.get("address", ""),

@@ -55,9 +55,6 @@
                             {% if is_place_type and s.is_permanently_closed %}
                             <span class="badge source-status-closed" data-i18n="sources.closed">Permanently Closed</span>
                             {% endif %}
-                            {% if is_place_type and has_coordinates %}
-                            <span class="badge source-meta-badge" data-i18n="sources.hasCoordinates">Has map coordinates</span>
-                            {% endif %}
                         </div>
                     </div>
                 </td>
@@ -276,8 +273,22 @@ if (SOURCE_MAP_POINTS.length) {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
+        function buildSourceMarkerIcon(point) {
+            const typeKey = point.type_key || 'physical_store';
+            return L.divIcon({
+                className: 'source-map-div-icon',
+                html: '<span class="source-map-marker source-map-marker-' + typeKey + '"></span>',
+                iconSize: [28, 38],
+                iconAnchor: [14, 38],
+                popupAnchor: [0, -34]
+            });
+        }
+
         const markers = SOURCE_MAP_POINTS.map(function(point) {
-            const marker = L.marker([parseFloat(point.latitude), parseFloat(point.longitude)]).addTo(map);
+            const marker = L.marker(
+                [parseFloat(point.latitude), parseFloat(point.longitude)],
+                { icon: buildSourceMarkerIcon(point) }
+            ).addTo(map);
             const popup = [
                 '<strong>' + point.name + '</strong>',
                 point.type_label,
