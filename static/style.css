@@ -1342,6 +1342,16 @@ select.form-control { cursor: pointer; }
     color: var(--lb-source-library-fg);
 }
 
+.source-map-marker-physical_store.source-map-marker-closed {
+    background: #dbe1ea;
+    color: #6f8096;
+}
+
+.source-map-marker-library.source-map-marker-closed {
+    background: #dbe7e2;
+    color: #5b766d;
+}
+
 .sources-map-empty {
     display: flex;
     align-items: center;

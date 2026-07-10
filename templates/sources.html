@@ -257,9 +257,10 @@ if (SOURCE_MAP_POINTS.length) {
 
         function buildSourceMarkerIcon(point) {
             const typeKey = point.type_key || 'physical_store';
+            const closedClass = point.is_permanently_closed ? ' source-map-marker-closed' : '';
             return L.divIcon({
                 className: 'source-map-div-icon',
-                html: '<span class="source-map-marker source-map-marker-' + typeKey + '"></span>',
+                html: '<span class="source-map-marker source-map-marker-' + typeKey + closedClass + '"></span>',
                 iconSize: [28, 38],
                 iconAnchor: [14, 38],
                 popupAnchor: [0, -34]
