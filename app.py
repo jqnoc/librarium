@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
@@ -828,12 +829,16 @@ def init_schema() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS sources (
-            id          TEXT    PRIMARY KEY,
-            type        TEXT    NOT NULL DEFAULT '',
-            name        TEXT    NOT NULL DEFAULT '',
-            location    TEXT    NOT NULL DEFAULT '',
-            url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT ''
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS series (
@@ -1013,6 +1018,7 @@ def _run_all_migrations() -> None:
     migrate_externalize_images()
     migrate_add_performance_indexes()
     migrate_remove_source_short_name()
+    migrate_add_source_place_details()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1603,22 +1609,36 @@ def migrate_shared_sources() -> None:
     db.execute("DROP TABLE IF EXISTS sources")
     db.execute("""
         CREATE TABLE sources (
-            id          TEXT    PRIMARY KEY,
-            type        TEXT    NOT NULL DEFAULT '',
-            name        TEXT    NOT NULL DEFAULT '',
-            location    TEXT    NOT NULL DEFAULT '',
-            url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT ''
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
         )
     """)
 
     for s in unique_sources:
         name = (s.get("name") or "").strip() or (s.get("short_name") or "").strip()
         db.execute(
-            "INSERT INTO sources (id, type, name, location, url, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (s["id"], s.get("type", ""), name,
-             s.get("location", ""), s.get("url", ""), s.get("notes", "")),
+            "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                s["id"],
+                s.get("type", ""),
+                name,
+                s.get("location", ""),
+                s.get("address", ""),
+                s.get("latitude", ""),
+                s.get("longitude", ""),
+                1 if s.get("is_permanently_closed") else 0,
+                s.get("url", ""),
+                s.get("notes", ""),
+            ),
         )
 
     db.commit()
@@ -2023,12 +2043,16 @@ def migrate_remove_source_short_name() -> None:
     db.execute("DROP TABLE IF EXISTS sources")
     db.execute("""
         CREATE TABLE sources (
-            id          TEXT    PRIMARY KEY,
-            type        TEXT    NOT NULL DEFAULT '',
-            name        TEXT    NOT NULL DEFAULT '',
-            location    TEXT    NOT NULL DEFAULT '',
-            url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT ''
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
         )
     """)
 
@@ -2036,12 +2060,16 @@ def migrate_remove_source_short_name() -> None:
         source = dict(row)
         name = (source.get("name") or "").strip() or (source.get("short_name") or "").strip()
         db.execute(
-            "INSERT INTO sources (id, type, name, location, url, notes) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 source["id"],
                 source.get("type", ""),
                 name,
                 source.get("location", ""),
+                source.get("address", ""),
+                source.get("latitude", ""),
+                source.get("longitude", ""),
+                1 if source.get("is_permanently_closed") else 0,
                 source.get("url", ""),
                 source.get("notes", ""),
             ),
@@ -2050,6 +2078,35 @@ def migrate_remove_source_short_name() -> None:
     db.commit()
     db.close()
     print(">> Migration complete — sources now use a single name field.")
+
+
+def migrate_add_source_place_details() -> None:
+    """Add structured place metadata to sources."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    changed = False
+
+    if "address" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN address TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "latitude" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN latitude TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "longitude" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN longitude TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "is_permanently_closed" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN is_permanently_closed INTEGER NOT NULL DEFAULT 0")
+        changed = True
+
+    if changed:
+        db.commit()
+        print(">> Migration complete — sources now include place metadata.")
+
+    db.close()
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -3360,6 +3417,7 @@ SOURCE_TYPES = {
     "library": "Library",
     "person": "Person",
 }
+PLACE_SOURCE_TYPES = {"physical_store", "library"}
 PURCHASE_SOURCE_TYPES = {"physical_store", "web_store"}
 BORROW_SOURCE_TYPES = {"library", "person"}
 GIFT_SOURCE_TYPES = {"person"}
@@ -3377,6 +3435,108 @@ def _get_source_by_id(source_id: str) -> dict | None:
     if row:
         return dict(row)
     return None
+
+
+def _format_coordinate(value: float) -> str:
+    """Serialize coordinates without unnecessary trailing zeroes."""
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str | None]:
+    """Validate and normalize source fields, including place metadata."""
+    data = {
+        "source_type": source_type,
+        "name": form.get("name", "").strip(),
+        "location": form.get("location", "").strip(),
+        "address": "",
+        "latitude": "",
+        "longitude": "",
+        "is_permanently_closed": 0,
+        "url": form.get("url", "").strip(),
+        "notes": form.get("notes", "").strip(),
+    }
+
+    if not data["name"]:
+        return None, "Source name is required."
+
+    if source_type in PLACE_SOURCE_TYPES:
+        data["address"] = form.get("address", "").strip()
+        data["is_permanently_closed"] = 1 if form.get("is_permanently_closed") else 0
+        latitude_raw = form.get("latitude", "").strip()
+        longitude_raw = form.get("longitude", "").strip()
+
+        if bool(latitude_raw) != bool(longitude_raw):
+            return None, "Latitude and longitude must be provided together."
+
+        if latitude_raw and longitude_raw:
+            try:
+                latitude = float(latitude_raw)
+                longitude = float(longitude_raw)
+            except ValueError:
+                return None, "Latitude and longitude must be valid decimal numbers."
+            if not -90 <= latitude <= 90:
+                return None, "Latitude must be between -90 and 90."
+            if not -180 <= longitude <= 180:
+                return None, "Longitude must be between -180 and 180."
+            data["latitude"] = _format_coordinate(latitude)
+            data["longitude"] = _format_coordinate(longitude)
+
+    return data, None
+
+
+def _source_map_url(source: dict) -> str:
+    """Return an OpenStreetMap link for a source when possible."""
+    latitude = (source.get("latitude") or "").strip()
+    longitude = (source.get("longitude") or "").strip()
+    if latitude and longitude:
+        return f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=16/{latitude}/{longitude}"
+
+    query_parts = [
+        (source.get("name") or "").strip(),
+        (source.get("address") or "").strip(),
+        (source.get("location") or "").strip(),
+    ]
+    query = ", ".join(part for part in query_parts if part)
+    if not query:
+        return ""
+    return "https://www.openstreetmap.org/search?query=" + urllib.parse.quote_plus(query)
+
+
+def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], list[dict], int]:
+    """Decorate source rows for the Sources page and collect map points."""
+    sections: list[dict] = []
+    map_points: list[dict] = []
+    missing_coords = 0
+
+    for type_key, type_label in SOURCE_TYPES.items():
+        rows = [dict(source) for source in sources if source.get("type") == type_key]
+        for source in rows:
+            source["is_place_type"] = type_key in PLACE_SOURCE_TYPES
+            source["has_coordinates"] = bool((source.get("latitude") or "").strip() and (source.get("longitude") or "").strip())
+            source["map_url"] = _source_map_url(source)
+            if source["is_place_type"]:
+                if source["has_coordinates"]:
+                    map_points.append({
+                        "name": source.get("name", ""),
+                        "type_label": type_label,
+                        "location": source.get("location", ""),
+                        "address": source.get("address", ""),
+                        "latitude": source.get("latitude", ""),
+                        "longitude": source.get("longitude", ""),
+                        "is_permanently_closed": 1 if source.get("is_permanently_closed") else 0,
+                        "url": source.get("url", ""),
+                    })
+                else:
+                    missing_coords += 1
+        if rows:
+            sections.append({
+                "key": type_key,
+                "label": type_label,
+                "sources": rows,
+            })
+
+    return sections, map_points, missing_coords
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -7908,31 +8068,45 @@ def new_book():
 def sources_list():
     """Sources management page."""
     db = get_db()
-    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name").fetchall()]
-    return render_template("sources.html", sources=sources, source_types=SOURCE_TYPES)
+    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY type, name").fetchall()]
+    source_sections, source_map_points, source_map_missing_count = _prepare_source_directory_rows(sources)
+    return render_template(
+        "sources.html",
+        sources=sources,
+        source_types=SOURCE_TYPES,
+        place_source_types=sorted(PLACE_SOURCE_TYPES),
+        source_sections=source_sections,
+        source_map_points=source_map_points,
+        source_map_missing_count=source_map_missing_count,
+    )
 
 
 @app.route("/sources/add", methods=["POST"])
 def add_source():
     db = get_db()
-    name = request.form.get("name", "").strip()
-    if not name:
-        flash("Source name is required.", "error")
+    source_type = request.form.get("source_type", "").strip()
+    payload, error = _clean_source_place_fields(request.form, source_type)
+    if error:
+        flash(error, "error")
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, location, url, notes) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
-            request.form.get("source_type", "").strip(),
-            name,
-            request.form.get("location", "").strip(),
-            request.form.get("url", "").strip(),
-            request.form.get("notes", "").strip(),
+            payload["source_type"],
+            payload["name"],
+            payload["location"],
+            payload["address"],
+            payload["latitude"],
+            payload["longitude"],
+            payload["is_permanently_closed"],
+            payload["url"],
+            payload["notes"],
         ),
     )
     db.commit()
-    flash(f"Source '{name}' added.", "success")
+    flash(f"Source '{payload['name']}' added.", "success")
     return redirect(url_for("sources_list"))
 
 
@@ -7943,20 +8117,27 @@ def edit_source(source_id: str):
     if not row:
         abort(404)
 
-    name = request.form.get("name", "").strip()
-    if not name:
-        flash("Source name is required.", "error")
+    source_type = request.form.get("source_type", "").strip()
+    payload, error = _clean_source_place_fields(request.form, source_type)
+    if error:
+        flash(error, "error")
         return redirect(url_for("sources_list"))
 
     db.execute("""
-        UPDATE sources SET type=?, name=?, location=?, url=?, notes=?
+        UPDATE sources
+        SET type=?, name=?, location=?, address=?, latitude=?, longitude=?,
+            is_permanently_closed=?, url=?, notes=?
         WHERE id=?
     """, (
-        request.form.get("source_type", "").strip(),
-        name,
-        request.form.get("location", "").strip(),
-        request.form.get("url", "").strip(),
-        request.form.get("notes", "").strip(),
+        payload["source_type"],
+        payload["name"],
+        payload["location"],
+        payload["address"],
+        payload["latitude"],
+        payload["longitude"],
+        payload["is_permanently_closed"],
+        payload["url"],
+        payload["notes"],
         source_id,
     ))
     db.commit()

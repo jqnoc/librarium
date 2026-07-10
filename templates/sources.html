@@ -1,73 +1,184 @@
 {% extends "base.html" %}
 {% block title %}Sources – Librarium{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endblock %}
+
 {% block content %}
 <h1 data-i18n="sources.title">Sources</h1>
 <p style="color: var(--lb-text-light); margin-bottom: 1.5rem;" data-i18n="sources.desc">
     Manage places and people from where you acquire or borrow books.
 </p>
 
-<!-- ── Existing sources ──────────────────────────────────────────────── -->
-{% if sources %}
-<div class="table-wrap">
-    <table>
-        <thead>
-            <tr>
-                <th data-i18n="sources.name">Name</th>
-                <th data-i18n="sources.type">Type</th>
-                <th data-i18n="sources.locationUrl">Location / URL</th>
-                <th data-i18n="sources.notes">Notes</th>
-                <th data-i18n="sources.actions">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for s in sources %}
-            <tr id="source-row-{{ loop.index0 }}">
-                <td><strong>{{ s.name }}</strong></td>
-                <td><span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span></td>
-                <td>
-                    {% if s.url %}
-                    <a href="{{ s.url }}" target="_blank" style="color: var(--lb-orange);">{{ s.url | truncate(35) }}</a>
-                    {% elif s.location %}
-                    {{ s.location }}
-                    {% else %}
-                    —
+{% if source_map_points or source_map_missing_count %}
+<section class="source-map-panel">
+    <div class="source-panel-header">
+        <div>
+            <h2 data-i18n="sources.mapTitle">Place Map</h2>
+            <p data-i18n="sources.mapDesc">Physical stores and libraries with coordinates appear here.</p>
+        </div>
+        {% if source_map_missing_count %}
+        <span class="badge source-meta-badge">{{ source_map_missing_count }} <span data-i18n="sources.missingCoordinates">missing coordinates</span></span>
+        {% endif %}
+    </div>
+    {% if source_map_points %}
+    <div id="sourcesMap" class="sources-map" aria-label="Sources map"></div>
+    {% else %}
+    <div class="sources-map-empty" data-i18n="sources.mapEmpty">Add coordinates to your physical stores and libraries to display them on the map.</div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if source_sections %}
+<div class="source-sections">
+    {% for section in source_sections %}
+    <section class="source-directory-section">
+        <div class="source-panel-header">
+            <div>
+                <h2>{{ section.label }}</h2>
+                {% if section.key in place_source_types %}
+                <p data-i18n="sources.placeSectionHint">Address, closure status, and map coordinates are available for place-based sources.</p>
+                {% else %}
+                <p data-i18n="sources.generalSectionHint">Use these entries for online stores and people you buy from or borrow from.</p>
+                {% endif %}
+            </div>
+            <span class="badge source-meta-badge">{{ section.sources|length }}</span>
+        </div>
+
+        <div class="source-card-grid">
+            {% for s in section.sources %}
+            <article class="source-card">
+                <div class="source-card-top">
+                    <div>
+                        <div class="source-card-title-row">
+                            <h3>{{ s.name }}</h3>
+                            {% if s.is_permanently_closed %}
+                            <span class="badge source-status-closed" data-i18n="sources.closed">Permanently Closed</span>
+                            {% endif %}
+                        </div>
+                        <div class="source-card-meta">
+                            <span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span>
+                            {% if s.location %}<span>{{ s.location }}</span>{% endif %}
+                            {% if s.has_coordinates %}<span data-i18n="sources.hasCoordinates">Has map coordinates</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="source-card-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ section.key }}-{{ loop.index0 }}')">✏️</button>
+                        <form method="POST" action="{{ url_for('delete_source', source_id=s.id) }}" style="display:inline;"
+                              onsubmit="return confirm('Delete this source?');">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                        </form>
+                    </div>
+                </div>
+
+                <dl class="source-detail-list">
+                    {% if s.location %}
+                    <div>
+                        <dt data-i18n="sources.location">Location</dt>
+                        <dd>{{ s.location }}</dd>
+                    </div>
                     {% endif %}
-                </td>
-                <td>{{ s.notes or '—' }}</td>
-                <td>
-                    <button class="btn btn-secondary btn-sm" onclick="toggleSourceEdit({{ loop.index0 }})">✏️</button>
-                    <form method="POST" action="{{ url_for('delete_source', source_id=s.id) }}" style="display:inline;"
-                          onsubmit="return confirm('Delete this source?');">
-                        <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                    {% if s.address %}
+                    <div>
+                        <dt data-i18n="sources.address">Address</dt>
+                        <dd>{{ s.address }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if s.url %}
+                    <div>
+                        <dt data-i18n="sources.url">URL</dt>
+                        <dd><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a></dd>
+                    </div>
+                    {% endif %}
+                    {% if s.has_coordinates %}
+                    <div>
+                        <dt data-i18n="sources.coordinates">Coordinates</dt>
+                        <dd>{{ s.latitude }}, {{ s.longitude }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if s.notes %}
+                    <div>
+                        <dt data-i18n="sources.notes">Notes</dt>
+                        <dd>{{ s.notes }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if s.map_url %}
+                    <div>
+                        <dt data-i18n="sources.mapLink">Map</dt>
+                        <dd><a href="{{ s.map_url }}" target="_blank" rel="noopener" data-i18n="sources.openInMap">Open in map</a></dd>
+                    </div>
+                    {% endif %}
+                    {% if not s.location and not s.address and not s.url and not s.notes and not s.has_coordinates %}
+                    <div>
+                        <dt data-i18n="sources.details">Details</dt>
+                        <dd>—</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+
+                <div class="source-edit-panel" id="source-edit-{{ section.key }}-{{ loop.index0 }}">
+                    <form method="POST" action="{{ url_for('edit_source', source_id=s.id) }}" class="source-form source-edit-form" data-source-form>
+                        <div class="form-row source-form-grid">
+                            <div class="form-group">
+                                <label data-i18n="sources.type">Type</label>
+                                <select name="source_type" class="form-control" data-source-type-select>
+                                    {% for key, label in source_types.items() %}
+                                    <option value="{{ key }}" {{ 'selected' if s.type == key }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="sources.nameReq">Name *</label>
+                                <input type="text" name="name" class="form-control" value="{{ s.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="sources.location">Location</label>
+                                <input type="text" name="location" class="form-control" value="{{ s.location or '' }}" placeholder="City / Area">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="sources.url">URL</label>
+                                <input type="url" name="url" class="form-control" value="{{ s.url or '' }}" placeholder="https://...">
+                            </div>
+                        </div>
+
+                        <div class="source-place-fields" data-place-fields>
+                            <div class="form-row source-form-grid">
+                                <div class="form-group source-form-span-2">
+                                    <label data-i18n="sources.address">Address</label>
+                                    <input type="text" name="address" class="form-control" value="{{ s.address or '' }}" placeholder="Street, number, city">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="sources.latitude">Latitude</label>
+                                    <input type="text" name="latitude" class="form-control" value="{{ s.latitude or '' }}" placeholder="40.4168">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="sources.longitude">Longitude</label>
+                                    <input type="text" name="longitude" class="form-control" value="{{ s.longitude or '' }}" placeholder="-3.7038">
+                                </div>
+                            </div>
+                            <label class="source-checkbox-row">
+                                <input type="checkbox" name="is_permanently_closed" value="1" {{ 'checked' if s.is_permanently_closed else '' }}>
+                                <span data-i18n="sources.closedCheckbox">Permanently closed</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label data-i18n="sources.notesLabel">Notes</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Optional">{{ s.notes or '' }}</textarea>
+                        </div>
+                        <div class="source-form-actions">
+                            <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ section.key }}-{{ loop.index0 }}')" data-i18n="form.cancel">Cancel</button>
+                        </div>
                     </form>
-                </td>
-            </tr>
-            <tr class="session-edit-row" id="source-edit-{{ loop.index0 }}">
-                <td colspan="5">
-                    <form method="POST" action="{{ url_for('edit_source', source_id=s.id) }}" class="inline-form" style="flex-wrap: wrap;">
-                        <label data-i18n="sources.type">Type</label>
-                        <select name="source_type" style="padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--lb-border);">
-                            {% for key, label in source_types.items() %}
-                            <option value="{{ key }}" {{ 'selected' if s.type == key }}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                        <label data-i18n="sources.name">Name</label>
-                        <input type="text" name="name" value="{{ s.name }}" required style="width: 180px;">
-                        <label data-i18n="sources.location">Location</label>
-                        <input type="text" name="location" value="{{ s.location or '' }}" style="width: 160px;">
-                        <label data-i18n="sources.url">URL</label>
-                        <input type="url" name="url" value="{{ s.url or '' }}" style="width: 180px;">
-                        <label data-i18n="sources.notesLabel">Notes</label>
-                        <input type="text" name="notes" value="{{ s.notes or '' }}" style="width: 160px;">
-                        <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit({{ loop.index0 }})" data-i18n="form.cancel">Cancel</button>
-                    </form>
-                </td>
-            </tr>
+                </div>
+            </article>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+    </section>
+    {% endfor %}
 </div>
 {% else %}
 <div class="empty-state" style="padding: 1.5rem;">
@@ -75,35 +186,58 @@
 </div>
 {% endif %}
 
-<!-- ── Add source panel ──────────────────────────────────────────────── -->
 <div class="add-session-panel">
     <h3 data-i18n="sources.addNew">Add New Source</h3>
-    <form method="POST" action="{{ url_for('add_source') }}" class="inline-form" style="margin-top: .75rem; flex-wrap: wrap;">
-        <div class="form-group">
-            <label data-i18n="sources.type">Type</label>
-            <select name="source_type" class="form-control" required>
-                {% for key, label in source_types.items() %}
-                <option value="{{ key }}">{{ label }}</option>
-                {% endfor %}
-            </select>
+    <form method="POST" action="{{ url_for('add_source') }}" class="source-form" data-source-form>
+        <div class="form-row source-form-grid">
+            <div class="form-group">
+                <label data-i18n="sources.type">Type</label>
+                <select name="source_type" class="form-control" required data-source-type-select>
+                    {% for key, label in source_types.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label data-i18n="sources.nameReq">Name *</label>
+                <input type="text" name="name" class="form-control" required placeholder="Name">
+            </div>
+            <div class="form-group">
+                <label data-i18n="sources.location">Location</label>
+                <input type="text" name="location" class="form-control" placeholder="City / Area">
+            </div>
+            <div class="form-group">
+                <label data-i18n="sources.url">URL</label>
+                <input type="url" name="url" class="form-control" placeholder="https://...">
+            </div>
         </div>
-        <div class="form-group">
-            <label data-i18n="sources.nameReq">Name *</label>
-            <input type="text" name="name" class="form-control" required placeholder="Name" style="width: 180px;">
+
+        <div class="source-place-fields" data-place-fields>
+            <div class="form-row source-form-grid">
+                <div class="form-group source-form-span-2">
+                    <label data-i18n="sources.address">Address</label>
+                    <input type="text" name="address" class="form-control" placeholder="Street, number, city">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="sources.latitude">Latitude</label>
+                    <input type="text" name="latitude" class="form-control" placeholder="40.4168">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="sources.longitude">Longitude</label>
+                    <input type="text" name="longitude" class="form-control" placeholder="-3.7038">
+                </div>
+            </div>
+            <label class="source-checkbox-row">
+                <input type="checkbox" name="is_permanently_closed" value="1">
+                <span data-i18n="sources.closedCheckbox">Permanently closed</span>
+            </label>
         </div>
-        <div class="form-group">
-            <label data-i18n="sources.location">Location</label>
-            <input type="text" name="location" class="form-control" placeholder="City / Address" style="width: 160px;">
-        </div>
-        <div class="form-group">
-            <label data-i18n="sources.url">URL</label>
-            <input type="url" name="url" class="form-control" placeholder="https://..." style="width: 180px;">
-        </div>
+
         <div class="form-group">
             <label data-i18n="sources.notesLabel">Notes</label>
-            <input type="text" name="notes" class="form-control" placeholder="Optional" style="width: 160px;">
+            <textarea name="notes" class="form-control" rows="3" placeholder="Optional"></textarea>
         </div>
-        <div class="form-group" style="align-self: flex-end;">
+        <div class="source-form-actions">
             <button type="submit" class="btn btn-primary" data-i18n="sources.addBtn">+ Add Source</button>
         </div>
     </form>
@@ -111,10 +245,74 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-function toggleSourceEdit(idx) {
-    const row = document.getElementById('source-edit-' + idx);
-    row.classList.toggle('active');
+const PLACE_SOURCE_TYPES = new Set({{ place_source_types | tojson }});
+const SOURCE_MAP_POINTS = {{ source_map_points | tojson }};
+
+function toggleSourceEdit(id) {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    panel.classList.toggle('active');
+}
+
+function updatePlaceFields(form) {
+    const select = form.querySelector('[data-source-type-select]');
+    const placeFields = form.querySelector('[data-place-fields]');
+    if (!select || !placeFields) return;
+    placeFields.classList.toggle('is-hidden', !PLACE_SOURCE_TYPES.has(select.value));
+}
+
+function sourceT(key, fallback) {
+    if (window.librariumI18n && typeof window.librariumI18n.t === 'function') {
+        return window.librariumI18n.t(key);
+    }
+    return fallback;
+}
+
+document.querySelectorAll('[data-source-form]').forEach(function(form) {
+    const select = form.querySelector('[data-source-type-select]');
+    if (!select) return;
+    updatePlaceFields(form);
+    select.addEventListener('change', function() {
+        updatePlaceFields(form);
+    });
+});
+
+if (SOURCE_MAP_POINTS.length) {
+    if (window.L) {
+        const map = L.map('sourcesMap');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = SOURCE_MAP_POINTS.map(function(point) {
+            const marker = L.marker([parseFloat(point.latitude), parseFloat(point.longitude)]).addTo(map);
+            const popup = [
+                '<strong>' + point.name + '</strong>',
+                point.type_label,
+                point.location || point.address || '',
+                point.is_permanently_closed ? sourceT('sources.closed', 'Permanently Closed') : '',
+                point.url ? '<a href="' + point.url + '" target="_blank" rel="noopener">' + sourceT('sources.url', 'URL') + '</a>' : ''
+            ].filter(Boolean).join('<br>');
+            marker.bindPopup(popup);
+            return marker;
+        });
+
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.2));
+        if (markers.length === 1) {
+            map.setZoom(13);
+        }
+    } else {
+        const mapElement = document.getElementById('sourcesMap');
+        if (mapElement) {
+            mapElement.classList.add('sources-map-empty');
+            mapElement.textContent = sourceT('sources.mapUnavailable', 'The map library could not be loaded.');
+        }
+    }
 }
 </script>
 {% endblock %}
