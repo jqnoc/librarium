@@ -8068,7 +8068,7 @@ def new_book():
 def sources_list():
     """Sources management page."""
     db = get_db()
-    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY type, name").fetchall()]
+    sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name").fetchall()]
     source_sections, source_map_points, source_map_missing_count = _prepare_source_directory_rows(sources)
     return render_template(
         "sources.html",

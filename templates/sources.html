@@ -31,94 +31,83 @@
 </section>
 {% endif %}
 
-{% if source_sections %}
-<div class="source-sections">
-    {% for section in source_sections %}
-    <section class="source-directory-section">
-        <div class="source-panel-header">
-            <div>
-                <h2>{{ section.label }}</h2>
-                {% if section.key in place_source_types %}
-                <p data-i18n="sources.placeSectionHint">Address, closure status, and map coordinates are available for place-based sources.</p>
-                {% else %}
-                <p data-i18n="sources.generalSectionHint">Use these entries for online stores and people you buy from or borrow from.</p>
-                {% endif %}
-            </div>
-            <span class="badge source-meta-badge">{{ section.sources|length }}</span>
-        </div>
-
-        <div class="source-card-grid">
-            {% for s in section.sources %}
-            <article class="source-card">
-                <div class="source-card-top">
-                    <div>
-                        <div class="source-card-title-row">
-                            <h3>{{ s.name }}</h3>
-                            {% if s.is_permanently_closed %}
+{% if sources %}
+<div class="table-wrap">
+    <table class="sources-table">
+        <thead>
+            <tr>
+                <th data-i18n="sources.name">Name</th>
+                <th data-i18n="sources.type">Type</th>
+                <th data-i18n="sources.details">Details</th>
+                <th data-i18n="sources.notes">Notes</th>
+                <th data-i18n="sources.actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sources %}
+            {% set is_place_type = s.type in place_source_types %}
+            {% set has_coordinates = s.latitude and s.longitude %}
+            <tr id="source-row-{{ loop.index0 }}">
+                <td>
+                    <div class="source-table-name">
+                        <strong>{{ s.name }}</strong>
+                        <div class="source-table-badges">
+                            {% if is_place_type and s.is_permanently_closed %}
                             <span class="badge source-status-closed" data-i18n="sources.closed">Permanently Closed</span>
                             {% endif %}
-                        </div>
-                        <div class="source-card-meta">
-                            <span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span>
-                            {% if s.location %}<span>{{ s.location }}</span>{% endif %}
-                            {% if s.has_coordinates %}<span data-i18n="sources.hasCoordinates">Has map coordinates</span>{% endif %}
+                            {% if is_place_type and has_coordinates %}
+                            <span class="badge source-meta-badge" data-i18n="sources.hasCoordinates">Has map coordinates</span>
+                            {% endif %}
                         </div>
                     </div>
-                    <div class="source-card-actions">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ section.key }}-{{ loop.index0 }}')">✏️</button>
-                        <form method="POST" action="{{ url_for('delete_source', source_id=s.id) }}" style="display:inline;"
-                              onsubmit="return confirm('Delete this source?');">
-                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
-                        </form>
+                </td>
+                <td><span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span></td>
+                <td>
+                    <div class="source-table-details">
+                        {% if s.location %}
+                        <span class="source-table-detail-line">
+                            <span class="source-table-label" data-i18n="sources.location">Location</span>
+                            <span>{{ s.location }}</span>
+                        </span>
+                        {% endif %}
+                        {% if is_place_type and s.address %}
+                        <span class="source-table-detail-line">
+                            <span class="source-table-label" data-i18n="sources.address">Address</span>
+                            <span>{{ s.address }}</span>
+                        </span>
+                        {% endif %}
+                        {% if s.url %}
+                        <span class="source-table-detail-line">
+                            <span class="source-table-label" data-i18n="sources.url">URL</span>
+                            <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
+                        </span>
+                        {% endif %}
+                        {% if is_place_type and has_coordinates %}
+                        <span class="source-table-detail-line">
+                            <span class="source-table-label" data-i18n="sources.coordinates">Coordinates</span>
+                            <span>{{ s.latitude }}, {{ s.longitude }}</span>
+                        </span>
+                        <span class="source-table-detail-line">
+                            <span class="source-table-label" data-i18n="sources.mapLink">Map</span>
+                            <a href="https://www.openstreetmap.org/?mlat={{ s.latitude }}&mlon={{ s.longitude }}#map=16/{{ s.latitude }}/{{ s.longitude }}" target="_blank" rel="noopener" class="source-table-link" data-i18n="sources.openInMap">Open in map</a>
+                        </span>
+                        {% endif %}
+                        {% if not s.location and not (is_place_type and s.address) and not s.url and not (is_place_type and has_coordinates) %}
+                        <span>—</span>
+                        {% endif %}
                     </div>
-                </div>
-
-                <dl class="source-detail-list">
-                    {% if s.location %}
-                    <div>
-                        <dt data-i18n="sources.location">Location</dt>
-                        <dd>{{ s.location }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if s.address %}
-                    <div>
-                        <dt data-i18n="sources.address">Address</dt>
-                        <dd>{{ s.address }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if s.url %}
-                    <div>
-                        <dt data-i18n="sources.url">URL</dt>
-                        <dd><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a></dd>
-                    </div>
-                    {% endif %}
-                    {% if s.has_coordinates %}
-                    <div>
-                        <dt data-i18n="sources.coordinates">Coordinates</dt>
-                        <dd>{{ s.latitude }}, {{ s.longitude }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if s.notes %}
-                    <div>
-                        <dt data-i18n="sources.notes">Notes</dt>
-                        <dd>{{ s.notes }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if s.map_url %}
-                    <div>
-                        <dt data-i18n="sources.mapLink">Map</dt>
-                        <dd><a href="{{ s.map_url }}" target="_blank" rel="noopener" data-i18n="sources.openInMap">Open in map</a></dd>
-                    </div>
-                    {% endif %}
-                    {% if not s.location and not s.address and not s.url and not s.notes and not s.has_coordinates %}
-                    <div>
-                        <dt data-i18n="sources.details">Details</dt>
-                        <dd>—</dd>
-                    </div>
-                    {% endif %}
-                </dl>
-
-                <div class="source-edit-panel" id="source-edit-{{ section.key }}-{{ loop.index0 }}">
+                </td>
+                <td>{{ s.notes or '—' }}</td>
+                <td>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ loop.index0 }}')">✏️</button>
+                    <form method="POST" action="{{ url_for('delete_source', source_id=s.id) }}" style="display:inline;"
+                          onsubmit="return confirm('Delete this source?');">
+                        <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            <tr class="session-edit-row source-edit-row" id="source-edit-{{ loop.index0 }}">
+                <td colspan="5">
                     <form method="POST" action="{{ url_for('edit_source', source_id=s.id) }}" class="source-form source-edit-form" data-source-form>
                         <div class="form-row source-form-grid">
                             <div class="form-group">
@@ -170,15 +159,14 @@
                         </div>
                         <div class="source-form-actions">
                             <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ section.key }}-{{ loop.index0 }}')" data-i18n="form.cancel">Cancel</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ loop.index0 }}')" data-i18n="form.cancel">Cancel</button>
                         </div>
                     </form>
-                </div>
-            </article>
+                </td>
+            </tr>
             {% endfor %}
-        </div>
-    </section>
-    {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% else %}
 <div class="empty-state" style="padding: 1.5rem;">

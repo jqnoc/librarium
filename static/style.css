@@ -1220,6 +1220,59 @@ select.form-control { cursor: pointer; }
     border: 1px solid rgba(83, 125, 150, 0.22);
 }
 
+.sources-table td {
+    vertical-align: top;
+}
+
+.source-table-name {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.source-table-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.source-table-details {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.65rem;
+    white-space: nowrap;
+}
+
+.source-table-detail-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.source-table-detail-line:not(:last-child)::after {
+    content: "|";
+    color: var(--lb-border-strong, var(--lb-border));
+    margin-left: 0.2rem;
+}
+
+.source-table-label {
+    color: var(--lb-text-light);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.source-table-link {
+    color: var(--lb-deep-orange);
+    text-decoration: none;
+}
+
+.source-table-link:hover {
+    text-decoration: underline;
+}
+
 .sources-map {
     height: 360px;
     border-radius: var(--lb-radius);
@@ -1337,6 +1390,11 @@ select.form-control { cursor: pointer; }
 
 .source-edit-panel.active {
     display: block;
+}
+
+.source-edit-row td {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
 }
 
 .source-form {
