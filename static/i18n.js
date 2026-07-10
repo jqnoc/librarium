@@ -470,7 +470,7 @@
         'sources.generalSectionHint': { en: 'Use these entries for online stores and people you buy from or borrow from.', es: 'Usa estas entradas para tiendas online y personas a las que compras o de quienes tomas prestado.' },
         'sources.missingCoordinates': { en: 'missing coordinates', es: 'sin coordenadas' },
         'sources.mapLink':    { en: 'Map',         es: 'Mapa' },
-        'sources.openInMap':  { en: 'Open in map', es: 'Abrir en el mapa' },
+        'sources.openInMap':  { en: 'Show in Map', es: 'Mostrar en el mapa' },
         'sources.details':    { en: 'Details',     es: 'Detalles' },
         'sources.url':        { en: 'URL',          es: 'URL' },
         'sources.notesLabel': { en: 'Notes',        es: 'Notas' },

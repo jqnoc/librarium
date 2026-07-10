@@ -17,7 +17,6 @@ import shutil
 import sqlite3
 import threading
 import urllib.error
-import urllib.parse
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
@@ -3485,24 +3484,6 @@ def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str
     return data, None
 
 
-def _source_map_url(source: dict) -> str:
-    """Return an OpenStreetMap link for a source when possible."""
-    latitude = (source.get("latitude") or "").strip()
-    longitude = (source.get("longitude") or "").strip()
-    if latitude and longitude:
-        return f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=16/{latitude}/{longitude}"
-
-    query_parts = [
-        (source.get("name") or "").strip(),
-        (source.get("address") or "").strip(),
-        (source.get("location") or "").strip(),
-    ]
-    query = ", ".join(part for part in query_parts if part)
-    if not query:
-        return ""
-    return "https://www.openstreetmap.org/search?query=" + urllib.parse.quote_plus(query)
-
-
 def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], list[dict], int]:
     """Decorate source rows for the Sources page and collect map points."""
     sections: list[dict] = []
@@ -3514,10 +3495,10 @@ def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], lis
         for source in rows:
             source["is_place_type"] = type_key in PLACE_SOURCE_TYPES
             source["has_coordinates"] = bool((source.get("latitude") or "").strip() and (source.get("longitude") or "").strip())
-            source["map_url"] = _source_map_url(source)
             if source["is_place_type"]:
                 if source["has_coordinates"]:
                     map_points.append({
+                        "id": source.get("id", ""),
                         "name": source.get("name", ""),
                         "type_key": source.get("type", ""),
                         "type_label": type_label,

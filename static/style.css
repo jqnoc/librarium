@@ -1282,6 +1282,20 @@ select.form-control { cursor: pointer; }
     text-decoration: underline;
 }
 
+.source-map-focus-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font: inherit;
+    line-height: 1;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.source-map-focus-btn:hover {
+    text-decoration: none;
+}
+
 .sources-map {
     height: 360px;
     border-radius: var(--lb-radius);
@@ -1311,6 +1325,20 @@ select.form-control { cursor: pointer; }
     inset: 6px;
     border-radius: 50%;
     background: currentColor;
+}
+
+.source-map-marker-active {
+    animation: source-map-marker-pulse 1s ease-in-out 2;
+    box-shadow: 0 0 0 6px rgba(83, 125, 150, 0.15), 0 10px 18px rgba(45, 45, 68, 0.25);
+}
+
+@keyframes source-map-marker-pulse {
+    0%, 100% {
+        transform: rotate(-45deg) scale(1);
+    }
+    50% {
+        transform: rotate(-45deg) scale(1.16);
+    }
 }
 
 .source-map-marker-physical_store {
