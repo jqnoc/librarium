@@ -3427,6 +3427,28 @@ def source_type_label_filter(type_key: str) -> str:
     return SOURCE_TYPES.get(type_key, type_key)
 
 
+@app.template_filter('source_display_label')
+def source_display_label_filter(source: dict | sqlite3.Row | None) -> str:
+    """Format a source label for dropdowns, appending location when available."""
+    if not source:
+        return ""
+
+    name = (source["name"] if "name" in source.keys() else source.get("name", "")) if hasattr(source, "keys") else ""
+    location = (source["location"] if "location" in source.keys() else source.get("location", "")) if hasattr(source, "keys") else ""
+    type_key = (source["type"] if "type" in source.keys() else source.get("type", "")) if hasattr(source, "keys") else ""
+
+    name = (name or "").strip()
+    location = (location or "").strip()
+    type_label = SOURCE_TYPES.get(type_key, type_key)
+
+    parts = [name]
+    if location:
+        parts.append(f"({location})")
+    if type_label:
+        parts.append(f"({type_label})")
+    return " ".join(part for part in parts if part)
+
+
 def _get_source_by_id(source_id: str) -> dict | None:
     """Look up a source by its ID."""
     db = get_db()
