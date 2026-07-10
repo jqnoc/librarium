@@ -1238,10 +1238,14 @@ select.form-control { cursor: pointer; }
     gap: 0.45rem;
 }
 
-.source-table-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+.source-table-name-text-closed {
+    color: var(--lb-text-light);
+}
+
+.source-table-detail-with-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
 }
 
 .source-table-link {
@@ -1386,12 +1390,6 @@ select.form-control { cursor: pointer; }
 .source-card-actions {
     display: inline-flex;
     gap: 0.4rem;
-}
-
-.source-status-closed {
-    background: rgba(220, 38, 38, 0.12);
-    color: #991b1b;
-    border: 1px solid rgba(220, 38, 38, 0.24);
 }
 
 .source-detail-list {
