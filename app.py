@@ -3428,8 +3428,8 @@ def source_type_label_filter(type_key: str) -> str:
 
 
 @app.template_filter('source_display_label')
-def source_display_label_filter(source: dict | sqlite3.Row | None) -> str:
-    """Format a source label for dropdowns, appending location when available."""
+def source_display_label_filter(source: dict | sqlite3.Row | None, include_type: bool = True) -> str:
+    """Format a source label, appending location and optionally the source type."""
     if not source:
         return ""
 
@@ -3444,7 +3444,7 @@ def source_display_label_filter(source: dict | sqlite3.Row | None) -> str:
     parts = [name]
     if location:
         parts.append(f"({location})")
-    if type_label:
+    if include_type and type_label:
         parts.append(f"({type_label})")
     return " ".join(part for part in parts if part)
 

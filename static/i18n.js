@@ -471,7 +471,7 @@
         'sources.missingCoordinates': { en: 'missing coordinates', es: 'sin coordenadas' },
         'sources.mapLink':    { en: 'Map',         es: 'Mapa' },
         'sources.openInMap':  { en: 'Show in Map', es: 'Mostrar en el mapa' },
-        'sources.details':    { en: 'Details',     es: 'Detalles' },
+        'sources.details':    { en: 'Address / URL',     es: 'Dirección / URL' },
         'sources.url':        { en: 'URL',          es: 'URL' },
         'sources.notesLabel': { en: 'Notes',        es: 'Notas' },
         'sources.empty':      { en: 'No sources yet. Add your first source below.', es: 'Aún no hay fuentes. Añade tu primera fuente a continuación.' },

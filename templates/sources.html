@@ -39,7 +39,6 @@
                 <th data-i18n="sources.name">Name</th>
                 <th data-i18n="sources.type">Type</th>
                 <th data-i18n="sources.details">Details</th>
-                <th data-i18n="sources.notes">Notes</th>
                 <th data-i18n="sources.actions">Actions</th>
             </tr>
         </thead>
@@ -50,7 +49,7 @@
             <tr id="source-row-{{ loop.index0 }}">
                 <td>
                     <div class="source-table-name">
-                        <strong>{{ s.name }}</strong>
+                        <strong>{{ s | source_display_label(false) }}</strong>
                         <div class="source-table-badges">
                             {% if is_place_type and s.is_permanently_closed %}
                             <span class="badge source-status-closed" data-i18n="sources.closed">Permanently Closed</span>
@@ -60,50 +59,29 @@
                 </td>
                 <td><span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span></td>
                 <td>
-                    <div class="source-table-details">
-                        {% if s.location %}
-                        <span class="source-table-detail-line">
-                            <span class="source-table-label" data-i18n="sources.location">Location</span>
-                            <span>{{ s.location }}</span>
-                        </span>
-                        {% endif %}
-                        {% if is_place_type and s.address %}
-                        <span class="source-table-detail-line">
-                            <span class="source-table-label" data-i18n="sources.address">Address</span>
-                            <span>{{ s.address }}</span>
-                        </span>
-                        {% endif %}
-                        {% if s.url %}
-                        <span class="source-table-detail-line">
-                            <span class="source-table-label" data-i18n="sources.url">URL</span>
-                            <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
-                        </span>
-                        {% endif %}
-                        {% if is_place_type and has_coordinates %}
-                        <span class="source-table-detail-line">
-                            <span class="source-table-label" data-i18n="sources.coordinates">Coordinates</span>
-                            <span>{{ s.latitude }}, {{ s.longitude }}</span>
-                        </span>
-                        <span class="source-table-detail-line">
-                            <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
-                        </span>
-                        {% endif %}
-                        {% if not s.location and not (is_place_type and s.address) and not s.url and not (is_place_type and has_coordinates) %}
-                        <span>—</span>
-                        {% endif %}
-                    </div>
+                    {% if s.type == 'web_store' and s.url %}
+                    <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
+                    {% elif is_place_type and s.address %}
+                    <span>{{ s.address }}</span>
+                    {% else %}
+                    <span>—</span>
+                    {% endif %}
                 </td>
-                <td>{{ s.notes or '—' }}</td>
                 <td>
+                    <div class="source-actions">
+                    {% if is_place_type and has_coordinates %}
+                    <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                    {% endif %}
                     <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSourceEdit('source-edit-{{ loop.index0 }}')">✏️</button>
                     <form method="POST" action="{{ url_for('delete_source', source_id=s.id) }}" style="display:inline;"
                           onsubmit="return confirm('Delete this source?');">
                         <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
                     </form>
+                    </div>
                 </td>
             </tr>
             <tr class="session-edit-row source-edit-row" id="source-edit-{{ loop.index0 }}">
-                <td colspan="5">
+                <td colspan="4">
                     <form method="POST" action="{{ url_for('edit_source', source_id=s.id) }}" class="source-form source-edit-form" data-source-form>
                         <div class="form-row source-form-grid">
                             <div class="form-group">
