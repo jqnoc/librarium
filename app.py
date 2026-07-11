@@ -81,7 +81,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0-beta"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -828,13 +828,16 @@ def init_schema() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS sources (
-            id          TEXT    PRIMARY KEY,
-            type        TEXT    NOT NULL DEFAULT '',
-            name        TEXT    NOT NULL DEFAULT '',
-            short_name  TEXT    NOT NULL DEFAULT '',
-            location    TEXT    NOT NULL DEFAULT '',
-            url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT ''
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS series (
@@ -969,6 +972,7 @@ def init_schema() -> None:
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
             definition TEXT    NOT NULL DEFAULT '',
+            synonyms   TEXT    NOT NULL DEFAULT '',
             translation TEXT   NOT NULL DEFAULT '',
             translation_language TEXT NOT NULL DEFAULT ''
         );
@@ -1009,8 +1013,11 @@ def _run_all_migrations() -> None:
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
     migrate_add_word_translations()
+    migrate_add_word_synonyms()
     migrate_externalize_images()
     migrate_add_performance_indexes()
+    migrate_remove_source_short_name()
+    migrate_add_source_place_details()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1601,22 +1608,36 @@ def migrate_shared_sources() -> None:
     db.execute("DROP TABLE IF EXISTS sources")
     db.execute("""
         CREATE TABLE sources (
-            id          TEXT    PRIMARY KEY,
-            type        TEXT    NOT NULL DEFAULT '',
-            name        TEXT    NOT NULL DEFAULT '',
-            short_name  TEXT    NOT NULL DEFAULT '',
-            location    TEXT    NOT NULL DEFAULT '',
-            url         TEXT    NOT NULL DEFAULT '',
-            notes       TEXT    NOT NULL DEFAULT ''
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
         )
     """)
 
     for s in unique_sources:
+        name = (s.get("name") or "").strip() or (s.get("short_name") or "").strip()
         db.execute(
-            "INSERT INTO sources (id, type, name, short_name, location, url, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (s["id"], s.get("type", ""), s.get("name", ""), s.get("short_name", ""),
-             s.get("location", ""), s.get("url", ""), s.get("notes", "")),
+            "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                s["id"],
+                s.get("type", ""),
+                name,
+                s.get("location", ""),
+                s.get("address", ""),
+                s.get("latitude", ""),
+                s.get("longitude", ""),
+                1 if s.get("is_permanently_closed") else 0,
+                s.get("url", ""),
+                s.get("notes", ""),
+            ),
         )
 
     db.commit()
@@ -1779,6 +1800,7 @@ def migrate_add_annotations() -> None:
             book_id    TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             word       TEXT    NOT NULL DEFAULT '',
             definition TEXT    NOT NULL DEFAULT '',
+            synonyms   TEXT    NOT NULL DEFAULT '',
             translation TEXT   NOT NULL DEFAULT '',
             translation_language TEXT NOT NULL DEFAULT ''
         );
@@ -1807,6 +1829,24 @@ def migrate_add_word_translations() -> None:
     if changed:
         db.commit()
         print(">> Migration complete - translation fields added to words.")
+    db.close()
+
+
+def migrate_add_word_synonyms() -> None:
+    """Add optional synonyms field to words."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(words)").fetchall()]
+    changed = False
+    if "synonyms" not in cols:
+        print(">> Migrating: adding synonyms column to words ...")
+        db.execute("ALTER TABLE words ADD COLUMN synonyms TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if changed:
+        db.commit()
+        print(">> Migration complete - synonyms field added to words.")
     db.close()
 
 
@@ -1970,10 +2010,102 @@ def migrate_add_performance_indexes() -> None:
 
         CREATE INDEX IF NOT EXISTS idx_book_series_series_book
             ON book_series(series_id, book_id);
+
+        CREATE INDEX IF NOT EXISTS idx_books_library_has_cover
+            ON books(library_id, has_cover);
+
+        CREATE INDEX IF NOT EXISTS idx_readings_book_status
+            ON readings(book_id, status);
     """)
     db.commit()
     db.close()
     print(">> Migration complete — performance indexes added.")
+
+
+def migrate_remove_source_short_name() -> None:
+    """Drop the legacy short_name column from sources."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=OFF")
+
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    if "short_name" not in cols:
+        db.close()
+        return
+
+    print(">> Migrating: removing legacy source short names ...")
+    all_sources = db.execute("SELECT * FROM sources ORDER BY name").fetchall()
+
+    db.execute("DROP TABLE IF EXISTS sources")
+    db.execute("""
+        CREATE TABLE sources (
+            id                      TEXT    PRIMARY KEY,
+            type                    TEXT    NOT NULL DEFAULT '',
+            name                    TEXT    NOT NULL DEFAULT '',
+            location                TEXT    NOT NULL DEFAULT '',
+            address                 TEXT    NOT NULL DEFAULT '',
+            latitude                TEXT    NOT NULL DEFAULT '',
+            longitude               TEXT    NOT NULL DEFAULT '',
+            is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
+            url                     TEXT    NOT NULL DEFAULT '',
+            notes                   TEXT    NOT NULL DEFAULT ''
+        )
+    """)
+
+    for row in all_sources:
+        source = dict(row)
+        name = (source.get("name") or "").strip() or (source.get("short_name") or "").strip()
+        db.execute(
+            "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                source["id"],
+                source.get("type", ""),
+                name,
+                source.get("location", ""),
+                source.get("address", ""),
+                source.get("latitude", ""),
+                source.get("longitude", ""),
+                1 if source.get("is_permanently_closed") else 0,
+                source.get("url", ""),
+                source.get("notes", ""),
+            ),
+        )
+
+    db.commit()
+    db.close()
+    print(">> Migration complete — sources now use a single name field.")
+
+
+def migrate_add_source_place_details() -> None:
+    """Add structured place metadata to sources."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    changed = False
+
+    if "address" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN address TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "latitude" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN latitude TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "longitude" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN longitude TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "is_permanently_closed" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN is_permanently_closed INTEGER NOT NULL DEFAULT 0")
+        changed = True
+
+    if changed:
+        db.commit()
+        print(">> Migration complete — sources now include place metadata.")
+
+    db.close()
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -2163,10 +2295,6 @@ def _get_author_canonical_map(db: sqlite3.Connection | None = None) -> dict[str,
         db = get_db()
 
     try:
-        cols = [r[1] for r in db.execute("PRAGMA table_info(authors)").fetchall()]
-        if "canonical_author" not in cols:
-            g._author_canonical_map = {}
-            return g._author_canonical_map
         mapping = {
             row["name"]: (row["canonical_author"] or "").strip()
             for row in db.execute("SELECT name, canonical_author FROM authors").fetchall()
@@ -2580,6 +2708,40 @@ def _iter_date_span(
         current += timedelta(days=1)
 
 
+def _iter_date_span_with_offset(
+    start_raw: str | None,
+    end_raw: str | None,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    """Yield tuples of (ISO day, offset from start_day) covered by a date span."""
+    start_day, end_day = _resolve_date_span(start_raw, end_raw)
+    if not start_day or not end_day:
+        return
+
+    orig_start = start_day
+    if date_from:
+        try:
+            start_day = max(start_day, date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            end_day = min(end_day, date.fromisoformat(date_to))
+        except ValueError:
+            pass
+    if end_day < start_day:
+        return
+
+    current = start_day
+    offset = (current - orig_start).days
+    while current <= end_day:
+        yield current.isoformat(), offset
+        current += timedelta(days=1)
+        offset += 1
+
+
 def _distribute_total_across_days(
     start_raw: str | None,
     end_raw: str | None,
@@ -2601,14 +2763,9 @@ def _distribute_total_across_days(
     if full_days <= 0:
         return []
 
-    clipped_days = list(_iter_date_span(start_raw, end_raw, date_from=date_from, date_to=date_to))
-    if not clipped_days:
-        return []
-
     base, remainder = divmod(total, full_days)
     distributed: list[tuple[str, int]] = []
-    for day_str in clipped_days:
-        day_offset = (date.fromisoformat(day_str) - start_day).days
+    for day_str, day_offset in _iter_date_span_with_offset(start_raw, end_raw, date_from=date_from, date_to=date_to):
         value = base + (1 if day_offset < remainder else 0)
         if value:
             distributed.append((day_str, value))
@@ -2678,27 +2835,153 @@ def _build_daily_activity_data(
             fallback_seconds=book_totals["seconds"],
         )
 
-        for day_str, pages_value in _distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            row["pages"] or 0,
-            date_from=date_from,
-            date_to=date_to,
-        ):
-            _ensure(day_str)["pages"] += pages_value
-        for day_str, seconds_value in _distribute_total_across_days(
-            row["start_date"],
-            row["end_date"],
-            total_period_seconds,
-            date_from=date_from,
-            date_to=date_to,
-        ):
-            _ensure(day_str)["seconds"] += seconds_value
+        start_day, end_day = _resolve_date_span(row["start_date"], row["end_date"])
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                clipped_span = list(_iter_date_span_with_offset(
+                    row["start_date"],
+                    row["end_date"],
+                    date_from=date_from,
+                    date_to=date_to,
+                ))
+                if clipped_span:
+                    p_total = int(row["pages"] or 0)
+                    p_base, p_rem = divmod(p_total, full_days)
+                    s_total = int(total_period_seconds or 0)
+                    s_base, s_rem = divmod(s_total, full_days)
+                    for day_str, day_offset in clipped_span:
+                        p_val = p_base + (1 if day_offset < p_rem else 0)
+                        s_val = s_base + (1 if day_offset < s_rem else 0)
+                        day_obj = _ensure(day_str)
+                        if p_val:
+                            day_obj["pages"] += p_val
+                        if s_val:
+                            day_obj["seconds"] += s_val
 
     return [
         {"date": day_str, "pages": values["pages"], "seconds": values["seconds"]}
         for day_str, values in sorted(daily_totals.items())
     ]
+
+
+def _build_yearly_book_activity(
+    db,
+    lf_b: str,
+    lp_b: tuple,
+) -> dict[str, dict[str, dict]]:
+    """Aggregate per-book yearly activity with distinct reading days and inferred time."""
+    activity_by_year: dict[str, dict[str, dict]] = {}
+    session_totals_by_book = _load_book_session_totals(db, lf_b, lp_b)
+
+    def _ensure_entry(row, day_str: str) -> dict:
+        year = (day_str or "")[:4]
+        year_map = activity_by_year.setdefault(year, {})
+        book_id = row["book_id"]
+        if book_id not in year_map:
+            year_map[book_id] = {
+                "id": book_id,
+                "name": row["name"],
+                "subtitle": row["subtitle"] or "",
+                "author": row["author"] or "",
+                "has_cover": bool(row["has_cover"]),
+                "cover_hash": row["cover_hash"] or "",
+                "total_pages": 0,
+                "total_seconds": 0,
+                "reading_days": set(),
+            }
+        return year_map[book_id]
+
+    def _add_day(
+        row,
+        day_str: str,
+        *,
+        pages: int = 0,
+        seconds: int = 0,
+        has_activity: bool = False,
+    ) -> None:
+        if not day_str or len(day_str) < 4 or not day_str[:4].isdigit():
+            return
+        entry = _ensure_entry(row, day_str)
+        entry["total_pages"] += int(pages or 0)
+        entry["total_seconds"] += int(seconds or 0)
+        if has_activity or pages or seconds:
+            entry["reading_days"].add(day_str)
+
+    for row in db.execute(
+        "SELECT s.book_id, b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, "
+        "s.date, COALESCE(s.pages, 0) AS pages, COALESCE(s.duration_seconds, 0) AS seconds "
+        "FROM sessions s JOIN books b ON b.id = s.book_id "
+        f"WHERE s.date != '' AND {lf_b}",
+        lp_b,
+    ).fetchall():
+        _add_day(
+            row,
+            row["date"],
+            pages=row["pages"] or 0,
+            seconds=row["seconds"] or 0,
+            has_activity=True,
+        )
+
+    for row in db.execute(
+        "SELECT p.book_id, p.start_date, p.end_date, p.pages, "
+        "COALESCE(p.duration_seconds, 0) AS duration_seconds, "
+        "b.name, b.subtitle, b.author, b.has_cover, b.cover_hash, b.format "
+        "FROM periods p JOIN books b ON b.id = p.book_id "
+        f"WHERE p.start_date != '' AND {lf_b} "
+        "AND (p.pages > 0 OR COALESCE(p.duration_seconds, 0) > 0 OR p.progress_pct IS NOT NULL)",
+        lp_b,
+    ).fetchall():
+        book_totals = session_totals_by_book.get(row["book_id"], {"pages": 0, "seconds": 0})
+        total_period_seconds = _estimate_period_seconds(
+            period_pages=row["pages"] or 0,
+            explicit_period_seconds=row["duration_seconds"] or 0,
+            is_pct_format=(row["format"] or "paper") in ("audiobook", "ebook"),
+            fallback_pages=book_totals["pages"],
+            fallback_seconds=book_totals["seconds"],
+        )
+
+        start_day, end_day = _resolve_date_span(row["start_date"], row["end_date"])
+        day_pages = {}
+        day_seconds = {}
+        span_days = []
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                p_total = int(row["pages"] or 0)
+                p_base, p_rem = divmod(p_total, full_days)
+                s_total = int(total_period_seconds or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+
+                current = start_day
+                offset = 0
+                while current <= end_day:
+                    ds = current.isoformat()
+                    span_days.append(ds)
+                    p_val = p_base + (1 if offset < p_rem else 0)
+                    s_val = s_base + (1 if offset < s_rem else 0)
+                    if p_val:
+                        day_pages[ds] = p_val
+                    if s_val:
+                        day_seconds[ds] = s_val
+                    current += timedelta(days=1)
+                    offset += 1
+
+        if not span_days:
+            fallback_day = (row["end_date"] or row["start_date"] or "").strip()
+            if fallback_day:
+                span_days = [fallback_day]
+
+        for day_str in span_days:
+            _add_day(
+                row,
+                day_str,
+                pages=day_pages.get(day_str, 0),
+                seconds=day_seconds.get(day_str, 0),
+                has_activity=True,
+            )
+
+    return activity_by_year
 
 
 def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
@@ -2767,20 +3050,27 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
             fallback_seconds=book_totals["seconds"],
         )
 
-        day_pages = dict(_distribute_total_across_days(
-            rp["start_date"],
-            rp["end_date"],
-            rp["pages"] or 0,
-            date_from=date_from,
-            date_to=date_to,
-        ))
-        day_seconds = dict(_distribute_total_across_days(
-            rp["start_date"],
-            rp["end_date"],
-            total_period_seconds,
-            date_from=date_from,
-            date_to=date_to,
-        ))
+        start_day, end_day = _resolve_date_span(rp["start_date"], rp["end_date"])
+        day_pages = {}
+        day_seconds = {}
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                p_total = int(rp["pages"] or 0)
+                p_base, p_rem = divmod(p_total, full_days)
+                s_total = int(total_period_seconds or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+
+                for day_str, day_offset in _iter_date_span_with_offset(
+                    rp["start_date"], rp["end_date"], date_from=date_from, date_to=date_to
+                ):
+                    p_val = p_base + (1 if day_offset < p_rem else 0)
+                    s_val = s_base + (1 if day_offset < s_rem else 0)
+                    if p_val:
+                        day_pages[day_str] = p_val
+                    if s_val:
+                        day_seconds[day_str] = s_val
+
         for day_str in sorted(set(day_pages) | set(day_seconds)):
             _raw.append({
                 "date": day_str,
@@ -2850,7 +3140,7 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
         f"s.name AS source_name "
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
         f"WHERE {lf} AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
-        f"AND b.source_type IN ('library','person') "
+        f"AND b.source_type = 'borrowed' "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_bor}",
         lp + tuple(dp_bor),
     ).fetchall():
@@ -3126,6 +3416,7 @@ SOURCE_TYPES = {
     "library": "Library",
     "person": "Person",
 }
+PLACE_SOURCE_TYPES = {"physical_store", "library"}
 PURCHASE_SOURCE_TYPES = {"physical_store", "web_store"}
 BORROW_SOURCE_TYPES = {"library", "person"}
 GIFT_SOURCE_TYPES = {"person"}
@@ -3136,6 +3427,28 @@ def source_type_label_filter(type_key: str) -> str:
     return SOURCE_TYPES.get(type_key, type_key)
 
 
+@app.template_filter('source_display_label')
+def source_display_label_filter(source: dict | sqlite3.Row | None, include_type: bool = True) -> str:
+    """Format a source label, appending location and optionally the source type."""
+    if not source:
+        return ""
+
+    name = (source["name"] if "name" in source.keys() else source.get("name", "")) if hasattr(source, "keys") else ""
+    location = (source["location"] if "location" in source.keys() else source.get("location", "")) if hasattr(source, "keys") else ""
+    type_key = (source["type"] if "type" in source.keys() else source.get("type", "")) if hasattr(source, "keys") else ""
+
+    name = (name or "").strip()
+    location = (location or "").strip()
+    type_label = SOURCE_TYPES.get(type_key, type_key)
+
+    parts = [name]
+    if location:
+        parts.append(f"({location})")
+    if include_type and type_label:
+        parts.append(f"({type_label})")
+    return " ".join(part for part in parts if part)
+
+
 def _get_source_by_id(source_id: str) -> dict | None:
     """Look up a source by its ID."""
     db = get_db()
@@ -3143,6 +3456,91 @@ def _get_source_by_id(source_id: str) -> dict | None:
     if row:
         return dict(row)
     return None
+
+
+def _format_coordinate(value: float) -> str:
+    """Serialize coordinates without unnecessary trailing zeroes."""
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str | None]:
+    """Validate and normalize source fields, including place metadata."""
+    data = {
+        "source_type": source_type,
+        "name": form.get("name", "").strip(),
+        "location": form.get("location", "").strip(),
+        "address": "",
+        "latitude": "",
+        "longitude": "",
+        "is_permanently_closed": 0,
+        "url": form.get("url", "").strip(),
+        "notes": form.get("notes", "").strip(),
+    }
+
+    if not data["name"]:
+        return None, "Source name is required."
+
+    if source_type in PLACE_SOURCE_TYPES:
+        data["address"] = form.get("address", "").strip()
+        data["is_permanently_closed"] = 1 if form.get("is_permanently_closed") else 0
+        latitude_raw = form.get("latitude", "").strip()
+        longitude_raw = form.get("longitude", "").strip()
+
+        if bool(latitude_raw) != bool(longitude_raw):
+            return None, "Latitude and longitude must be provided together."
+
+        if latitude_raw and longitude_raw:
+            try:
+                latitude = float(latitude_raw)
+                longitude = float(longitude_raw)
+            except ValueError:
+                return None, "Latitude and longitude must be valid decimal numbers."
+            if not -90 <= latitude <= 90:
+                return None, "Latitude must be between -90 and 90."
+            if not -180 <= longitude <= 180:
+                return None, "Longitude must be between -180 and 180."
+            data["latitude"] = _format_coordinate(latitude)
+            data["longitude"] = _format_coordinate(longitude)
+
+    return data, None
+
+
+def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], list[dict], int]:
+    """Decorate source rows for the Sources page and collect map points."""
+    sections: list[dict] = []
+    map_points: list[dict] = []
+    missing_coords = 0
+
+    for type_key, type_label in SOURCE_TYPES.items():
+        rows = [dict(source) for source in sources if source.get("type") == type_key]
+        for source in rows:
+            source["is_place_type"] = type_key in PLACE_SOURCE_TYPES
+            source["has_coordinates"] = bool((source.get("latitude") or "").strip() and (source.get("longitude") or "").strip())
+            if source["is_place_type"]:
+                if source["has_coordinates"]:
+                    map_points.append({
+                        "id": source.get("id", ""),
+                        "name": source.get("name", ""),
+                        "type_key": source.get("type", ""),
+                        "type_label": type_label,
+                        "location": source.get("location", ""),
+                        "address": source.get("address", ""),
+                        "latitude": source.get("latitude", ""),
+                        "longitude": source.get("longitude", ""),
+                        "is_permanently_closed": 1 if source.get("is_permanently_closed") else 0,
+                        "url": source.get("url", ""),
+                    })
+                else:
+                    missing_coords += 1
+        if rows:
+            sections.append({
+                "key": type_key,
+                "label": type_label,
+                "sources": rows,
+            })
+
+    return sections, map_points, missing_coords
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3157,7 +3555,7 @@ def _build_index_per_reading(db, lib_ids):
     - 1 reading  → show it
     - >1 readings, some finished → show each finished one
     - >1 readings, none finished → show the one with highest priority
-      (reading > abandoned > not-started > draft)
+            (reading > abandoned > not-started > wishlist > draft)
     """
     lf, lp = _lib_filter(lib_ids)
     book_rows = db.execute(
@@ -3188,7 +3586,7 @@ def _build_index_per_reading(db, lib_ids):
     for r in all_readings:
         readings_by_book.setdefault(r["book_id"], []).append(dict(r))
 
-    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "draft": 3, "finished": 4}
+    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "wishlist": 3, "draft": 4, "finished": 5}
     selected: list[tuple] = []  # (book_id, reading_id, reading_number, status)
     for bid in bids:
         rlist = readings_by_book.get(bid, [])
@@ -3362,6 +3760,7 @@ def dashboard():
     total_library_pages = 0
     reading_count = 0
     not_started_count = 0
+    wishlist_count = 0
     format_counts: dict[str, int] = Counter()
     source_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
@@ -3383,6 +3782,8 @@ def dashboard():
             reading_count += 1
         elif br["status"] == "not-started":
             not_started_count += 1
+        elif br["status"] == "wishlist":
+            wishlist_count += 1
 
         book_fmt = br["format"] or "paper"
         format_counts[book_fmt] += 1
@@ -3513,29 +3914,53 @@ def dashboard():
     # ── Recent activity feed (comprehensive events) ──────────────────────
     recent_activity = _collect_activity_events(db, lf, lp, lf_b, lp_b)[:50]
 
-    # ── Last books owned (50 most recent) ─────────────────────────────
-    last_books_owned: list[dict] = []
+    # ── Last books acquired (50 most recent owned / gifted / borrowed) ──
+    last_books_acquired: list[dict] = []
     for row in db.execute(
         f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.purchase_date, "
         f"b.purchase_price, b.source_type, b.is_gift, "
         f"s.name AS source_name "
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
-        f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
+        f"WHERE {lf} AND b.source_type = 'owned' "
+        f"AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
         f"ORDER BY b.purchase_date DESC LIMIT 50", lp
     ).fetchall():
-        last_books_owned.append({
+        last_books_acquired.append({
             "id": row["id"],
             "name": row["name"],
             "author": row["author"] or "",
             "has_cover": bool(row["has_cover"]),
             "cover_hash": row["cover_hash"] or "",
-            "purchase_date": row["purchase_date"],
+            "acquired_date": row["purchase_date"],
             "purchase_price": row["purchase_price"] or "",
             "source_name": row["source_name"] or "",
             "source_type": row["source_type"] or "",
             "is_gift": bool(row["is_gift"]),
         })
+    for row in db.execute(
+        f"SELECT b.id, b.name, b.author, b.has_cover, b.cover_hash, b.borrowed_start, "
+        f"b.source_type, s.name AS source_name "
+        f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
+        f"WHERE {lf} AND b.source_type = 'borrowed' "
+        f"AND b.borrowed_start IS NOT NULL AND b.borrowed_start != '' "
+        f"AND (b.work_id IS NULL OR b.is_primary_edition = 1) "
+        f"ORDER BY b.borrowed_start DESC LIMIT 50", lp
+    ).fetchall():
+        last_books_acquired.append({
+            "id": row["id"],
+            "name": row["name"],
+            "author": row["author"] or "",
+            "has_cover": bool(row["has_cover"]),
+            "cover_hash": row["cover_hash"] or "",
+            "acquired_date": row["borrowed_start"],
+            "purchase_price": "",
+            "source_name": row["source_name"] or "",
+            "source_type": row["source_type"] or "",
+            "is_gift": False,
+        })
+    last_books_acquired.sort(key=lambda book: book["acquired_date"] or "0000-00-00", reverse=True)
+    last_books_acquired = last_books_acquired[:50]
 
     # ── Top-rated books ──────────────────────────────────────────────────
     top_rated = [
@@ -3620,13 +4045,40 @@ def dashboard():
     series_progress = series_progress[:8]
 
     # ── TBR (not-started) pile ───────────────────────────────────────────
+    cover_strip_limit = 60
+    tbr_sort = (request.args.get("tbr_sort") or "random").strip()
+    acquisition_date_expr = "COALESCE(NULLIF(borrowed_start, ''), NULLIF(purchase_date, ''), '0001-01-01')"
+    tbr_sort_map = {
+        "random": "RANDOM()",
+        "recent": f"{acquisition_date_expr} DESC, COALESCE(author, '') COLLATE NOCASE ASC, name COLLATE NOCASE ASC",
+        "oldest": f"{acquisition_date_expr} ASC, COALESCE(author, '') COLLATE NOCASE ASC, name COLLATE NOCASE ASC",
+    }
+    if tbr_sort not in tbr_sort_map:
+        tbr_sort = "random"
     tbr_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'not-started' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY RANDOM() LIMIT 15", lp
+        f"ORDER BY {tbr_sort_map[tbr_sort]} LIMIT {cover_strip_limit}", lp
     ).fetchall()
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
+
+    if request.args.get("dashboard_fragment") == "tbr":
+        return render_template(
+            "_dashboard_tbr_section.html",
+            not_started_count=not_started_count,
+            tbr_sort=tbr_sort,
+            tbr_list=tbr_list,
+        )
+
+    # ── Wishlist (to-buy) pile ──────────────────────────────────────────
+    wishlist_books = db.execute(
+        f"SELECT id, name, has_cover, cover_hash, author FROM books "
+        f"WHERE {lf} AND status = 'wishlist' AND (work_id IS NULL OR is_primary_edition = 1) "
+        f"ORDER BY RANDOM() LIMIT {cover_strip_limit}", lp
+    ).fetchall()
+    wishlist_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
+                      "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in wishlist_books]
 
     # ── Author spotlight (4 random authors) ──────────────────────────────
     spotlight_authors: list[dict] = []
@@ -3691,7 +4143,7 @@ def dashboard():
     ).fetchall():
         lang = lang_row["language"]
         row = db.execute(
-            f"SELECT w.word, w.definition, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
+            f"SELECT w.word, w.definition, w.synonyms, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
             f"FROM words w JOIN books b ON b.id = w.book_id "
             f"WHERE {lf_b} AND b.language = ? ORDER BY RANDOM() LIMIT 1",
             (*lp_b, lang),
@@ -3719,6 +4171,7 @@ def dashboard():
         finished_count=finished_count,
         reading_count=reading_count,
         not_started_count=not_started_count,
+        wishlist_count=wishlist_count,
         owned_count=owned_count,
         avg_rating=avg_rating,
         # Currently reading
@@ -3733,8 +4186,8 @@ def dashboard():
         yoy_diff=yoy_diff,
         # Recent activity
         recent_activity=recent_activity,
-        # Last books owned
-        last_books_owned=last_books_owned,
+        # Last books acquired
+        last_books_acquired=last_books_acquired,
         # Top rated
         top_rated=top_rated,
         # Records
@@ -3750,7 +4203,9 @@ def dashboard():
         # Series
         series_progress=series_progress,
         # TBR
+        tbr_sort=tbr_sort,
         tbr_list=tbr_list,
+        wishlist_list=wishlist_list,
         # Author spotlight
         spotlight_authors=spotlight_authors,
         # Language
@@ -3960,7 +4415,7 @@ def index():
         def __ge__(self, o): return self.v <= o.v
         def __eq__(self, o): return self.v == o.v
 
-    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4, "draft": 5}
+    STATUS_ORDER = {"reading": 1, "finished": 2, "not-started": 3, "abandoned": 4, "wishlist": 5, "draft": 6}
 
     def _sort_key_for(criterion, b):
         if criterion == "last_session":
@@ -3968,7 +4423,7 @@ def index():
         elif criterion == "rating":
             return (_Rev(b["avg_rating"] or 0),)
         elif criterion == "status":
-            return (STATUS_ORDER.get(b["status"], 5),)
+            return (STATUS_ORDER.get(b["status"], 6),)
         elif criterion == "author":
             return (b["author"],)
         elif criterion == "time_read":
@@ -4032,9 +4487,9 @@ def _compute_status_timeline(db, lib_ids):
     today = _date.today()
     today_s = today.isoformat()
     lf, lp = _lib_filter(lib_ids)
-    STATUSES = ["reading", "finished", "not-started", "abandoned", "draft"]
+    STATUSES = ["reading", "finished", "not-started", "abandoned", "wishlist", "draft"]
     # Sort key: lower = processed first on the same date
-    _STATUS_ORDER = {"not-started": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
+    _STATUS_ORDER = {"not-started": 0, "wishlist": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
 
     # ── 1. Representative books (primary or standalone) ──────────────────
     books = db.execute(
@@ -4049,20 +4504,19 @@ def _compute_status_timeline(db, lib_ids):
     book_map = {b["id"]: dict(b) for b in books}
 
     # ── 2. For works, find ALL edition IDs (including secondary) ─────────
-    work_ids = [b["work_id"] for b in books if b["work_id"]]
+    work_to_rep = {b["work_id"]: b["id"] for b in books if b["work_id"]}
     # Map: representative_bid → list of all edition book_ids
     editions_map: dict[str, list[str]] = {}
-    if work_ids:
+    if work_to_rep:
+        work_ids = list(work_to_rep.keys())
         wph = ",".join("?" * len(work_ids))
         for row in db.execute(
             f"SELECT id, work_id FROM books WHERE work_id IN ({wph})",
             work_ids,
         ).fetchall():
-            # Find the representative (primary) for this work
-            for bid, bk in book_map.items():
-                if bk.get("work_id") == row["work_id"]:
-                    editions_map.setdefault(bid, []).append(row["id"])
-                    break
+            rep_bid = work_to_rep.get(row["work_id"])
+            if rep_bid:
+                editions_map.setdefault(rep_bid, []).append(row["id"])
     # Standalone books map to themselves
     for bid in book_map:
         if bid not in editions_map:
@@ -4144,7 +4598,7 @@ def _compute_status_timeline(db, lib_ids):
             st = bk["status"] or "not-started"
             transitions.append((entry or today_s, _STATUS_ORDER.get(st, 0), st))
         elif entry and first_start and entry < first_start:
-            initial = "draft" if bk["status"] == "draft" else "not-started"
+            initial = bk["status"] if bk["status"] in ("draft", "wishlist") else "not-started"
             transitions.insert(0, (entry, _STATUS_ORDER.get(initial, 0), initial))
 
         transitions.sort()
@@ -4209,13 +4663,28 @@ def global_stats():
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
     daily_data = _build_daily_activity_data(db, lf_b, lp_b)
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    author_canonical_map = _get_author_canonical_map(db)
 
     pages_by_year: dict[str, int] = {}
-    time_by_year: dict[str, int] = {}
     for day in daily_data:
         year = day["date"][:4]
         pages_by_year[year] = pages_by_year.get(year, 0) + (day["pages"] or 0)
-        time_by_year[year] = time_by_year.get(year, 0) + (day["seconds"] or 0)
+
+    time_by_year: dict[str, int] = {}
+    authors_read_by_year: dict[str, int] = {}
+    for year, books in yearly_book_activity.items():
+        time_by_year[year] = sum(book["total_seconds"] for book in books.values())
+        year_authors: set[str] = set()
+        for book in books.values():
+            if not book["reading_days"]:
+                continue
+            for author_name in _split_book_authors(book["author"] or ""):
+                if author_name.lower() == "anonymous":
+                    continue
+                year_authors.add(_resolve_author_page_name(author_name, author_canonical_map))
+        if year_authors:
+            authors_read_by_year[year] = len(year_authors)
 
     # Books finished by year – count ALL finished readings across all editions
     books_finished_by_year: dict[str, int] = {}
@@ -4231,10 +4700,16 @@ def global_stats():
             finish_year = finish_date[:4]
             books_finished_by_year[finish_year] = books_finished_by_year.get(finish_year, 0) + 1
 
-    all_years = sorted(set(pages_by_year.keys()) | set(books_finished_by_year.keys()) | set(time_by_year.keys()))
+    all_years = sorted(
+        set(pages_by_year.keys())
+        | set(books_finished_by_year.keys())
+        | set(time_by_year.keys())
+        | set(authors_read_by_year.keys())
+    )
     pages_data = [pages_by_year.get(y, 0) for y in all_years]
     books_data = [books_finished_by_year.get(y, 0) for y in all_years]
     time_data = [time_by_year.get(y, 0) for y in all_years]
+    authors_read_data = [authors_read_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
     all_lib_books = [
@@ -4295,7 +4770,7 @@ def global_stats():
     top_authors = author_counts.most_common(10)
 
     # Format status labels
-    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned", "draft": "Draft"}
+    status_labels_map = {"reading": "Reading", "finished": "Finished", "not-started": "Not Started", "abandoned": "Abandoned", "wishlist": "Wishlist", "draft": "Draft"}
     status_chart = {status_labels_map.get(k, k.title()): v for k, v in status_counts.items()}
 
     # Remove 'Unknown' entries from all count maps — they don't represent a real value
@@ -4338,6 +4813,7 @@ def global_stats():
         pages_data=pages_data,
         books_data=books_data,
         time_data=time_data,
+        authors_read_data=authors_read_data,
         bought_years=bought_years,
         bought_data=bought_data,
         status_chart=status_chart_clean,
@@ -4966,6 +5442,167 @@ def stats_year(year: str):
     )
 
 
+@app.route("/stats/year/<year>/time")
+def stats_year_time(year: str):
+    """Display all books contributing tracked or inferred reading time in a year."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    year_books = []
+    for book in yearly_book_activity.get(year, {}).values():
+        total_seconds = book["total_seconds"] or 0
+        if total_seconds <= 0:
+            continue
+        year_books.append({
+            "id": book["id"],
+            "name": book["name"],
+            "subtitle": book["subtitle"],
+            "author": book["author"],
+            "has_cover": book["has_cover"],
+            "cover_hash": book["cover_hash"],
+            "reading_days": len(book["reading_days"]),
+            "total_seconds": total_seconds,
+            "total_time": _format_duration(total_seconds),
+        })
+
+    year_books.sort(key=lambda book: (-book["total_seconds"], book["name"].lower()))
+    years_with_time = sorted(
+        year_key
+        for year_key, books in yearly_book_activity.items()
+        if any((book["total_seconds"] or 0) > 0 for book in books.values())
+    )
+    prev_year = None
+    next_year = None
+    if year in years_with_time:
+        idx = years_with_time.index(year)
+        if idx > 0:
+            prev_year = years_with_time[idx - 1]
+        if idx < len(years_with_time) - 1:
+            next_year = years_with_time[idx + 1]
+
+    total_seconds = sum(book["total_seconds"] for book in year_books)
+    return render_template(
+        "stats_year_time.html",
+        year=year,
+        books=year_books,
+        total_seconds=total_seconds,
+        total_time=_format_duration(total_seconds),
+        prev_year=prev_year,
+        next_year=next_year,
+    )
+
+
+@app.route("/stats/year/<year>/authors")
+def stats_year_authors(year: str):
+    """Display canonical authors read in a year with book/day/time summaries."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    sort = request.args.get("sort", "time")
+    order = request.args.get("order", "desc")
+    if sort not in ("name", "books", "days", "time"):
+        sort = "time"
+    if order not in ("asc", "desc"):
+        order = "desc"
+
+    yearly_book_activity = _build_yearly_book_activity(db, lf_b, lp_b)
+    author_canonical_map = _get_author_canonical_map(db)
+    author_photo_info = {
+        row["name"]: row["photo_hash"] or ""
+        for row in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall()
+    }
+
+    author_map: dict[str, dict] = {}
+    for book in yearly_book_activity.get(year, {}).values():
+        if not book["reading_days"]:
+            continue
+        book_entry = {
+            "id": book["id"],
+            "name": book["name"],
+            "subtitle": book["subtitle"],
+            "author": book["author"],
+            "has_cover": book["has_cover"],
+            "cover_hash": book["cover_hash"],
+            "total_seconds": book["total_seconds"],
+        }
+        for author_name in _split_book_authors(book["author"] or ""):
+            if author_name.lower() == "anonymous":
+                continue
+            canonical_name = _resolve_author_page_name(author_name, author_canonical_map)
+            author_group = author_map.setdefault(canonical_name, {
+                "name": canonical_name,
+                "book_ids": set(),
+                "books": [],
+                "reading_days": set(),
+                "total_seconds": 0,
+                "pen_names": set(),
+            })
+            if book["id"] not in author_group["book_ids"]:
+                author_group["book_ids"].add(book["id"])
+                author_group["books"].append(book_entry)
+            author_group["reading_days"].update(book["reading_days"])
+            author_group["total_seconds"] += book["total_seconds"]
+            if author_name != canonical_name:
+                author_group["pen_names"].add(author_name)
+
+    authors = [
+        {
+            "name": name,
+            "book_count": len(data["book_ids"]),
+            "reading_days": len(data["reading_days"]),
+            "total_seconds": data["total_seconds"],
+            "total_time": _format_duration(data["total_seconds"]),
+            "books": data["books"],
+            "pen_names": sorted(data["pen_names"], key=str.lower),
+            "has_photo": name in author_photo_info,
+            "photo_hash": author_photo_info.get(name, ""),
+        }
+        for name, data in author_map.items()
+    ]
+
+    def _author_sort_key(author: dict):
+        if sort == "name":
+            return (author["name"].lower(),)
+        primary_value = {
+            "books": author["book_count"],
+            "days": author["reading_days"],
+            "time": author["total_seconds"],
+        }[sort]
+        if order == "desc":
+            primary_value = -primary_value
+        return (primary_value, author["name"].lower())
+
+    authors.sort(key=_author_sort_key)
+    if sort == "name" and order == "desc":
+        authors.reverse()
+
+    years_with_authors = sorted(
+        year_key
+        for year_key, books in yearly_book_activity.items()
+        if any(book["reading_days"] for book in books.values())
+    )
+    prev_year = None
+    next_year = None
+    if year in years_with_authors:
+        idx = years_with_authors.index(year)
+        if idx > 0:
+            prev_year = years_with_authors[idx - 1]
+        if idx < len(years_with_authors) - 1:
+            next_year = years_with_authors[idx + 1]
+
+    return render_template(
+        "stats_year_authors.html",
+        year=year,
+        authors=authors,
+        sort=sort,
+        order=order,
+        prev_year=prev_year,
+        next_year=next_year,
+    )
+
+
 @app.route("/stats/year/<year>/books")
 def stats_year_books(year: str):
     """Display all books/readings finished in a specific year with their covers."""
@@ -4976,6 +5613,16 @@ def stats_year_books(year: str):
     sort = request.args.get("sort", "date")
     if sort not in ("alpha", "author", "date", "rating"):
         sort = "date"
+
+    year_int = int(year)
+    year_start = date(year_int, 1, 1)
+    year_end   = date(year_int, 12, 31)
+    date_from  = year_start.isoformat()
+    date_to    = year_end.isoformat()
+    daily_year_data = _build_daily_activity_data(db, lf_b, lp_b, date_from=date_from, date_to=date_to)
+    year_reading_days = len(daily_year_data)
+    year_pages   = sum(day["pages"]   for day in daily_year_data)
+    year_seconds = sum(day["seconds"] for day in daily_year_data)
 
     finished_readings = db.execute(f"""
         SELECT r.id AS reading_id, r.book_id, r.reading_number,
@@ -5037,7 +5684,9 @@ def stats_year_books(year: str):
             next_year = sorted_years[idx + 1]
 
     return render_template("stats_year_books.html", year=year, books=books_finished, sort=sort,
-                           prev_year=prev_year, next_year=next_year)
+                           prev_year=prev_year, next_year=next_year,
+                           year_pages=year_pages, year_seconds=year_seconds,
+                           year_reading_days=year_reading_days)
 
 
 @app.route("/stats/year/<year>/bought")
@@ -5207,6 +5856,14 @@ def calendar_view():
     for row in db.execute(
         f"SELECT DISTINCT SUBSTR(purchase_date, 1, 4) AS yr FROM books "
         f"WHERE {lf} AND purchase_date IS NOT NULL AND purchase_date != ''", lp
+    ).fetchall():
+        try:
+            avail_years.add(int(row["yr"]))
+        except (ValueError, TypeError):
+            pass
+    for row in db.execute(
+        f"SELECT DISTINCT SUBSTR(borrowed_start, 1, 4) AS yr FROM books "
+        f"WHERE {lf} AND borrowed_start IS NOT NULL AND borrowed_start != ''", lp
     ).fetchall():
         try:
             avail_years.add(int(row["yr"]))
@@ -5430,24 +6087,18 @@ def author_photo(author_name: str):
     """Serve the author's photo from the filesystem (or legacy DB BLOB)."""
     db = get_db()
 
-    # Lightweight hash-only check for conditional requests
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
-            (author_name,)
-        ).fetchone()
-        if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{ hash_row["photo_hash"] }"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute("SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
                      (author_name,)).fetchone()
     if not row:
         abort(404)
     photo_hash = row["photo_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and photo_hash == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
 
     # Serve from filesystem
     img_path = _author_photo_path(author_name)
@@ -5475,26 +6126,24 @@ def author_photo_thumb(author_name: str):
     """Serve a thumbnail of the author's photo from the database."""
     db = get_db()
 
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT photo_hash FROM authors WHERE name = ? AND has_photo = 1",
-            (author_name,)
-        ).fetchone()
-        if hash_row and hash_row["photo_hash"] and hash_row["photo_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{ hash_row["photo_hash"] }"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute(
         "SELECT photo_thumb, photo_hash FROM authors WHERE name = ? AND has_photo = 1",
         (author_name,)
     ).fetchone()
-    if not row or not row["photo_thumb"]:
+    if not row:
         abort(404)
 
     photo_hash = row["photo_hash"] or ""
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and photo_hash == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{photo_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if not row["photo_thumb"]:
+        abort(404)
+
     resp = make_response(row["photo_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"{photo_hash}"'
@@ -6033,19 +6682,21 @@ def book_detail(book_id: str):
                 seconds=session["duration_seconds"],
             )
     for period in cur_periods:
-        for day_str, seconds in _distribute_total_across_days(
-            period.get("start_date"),
-            period.get("end_date"),
-            period.get("duration_seconds") or 0,
-        ):
-            _add_daily_activity(day_str, seconds=seconds)
-        if not is_pct_format:
-            for day_str, pages in _distribute_total_across_days(
-                period.get("start_date"),
-                period.get("end_date"),
-                period.get("pages") or 0,
-            ):
-                _add_daily_activity(day_str, pages=pages)
+        start_day, end_day = _resolve_date_span(period.get("start_date"), period.get("end_date"))
+        if start_day and end_day:
+            full_days = (end_day - start_day).days + 1
+            if full_days > 0:
+                s_total = int(period.get("duration_seconds") or 0)
+                s_base, s_rem = divmod(s_total, full_days)
+                p_total = int(period.get("pages") or 0) if not is_pct_format else 0
+                p_base, p_rem = divmod(p_total, full_days)
+
+                for day_str, day_offset in _iter_date_span_with_offset(
+                    period.get("start_date"), period.get("end_date")
+                ):
+                    s_val = s_base + (1 if day_offset < s_rem else 0)
+                    p_val = p_base + (1 if day_offset < p_rem else 0) if not is_pct_format else 0
+                    _add_daily_activity(day_str, pages=p_val, seconds=s_val)
 
     unique_dates = set(daily_activity)
     reading_days = len(unique_dates)
@@ -6303,22 +6954,17 @@ def book_detail(book_id: str):
 def book_cover(book_id: str):
     db = get_db()
 
-    # First try a lightweight hash-only check for conditional requests
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)
-        ).fetchone()
-        if hash_row and hash_row["cover_hash"] and hash_row["cover_hash"] == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"{hash_row["cover_hash"]}"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute("SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)).fetchone()
     if not row:
         abort(404)
     cover_hash = row["cover_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and etag_from_client == cover_hash:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
 
     # Serve from filesystem
     img_path = _cover_path(book_id)
@@ -6346,25 +6992,24 @@ def book_cover_thumb(book_id: str):
     """Serve a thumbnail version of a book cover (300 px wide)."""
     db = get_db()
 
-    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
-    if etag_from_client:
-        hash_row = db.execute(
-            "SELECT cover_hash FROM books WHERE id = ? AND has_cover = 1", (book_id,)
-        ).fetchone()
-        if hash_row and hash_row["cover_hash"] and ("t-" + hash_row["cover_hash"]) == etag_from_client:
-            resp = make_response("", 304)
-            resp.headers["ETag"] = f'"t-{hash_row["cover_hash"]}"'
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-
     row = db.execute(
         "SELECT cover_thumb, cover_hash FROM books WHERE id = ? AND has_cover = 1",
         (book_id,),
     ).fetchone()
-    if not row or not row["cover_thumb"]:
+    if not row:
+        abort(404)
+    cover_hash = row["cover_hash"] or ""
+
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and ("t-" + cover_hash) == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"t-{cover_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if not row["cover_thumb"]:
         abort(404)
 
-    cover_hash = row["cover_hash"] or ""
     resp = make_response(row["cover_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"t-{cover_hash}"'
@@ -6481,6 +7126,7 @@ def add_word(book_id: str):
         abort(404)
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    synonyms = request.form.get("synonyms", "").strip()
     translation = request.form.get("translation", "").strip()
     translation_language = request.form.get("translation_language", "").strip()
     if not translation:
@@ -6490,8 +7136,8 @@ def add_word(book_id: str):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
         db.execute(
-            "INSERT INTO words (book_id, word, definition, translation, translation_language) VALUES (?, ?, ?, ?, ?)",
-            (book_id, word, definition, translation, translation_language),
+            "INSERT INTO words (book_id, word, definition, synonyms, translation, translation_language) VALUES (?, ?, ?, ?, ?, ?)",
+            (book_id, word, definition, synonyms, translation, translation_language),
         )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
@@ -6502,6 +7148,7 @@ def edit_word(book_id: str, wid: int):
     db = get_db()
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
+    synonyms = request.form.get("synonyms", "").strip()
     translation = request.form.get("translation", "").strip()
     translation_language = request.form.get("translation_language", "").strip()
     if not translation:
@@ -6511,8 +7158,8 @@ def edit_word(book_id: str, wid: int):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
     if word:
         db.execute(
-            "UPDATE words SET word = ?, definition = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
-            (word, definition, translation, translation_language, wid, book_id),
+            "UPDATE words SET word = ?, definition = ?, synonyms = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
+            (word, definition, synonyms, translation, translation_language, wid, book_id),
         )
         db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
@@ -7427,32 +8074,44 @@ def sources_list():
     """Sources management page."""
     db = get_db()
     sources = [dict(r) for r in db.execute("SELECT * FROM sources ORDER BY name").fetchall()]
-    return render_template("sources.html", sources=sources, source_types=SOURCE_TYPES)
+    source_sections, source_map_points, source_map_missing_count = _prepare_source_directory_rows(sources)
+    return render_template(
+        "sources.html",
+        sources=sources,
+        source_types=SOURCE_TYPES,
+        place_source_types=sorted(PLACE_SOURCE_TYPES),
+        source_sections=source_sections,
+        source_map_points=source_map_points,
+        source_map_missing_count=source_map_missing_count,
+    )
 
 
 @app.route("/sources/add", methods=["POST"])
 def add_source():
     db = get_db()
-    name = request.form.get("name", "").strip()
-    short_name = request.form.get("short_name", "").strip()
-    if not name:
-        flash("Source name is required.", "error")
+    source_type = request.form.get("source_type", "").strip()
+    payload, error = _clean_source_place_fields(request.form, source_type)
+    if error:
+        flash(error, "error")
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, short_name, location, url, notes) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
-            request.form.get("source_type", "").strip(),
-            name,
-            short_name or name,
-            request.form.get("location", "").strip(),
-            request.form.get("url", "").strip(),
-            request.form.get("notes", "").strip(),
+            payload["source_type"],
+            payload["name"],
+            payload["location"],
+            payload["address"],
+            payload["latitude"],
+            payload["longitude"],
+            payload["is_permanently_closed"],
+            payload["url"],
+            payload["notes"],
         ),
     )
     db.commit()
-    flash(f"Source '{name}' added.", "success")
+    flash(f"Source '{payload['name']}' added.", "success")
     return redirect(url_for("sources_list"))
 
 
@@ -7463,17 +8122,27 @@ def edit_source(source_id: str):
     if not row:
         abort(404)
 
-    name = request.form.get("name", "").strip()
-    short_name = request.form.get("short_name", "").strip() or name
+    source_type = request.form.get("source_type", "").strip()
+    payload, error = _clean_source_place_fields(request.form, source_type)
+    if error:
+        flash(error, "error")
+        return redirect(url_for("sources_list"))
+
     db.execute("""
-        UPDATE sources SET type=?, name=?, short_name=?, location=?, url=?, notes=?
+        UPDATE sources
+        SET type=?, name=?, location=?, address=?, latitude=?, longitude=?,
+            is_permanently_closed=?, url=?, notes=?
         WHERE id=?
     """, (
-        request.form.get("source_type", "").strip(),
-        name, short_name,
-        request.form.get("location", "").strip(),
-        request.form.get("url", "").strip(),
-        request.form.get("notes", "").strip(),
+        payload["source_type"],
+        payload["name"],
+        payload["location"],
+        payload["address"],
+        payload["latitude"],
+        payload["longitude"],
+        payload["is_permanently_closed"],
+        payload["url"],
+        payload["notes"],
         source_id,
     ))
     db.commit()

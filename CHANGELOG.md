@@ -5,7 +5,29 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] — 2026-07-11
+
+### Added
+- Book word annotations now support synonyms, allowing users to enter synonyms when adding or editing a word, displaying them between the definition and translation on both the book detail page and the dashboard's Word of the Day spotlight
+- Wishlist book status for books you want to buy, including form/filter support, badge and chart styling, and a dashboard cover shelf so planned purchases stay visible
+- Global stats now include clickable Time Read and Authors Read yearly charts with new `/stats/year/<year>/time` and `/stats/year/<year>/authors` detail pages that reuse the Library card-view layout; both pages show value-only badges (time in `h m s`, reading days, book/author count) without label prefixes, and the Authors Read page adds persisted sort/order controls
+- Edit Author Details page now shows sections in the order: Life Details, Biography, Photo, Identity
+- "Generate Infographic" button at the bottom of the Books Finished in YYYY page exports a PNG image with a dark-themed layout showing all book covers in an auto-fitted grid, the year, stat badges (book count, pages read, reading days, hours read), per-book rating pill styled like the Library card-view badge with a `#e3bc37` star fill, yellow border, and blue score text, the Librarium version in the footer, and an accent separator; the modal can now infer height from width when the user specifies books per row, persists that books-per-row preference, honors that explicit row width before downloading, and now uses the active app language for exported labels
+- Sources now support place-specific metadata for physical stores and library sources, including address, permanent-closure status, and map coordinates; the Sources tab keeps a single-table layout sorted by name, now shows source names with their locations in parentheses, greys out permanently closed source names instead of showing a badge, reduces the details column to address-or-URL-only content with the map-focus icon next to the address, hides the notes column, plots coordinate-backed places on an interactive map with source-type-colored markers whose closed places use muted greyed variants, keeps the map beneath the sticky top menu, and appends source locations inside source dropdown labels before the source type when a location is available
+
+### Changed
+- Database queries and thumbnail endpoints (`book_cover_thumb` and `author_photo_thumb`) optimized to retrieve both the hash and thumbnail BLOB in a single database hit, preventing redundant SQL executions and speeding up page load times on thumbnail grids
+- Period-to-day conversion helper `_build_yearly_book_activity` and `_collect_activity_events` optimized to resolve spans and compute page/second distributions concurrently in a single date-parsing pass
+- Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty
+- Authors tab cards now use the same cover-card layout as the Authors Read in YYYY page, with a single "N books" badge and no pen-name line; author card images use a 4:5 portrait aspect ratio
+- Versioning paradigm updated: `APP_VERSION` and `package.json` are now bumped to `x.y.z-beta` as soon as the Unreleased changelog section contains any entry (minor bump for `Added`/`Changed`, patch bump for `Fixed`/`Removed` only); the beta suffix is stripped when a release is cut
+- Dashboard rows now render in the order: Recent Activity / Last Books Acquired / Top Rated, Author Spotlight / Records, Format & Source / Languages, then full-width Wishlist, full-width To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
+- Dashboard's Last Books Acquired shelf now merges owned, gifted, and borrowed books and shows the acquisition date plus lender/source details for borrowed entries
+- Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, sort changes now update the shelf in place without reloading or resetting the page scroll, and both the Wishlist and TBR cover rows now show as many books as fit their current width without clipping
+- Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
+
+### Fixed
+- Borrowed-book acquisitions now appear in the Dashboard Recent Activity feed and Calendar events, and calendar year navigation now includes years that only have borrowed-book dates
 
 ## [2.0.0] — 2026-04-19
 
