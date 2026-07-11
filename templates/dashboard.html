@@ -512,41 +512,35 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Wishlist + TBR Pile                                                    -->
+<!-- Wishlist / TBR Pile                                                    -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% set collection_row_count = (1 if wishlist_count > 0 else 0) + (1 if not_started_count > 0 else 0) %}
-{% if collection_row_count > 0 %}
-{% set collection_row_class = 'dash-two-col' if collection_row_count == 2 else 'dash-single-col' %}
-<div class="{{ collection_row_class }}">
-    {% if wishlist_count > 0 %}
-    <div class="dash-section">
-        <h2 class="dash-heading" data-i18n="dash.wishlistPile">Wishlist</h2>
-        <div class="card">
-            <div class="card-body">
-                <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
-                    <strong>{{ wishlist_count }}</strong> <span data-i18n="dash.booksToBuy">books you want to buy</span>
-                </p>
-                <div class="dash-tbr-covers" id="dashWishlistCovers">
-                    {% for book in wishlist_list %}
-                    <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
-                        {% if book.has_cover %}
-                        <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
-                    {% else %}
-                        <div class="cover-placeholder" style="width:100%;height:100%;">📚</div>
-                    {% endif %}
-                    </a>
-                    {% endfor %}
-                </div>
+{% if wishlist_count > 0 %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.wishlistPile">Wishlist</h2>
+    <div class="card">
+        <div class="card-body">
+            <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--lb-text-light);">
+                <strong>{{ wishlist_count }}</strong> <span data-i18n="dash.booksToBuy">books you want to buy</span>
+            </p>
+            <div class="dash-tbr-covers" id="dashWishlistCovers">
+                {% for book in wishlist_list %}
+                <a href="{{ url_for('book_detail', book_id=book.id) }}" class="dash-tbr-item" title="{{ book.name }}">
+                    {% if book.has_cover %}
+                    <img src="{{ url_for('book_cover_thumb', book_id=book.id) }}?v={{ book.cover_hash }}" alt="{{ book.name }}" loading="lazy">
+                {% else %}
+                    <div class="cover-placeholder" style="width:100%;height:100%;">📚</div>
+                {% endif %}
+                </a>
+                {% endfor %}
             </div>
         </div>
     </div>
-    {% endif %}
-
-    <!-- TBR Pile -->
-    {% if not_started_count > 0 %}
-    {% include "_dashboard_tbr_section.html" %}
-    {% endif %}
 </div>
+{% endif %}
+
+<!-- TBR Pile -->
+{% if not_started_count > 0 %}
+{% include "_dashboard_tbr_section.html" %}
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -757,6 +751,9 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
             bindTbrSelect();
             if (window.librariumI18n && typeof window.librariumI18n.apply === 'function') {
                 window.librariumI18n.apply();
+            }
+            if (typeof window.fitDashboardCoverStrips === 'function') {
+                window.fitDashboardCoverStrips(nextSection);
             }
             localStorage.setItem(storageKey, value);
             history.replaceState(null, '', buildTbrUrl(value, false));
@@ -1036,19 +1033,51 @@ makeDonut('sourceDonut', sourceCounts);
 // Dashboard cover strips dynamic sizing
 // ═══════════════════════════════════════════════════════════════════════════
 (function() {
-    document.querySelectorAll('.dash-tbr-covers').forEach(function(container) {
-        const items = Array.from(container.children);
-        if (items.length === 0) return;
-        function fitStrip() {
-            const containerWidth = container.offsetWidth;
-            const itemWidth = 60 + 8; // width + gap
-            const maxVisible = Math.max(1, Math.floor(containerWidth / itemWidth));
-            items.forEach(function(item, i) {
-                item.style.display = i < maxVisible ? '' : 'none';
-            });
+    var resizeToken = null;
+
+    function fitStrip(container) {
+        var items = Array.from(container.querySelectorAll('.dash-tbr-item'));
+        if (items.length === 0) {
+            return;
         }
-        fitStrip();
-        window.addEventListener('resize', fitStrip);
+
+        items.forEach(function(item) {
+            item.hidden = false;
+        });
+
+        var firstItem = items[0];
+        var itemWidth = firstItem.getBoundingClientRect().width || firstItem.offsetWidth || 60;
+        var containerStyles = window.getComputedStyle(container);
+        var gapValue = containerStyles.columnGap;
+        if (!gapValue || gapValue === 'normal') {
+            gapValue = containerStyles.gap;
+        }
+        var gap = parseFloat(gapValue) || 0;
+        var containerWidth = container.clientWidth || container.getBoundingClientRect().width;
+        var itemStride = itemWidth + gap;
+        var maxVisible = itemStride > 0 ? Math.floor((containerWidth + gap) / itemStride) : items.length;
+
+        maxVisible = Math.max(1, Math.min(items.length, maxVisible));
+        items.forEach(function(item, index) {
+            item.hidden = index >= maxVisible;
+        });
+    }
+
+    window.fitDashboardCoverStrips = function(root) {
+        (root || document).querySelectorAll('.dash-tbr-covers').forEach(function(container) {
+            fitStrip(container);
+        });
+    };
+
+    window.fitDashboardCoverStrips(document);
+    window.addEventListener('resize', function() {
+        if (resizeToken !== null) {
+            window.cancelAnimationFrame(resizeToken);
+        }
+        resizeToken = window.requestAnimationFrame(function() {
+            resizeToken = null;
+            window.fitDashboardCoverStrips(document);
+        });
     });
 })();
 </script>

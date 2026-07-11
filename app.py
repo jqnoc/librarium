@@ -4045,6 +4045,7 @@ def dashboard():
     series_progress = series_progress[:8]
 
     # ── TBR (not-started) pile ───────────────────────────────────────────
+    cover_strip_limit = 60
     tbr_sort = (request.args.get("tbr_sort") or "random").strip()
     acquisition_date_expr = "COALESCE(NULLIF(borrowed_start, ''), NULLIF(purchase_date, ''), '0001-01-01')"
     tbr_sort_map = {
@@ -4057,7 +4058,7 @@ def dashboard():
     tbr_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'not-started' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY {tbr_sort_map[tbr_sort]} LIMIT 15", lp
+        f"ORDER BY {tbr_sort_map[tbr_sort]} LIMIT {cover_strip_limit}", lp
     ).fetchall()
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
@@ -4074,7 +4075,7 @@ def dashboard():
     wishlist_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'wishlist' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY RANDOM() LIMIT 15", lp
+        f"ORDER BY RANDOM() LIMIT {cover_strip_limit}", lp
     ).fetchall()
     wishlist_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                       "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in wishlist_books]

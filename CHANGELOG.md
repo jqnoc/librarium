@@ -5,7 +5,7 @@ All notable changes to Librarium will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] — 2026-07-11
 
 ### Added
 - Book word annotations now support synonyms, allowing users to enter synonyms when adding or editing a word, displaying them between the definition and translation on both the book detail page and the dashboard's Word of the Day spotlight
@@ -21,9 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sources now use a single `name` field across the schema, management page, and book acquisition forms; the legacy `short_name` column is migrated away and existing rows fall back to it only if `name` was empty
 - Authors tab cards now use the same cover-card layout as the Authors Read in YYYY page, with a single "N books" badge and no pen-name line; author card images use a 4:5 portrait aspect ratio
 - Versioning paradigm updated: `APP_VERSION` and `package.json` are now bumped to `x.y.z-beta` as soon as the Unreleased changelog section contains any entry (minor bump for `Added`/`Changed`, patch bump for `Fixed`/`Removed` only); the beta suffix is stripped when a release is cut
-- Dashboard rows now render in the order: Recent Activity / Last Books Acquired / Top Rated, Author Spotlight / Records, Format & Source / Languages, Wishlist / To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
+- Dashboard rows now render in the order: Recent Activity / Last Books Acquired / Top Rated, Author Spotlight / Records, Format & Source / Languages, then full-width Wishlist, full-width To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
 - Dashboard's Last Books Acquired shelf now merges owned, gifted, and borrowed books and shows the acquisition date plus lender/source details for borrowed entries
-- Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, and sort changes now update the shelf in place without reloading or resetting the page scroll
+- Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, sort changes now update the shelf in place without reloading or resetting the page scroll, and both the Wishlist and TBR cover rows now show as many books as fit their current width without clipping
 - Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
 
 ### Fixed
