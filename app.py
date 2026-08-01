@@ -83,6 +83,95 @@ DB_PATH = DATA_DIR / "librarium.db"
 
 APP_VERSION = "2.2.0-beta"
 
+TAXONOMY_FIELDS = (
+    {
+        "field": "genres",
+        "filter_param": "genre",
+        "label": "Genres",
+        "label_key": "bookForm.genres",
+        "placeholder": "Add a genre",
+        "placeholder_key": "bookForm.addGenre",
+        "cloud_key": "dash.genreCloud",
+        "csv_label": "Genre",
+        "missing_key": "dash.noGenres",
+        "missing_label": "books without genres",
+    },
+    {
+        "field": "themes",
+        "filter_param": "theme",
+        "label": "Themes",
+        "label_key": "bookForm.themes",
+        "placeholder": "Add a theme",
+        "placeholder_key": "bookForm.addTheme",
+        "cloud_key": "dash.themeCloud",
+        "csv_label": "Theme",
+        "missing_key": "dash.noThemes",
+        "missing_label": "books without themes",
+    },
+    {
+        "field": "settings",
+        "filter_param": "setting",
+        "label": "Settings",
+        "label_key": "bookForm.settings",
+        "placeholder": "Add a setting",
+        "placeholder_key": "bookForm.addSetting",
+        "cloud_key": "dash.settingCloud",
+        "csv_label": "Setting",
+        "missing_key": "dash.noSettings",
+        "missing_label": "books without settings",
+    },
+    {
+        "field": "historical_periods",
+        "filter_param": "historical_period",
+        "label": "Historical Periods",
+        "label_key": "bookForm.historicalPeriods",
+        "placeholder": "Add a historical period",
+        "placeholder_key": "bookForm.addHistoricalPeriod",
+        "cloud_key": "dash.historicalPeriodCloud",
+        "csv_label": "Historical Period",
+        "missing_key": "dash.noHistoricalPeriods",
+        "missing_label": "books without historical periods",
+    },
+    {
+        "field": "subjects",
+        "filter_param": "subject",
+        "label": "Subjects",
+        "label_key": "bookForm.subjects",
+        "placeholder": "Add a subject",
+        "placeholder_key": "bookForm.addSubject",
+        "cloud_key": "dash.subjectCloud",
+        "csv_label": "Subject",
+        "missing_key": "dash.noSubjects",
+        "missing_label": "books without subjects",
+    },
+    {
+        "field": "audiences",
+        "filter_param": "audience",
+        "label": "Audiences",
+        "label_key": "bookForm.audiences",
+        "placeholder": "Add an audience",
+        "placeholder_key": "bookForm.addAudience",
+        "cloud_key": "dash.audienceCloud",
+        "csv_label": "Audience",
+        "missing_key": "dash.noAudiences",
+        "missing_label": "books without audiences",
+    },
+    {
+        "field": "forms",
+        "filter_param": "form",
+        "label": "Forms",
+        "label_key": "bookForm.forms",
+        "placeholder": "Add a form",
+        "placeholder_key": "bookForm.addForm",
+        "cloud_key": "dash.formCloud",
+        "csv_label": "Form",
+        "missing_key": "dash.noForms",
+        "missing_label": "books without forms",
+    },
+)
+TAXONOMY_FIELD_NAMES = tuple(item["field"] for item in TAXONOMY_FIELDS)
+TAXONOMY_FIELDS_BY_NAME = {item["field"]: item for item in TAXONOMY_FIELDS}
+
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
 
@@ -894,7 +983,13 @@ def init_schema() -> None:
             total_time_seconds        INTEGER DEFAULT NULL,
             cover_thumb               BLOB    DEFAULT NULL,
             tags                      TEXT    NOT NULL DEFAULT '',
-            genres                    TEXT    NOT NULL DEFAULT ''
+            genres                    TEXT    NOT NULL DEFAULT '',
+            themes                    TEXT    NOT NULL DEFAULT '',
+            settings                  TEXT    NOT NULL DEFAULT '',
+            historical_periods        TEXT    NOT NULL DEFAULT '',
+            subjects                  TEXT    NOT NULL DEFAULT '',
+            audiences                 TEXT    NOT NULL DEFAULT '',
+            forms                     TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS authors (
@@ -1022,6 +1117,7 @@ def _run_all_migrations() -> None:
     migrate_remove_source_short_name()
     migrate_add_source_place_details()
     migrate_add_genres()
+    migrate_add_taxonomy_fields()
     migrate_add_contributor_fields()
 
 
@@ -1720,6 +1816,38 @@ def migrate_add_genres() -> None:
     db.commit()
     db.close()
     print(">> Migration complete - genres column added to books.")
+
+
+# ── Migration: Add taxonomy classification columns ──────────────────────
+def migrate_add_taxonomy_fields() -> None:
+    """Add taxonomy fields and preserve existing tags as themes once."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    themes_was_missing = "themes" not in cols
+    added_columns: list[str] = []
+
+    for column in TAXONOMY_FIELD_NAMES:
+        if column == "genres" or column in cols:
+            continue
+        db.execute(f"ALTER TABLE books ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        added_columns.append(column)
+
+    if themes_was_missing:
+        db.execute("""
+            UPDATE books
+            SET themes = tags
+            WHERE (themes IS NULL OR TRIM(themes) = '')
+              AND tags IS NOT NULL
+              AND TRIM(tags) != ''
+        """)
+
+    if added_columns:
+        db.commit()
+        print(">> Migration complete - taxonomy classification fields added.")
+    db.close()
 
 
 # ── Migration: Rename and extend contributor fields ─────────────────────
@@ -3455,6 +3583,33 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     return {f: sorted(vals) for f, vals in buckets.items()}
 
 
+def _split_taxonomy_values(raw: str | None) -> list[str]:
+    """Return distinct, non-empty taxonomy values while preserving their wording."""
+    values: list[str] = []
+    seen: set[str] = set()
+    for part in (raw or "").split(";"):
+        value = part.strip()
+        if value and value not in seen:
+            seen.add(value)
+            values.append(value)
+    return values
+
+
+def _build_taxonomy_audit(books: list[dict]) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, list[str]]]]:
+    """Aggregate taxonomy values and the primary-book titles that use them."""
+    counts = {field: {} for field in TAXONOMY_FIELD_NAMES}
+    titles = {field: {} for field in TAXONOMY_FIELD_NAMES}
+
+    for book in books:
+        title = book.get("name", "")
+        for field in TAXONOMY_FIELD_NAMES:
+            for value in _split_taxonomy_values(book.get(field)):
+                counts[field][value] = counts[field].get(value, 0) + 1
+                titles[field].setdefault(value, []).append(title)
+
+    return counts, titles
+
+
 # ── Edition helpers ──────────────────────────────────────────────────────
 def _get_work_id(book: dict) -> str:
     """Return the effective work ID for a book (its work_id or its own id if standalone)."""
@@ -3629,10 +3784,11 @@ def _build_index_per_reading(db, lib_ids):
             (reading > abandoned > not-started > wishlist > draft)
     """
     lf, lp = _lib_filter(lib_ids)
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
     book_rows = db.execute(
         f"SELECT id, name, subtitle, author, status, pages, starting_page, "
         f"has_cover, cover_hash, publisher, language, publication_date, "
-        f"work_id, format, total_time_seconds, tags, genres FROM books WHERE {lf}",
+        f"work_id, format, total_time_seconds, tags, {taxonomy_columns} FROM books WHERE {lf}",
         lp,
     ).fetchall()
     bk_map = {r["id"]: dict(r) for r in book_rows}
@@ -3778,7 +3934,7 @@ def _build_index_per_reading(db, lib_ids):
             "edition_count": edition_count,
             "reading_number": rnum,
             "tags": bk.get("tags", "") or "",
-            "genres": bk.get("genres", "") or "",
+            **{field: bk.get(field, "") or "" for field in TAXONOMY_FIELD_NAMES},
         })
 
     # Only show reading_number when a book appears more than once
@@ -3813,12 +3969,13 @@ def dashboard():
     prev_year = str(today.year - 1)
     prev_year_start = f"{prev_year}-01-01"
     same_day_prev_year = f"{prev_year}-{today_str[5:]}"
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
 
     primary_books = [
         dict(row)
         for row in db.execute(
             "SELECT id, name, author, pages, starting_page, status, source_type, work_id, "
-            "has_cover, cover_hash, format, tags, genres, language, is_gift "
+            f"has_cover, cover_hash, format, {taxonomy_columns}, language, is_gift "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
         ).fetchall()
@@ -3835,10 +3992,6 @@ def dashboard():
     wishlist_count = 0
     format_counts: dict[str, int] = Counter()
     source_counts: dict[str, int] = Counter()
-    tag_counts: dict[str, int] = Counter()
-    genre_counts: dict[str, int] = Counter()
-    tag_books: dict[str, list[str]] = {}
-    genre_books: dict[str, list[str]] = {}
     author_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     rated_values: list[float] = []
@@ -3871,23 +4024,6 @@ def dashboard():
 
         if br["language"]:
             language_counts[br["language"]] += 1
-
-        if br["tags"]:
-            seen_tags = set()
-            for tag in br["tags"].split(";"):
-                tag = tag.strip()
-                if tag and tag not in seen_tags:
-                    seen_tags.add(tag)
-                    tag_counts[tag] += 1
-                    tag_books.setdefault(tag, []).append(br["name"])
-        if br["genres"]:
-            seen_genres = set()
-            for genre in br["genres"].split(";"):
-                genre = genre.strip()
-                if genre and genre not in seen_genres:
-                    seen_genres.add(genre)
-                    genre_counts[genre] += 1
-                    genre_books.setdefault(genre, []).append(br["name"])
 
         avg_value = avg_ratings.get(br["id"])
         if avg_value is not None and avg_value > 0:
@@ -4113,8 +4249,21 @@ def dashboard():
             most_reread = {"name": rbk["name"], "id": rbk["id"], "count": reread_row["cnt"],
                            "has_cover": bool(rbk["has_cover"]), "cover_hash": rbk["cover_hash"] or ""}
 
-    top_genres = dict(Counter(genre_counts).most_common(20))
-    top_tags = dict(Counter(tag_counts).most_common(20))
+    taxonomy_counts, taxonomy_books = _build_taxonomy_audit(primary_books)
+    taxonomy_clouds = []
+    taxonomy_audit = []
+    for taxonomy_field in TAXONOMY_FIELDS:
+        field = taxonomy_field["field"]
+        counts = taxonomy_counts[field]
+        top_counts = dict(sorted(
+            counts.items(), key=lambda item: (-item[1], item[0].casefold())
+        )[:20])
+        taxonomy_clouds.append({**taxonomy_field, "top_counts": top_counts})
+        taxonomy_audit.append({
+            "type": taxonomy_field["csv_label"],
+            "counts": counts,
+            "books": taxonomy_books[field],
+        })
 
     # ── Series progress ──────────────────────────────────────────────────
     series_progress = []
@@ -4218,10 +4367,15 @@ def dashboard():
     authors_without_photo = db.execute(
         "SELECT COUNT(*) FROM authors WHERE (has_photo IS NULL OR has_photo = 0) AND name != 'Anonymous'"
     ).fetchone()[0]
-    books_without_tags = db.execute(
-        f"SELECT COUNT(*) FROM books WHERE {lf} AND (tags IS NULL OR tags = '') "
-        f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
-    ).fetchone()[0]
+    taxonomy_missing_counts = {}
+    for taxonomy_field in TAXONOMY_FIELDS:
+        field = taxonomy_field["field"]
+        taxonomy_missing_counts[field] = db.execute(
+            f"SELECT COUNT(*) FROM books WHERE {lf} "
+            f"AND TRIM(COALESCE({field}, '')) = '' "
+            f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
+        ).fetchone()[0]
+    has_taxonomy_gaps = any(taxonomy_missing_counts.values())
     abandoned_count = db.execute(
         f"SELECT COUNT(*) FROM books WHERE {lf} AND status = 'abandoned' "
         f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
@@ -4303,13 +4457,10 @@ def dashboard():
         # Format & source
         format_counts=dict(format_counts),
         source_counts=dict(source_counts),
-        # Genres & tags
-        top_genres=top_genres,
-        top_tags=top_tags,
-        all_genres=dict(genre_counts),
-        all_tags=dict(tag_counts),
-        all_genre_books=genre_books,
-        all_tag_books=tag_books,
+        # Taxonomy audit
+        taxonomy_fields=TAXONOMY_FIELDS,
+        taxonomy_clouds=taxonomy_clouds,
+        taxonomy_audit=taxonomy_audit,
         # Series
         series_progress=series_progress,
         # TBR
@@ -4325,7 +4476,8 @@ def dashboard():
         books_without_cover=books_without_cover,
         finished_unrated=finished_unrated,
         authors_without_photo=authors_without_photo,
-        books_without_tags=books_without_tags,
+        taxonomy_missing_counts=taxonomy_missing_counts,
+        has_taxonomy_gaps=has_taxonomy_gaps,
         abandoned_count=abandoned_count,
         books_without_pages=books_without_pages,
         books_without_summary=books_without_summary,
@@ -4354,7 +4506,15 @@ def index():
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_show_editions", "0")
     show_readings = request.args.get("show_readings") or request.cookies.get("librarium_show_readings", "0")
     tag_filter = request.args.get("tag", "").strip()
-    genre_filter = request.args.get("genre", "").strip()
+    taxonomy_filter = None
+    for taxonomy_field in TAXONOMY_FIELDS:
+        value = request.args.get(taxonomy_field["filter_param"], "").strip()
+        if value:
+            taxonomy_filter = {**taxonomy_field, "value": value}
+            break
+    missing_taxonomy = TAXONOMY_FIELDS_BY_NAME.get(
+        request.args.get("missing_taxonomy", "").strip()
+    )
     if show_editions != "1":
         show_readings = "0"
 
@@ -4362,6 +4522,7 @@ def index():
         books = _build_index_per_reading(db, lib_ids)
     else:
         lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+        taxonomy_columns = ", ".join(f"b.{field}" for field in TAXONOMY_FIELD_NAMES)
         edition_filter = " AND (b.work_id IS NULL OR b.is_primary_edition = 1)" if show_editions != "1" else ""
         rows = db.execute(f"""
         SELECT
@@ -4381,7 +4542,7 @@ def index():
             b.format,
             b.total_time_seconds,
             b.tags,
-            b.genres,
+            {taxonomy_columns},
             COALESCE(sess.total_pages, 0)   AS session_pages,
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
@@ -4516,7 +4677,7 @@ def index():
                 "edition_count": edition_count,
                 "reading_number": None,
                 "tags": r["tags"] or "",
-                "genres": r["genres"] or "",
+                **{field: r[field] or "" for field in TAXONOMY_FIELD_NAMES},
             })
 
     # Sorting helpers
@@ -4551,9 +4712,16 @@ def index():
     if tag_filter:
         tag_lower = tag_filter.lower()
         books = [b for b in books if tag_lower in [t.strip().lower() for t in b.get("tags", "").split(";") if t.strip()]]
-    if genre_filter:
-        genre_lower = genre_filter.lower()
-        books = [b for b in books if genre_lower in [g.strip().lower() for g in b.get("genres", "").split(";") if g.strip()]]
+    if taxonomy_filter:
+        field = taxonomy_filter["field"]
+        value_lower = taxonomy_filter["value"].lower()
+        books = [
+            book for book in books
+            if value_lower in [value.lower() for value in _split_taxonomy_values(book.get(field))]
+        ]
+    if missing_taxonomy:
+        field = missing_taxonomy["field"]
+        books = [book for book in books if not (book.get(field) or "").strip()]
 
     if sort2 and sort2 != sort1:
         books.sort(key=lambda b: _sort_key_for(sort1, b) + _sort_key_for(sort2, b))
@@ -4569,7 +4737,8 @@ def index():
         show_editions=show_editions,
         show_readings=show_readings,
         tag_filter=tag_filter,
-        genre_filter=genre_filter,
+        taxonomy_filter=taxonomy_filter,
+        missing_taxonomy=missing_taxonomy,
     ))
     # Persist preferences in cookies (1 year expiry)
     resp.set_cookie("librarium_sort1", sort1, max_age=365*24*3600, samesite="Lax")
@@ -4834,7 +5003,7 @@ def global_stats():
     all_lib_books = [
         dict(row)
         for row in db.execute(
-            "SELECT id, name, status, tags, genres, language, original_language, pages, publisher, has_cover, cover_hash, author "
+            "SELECT id, name, status, genres, themes, language, original_language, pages, publisher, has_cover, cover_hash, author "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
         ).fetchall()
@@ -4842,10 +5011,8 @@ def global_stats():
     avg_ratings = _load_avg_ratings_for_books(db, [book["id"] for book in all_lib_books])
 
     status_counts: dict[str, int] = Counter()
-    tag_counts: dict[str, int] = Counter()
+    theme_counts: dict[str, int] = Counter()
     genre_counts: dict[str, int] = Counter()
-    tag_books: dict[str, list[str]] = {}
-    genre_books: dict[str, list[str]] = {}
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
     publisher_counts: dict[str, int] = Counter()
@@ -4856,22 +5023,10 @@ def global_stats():
 
     for bk in all_lib_books:
         status_counts[bk["status"] or "unknown"] += 1
-        if bk["tags"]:
-            seen_tags = set()
-            for t in bk["tags"].split(";"):
-                t = t.strip()
-                if t and t not in seen_tags:
-                    seen_tags.add(t)
-                    tag_counts[t] += 1
-                    tag_books.setdefault(t, []).append(bk["name"])
-        if bk["genres"]:
-            seen_genres = set()
-            for genre in bk["genres"].split(";"):
-                genre = genre.strip()
-                if genre and genre not in seen_genres:
-                    seen_genres.add(genre)
-                    genre_counts[genre] += 1
-                    genre_books.setdefault(genre, []).append(bk["name"])
+        for theme in _split_taxonomy_values(bk["themes"]):
+            theme_counts[theme] += 1
+        for genre in _split_taxonomy_values(bk["genres"]):
+            genre_counts[genre] += 1
         if bk["language"]:
             language_counts[bk["language"]] += 1
         else:
@@ -4917,9 +5072,7 @@ def global_stats():
     status_chart_clean = {k: v for k, v in status_chart.items() if str(k).strip().lower() != 'unknown'}
 
     genre_counts_clean = _remove_unknown(dict(genre_counts))
-    tag_counts_clean = _remove_unknown(dict(tag_counts))
-    genre_books_clean = _remove_unknown(dict(genre_books))
-    tag_books_clean = _remove_unknown(dict(tag_books))
+    theme_counts_clean = _remove_unknown(dict(theme_counts))
 
     # Prepare publisher chart data: show top N publishers and aggregate the rest as "Other" (computed from cleaned counts)
     TOP_PUBLISHERS_FOR_CHART = 20
@@ -4954,9 +5107,7 @@ def global_stats():
         bought_data=bought_data,
         status_chart=status_chart_clean,
         genre_counts=genre_counts_clean,
-        tag_counts=tag_counts_clean,
-        genre_books=genre_books_clean,
-        tag_books=tag_books_clean,
+        theme_counts=theme_counts_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
         publisher_counts=publisher_counts_clean,
@@ -7172,6 +7323,7 @@ def book_detail(book_id: str):
         editions=editions,
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
+        taxonomy_fields=TAXONOMY_FIELDS,
         quotes=[dict(r) for r in db.execute(
             "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
         ).fetchall()],
@@ -7612,7 +7764,7 @@ def edit_metadata(book_id: str):
         text_fields = (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genres", "tags",
+            "publication_date", "isbn", "publisher", *TAXONOMY_FIELD_NAMES,
             "summary", "translator", "illustrator", "editor",
             "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
@@ -7700,7 +7852,8 @@ def edit_metadata(book_id: str):
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
-                publisher=?, genres=?, tags=?, summary=?, translator=?, illustrator=?,
+                publisher=?, genres=?, themes=?, settings=?, historical_periods=?,
+                subjects=?, audiences=?, forms=?, tags=?, summary=?, translator=?, illustrator=?,
                 editor=?, foreword_author=?, epilogue_author=?, contributing_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
@@ -7713,7 +7866,9 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genres"], info["tags"], info["summary"],
+            info["publisher"], info["genres"], info["themes"], info["settings"],
+            info["historical_periods"], info["subjects"], info["audiences"], info["forms"],
+            info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["foreword_author"], info["epilogue_author"],
             info["contributing_author"], info["status"],
@@ -7766,7 +7921,7 @@ def edit_metadata(book_id: str):
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genres", "tags", "publisher",
+        "author", *TAXONOMY_FIELD_NAMES, "publisher",
         "translator", "illustrator", "editor", "foreword_author",
         "epilogue_author", "contributing_author",
     )
@@ -7795,6 +7950,7 @@ def edit_metadata(book_id: str):
                            languages=languages, suggestions=suggestions,
                            cover_palette=cover_palette,
                            all_series=all_series, book_series_entries=book_series_entries,
+                           taxonomy_fields=TAXONOMY_FIELDS,
                            is_secondary_edition=bool(info.get("work_id") and not info.get("is_primary_edition")))
 
 
@@ -8058,7 +8214,7 @@ def isbn_lookup():
         "pages": pages,
         "isbn": original_isbn,
         "publication_date": pub_date,
-        "tags": subjects,
+        "subjects": subjects,
         "cover_url": cover_url,
     }
     return jsonify(result)
@@ -8090,7 +8246,7 @@ def new_book():
         for field in (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "genres", "tags",
+            "publication_date", "isbn", "publisher", *TAXONOMY_FIELD_NAMES,
             "summary", "translator", "illustrator", "editor",
             "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
@@ -8212,7 +8368,7 @@ def new_book():
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["tags"], info["summary"],
+            info["publisher"], info.get("tags", ""), info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["foreword_author"], info["epilogue_author"],
             info["contributing_author"], info["status"],
@@ -8225,7 +8381,15 @@ def new_book():
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
-        db.execute("UPDATE books SET genres = ? WHERE id = ?", (info["genres"], book_id))
+        db.execute("""
+            UPDATE books
+            SET genres=?, themes=?, settings=?, historical_periods=?, subjects=?, audiences=?, forms=?
+            WHERE id=?
+        """, (
+            info["genres"], info["themes"], info["settings"],
+            info["historical_periods"], info["subjects"], info["audiences"], info["forms"],
+            book_id,
+        ))
 
         # Save full-size cover image to filesystem + Dropbox
         if _cover_blob_for_file:
@@ -8271,7 +8435,7 @@ def new_book():
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "genres", "tags", "publisher",
+        "author", *TAXONOMY_FIELD_NAMES, "publisher",
         "translator", "illustrator", "editor", "foreword_author",
         "epilogue_author", "contributing_author",
     )
@@ -8293,14 +8457,14 @@ def new_book():
         if primary:
             parent_book_name = primary.get("name", "")
             for f in ("author", "original_title", "original_language",
-                      "original_publication_date", "genres", "tags", "summary",
+                      "original_publication_date", *TAXONOMY_FIELD_NAMES, "summary",
                       "translator", "illustrator", "editor", "foreword_author",
                       "epilogue_author", "contributing_author"):
                 prefill[f] = primary.get(f, "")
 
     # Pre-fill from ISBN lookup (query params)
     for key in ("name", "subtitle", "author", "publisher", "isbn",
-                "publication_date", "genres", "tags", "pages", "cover_url"):
+                "publication_date", *TAXONOMY_FIELD_NAMES, "pages", "cover_url"):
         val = request.args.get(key, "").strip()
         if val and key not in prefill:
             prefill[key] = val
@@ -8313,6 +8477,7 @@ def new_book():
                            prefill=prefill,
                            parent_work_id=parent_work_id,
                            parent_book_name=parent_book_name,
+                           taxonomy_fields=TAXONOMY_FIELDS,
                            default_library_id=lib_ids[0] if lib_ids else 1)
 
 

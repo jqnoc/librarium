@@ -597,7 +597,7 @@ function toggleDashboardWordEdit(wordId) {
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Library Health                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% if books_without_cover > 0 or finished_unrated > 0 or authors_without_photo > 0 or books_without_tags > 0 or abandoned_count > 0 or books_without_pages > 0 or books_without_summary > 0 or books_without_author > 0 %}
+{% if books_without_cover > 0 or finished_unrated > 0 or authors_without_photo > 0 or has_taxonomy_gaps or abandoned_count > 0 or books_without_pages > 0 or books_without_summary > 0 or books_without_author > 0 %}
 <div class="dash-section">
     <h2 class="dash-heading" data-i18n="dash.libraryHealth">Library Health</h2>
     <div class="dash-health-row">
@@ -619,12 +619,14 @@ function toggleDashboardWordEdit(wordId) {
             <span><strong>{{ authors_without_photo }}</strong> <span data-i18n="dash.noPhoto">authors without photo</span></span>
         </div>
         {% endif %}
-        {% if books_without_tags > 0 %}
-        <div class="dash-health-card">
-            <span class="dash-health-icon">🏷️</span>
-            <span><strong>{{ books_without_tags }}</strong> <span data-i18n="dash.noTags">books without tags</span></span>
-        </div>
+        {% for taxonomy_field in taxonomy_fields %}
+        {% set missing_count = taxonomy_missing_counts.get(taxonomy_field.field, 0) %}
+        {% if missing_count > 0 %}
+        <a class="dash-health-card dash-health-card-link" href="{{ url_for('index', missing_taxonomy=taxonomy_field.field) }}">
+            <span><strong>{{ missing_count }}</strong> <span data-i18n="{{ taxonomy_field.missing_key }}">{{ taxonomy_field.missing_label }}</span></span>
+        </a>
         {% endif %}
+        {% endfor %}
         {% if abandoned_count > 0 %}
         <div class="dash-health-card">
             <span class="dash-health-icon">🚪</span>
@@ -654,45 +656,31 @@ function toggleDashboardWordEdit(wordId) {
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Genre Cloud                                                            -->
+<!-- Taxonomy Audit                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% if top_genres %}
 <div class="dash-section">
-    <h2 class="dash-heading" data-i18n="dash.genreCloud">Genre Cloud</h2>
-    <div class="card">
-        <div class="card-body">
-            <div id="dashGenreCloud" class="word-cloud"></div>
-            <div class="cloud-export-actions">
-                <button type="button" class="btn btn-secondary btn-sm"
-                        onclick="downloadTermList('genres', allGenres, allGenreBooks)"
-                        data-i18n-title="dash.downloadGenresTitle">
-                    <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadGenres">Download all genres</span>
-                </button>
+    <div class="dash-taxonomy-heading">
+        <h2 class="dash-heading" data-i18n="dash.taxonomyAudit">Taxonomy Audit</h2>
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="downloadTaxonomyAudit(taxonomyAudit)"
+                data-i18n-title="dash.downloadTaxonomyAuditTitle">
+            <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTaxonomyAudit">Download taxonomy audit</span>
+        </button>
+    </div>
+    <div class="dash-taxonomy-cloud-grid">
+        {% for taxonomy_cloud in taxonomy_clouds %}
+        <div class="card">
+            <div class="card-body">
+                <h3 class="dash-taxonomy-cloud-title" data-i18n="{{ taxonomy_cloud.cloud_key }}">{{ taxonomy_cloud.csv_label }} Cloud</h3>
+                <div id="dash-{{ taxonomy_cloud.field }}-cloud" class="word-cloud"></div>
+                {% if not taxonomy_cloud.top_counts %}
+                <p class="dash-taxonomy-empty" data-i18n="dash.noTaxonomyValues">No values yet.</p>
+                {% endif %}
             </div>
         </div>
+        {% endfor %}
     </div>
 </div>
-{% endif %}
-
-<!-- Tag Cloud                                                              -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-{% if top_tags %}
-<div class="dash-section">
-    <h2 class="dash-heading" data-i18n="dash.tagCloud">Tag Cloud</h2>
-    <div class="card">
-        <div class="card-body">
-            <div id="dashTagCloud" class="word-cloud"></div>
-            <div class="cloud-export-actions">
-                <button type="button" class="btn btn-secondary btn-sm"
-                        onclick="downloadTermList('tags', allTags, allTagBooks)"
-                        data-i18n-title="dash.downloadTagsTitle">
-                    <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTags">Download all tags</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 {% endblock %}
 
@@ -707,12 +695,7 @@ const readingBooks  = {{ reading_books | tojson }};
 const formatCounts  = {{ format_counts | tojson }};
 const sourceCounts  = {{ source_counts | tojson }};
 {% if language_counts %}const languageCounts = {{ language_counts | tojson }};{% endif %}
-{% if top_genres %}const topGenres = {{ top_genres | tojson }};{% endif %}
-{% if top_tags %}const topTags = {{ top_tags | tojson }};{% endif %}
-const allGenres = {{ all_genres | tojson }};
-const allTags = {{ all_tags | tojson }};
-const allGenreBooks = {{ all_genre_books | tojson }};
-const allTagBooks = {{ all_tag_books | tojson }};
+const taxonomyAudit = {{ taxonomy_audit | tojson }};
 
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
@@ -1124,8 +1107,9 @@ function renderDashboardCloud(containerId, counts, filterKey) {
         container.appendChild(a);
     });
 }
-{% if top_genres %}renderDashboardCloud('dashGenreCloud', topGenres, 'genre');{% endif %}
-{% if top_tags %}renderDashboardCloud('dashTagCloud', topTags, 'tag');{% endif %}
+{% for taxonomy_cloud in taxonomy_clouds %}
+{% if taxonomy_cloud.top_counts %}renderDashboardCloud('dash-{{ taxonomy_cloud.field }}-cloud', {{ taxonomy_cloud.top_counts | tojson }}, '{{ taxonomy_cloud.filter_param }}');{% endif %}
+{% endfor %}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Dashboard cover strips dynamic sizing

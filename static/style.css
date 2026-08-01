@@ -2339,10 +2339,30 @@ select.form-control { cursor: pointer; }
     background: var(--lb-orange);
     border-color: var(--lb-orange);
 }
-.cloud-export-actions {
+.dash-taxonomy-heading {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
-    margin-top: 0.75rem;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.dash-taxonomy-heading .dash-heading {
+    margin: 0 auto 0 0;
+}
+.dash-taxonomy-cloud-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+.dash-taxonomy-cloud-title {
+    margin: 0 0 0.75rem;
+    color: var(--lb-deep-orange);
+    font-size: 1rem;
+}
+.dash-taxonomy-empty {
+    margin: 0;
+    color: var(--lb-text-light);
+    font-size: 0.9rem;
 }
 
 /* ── Activity responsive ───────────────────────────────────────────────── */
@@ -2981,6 +3001,14 @@ select.form-control { cursor: pointer; }
     font-size: 0.85rem;
     color: var(--lb-text-light);
 }
+.dash-health-card-link {
+    text-decoration: none;
+    transition: box-shadow .15s, transform .15s;
+}
+.dash-health-card-link:hover {
+    box-shadow: 0 3px 12px rgba(42, 74, 90, .16);
+    transform: translateY(-1px);
+}
 .dash-health-icon { font-size: 1.1rem; }
 
 /* Dashboard responsiveness */
@@ -2988,6 +3016,9 @@ select.form-control { cursor: pointer; }
     .dash-two-col,
     .dash-three-col { grid-template-columns: 1fr; }
     .dash-reading-grid { grid-template-columns: 1fr; }
+    .dash-taxonomy-cloud-grid { grid-template-columns: 1fr; }
+    .dash-taxonomy-heading { align-items: flex-start; flex-direction: column; }
+    .dash-taxonomy-heading .dash-heading { margin-right: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

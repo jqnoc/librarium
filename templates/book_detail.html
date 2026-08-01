@@ -285,27 +285,18 @@ function recalcAverage() {
 }
 document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
-<!-- ── Genres and tags ────────────────────────────────────────────────── -->
-{% set raw_genres = info.get('genres', '') or '' %}
-{% set genre_list = raw_genres.split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
-{% if genre_list %}
-<h2 data-i18n="book.genresSection">Genres</h2>
+<!-- ── Taxonomy ───────────────────────────────────────────────────────── -->
+{% for taxonomy_field in taxonomy_fields %}
+{% set taxonomy_values = (info.get(taxonomy_field.field, '') or '').split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
+{% if taxonomy_values %}
+<h2 data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</h2>
 <div class="tag-bubbles">
-    {% for genre in genre_list %}
-    <a href="{{ url_for('index', genre=genre) }}" class="tag-bubble">{{ genre }}</a>
+    {% for taxonomy_value in taxonomy_values %}
+    <a href="{{ url_for('index') }}?{{ taxonomy_field.filter_param }}={{ taxonomy_value | urlencode }}" class="tag-bubble">{{ taxonomy_value }}</a>
     {% endfor %}
 </div>
 {% endif %}
-{% set raw_tags = info.get('tags', '') or '' %}
-{% set tag_list = raw_tags.split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
-{% if tag_list %}
-<h2 data-i18n="book.tagsSection">Tags</h2>
-<div class="tag-bubbles">
-    {% for tag in tag_list %}
-    <a href="{{ url_for('index', tag=tag) }}" class="tag-bubble">{{ tag }}</a>
-    {% endfor %}
-</div>
-{% endif %}
+{% endfor %}
 <!-- ── Readings timeline ─────────────────────────────────────────────── -->
 {% if readings %}
 <h2>Readings</h2>
