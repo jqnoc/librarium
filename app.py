@@ -3299,6 +3299,15 @@ def _format_duration(seconds: int) -> str:
         return f"{secs}s"
 
 
+def _format_duration_minutes(seconds: int) -> str:
+    """Convert seconds to human-readable hours and minutes."""
+    total_minutes = max(0, seconds) // 60
+    hours, minutes = divmod(total_minutes, 60)
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
 def _format_duration_long(seconds: int) -> str:
     """Convert seconds to human-readable format with days for large totals."""
     days = seconds // 86400
@@ -3922,10 +3931,10 @@ def dashboard():
             "pages_read": total_read,
             "pages_remaining": remaining,
             "progress_pct": prog_pct,
-            "estimated_time_left": _format_duration(estimated_seconds) if estimated_seconds > 0 else "",
+            "estimated_time_left": _format_duration_minutes(estimated_seconds) if estimated_seconds > 0 else "",
             "last_activity": last_activity,
             "format": book_fmt,
-            "total_time": _format_duration(total_seconds_display),
+            "total_time": _format_duration_minutes(total_seconds_display),
         })
     reading_books.sort(key=lambda b: b["last_activity"] or "0000-00-00", reverse=True)
 

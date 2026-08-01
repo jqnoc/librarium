@@ -2325,64 +2325,28 @@ select.form-control { cursor: pointer; }
     white-space: nowrap;
 }
 .dash-reading-meta {
+    font-size: 0.8rem;
     color: var(--lb-text-light);
-    margin-top: 0.4rem;
+    margin-top: 0.25rem;
 }
 .dash-reading-progress {
-    display: flex;
-    align-items: baseline;
-    gap: 0.35rem;
     min-width: 0;
     overflow: hidden;
-    font-size: 0.8rem;
     line-height: 1.35;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
-.dash-reading-progress-value {
-    color: var(--lb-text);
-    font-weight: 600;
-}
-.dash-reading-progress-percent {
-    flex: 0 0 auto;
-    color: var(--lb-text-light);
-}
-.dash-reading-times {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.35rem 0.7rem;
-    margin-top: 0.4rem;
-}
-.dash-reading-times--single {
-    grid-template-columns: 1fr;
-}
-.dash-reading-time-item {
-    display: flex;
+.dash-reading-time-row {
     min-width: 0;
-    flex-direction: column;
-    gap: 0.05rem;
+    margin-top: 0.35rem;
+    overflow: hidden;
     line-height: 1.2;
-}
-.dash-reading-time-label {
-    overflow: hidden;
-    color: var(--lb-muted, #9CA3AF);
-    font-size: 0.66rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
     white-space: nowrap;
-}
-.dash-reading-time-value {
-    overflow: hidden;
-    color: var(--lb-text);
-    font-size: 0.78rem;
-    font-weight: 600;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
-.dash-reading-time-left .dash-reading-time-value {
+.dash-reading-time-left {
     color: var(--lb-deep-orange);
+    font-weight: 400;
 }
 .dash-reading-last {
     font-size: 0.75rem;

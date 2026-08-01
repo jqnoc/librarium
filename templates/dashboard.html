@@ -77,23 +77,13 @@
                 <div class="dash-reading-meta">
                     <div class="dash-reading-progress">
                     {% if book.format in ('audiobook', 'ebook') %}
-                    <span class="dash-reading-progress-value">{{ book.progress_pct }}%</span>
+                    {{ book.progress_pct }}%
                     {% else %}
-                    <span class="dash-reading-progress-value">{{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span></span>
-                    <span class="dash-reading-progress-percent">({{ book.progress_pct }}%)</span>
+                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> ({{ book.progress_pct }}%)
                     {% endif %}
                     </div>
-                    <div class="dash-reading-times{% if not book.estimated_time_left %} dash-reading-times--single{% endif %}">
-                        <div class="dash-reading-time-item">
-                            <span class="dash-reading-time-label" data-i18n="dash.timeRead">Time read</span>
-                            <span class="dash-reading-time-value">{{ book.total_time }}</span>
-                        </div>
-                        {% if book.estimated_time_left %}
-                        <div class="dash-reading-time-item dash-reading-time-left">
-                            <span class="dash-reading-time-label" data-i18n="dash.timeLeftLabel">Time left</span>
-                            <span class="dash-reading-time-value">~{{ book.estimated_time_left }}</span>
-                        </div>
-                        {% endif %}
+                    <div class="dash-reading-time-row">
+                        {{ book.total_time }} <span data-i18n="dash.timeReadSuffix">read</span>{% if book.estimated_time_left %} <span class="dash-reading-time-left">(~{{ book.estimated_time_left }} <span data-i18n="dash.timeLeft">left</span>)</span>{% endif %}
                     </div>
                 </div>
                 {% if book.last_activity %}
