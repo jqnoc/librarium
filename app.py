@@ -4507,14 +4507,15 @@ def _compute_status_timeline(db, lib_ids):
     today = _date.today()
     today_s = today.isoformat()
     lf, lp = _lib_filter(lib_ids)
-    STATUSES = ["reading", "finished", "not-started", "abandoned", "wishlist", "draft"]
+    STATUSES = ["reading", "finished", "not-started", "abandoned"]
     # Sort key: lower = processed first on the same date
-    _STATUS_ORDER = {"not-started": 0, "wishlist": 0, "draft": 0, "reading": 1, "finished": 2, "abandoned": 2}
+    _STATUS_ORDER = {"not-started": 0, "reading": 1, "finished": 2, "abandoned": 2}
 
     # ── 1. Representative books (primary or standalone) ──────────────────
     books = db.execute(
         "SELECT id, status, purchase_date, borrowed_start, work_id "
         f"FROM books WHERE {lf} "
+        "AND COALESCE(status, '') NOT IN ('wishlist', 'draft') "
         "AND (work_id IS NULL OR is_primary_edition = 1)",
         lp,
     ).fetchall()
