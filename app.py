@@ -5979,6 +5979,41 @@ def authors_list():
     for ar in db.execute("SELECT name, photo_hash FROM authors WHERE has_photo = 1").fetchall():
         author_photo_info[ar["name"]] = ar["photo_hash"] or ""
 
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    book_session_totals = _load_book_session_totals(db, lf_b, lp_b)
+    finished_book_ids = {
+        row["book_id"]
+        for row in db.execute(
+            f"SELECT DISTINCT r.book_id FROM readings r JOIN books b ON b.id = r.book_id "
+            f"WHERE r.status = 'finished' AND {lf_b}", lp_b
+        ).fetchall()
+    }
+    book_read_stats: dict[str, dict[str, int]] = {}
+    for row in rows:
+        session_totals = book_session_totals.get(row["id"], {})
+        book_read_stats[row["id"]] = {
+            "books_read": 1 if row["id"] in finished_book_ids else 0,
+            "time_read_seconds": session_totals.get("seconds", 0),
+        }
+
+    for period in db.execute(
+        f"SELECT p.book_id, p.pages, p.duration_seconds, b.format "
+        f"FROM periods p JOIN books b ON b.id = p.book_id WHERE {lf_b}", lp_b
+    ).fetchall():
+        stats = book_read_stats.get(period["book_id"])
+        if stats is None:
+            continue
+        session_totals = book_session_totals.get(period["book_id"], {})
+        stats["time_read_seconds"] += _estimate_period_seconds(
+            period_pages=period["pages"] or 0,
+            explicit_period_seconds=period["duration_seconds"] or 0,
+            is_pct_format=(period["format"] or "paper") in ("audiobook", "ebook"),
+            session_pages=session_totals.get("pages", 0),
+            session_seconds=session_totals.get("seconds", 0),
+            fallback_pages=session_totals.get("pages", 0),
+            fallback_seconds=session_totals.get("seconds", 0),
+        )
+
     author_map: dict[str, dict] = {}
     for r in rows:
         book_entry = {
@@ -5996,10 +6031,15 @@ def authors_list():
                 "books": [],
                 "book_ids": set(),
                 "pen_names": set(),
+                "books_read": 0,
+                "time_read_seconds": 0,
             })
             if r["id"] not in author_group["book_ids"]:
                 author_group["books"].append(book_entry)
                 author_group["book_ids"].add(r["id"])
+                stats = book_read_stats[r["id"]]
+                author_group["books_read"] += stats["books_read"]
+                author_group["time_read_seconds"] += stats["time_read_seconds"]
             if author != canonical_name:
                 author_group["pen_names"].add(author)
 
@@ -6009,6 +6049,9 @@ def authors_list():
             "name": name,
             "books": data["books"],
             "book_count": len(data["books"]),
+            "books_read": data["books_read"],
+            "time_read_seconds": data["time_read_seconds"],
+            "time_read": _format_duration(data["time_read_seconds"]),
             "pen_names": sorted(data["pen_names"], key=str.lower),
             "has_photo": name in author_photo_info,
             "photo_hash": author_photo_info.get(name, ""),
@@ -6017,6 +6060,10 @@ def authors_list():
     ]
     if sort == "books":
         authors.sort(key=lambda a: (-a["book_count"], a["name"].lower()))
+    elif sort == "books_read":
+        authors.sort(key=lambda a: (-a["books_read"], a["name"].lower()))
+    elif sort == "time_read":
+        authors.sort(key=lambda a: (-a["time_read_seconds"], a["name"].lower()))
     else:
         authors.sort(key=lambda a: a["name"].lower())
     return render_template("authors.html", authors=authors, sort=sort)

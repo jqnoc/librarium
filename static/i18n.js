@@ -292,6 +292,10 @@
         'authors.sortBy':    { en: 'Sort by:',      es: 'Ordenar por:' },
         'authors.sortName':  { en: 'Name',          es: 'Nombre' },
         'authors.sortBooks': { en: 'Number of Books', es: 'Número de Libros' },
+        'authors.sortBooksRead': { en: 'Books Read',  es: 'Libros Leídos' },
+        'authors.sortTimeRead':  { en: 'Time Read',   es: 'Tiempo Leído' },
+        'authors.booksRead':     { en: 'Books read',   es: 'Libros leídos' },
+        'authors.timeRead':      { en: 'Time read',    es: 'Tiempo leído' },
         'authors.penNames':  { en: 'Pen names:',    es: 'Seudónimos:' },
         'authors.empty':     { en: 'No authors found. Add some books to your library first.', es: 'No se encontraron autores. Añade libros a tu biblioteca primero.' },
 

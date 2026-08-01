@@ -25,6 +25,8 @@
                 style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
             <option value="name"  {% if sort == 'name'  %}selected{% endif %} data-i18n="authors.sortName">Name</option>
             <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="authors.sortBooks">Number of Books</option>
+            <option value="books_read" {% if sort == 'books_read' %}selected{% endif %} data-i18n="authors.sortBooksRead">Books Read</option>
+            <option value="time_read" {% if sort == 'time_read' %}selected{% endif %} data-i18n="authors.sortTimeRead">Time Read</option>
         </select>
     </label>
 </div>
@@ -62,6 +64,8 @@ function updateAuthorSort() {
             <div class="book-title">{{ author.name }}</div>
             <div class="book-stats">
                 <span class="badge">{{ author.book_count }} book{{ 's' if author.book_count != 1 else '' }}</span>
+                    <span class="badge"><span data-i18n="authors.booksRead">Books read</span>: {{ author.books_read }}</span>
+                    <span class="badge"><span data-i18n="authors.timeRead">Time read</span>: {{ author.time_read }}</span>
             </div>
         </div>
     </a>

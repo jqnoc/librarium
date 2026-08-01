@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Currently Reading dashboard cards now show an estimated time remaining after the reading progress
 - Words of the Day can now be edited directly from the Dashboard and saved to their books
 - Top Rated Dashboard cards now share the same height limit as Recent Activity and Last Books Acquired
+- Author cards now show books read and total time read, with sorting by both values
 
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
