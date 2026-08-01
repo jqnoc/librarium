@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, sessions, periods, status, and the selected book cover
+- Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, sessions, periods, status, and the selected book cover, with the action button above its separator
 
 ### Changed
 - Currently Reading cards now separate progress, time read, and estimated time left into compact labeled rows
