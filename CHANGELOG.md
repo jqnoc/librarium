@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, sessions, periods, status, and the selected book cover
 
+### Changed
+- Currently Reading dashboard cards now show an estimated time remaining after the reading progress
+
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
 

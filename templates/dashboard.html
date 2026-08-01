@@ -77,8 +77,9 @@
                 <div class="dash-reading-meta">
                     {% if book.format in ('audiobook', 'ebook') %}
                     {{ book.progress_pct }}%
+                    {% if book.estimated_time_left %}<span class="dash-reading-time-left"> (~{{ book.estimated_time_left }} <span data-i18n="dash.timeLeft">left</span>)</span>{% endif %}
                     {% else %}
-                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> ({{ book.progress_pct }}%)
+                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> ({{ book.progress_pct }}%){% if book.estimated_time_left %}<span class="dash-reading-time-left"> (~{{ book.estimated_time_left }} <span data-i18n="dash.timeLeft">left</span>)</span>{% endif %}
                     {% endif %}
                 </div>
                 {% if book.last_activity %}

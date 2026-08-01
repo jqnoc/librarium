@@ -3827,7 +3827,7 @@ def dashboard():
     reading_books: list[dict] = []
     for row in db.execute(f"""
         SELECT b.id, b.name, b.author, b.pages, b.starting_page, b.has_cover, b.cover_hash,
-               b.format,
+               b.format, b.total_time_seconds,
                COALESCE(s.tp, 0) AS session_pages,
                COALESCE(s.ts, 0) AS session_seconds,
                COALESCE(p.pp, 0) AS period_pages,
@@ -3871,6 +3871,17 @@ def dashboard():
             total_read = row["session_pages"] + row["period_pages"]
             remaining = max(eff - total_read, 0)
             prog_pct = round(min(total_read / eff * 100, 100), 1) if eff > 0 else 0
+
+        estimated_seconds = 0
+        if not is_pct_fmt and remaining > 0 and total_read > 0 and total_seconds_display > 0:
+            pages_per_hour = total_read / (total_seconds_display / 3600)
+            if pages_per_hour > 0:
+                estimated_seconds = int(remaining / pages_per_hour * 3600)
+        elif prog_pct > 0 and prog_pct < 100:
+            if book_fmt == "audiobook" and row["total_time_seconds"]:
+                estimated_seconds = int(row["total_time_seconds"] * (1 - prog_pct / 100))
+            elif is_pct_fmt and total_seconds_display > 0:
+                estimated_seconds = int(total_seconds_display * (100 - prog_pct) / prog_pct)
         last_candidates = [d for d in (row["last_date"], row["last_period"]) if d]
         last_activity = max(last_candidates) if last_candidates else None
         reading_books.append({
@@ -3884,6 +3895,7 @@ def dashboard():
             "pages_read": total_read,
             "pages_remaining": remaining,
             "progress_pct": prog_pct,
+            "estimated_time_left": _format_duration(estimated_seconds) if estimated_seconds > 0 else "",
             "last_activity": last_activity,
             "format": book_fmt,
             "total_time": _format_duration(total_seconds_display),

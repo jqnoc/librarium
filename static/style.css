@@ -2322,6 +2322,10 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text-light);
     margin-top: 0.25rem;
 }
+.dash-reading-time-left {
+    color: var(--lb-deep-orange);
+    font-weight: 500;
+}
 .dash-reading-last {
     font-size: 0.75rem;
     color: var(--lb-muted, #9CA3AF);
