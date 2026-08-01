@@ -1030,7 +1030,14 @@ select.form-control { cursor: pointer; }
     min-width: 0;
 }
 .edit-metadata-form .classification-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+}
+.classification-card {
+    overflow: visible;
+}
+.classification-card:focus-within {
+    position: relative;
+    z-index: 2;
 }
 .classification-editor {
     position: relative;
