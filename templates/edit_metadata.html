@@ -60,59 +60,6 @@
         </div>
     </div>
 
-    <div class="card classification-card" style="margin-bottom: 1.5rem;">
-        <div class="card-body">
-            <h3 style="margin-top:0;" data-i18n="bookForm.classification">Classification</h3>
-            <div class="form-row classification-row">
-                <div class="form-group">
-                    <label for="genres-input" data-i18n="bookForm.genres">Genres</label>
-                    <div class="classification-editor" data-classification-editor data-field="genres">
-                        <div class="classification-chips" data-chips-container aria-live="polite">
-                            {% for value in (info.get('genres', '') or '').split(';') %}
-                            {% if value.strip() %}
-                            <span class="classification-chip">
-                                <span class="classification-chip-label">{{ value.strip() }}</span>
-                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
-                            </span>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <input type="text" id="genres-input" class="classification-input" data-chip-input autocomplete="off"
-                               placeholder="Add a genre" data-i18n-placeholder="bookForm.addGenre">
-                           <div class="classification-suggestions" data-classification-suggestions id="genres-suggestions" role="listbox" aria-label="Genre suggestions"></div>
-                    </div>
-                    <input type="hidden" id="genres" name="genres" value="{{ info.get('genres', '') }}">
-                    <datalist id="genres-list">
-                        {% for v in suggestions.genres %}<option value="{{ v }}">{% endfor %}
-                    </datalist>
-                </div>
-                <div class="form-group">
-                    <label for="tags-input" data-i18n="bookForm.tags">Tags</label>
-                    <div class="classification-editor" data-classification-editor data-field="tags">
-                        <div class="classification-chips" data-chips-container aria-live="polite">
-                            {% for value in (info.get('tags', '') or '').split(';') %}
-                            {% if value.strip() %}
-                            <span class="classification-chip">
-                                <span class="classification-chip-label">{{ value.strip() }}</span>
-                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
-                            </span>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <input type="text" id="tags-input" class="classification-input" data-chip-input autocomplete="off"
-                               placeholder="Add a tag" data-i18n-placeholder="bookForm.addTag">
-                           <div class="classification-suggestions" data-classification-suggestions id="tags-suggestions" role="listbox" aria-label="Tag suggestions"></div>
-                    </div>
-                    <input type="hidden" id="tags" name="tags" value="{{ info.get('tags', '') }}">
-                    <datalist id="tags-list">
-                        {% for v in suggestions.tags %}<option value="{{ v }}">{% endfor %}
-                    </datalist>
-                </div>
-            </div>
-            <p class="classification-hint" data-i18n="bookForm.classificationHint">Add one item at a time, then press Enter or type a comma. Select an existing value from the suggestions.</p>
-        </div>
-    </div>
-
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
             <h3 style="margin-top:0;" data-i18n="bookForm.pubDetails">Publication Details</h3>
@@ -348,6 +295,59 @@
                 {% endif %}
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="add-series-btn" data-i18n="bookForm.seriesAdd">+ Add Series</button>
+        </div>
+    </div>
+
+    <div class="card classification-card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.classification">Classification</h3>
+            <div class="form-row classification-row">
+                <div class="form-group">
+                    <label for="genres-input" data-i18n="bookForm.genres">Genres</label>
+                    <div class="classification-editor" data-classification-editor data-field="genres">
+                        <div class="classification-chips" data-chips-container aria-live="polite">
+                            {% for value in (info.get('genres', '') or '').split(';') %}
+                            {% if value.strip() %}
+                            <span class="classification-chip">
+                                <span class="classification-chip-label">{{ value.strip() }}</span>
+                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <input type="text" id="genres-input" class="classification-input" data-chip-input autocomplete="off"
+                               placeholder="Add a genre" data-i18n-placeholder="bookForm.addGenre">
+                        <div class="classification-suggestions" data-classification-suggestions id="genres-suggestions" role="listbox" aria-label="Genre suggestions"></div>
+                    </div>
+                    <input type="hidden" id="genres" name="genres" value="{{ info.get('genres', '') }}">
+                    <datalist id="genres-list">
+                        {% for v in suggestions.genres %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="tags-input" data-i18n="bookForm.tags">Tags</label>
+                    <div class="classification-editor" data-classification-editor data-field="tags">
+                        <div class="classification-chips" data-chips-container aria-live="polite">
+                            {% for value in (info.get('tags', '') or '').split(';') %}
+                            {% if value.strip() %}
+                            <span class="classification-chip">
+                                <span class="classification-chip-label">{{ value.strip() }}</span>
+                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <input type="text" id="tags-input" class="classification-input" data-chip-input autocomplete="off"
+                               placeholder="Add a tag" data-i18n-placeholder="bookForm.addTag">
+                        <div class="classification-suggestions" data-classification-suggestions id="tags-suggestions" role="listbox" aria-label="Tag suggestions"></div>
+                    </div>
+                    <input type="hidden" id="tags" name="tags" value="{{ info.get('tags', '') }}">
+                    <datalist id="tags-list">
+                        {% for v in suggestions.tags %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <p class="classification-hint" data-i18n="bookForm.classificationHint">Add one item at a time, then press Enter or type a comma. Select an existing value from the suggestions.</p>
         </div>
     </div>
 
