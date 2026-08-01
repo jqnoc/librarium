@@ -179,7 +179,7 @@
         <div id="genreCloud" class="word-cloud"></div>
         <div class="cloud-export-actions">
             <button type="button" class="btn btn-secondary btn-sm"
-                    onclick="downloadTermList('genres', FULL_GENRE_COUNTS)"
+                    onclick="downloadTermList('genres', FULL_GENRE_COUNTS, FULL_GENRE_BOOKS)"
                     data-i18n-title="dash.downloadGenresTitle">
                 <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadGenres">Download all genres</span>
             </button>
@@ -196,7 +196,7 @@
         <div id="tagCloud" class="word-cloud"></div>
         <div class="cloud-export-actions">
             <button type="button" class="btn btn-secondary btn-sm"
-                    onclick="downloadTermList('tags', FULL_TAG_COUNTS)"
+                    onclick="downloadTermList('tags', FULL_TAG_COUNTS, FULL_TAG_BOOKS)"
                     data-i18n-title="dash.downloadTagsTitle">
                 <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTags">Download all tags</span>
             </button>
@@ -773,11 +773,13 @@ function renderWordCloud(containerId, countsObj, filterKey) {
 
 {% if genre_counts %}
 const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
+const FULL_GENRE_BOOKS = {{ genre_books | tojson }};
 renderWordCloud('genreCloud', FULL_GENRE_COUNTS, 'genre');
 {% endif %}
 
 {% if tag_counts %}
 const FULL_TAG_COUNTS = {{ tag_counts | tojson }};
+const FULL_TAG_BOOKS = {{ tag_books | tojson }};
 renderWordCloud('tagCloud', FULL_TAG_COUNTS, 'tag');
 {% endif %}
 

@@ -3837,6 +3837,8 @@ def dashboard():
     source_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
     genre_counts: dict[str, int] = Counter()
+    tag_books: dict[str, list[str]] = {}
+    genre_books: dict[str, list[str]] = {}
     author_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     rated_values: list[float] = []
@@ -3871,15 +3873,21 @@ def dashboard():
             language_counts[br["language"]] += 1
 
         if br["tags"]:
+            seen_tags = set()
             for tag in br["tags"].split(";"):
                 tag = tag.strip()
-                if tag:
+                if tag and tag not in seen_tags:
+                    seen_tags.add(tag)
                     tag_counts[tag] += 1
+                    tag_books.setdefault(tag, []).append(br["name"])
         if br["genres"]:
+            seen_genres = set()
             for genre in br["genres"].split(";"):
                 genre = genre.strip()
-                if genre:
+                if genre and genre not in seen_genres:
+                    seen_genres.add(genre)
                     genre_counts[genre] += 1
+                    genre_books.setdefault(genre, []).append(br["name"])
 
         avg_value = avg_ratings.get(br["id"])
         if avg_value is not None and avg_value > 0:
@@ -4300,6 +4308,8 @@ def dashboard():
         top_tags=top_tags,
         all_genres=dict(genre_counts),
         all_tags=dict(tag_counts),
+        all_genre_books=genre_books,
+        all_tag_books=tag_books,
         # Series
         series_progress=series_progress,
         # TBR
@@ -4834,6 +4844,8 @@ def global_stats():
     status_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
     genre_counts: dict[str, int] = Counter()
+    tag_books: dict[str, list[str]] = {}
+    genre_books: dict[str, list[str]] = {}
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
     publisher_counts: dict[str, int] = Counter()
@@ -4845,15 +4857,21 @@ def global_stats():
     for bk in all_lib_books:
         status_counts[bk["status"] or "unknown"] += 1
         if bk["tags"]:
+            seen_tags = set()
             for t in bk["tags"].split(";"):
                 t = t.strip()
-                if t:
+                if t and t not in seen_tags:
+                    seen_tags.add(t)
                     tag_counts[t] += 1
+                    tag_books.setdefault(t, []).append(bk["name"])
         if bk["genres"]:
+            seen_genres = set()
             for genre in bk["genres"].split(";"):
                 genre = genre.strip()
-                if genre:
+                if genre and genre not in seen_genres:
+                    seen_genres.add(genre)
                     genre_counts[genre] += 1
+                    genre_books.setdefault(genre, []).append(bk["name"])
         if bk["language"]:
             language_counts[bk["language"]] += 1
         else:
@@ -4900,6 +4918,8 @@ def global_stats():
 
     genre_counts_clean = _remove_unknown(dict(genre_counts))
     tag_counts_clean = _remove_unknown(dict(tag_counts))
+    genre_books_clean = _remove_unknown(dict(genre_books))
+    tag_books_clean = _remove_unknown(dict(tag_books))
 
     # Prepare publisher chart data: show top N publishers and aggregate the rest as "Other" (computed from cleaned counts)
     TOP_PUBLISHERS_FOR_CHART = 20
@@ -4935,6 +4955,8 @@ def global_stats():
         status_chart=status_chart_clean,
         genre_counts=genre_counts_clean,
         tag_counts=tag_counts_clean,
+        genre_books=genre_books_clean,
+        tag_books=tag_books_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
         publisher_counts=publisher_counts_clean,

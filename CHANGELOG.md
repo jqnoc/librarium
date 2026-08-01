@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
-- Dashboard and Global Stats Genre Cloud and Tag Cloud sections now offer complete CSV downloads with each term's book count for reviewing duplicate or differently phrased values
+- Dashboard and Global Stats Genre Cloud and Tag Cloud sections now offer complete CSV downloads with each term's book count and matching book titles for reviewing duplicate or differently phrased values
 
 ### Changed
 - Currently Reading cards now preserve the original progress line, accent the percentage like estimated time left, keep matching metadata spacing, and omit seconds from read and estimated-left times

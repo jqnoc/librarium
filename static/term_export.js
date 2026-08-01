@@ -1,12 +1,17 @@
 (function () {
-    window.downloadTermList = function (kind, counts) {
-        var rows = [['Term', 'Book count']];
+    window.downloadTermList = function (kind, counts, termBooks) {
+        var rows = [['Term', 'Book count', 'Book titles']];
         Object.entries(counts || {})
             .sort(function (a, b) {
                 return a[0].localeCompare(b[0], undefined, { sensitivity: 'base' });
             })
             .forEach(function (entry) {
-                rows.push([entry[0], String(entry[1])]);
+                var titles = termBooks && Array.isArray(termBooks[entry[0]])
+                    ? termBooks[entry[0]].slice().sort(function (a, b) {
+                        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+                    })
+                    : [];
+                rows.push([entry[0], String(entry[1]), titles.join('; ')]);
             });
 
         var csv = rows.map(function (row) {
