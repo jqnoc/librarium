@@ -4298,6 +4298,8 @@ def dashboard():
         # Genres & tags
         top_genres=top_genres,
         top_tags=top_tags,
+        all_genres=dict(genre_counts),
+        all_tags=dict(tag_counts),
         # Series
         series_progress=series_progress,
         # TBR

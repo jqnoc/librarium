@@ -662,6 +662,13 @@ function toggleDashboardWordEdit(wordId) {
     <div class="card">
         <div class="card-body">
             <div id="dashGenreCloud" class="word-cloud"></div>
+            <div class="cloud-export-actions">
+                <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="downloadTermList('genres', allGenres)"
+                        data-i18n-title="dash.downloadGenresTitle">
+                    <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadGenres">Download all genres</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -675,6 +682,13 @@ function toggleDashboardWordEdit(wordId) {
     <div class="card">
         <div class="card-body">
             <div id="dashTagCloud" class="word-cloud"></div>
+            <div class="cloud-export-actions">
+                <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="downloadTermList('tags', allTags)"
+                        data-i18n-title="dash.downloadTagsTitle">
+                    <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTags">Download all tags</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -695,6 +709,8 @@ const sourceCounts  = {{ source_counts | tojson }};
 {% if language_counts %}const languageCounts = {{ language_counts | tojson }};{% endif %}
 {% if top_genres %}const topGenres = {{ top_genres | tojson }};{% endif %}
 {% if top_tags %}const topTags = {{ top_tags | tojson }};{% endif %}
+const allGenres = {{ all_genres | tojson }};
+const allTags = {{ all_tags | tojson }};
 
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 

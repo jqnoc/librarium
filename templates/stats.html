@@ -177,6 +177,13 @@
     <div class="card-body">
         <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.genreCloud">Genre Cloud</h3>
         <div id="genreCloud" class="word-cloud"></div>
+        <div class="cloud-export-actions">
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="downloadTermList('genres', FULL_GENRE_COUNTS)"
+                    data-i18n-title="dash.downloadGenresTitle">
+                <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadGenres">Download all genres</span>
+            </button>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -187,6 +194,13 @@
     <div class="card-body">
         <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.tagCloud">Tag Cloud</h3>
         <div id="tagCloud" class="word-cloud"></div>
+        <div class="cloud-export-actions">
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="downloadTermList('tags', FULL_TAG_COUNTS)"
+                    data-i18n-title="dash.downloadTagsTitle">
+                <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTags">Download all tags</span>
+            </button>
+        </div>
     </div>
 </div>
 {% endif %}

@@ -2339,6 +2339,11 @@ select.form-control { cursor: pointer; }
     background: var(--lb-orange);
     border-color: var(--lb-orange);
 }
+.cloud-export-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.75rem;
+}
 
 /* ── Activity responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
