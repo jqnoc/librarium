@@ -4025,7 +4025,7 @@ def dashboard():
         if avg_ratings.get(book["id"]) is not None and avg_ratings[book["id"]] > 0
     ]
     top_rated.sort(key=lambda x: x["rating"], reverse=True)
-    top_rated = top_rated[:5]
+    top_rated = top_rated[:25]
 
     # ── Records: highest rated, longest, shortest, most reread ───────────
     highest_rated_book = top_rated[0] if top_rated else None
