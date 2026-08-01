@@ -64,8 +64,14 @@ function updateAuthorSort() {
             <div class="book-title">{{ author.name }}</div>
             <div class="book-stats">
                 <span class="badge">{{ author.book_count }} book{{ 's' if author.book_count != 1 else '' }}</span>
-                    <span class="badge"><span data-i18n="authors.booksRead">Books read</span>: {{ author.books_read }}</span>
-                    <span class="badge"><span data-i18n="authors.timeRead">Time read</span>: {{ author.time_read }}</span>
+                {% if author.books_read == 0 %}
+                <span class="badge" data-i18n="authors.noBooksRead">No books read</span>
+                {% elif author.books_read == 1 %}
+                <span class="badge" data-i18n="authors.oneBookRead">1 book read</span>
+                {% else %}
+                <span class="badge">{{ author.books_read }} <span data-i18n="authors.booksReadSuffix">books read</span></span>
+                {% endif %}
+                <span class="badge">{{ author.time_read }}</span>
             </div>
         </div>
     </a>
