@@ -3193,6 +3193,13 @@ select.form-control { cursor: pointer; }
     text-align: left;
 }
 
+.spotlight-word-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
 .spotlight-word-lang {
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -3200,6 +3207,10 @@ select.form-control { cursor: pointer; }
     color: var(--lb-text-light);
     font-weight: 600;
     margin-bottom: 0.35rem;
+}
+
+.spotlight-word-edit-button {
+    flex: 0 0 auto;
 }
 
 .spotlight-word-term {
@@ -3214,6 +3225,36 @@ select.form-control { cursor: pointer; }
     line-height: 1.5;
     font-size: 0.92rem;
     margin-bottom: 0.5rem;
+}
+
+.spotlight-word-edit {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--lb-border);
+}
+
+.spotlight-word-edit.active {
+    display: block;
+}
+
+.spotlight-word-edit-form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.spotlight-word-edit-form input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
 }
 
 

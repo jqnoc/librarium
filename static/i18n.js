@@ -713,6 +713,7 @@
         'dash.streaks':             { en: 'Streaks & Consistency', es: 'Rachas y Consistencia' },
         'dash.last52Weeks':         { en: '(last 52 weeks)',       es: '(últimas 52 semanas)' },
         'dash.recentActivity':      { en: 'Recent Activity',       es: 'Actividad Reciente' },
+        'dash.editWord':            { en: 'Edit word',              es: 'Editar palabra' },
         'dash.timeLeft':             { en: 'left',                   es: 'restantes' },
         'dash.read':                { en: 'Read',                  es: 'Leyó' },
         'dash.of':                  { en: 'of',                    es: 'de' },

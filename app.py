@@ -4162,7 +4162,7 @@ def dashboard():
     ).fetchall():
         lang = lang_row["language"]
         row = db.execute(
-            f"SELECT w.word, w.definition, w.synonyms, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
+            f"SELECT w.id AS word_id, w.word, w.definition, w.synonyms, w.translation, w.translation_language, b.name AS book_name, b.id AS book_id "
             f"FROM words w JOIN books b ON b.id = w.book_id "
             f"WHERE {lf_b} AND b.language = ? ORDER BY RANDOM() LIMIT 1",
             (*lp_b, lang),
@@ -7191,6 +7191,12 @@ def add_word(book_id: str):
 @app.route("/book/<book_id>/words/<int:wid>/edit", methods=["POST"])
 def edit_word(book_id: str, wid: int):
     db = get_db()
+    return_to_dashboard = request.form.get("return_to", "").strip() == "dashboard"
+    redirect_target = (
+        url_for("dashboard")
+        if return_to_dashboard
+        else url_for("book_detail", book_id=book_id, _anchor="words")
+    )
     word = request.form.get("word", "").strip()
     definition = sanitize_html(request.form.get("definition", "").strip())
     synonyms = request.form.get("synonyms", "").strip()
@@ -7200,14 +7206,14 @@ def edit_word(book_id: str, wid: int):
         translation_language = ""
     elif not translation_language:
         flash("Choose a translation language before saving a translated word.", "error")
-        return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+        return redirect(redirect_target)
     if word:
         db.execute(
             "UPDATE words SET word = ?, definition = ?, synonyms = ?, translation = ?, translation_language = ? WHERE id = ? AND book_id = ?",
             (word, definition, synonyms, translation, translation_language, wid, book_id),
         )
         db.commit()
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+    return redirect(redirect_target)
 
 
 @app.route("/book/<book_id>/words/<int:wid>/delete", methods=["POST"])
