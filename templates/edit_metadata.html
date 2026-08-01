@@ -8,7 +8,7 @@
 
 <h1 data-i18n="bookForm.editMetadata">Edit Metadata</h1>
 
-<form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_metadata', book_id=book_id) }}">
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_metadata', book_id=book_id) }}" class="edit-metadata-form">
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
             <h3 style="margin-top:0;" data-i18n="bookForm.basicInfo">Basic Information</h3>
@@ -96,6 +96,7 @@
                         <select id="binding" name="binding" class="form-control" {% if info.get('format', 'paper') != 'paper' %}disabled{% endif %}>
                             <option value="">—</option>
                             <option value="paperback" {{ 'selected' if info.get('binding') == 'paperback' }} data-i18n="bookForm.bindingPaperback">Paperback</option>
+                            <option value="softcover" {{ 'selected' if info.get('binding') == 'softcover' }} data-i18n="bookForm.bindingSoftcover">Softcover</option>
                             <option value="hardcover" {{ 'selected' if info.get('binding') == 'hardcover' }} data-i18n="bookForm.bindingHardcover">Hardcover</option>
                             <option value="manga" {{ 'selected' if info.get('binding') == 'manga' }} data-i18n="bookForm.bindingManga">Manga</option>
                         </select>

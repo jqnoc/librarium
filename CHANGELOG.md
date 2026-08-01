@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, sessions, periods, status, and the selected book cover
 
 ### Changed
+- Currently Reading cards now separate progress, time read, and estimated time left into compact labeled rows
+- Edit Metadata now uses three columns per section on desktop and paper-book bindings include Softcover
 - Books now store Genres separately from Tags, with independent Book Details displays and Dashboard and Global Stats clouds
 - Currently Reading dashboard cards now show an estimated time remaining after the reading progress
 - Words of the Day can now be edited directly from the Dashboard and saved to their books

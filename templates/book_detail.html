@@ -72,7 +72,7 @@
             {% if info.get('binding') %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.binding">Binding</div>
-                <div class="meta-value" data-i18n="book.binding{{ {'paperback':'Paperback','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding',''), '') }}">{{ {'paperback':'Paperback','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding', ''), info.get('binding', '')) }}</div>
+                <div class="meta-value" data-i18n="book.binding{{ {'paperback':'Paperback','softcover':'Softcover','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding',''), '') }}">{{ {'paperback':'Paperback','softcover':'Softcover','hardcover':'Hardcover','manga':'Manga'}.get(info.get('binding', ''), info.get('binding', '')) }}</div>
             </div>
             {% endif %}
             {% if info.get('audio_format') %}
