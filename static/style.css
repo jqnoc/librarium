@@ -2592,6 +2592,8 @@ select.form-control { cursor: pointer; }
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
 }
 
 /* Books bought this year */
