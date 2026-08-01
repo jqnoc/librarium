@@ -77,9 +77,9 @@
                 <div class="dash-reading-meta">
                     <div class="dash-reading-progress">
                     {% if book.format in ('audiobook', 'ebook') %}
-                    {{ book.progress_pct }}%
+                    <span class="dash-reading-progress-percent">{{ book.progress_pct }}%</span>
                     {% else %}
-                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> ({{ book.progress_pct }}%)
+                    {{ book.pages_read }} / {{ book.effective_pages }} <span data-i18n="activity.pagesLabel">pages</span> <span class="dash-reading-progress-percent">({{ book.progress_pct }}%)</span>
                     {% endif %}
                     </div>
                     <div class="dash-reading-time-row">
