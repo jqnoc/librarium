@@ -133,7 +133,9 @@
             if (ev.source_name) seg += ' ' + t('dash.actFrom', 'from') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
             parts.push(seg);
         } else if (ev.gift) {
-            parts.push('<strong>' + t('dash.actGift', 'Received') + '</strong> ' + link + ' ' + t('dash.actAsGift', 'as a gift'));
+            var seg = '<strong>' + t('dash.actGift', 'Received') + '</strong> ' + link + ' ' + t('dash.actAsGift', 'as a gift');
+            if (ev.source_name) seg += ' ' + t('dash.actFrom', 'from') + ' <strong>' + escHtml(ev.source_name) + '</strong>';
+            parts.push(seg);
         } else if (ev.started) {
             parts.push('<strong>' + t('dash.actStarted', 'Started reading') + '</strong> ' + link);
         } else if (ev.pages > 0) {
@@ -224,7 +226,7 @@
                 if (ev.finished) g.finished = true;
                 if (ev.bought) { g.bought = true; g.purchase_price = ev.purchase_price || g.purchase_price; g.source_name = ev.source_name || g.source_name; }
                 if (ev.borrowed) { g.borrowed = true; g.source_name = ev.source_name || g.source_name; }
-                if (ev.gift) g.gift = true;
+                if (ev.gift) { g.gift = true; g.source_name = ev.source_name || g.source_name; }
             }
         }
         var result = [];

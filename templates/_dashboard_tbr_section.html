@@ -1,5 +1,5 @@
 {% if not_started_count > 0 %}
-<div class="dash-section" id="dashTbrSection" data-tbr-sort="{{ tbr_sort }}">
+<div class="dash-section" id="dashTbrSection" data-tbr-sort="{{ tbr_sort }}" data-tbr-rows="{{ tbr_rows }}">
     <h2 class="dash-heading" data-i18n="dash.tbrPile">To Be Read</h2>
     <div class="card">
         <div class="card-body">
@@ -7,14 +7,24 @@
                 <p class="dash-tbr-summary">
                     <strong>{{ not_started_count }}</strong> <span data-i18n="dash.booksWaiting">books waiting to be read</span>
                 </p>
-                <label class="dash-tbr-sort" for="dashTbrSort">
-                    <span data-i18n="dash.show">Show:</span>
-                    <select id="dashTbrSort" class="dash-tbr-select">
-                        <option value="random" {{ 'selected' if tbr_sort == 'random' else '' }} data-i18n="dash.tbrSortRandom">Random Set</option>
-                        <option value="recent" {{ 'selected' if tbr_sort == 'recent' else '' }} data-i18n="dash.tbrSortRecent">Most Recently Acquired</option>
-                        <option value="oldest" {{ 'selected' if tbr_sort == 'oldest' else '' }} data-i18n="dash.tbrSortOldest">Least Recently Acquired</option>
-                    </select>
-                </label>
+                <div class="dash-tbr-controls">
+                    <label class="dash-tbr-sort" for="dashTbrRows">
+                        <span data-i18n="dash.rows">Rows:</span>
+                        <select id="dashTbrRows" class="dash-tbr-select dash-tbr-select--rows">
+                            {% for n in range(1, 7) %}
+                            <option value="{{ n }}" {{ 'selected' if tbr_rows == n else '' }}>{{ n }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="dash-tbr-sort" for="dashTbrSort">
+                        <span data-i18n="dash.show">Show:</span>
+                        <select id="dashTbrSort" class="dash-tbr-select">
+                            <option value="random" {{ 'selected' if tbr_sort == 'random' else '' }} data-i18n="dash.tbrSortRandom">Random Set</option>
+                            <option value="recent" {{ 'selected' if tbr_sort == 'recent' else '' }} data-i18n="dash.tbrSortRecent">Most Recently Acquired</option>
+                            <option value="oldest" {{ 'selected' if tbr_sort == 'oldest' else '' }} data-i18n="dash.tbrSortOldest">Least Recently Acquired</option>
+                        </select>
+                    </label>
+                </div>
             </div>
             <div class="dash-tbr-covers" id="dashTbrCovers">
                 {% for book in tbr_list %}

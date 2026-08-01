@@ -81,7 +81,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "2.1.0-beta"
+APP_VERSION = "2.1.1-beta"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -3118,6 +3118,7 @@ def _collect_activity_events(db, lf: str, lp: tuple, lf_b: str, lp_b: tuple,
         f"FROM books b LEFT JOIN sources s ON s.id = b.source_id "
         f"WHERE {lf} AND b.purchase_date IS NOT NULL AND b.purchase_date != '' "
         f"AND b.source_type IN ('owned','physical_store','web_store') "
+        f"AND b.is_gift = 0 "
         f"AND (b.work_id IS NULL OR b.is_primary_edition = 1){dr_buy}",
         lp + tuple(dp_buy),
     ).fetchall():
@@ -4047,6 +4048,11 @@ def dashboard():
     # ── TBR (not-started) pile ───────────────────────────────────────────
     cover_strip_limit = 60
     tbr_sort = (request.args.get("tbr_sort") or "random").strip()
+    try:
+        tbr_rows = int(request.args.get("tbr_rows", 1))
+    except (TypeError, ValueError):
+        tbr_rows = 1
+    tbr_rows = max(1, min(tbr_rows, 6))
     acquisition_date_expr = "COALESCE(NULLIF(borrowed_start, ''), NULLIF(purchase_date, ''), '0001-01-01')"
     tbr_sort_map = {
         "random": "RANDOM()",
@@ -4058,7 +4064,7 @@ def dashboard():
     tbr_books = db.execute(
         f"SELECT id, name, has_cover, cover_hash, author FROM books "
         f"WHERE {lf} AND status = 'not-started' AND (work_id IS NULL OR is_primary_edition = 1) "
-        f"ORDER BY {tbr_sort_map[tbr_sort]} LIMIT {cover_strip_limit}", lp
+        f"ORDER BY {tbr_sort_map[tbr_sort]} LIMIT {cover_strip_limit * tbr_rows}", lp
     ).fetchall()
     tbr_list = [{"id": b["id"], "name": b["name"], "author": b["author"] or "",
                  "has_cover": bool(b["has_cover"]), "cover_hash": b["cover_hash"] or ""} for b in tbr_books]
@@ -4068,6 +4074,7 @@ def dashboard():
             "_dashboard_tbr_section.html",
             not_started_count=not_started_count,
             tbr_sort=tbr_sort,
+            tbr_rows=tbr_rows,
             tbr_list=tbr_list,
         )
 
@@ -4204,6 +4211,7 @@ def dashboard():
         series_progress=series_progress,
         # TBR
         tbr_sort=tbr_sort,
+        tbr_rows=tbr_rows,
         tbr_list=tbr_list,
         wishlist_list=wishlist_list,
         # Author spotlight

@@ -657,7 +657,8 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
 
 (function() {
     var allowed = { random: true, recent: true, oldest: true };
-    var storageKey = 'librarium_dashboard_tbr_sort';
+    var sortStorageKey = 'librarium_dashboard_tbr_sort';
+    var rowsStorageKey = 'librarium_dashboard_tbr_rows';
     var requestNonce = 0;
     var pendingController = null;
 
@@ -665,13 +666,25 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
         return allowed[value] ? value : 'random';
     }
 
-    function buildTbrUrl(value, includeFragment) {
+    function sanitizeRows(value) {
+        var n = parseInt(value, 10);
+        if (!n || n < 1) return 1;
+        return Math.min(n, 6);
+    }
+
+    function buildTbrUrl(sortValue, rowsValue, includeFragment) {
         var url = new URL(window.location.href);
-        value = sanitizeSort(value);
-        if (value === 'random') {
+        sortValue = sanitizeSort(sortValue);
+        rowsValue = sanitizeRows(rowsValue);
+        if (sortValue === 'random') {
             url.searchParams.delete('tbr_sort');
         } else {
-            url.searchParams.set('tbr_sort', value);
+            url.searchParams.set('tbr_sort', sortValue);
+        }
+        if (rowsValue === 1) {
+            url.searchParams.delete('tbr_rows');
+        } else {
+            url.searchParams.set('tbr_rows', rowsValue);
         }
         if (includeFragment) {
             url.searchParams.set('dashboard_fragment', 'tbr');
@@ -690,33 +703,52 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
         return sanitizeSort(section ? section.getAttribute('data-tbr-sort') : 'random');
     }
 
+    function getCurrentRows() {
+        var section = getTbrSection();
+        return sanitizeRows(section ? section.getAttribute('data-tbr-rows') : 1);
+    }
+
     function setLoading(isLoading) {
         var section = getTbrSection();
-        var select = document.getElementById('dashTbrSort');
+        var sortSelect = document.getElementById('dashTbrSort');
+        var rowsSelect = document.getElementById('dashTbrRows');
         if (section) {
             section.classList.toggle('is-loading', isLoading);
         }
-        if (select) {
-            select.disabled = isLoading;
+        if (sortSelect) {
+            sortSelect.disabled = isLoading;
+        }
+        if (rowsSelect) {
+            rowsSelect.disabled = isLoading;
         }
     }
 
     function bindTbrSelect() {
-        var select = document.getElementById('dashTbrSort');
-        if (!select || select.dataset.bound === '1') return;
-        select.dataset.bound = '1';
-        select.addEventListener('change', function() {
-            loadTbrSection(this.value || 'random');
-        });
+        var sortSelect = document.getElementById('dashTbrSort');
+        if (sortSelect && sortSelect.dataset.bound !== '1') {
+            sortSelect.dataset.bound = '1';
+            sortSelect.addEventListener('change', function() {
+                loadTbrSection(this.value || 'random', getCurrentRows());
+            });
+        }
+        var rowsSelect = document.getElementById('dashTbrRows');
+        if (rowsSelect && rowsSelect.dataset.bound !== '1') {
+            rowsSelect.dataset.bound = '1';
+            rowsSelect.addEventListener('change', function() {
+                loadTbrSection(getCurrentSort(), this.value || 1);
+            });
+        }
     }
 
-    async function loadTbrSection(value, options) {
+    async function loadTbrSection(sortValue, rowsValue, options) {
         options = options || {};
-        value = sanitizeSort(value);
+        sortValue = sanitizeSort(sortValue);
+        rowsValue = sanitizeRows(rowsValue);
 
-        if (!options.force && value === getCurrentSort()) {
-            localStorage.setItem(storageKey, value);
-            history.replaceState(null, '', buildTbrUrl(value, false));
+        if (!options.force && sortValue === getCurrentSort() && rowsValue === getCurrentRows()) {
+            localStorage.setItem(sortStorageKey, sortValue);
+            localStorage.setItem(rowsStorageKey, rowsValue);
+            history.replaceState(null, '', buildTbrUrl(sortValue, rowsValue, false));
             return;
         }
 
@@ -729,7 +761,7 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
         setLoading(true);
 
         try {
-            var response = await fetch(buildTbrUrl(value, true), {
+            var response = await fetch(buildTbrUrl(sortValue, rowsValue, true), {
                 headers: { 'X-Requested-With': 'fetch' },
                 signal: pendingController.signal,
             });
@@ -755,11 +787,12 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
             if (typeof window.fitDashboardCoverStrips === 'function') {
                 window.fitDashboardCoverStrips(nextSection);
             }
-            localStorage.setItem(storageKey, value);
-            history.replaceState(null, '', buildTbrUrl(value, false));
+            localStorage.setItem(sortStorageKey, sortValue);
+            localStorage.setItem(rowsStorageKey, rowsValue);
+            history.replaceState(null, '', buildTbrUrl(sortValue, rowsValue, false));
         } catch (error) {
             if (error.name === 'AbortError') return;
-            window.location.href = buildTbrUrl(value, false);
+            window.location.href = buildTbrUrl(sortValue, rowsValue, false);
         } finally {
             if (nonce === requestNonce) {
                 pendingController = null;
@@ -772,14 +805,18 @@ function cssVar(v) { return getComputedStyle(document.documentElement).getProper
 
     var url = new URL(window.location.href);
     var hasExplicitSort = url.searchParams.has('tbr_sort');
+    var hasExplicitRows = url.searchParams.has('tbr_rows');
     var currentSort = getCurrentSort();
-    var savedSort = sanitizeSort(localStorage.getItem(storageKey) || currentSort);
-    if (!hasExplicitSort && savedSort !== currentSort) {
-        loadTbrSection(savedSort, { force: true });
+    var currentRows = getCurrentRows();
+    var savedSort = sanitizeSort(localStorage.getItem(sortStorageKey) || currentSort);
+    var savedRows = sanitizeRows(localStorage.getItem(rowsStorageKey) || currentRows);
+    if ((!hasExplicitSort && savedSort !== currentSort) || (!hasExplicitRows && savedRows !== currentRows)) {
+        loadTbrSection(hasExplicitSort ? currentSort : savedSort, hasExplicitRows ? currentRows : savedRows, { force: true });
         return;
     }
 
-    localStorage.setItem(storageKey, currentSort);
+    localStorage.setItem(sortStorageKey, currentSort);
+    localStorage.setItem(rowsStorageKey, currentRows);
 })();
 
 function dateStr(d) {
@@ -1055,9 +1092,14 @@ makeDonut('sourceDonut', sourceCounts);
         var gap = parseFloat(gapValue) || 0;
         var containerWidth = container.clientWidth || container.getBoundingClientRect().width;
         var itemStride = itemWidth + gap;
-        var maxVisible = itemStride > 0 ? Math.floor((containerWidth + gap) / itemStride) : items.length;
+        var itemsPerRow = itemStride > 0 ? Math.floor((containerWidth + gap) / itemStride) : items.length;
+        itemsPerRow = Math.max(1, itemsPerRow);
 
-        maxVisible = Math.max(1, Math.min(items.length, maxVisible));
+        var rowsHost = container.closest('[data-tbr-rows]');
+        var rows = rowsHost ? parseInt(rowsHost.getAttribute('data-tbr-rows'), 10) : 1;
+        if (!rows || rows < 1) rows = 1;
+
+        var maxVisible = Math.max(1, Math.min(items.length, itemsPerRow * rows));
         items.forEach(function(item, index) {
             item.hidden = index >= maxVisible;
         });

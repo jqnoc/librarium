@@ -1,6 +1,6 @@
 {
   "name": "librarium",
-  "version": "2.1.0",
+  "version": "2.1.1-beta",
   "description": "A local application for tracking personal book reading statistics",
   "author": "Joaquín Ossorio-Castillo",
   "main": "main.js",

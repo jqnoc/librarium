@@ -2692,11 +2692,17 @@ select.form-control { cursor: pointer; }
     font-size: 0.9rem;
     color: var(--lb-text-light);
 }
+.dash-tbr-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
 .dash-tbr-sort {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-left: auto;
     font-size: 0.85rem;
     color: var(--lb-text-light);
 }
@@ -2711,6 +2717,9 @@ select.form-control { cursor: pointer; }
     font-size: 0.85rem;
     cursor: pointer;
 }
+.dash-tbr-select--rows {
+    min-width: 64px;
+}
 .dash-section.is-loading .dash-tbr-covers {
     opacity: 0.55;
 }
@@ -2720,7 +2729,7 @@ select.form-control { cursor: pointer; }
 .dash-tbr-covers {
     display: flex;
     gap: 0.5rem;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     overflow: hidden;
 }
 .dash-tbr-item {
