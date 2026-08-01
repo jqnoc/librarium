@@ -81,7 +81,7 @@ MAX_BACKUPS = 5
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
 
-APP_VERSION = "2.1.1-beta"
+APP_VERSION = "2.2.0-beta"
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -6911,6 +6911,31 @@ def book_detail(book_id: str):
         all_sessions=all_sessions_data,
         total_pages=total_pages,
         total_time=_format_duration(total_seconds),
+        reading_infographic={
+            "id": book_id,
+            "name": info.get("name", "") or "",
+            "subtitle": info.get("subtitle", "") or "",
+            "author": info.get("author", "") or "",
+            "has_cover": bool(info.get("has_cover")),
+            "cover_hash": info.get("cover_hash", "") or "",
+            "reading_number": current_reading["reading_number"],
+            "status": current_reading["status"] or "",
+            "date_started": _ds_raw,
+            "date_finished": _df_raw if current_reading["status"] == "finished" else None,
+            "rating": avg_rating or 0,
+            "total_pages": total_pages,
+            "progress_pct": progress_pct,
+            "total_seconds": total_seconds,
+            "reading_days": reading_days,
+            "avg_pages_per_day": avg_pages_per_day,
+            "max_pages_per_day": max_pages_per_day,
+            "max_seconds_per_day": _max_seconds_per_day,
+            "avg_pages_per_hour": avg_pages_per_hour,
+            "session_count": len(cur_sessions),
+            "period_count": len(cur_periods),
+            "is_pct_format": is_pct_format,
+            "version": APP_VERSION,
+        },
         effective_pages=effective_pages,
         has_cover=bool(info.get("has_cover")),
         last_date=last_date,

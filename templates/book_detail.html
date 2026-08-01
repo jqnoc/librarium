@@ -324,6 +324,344 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% endfor %}
 </div>
 {% endif %}
+<!-- ── Reading infographic ──────────────────────────────────────────── -->
+{% if readings and reading_infographic %}
+<div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--lb-border); display: flex; justify-content: center;">
+    <button onclick="openReadingInfographicModal()"
+            class="btn btn-primary"
+            style="font-size: 1rem; padding: 0.7rem 2rem; display: flex; align-items: center; gap: 0.5rem;">
+        &#127912; <span data-i18n="book.generateInfographic">Generate Infographic</span>
+    </button>
+</div>
+
+<div id="readingInfographicModal" class="modal-overlay infographic-modal-overlay"
+     onclick="if(event.target===this)closeReadingInfographicModal()">
+    <div class="modal-box infographic-modal-box">
+        <h3 class="infographic-modal-title" data-i18n="book.readingInfographic.title">Generate Infographic</h3>
+        <div class="infographic-modal-grid">
+            <label class="infographic-modal-label">
+                <span data-i18n="yearBooks.infographic.width">Width (px)</span>
+                <input type="number" id="readingInfW" value="1600" min="800" max="8000" step="10"
+                       class="infographic-modal-input">
+            </label>
+            <label class="infographic-modal-label">
+                <span data-i18n="yearBooks.infographic.height">Height (px)</span>
+                <input type="number" id="readingInfH" value="1000" min="600" max="8000" step="10"
+                       class="infographic-modal-input">
+            </label>
+        </div>
+        <p class="infographic-modal-note" data-i18n="book.readingInfographic.note">Export the selected reading's dates and statistics as a PNG.</p>
+        <div class="infographic-modal-actions">
+            <button onclick="closeReadingInfographicModal()"
+                    class="btn btn-secondary" data-i18n="yearBooks.infographic.cancel">Cancel</button>
+            <button onclick="generateReadingInfographic()" id="readingInfGenerateBtn"
+                    class="btn btn-primary"
+                    style="display:flex; align-items:center; gap:0.4rem;">
+                &#127912; <span data-i18n="yearBooks.infographic.generate">Generate &amp; Download</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+    const DATA = {{ reading_infographic | tojson }};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var modal = document.getElementById('readingInfographicModal');
+        if (modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    });
+
+    function _t(key, fallback) {
+        var i18n = window.librariumI18n;
+        return i18n && typeof i18n.t === 'function' ? i18n.t(key) : fallback;
+    }
+
+    function _locale() {
+        return window.librariumI18n && window.librariumI18n.getLang() === 'es' ? 'es-ES' : 'en-US';
+    }
+
+    function _number(value, decimals) {
+        if (!Number.isFinite(Number(value))) return '—';
+        return Number(value).toLocaleString(_locale(), {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        });
+    }
+
+    function _duration(seconds) {
+        var total = Math.max(0, Math.round(Number(seconds) || 0));
+        var hours = Math.floor(total / 3600);
+        var minutes = Math.floor((total % 3600) / 60);
+        if (hours > 0) return hours + 'h ' + minutes + 'm';
+        return minutes + 'm';
+    }
+
+    function _date(raw) {
+        if (!raw) return '—';
+        var bits = raw.split('-').map(Number);
+        if (bits.length !== 3 || bits.some(function (part) { return !Number.isFinite(part); })) return raw;
+        return new Date(bits[0], bits[1] - 1, bits[2]).toLocaleDateString(_locale(), {
+            year: 'numeric', month: 'short', day: 'numeric'
+        });
+    }
+
+    function _status(status) {
+        var keys = {
+            reading: 'bookForm.statusReading',
+            finished: 'bookForm.statusFinished',
+            'not-started': 'bookForm.statusNotStarted',
+            abandoned: 'bookForm.statusAbandoned',
+            wishlist: 'bookForm.statusWishlist',
+            draft: 'bookForm.statusDraft',
+        };
+        if (!keys[status]) return status ? status.replace('-', ' ') : '—';
+        return _t(keys[status], status.replace('-', ' '));
+    }
+
+    function _trunc(ctx, text, maxWidth) {
+        text = text || '';
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        var low = 0;
+        var high = text.length;
+        while (low < high - 1) {
+            var middle = (low + high) >> 1;
+            if (ctx.measureText(text.slice(0, middle) + '\u2026').width <= maxWidth) low = middle;
+            else high = middle;
+        }
+        return text.slice(0, low) + '\u2026';
+    }
+
+    function _rrect(ctx, x, y, width, height, radius) {
+        radius = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + width, y, x + width, y + height, radius);
+        ctx.arcTo(x + width, y + height, x, y + height, radius);
+        ctx.arcTo(x, y + height, x, y, radius);
+        ctx.arcTo(x, y, x + width, y, radius);
+        ctx.closePath();
+    }
+
+    window.openReadingInfographicModal = function () {
+        var modal = document.getElementById('readingInfographicModal');
+        if (modal) modal.classList.add('active');
+    };
+
+    window.closeReadingInfographicModal = function () {
+        var modal = document.getElementById('readingInfographicModal');
+        if (modal) modal.classList.remove('active');
+    };
+
+    window.generateReadingInfographic = async function () {
+        var width = Math.max(800, Math.min(8000, parseInt(document.getElementById('readingInfW').value, 10) || 1600));
+        var height = Math.max(600, Math.min(8000, parseInt(document.getElementById('readingInfH').value, 10) || 1000));
+        var button = document.getElementById('readingInfGenerateBtn');
+        var buttonLabel = button ? button.querySelector('span') : null;
+        var originalLabel = buttonLabel ? buttonLabel.textContent : '';
+        if (buttonLabel) buttonLabel.textContent = '\u2026';
+        if (button) button.disabled = true;
+
+        try {
+            var canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            var ctx = canvas.getContext('2d');
+            var BG1 = '#1b303d';
+            var BG2 = '#0d1d25';
+            var ACCENT = '#44A194';
+            var GOLD = '#EC8F8D';
+            var TEXT = '#e8f4f8';
+            var SUB = '#7eaab8';
+            var CARD = '#1e2e38';
+            var pad = Math.round(width * 0.045);
+            var footerHeight = Math.round(height * 0.055);
+            var headerHeight = Math.round(height * 0.23);
+            var contentTop = headerHeight + Math.round(height * 0.025);
+            var contentHeight = height - contentTop - footerHeight - Math.round(height * 0.025);
+            var contentWidth = width - pad * 2;
+            var gap = Math.max(12, Math.round(width * 0.012));
+
+            var background = ctx.createLinearGradient(0, 0, width * 0.6, height);
+            background.addColorStop(0, BG1);
+            background.addColorStop(1, BG2);
+            ctx.fillStyle = background;
+            ctx.fillRect(0, 0, width, height);
+
+            var dotStep = Math.max(12, Math.round(width / 72));
+            ctx.fillStyle = 'rgba(255,255,255,0.022)';
+            for (var dotX = pad; dotX < width - pad; dotX += dotStep) {
+                for (var dotY = contentTop; dotY < height - footerHeight; dotY += dotStep) {
+                    ctx.fillRect(dotX, dotY, 1.5, 1.5);
+                }
+            }
+
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.font = '800 ' + Math.round(height * 0.058) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = GOLD;
+            ctx.fillText(_trunc(ctx, DATA.name, contentWidth * 0.72), pad, Math.round(height * 0.075));
+            ctx.font = '400 ' + Math.round(height * 0.022) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = TEXT;
+            var byline = [DATA.author, DATA.subtitle].filter(Boolean).join(' | ');
+            ctx.fillText(_trunc(ctx, byline, contentWidth * 0.72), pad, Math.round(height * 0.125));
+            ctx.font = '600 ' + Math.round(height * 0.021) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = SUB;
+            var dateLine = _t('book.readingInfographic.started', 'Started') + ': ' + _date(DATA.date_started) +
+                '  |  ' + _t('book.readingInfographic.finished', 'Finished') + ': ' +
+                (DATA.date_finished ? _date(DATA.date_finished) : _t('book.readingInfographic.inProgress', 'In progress'));
+            ctx.fillText(_trunc(ctx, dateLine, contentWidth * 0.72), pad, Math.round(height * 0.175));
+
+            ctx.textAlign = 'right';
+            ctx.font = '700 ' + Math.round(height * 0.031) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = TEXT;
+            ctx.fillText(_t('book.readingInfographic.header', 'Reading summary') + ' #' + DATA.reading_number, width - pad, Math.round(height * 0.10));
+            ctx.font = '500 ' + Math.round(height * 0.021) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = SUB;
+            ctx.fillText(_status(DATA.status), width - pad, Math.round(height * 0.145));
+
+            var separator = ctx.createLinearGradient(pad, 0, pad + contentWidth * 0.6, 0);
+            separator.addColorStop(0, ACCENT);
+            separator.addColorStop(1, 'rgba(68,161,148,0)');
+            ctx.fillStyle = separator;
+            ctx.fillRect(pad, headerHeight - 2, contentWidth, 2);
+
+            var coverWidth = Math.min(Math.round(contentWidth * 0.28), Math.round(contentHeight / 1.5));
+            var coverHeight = Math.min(contentHeight, Math.round(coverWidth * 1.5));
+            var coverX = pad;
+            var coverY = contentTop + Math.round((contentHeight - coverHeight) / 2);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur = Math.round(coverWidth * 0.07);
+            ctx.shadowOffsetY = Math.round(coverWidth * 0.035);
+            ctx.fillStyle = CARD;
+            _rrect(ctx, coverX, coverY, coverWidth, coverHeight, 7);
+            ctx.fill();
+            ctx.restore();
+
+            if (DATA.has_cover) {
+                await new Promise(function (resolve) {
+                    var image = new Image();
+                    image.onload = function () {
+                        ctx.save();
+                        _rrect(ctx, coverX, coverY, coverWidth, coverHeight, 7);
+                        ctx.clip();
+                        var imageRatio = image.naturalWidth / image.naturalHeight;
+                        var coverRatio = coverWidth / coverHeight;
+                        var sourceX = 0;
+                        var sourceY = 0;
+                        var sourceWidth = image.naturalWidth;
+                        var sourceHeight = image.naturalHeight;
+                        if (imageRatio > coverRatio) {
+                            sourceWidth = sourceHeight * coverRatio;
+                            sourceX = (image.naturalWidth - sourceWidth) / 2;
+                        } else {
+                            sourceHeight = sourceWidth / coverRatio;
+                            sourceY = (image.naturalHeight - sourceHeight) / 2;
+                        }
+                        ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, coverX, coverY, coverWidth, coverHeight);
+                        ctx.restore();
+                        resolve();
+                    };
+                    image.onerror = resolve;
+                    image.src = '/cover_thumb/' + DATA.id + (DATA.cover_hash ? '?v=' + encodeURIComponent(DATA.cover_hash) : '');
+                });
+            } else {
+                ctx.save();
+                _rrect(ctx, coverX, coverY, coverWidth, coverHeight, 7);
+                ctx.clip();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = Math.round(coverWidth * 0.25) + 'px system-ui';
+                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                ctx.fillText('\uD83D\uDCD6', coverX + coverWidth / 2, coverY + coverHeight / 2);
+                ctx.restore();
+            }
+
+            var metrics = [
+                { label: _t('book.readingInfographic.overallRating', 'Overall Rating'), value: DATA.rating > 0 ? _number(DATA.rating, 2) + ' / 5' : '—' },
+                { label: DATA.is_pct_format ? _t('book.progress', 'Progress') : _t('book.pagesRead', 'Pages Read'), value: DATA.is_pct_format ? _number(DATA.progress_pct, 1) + '%' : _number(DATA.total_pages, 0) },
+                { label: _t('book.totalTime', 'Total Time'), value: _duration(DATA.total_seconds) },
+                { label: _t('book.readingDays', 'Reading Days'), value: _number(DATA.reading_days, 0) },
+                { label: _t('book.readingInfographic.avgTimeDay', 'Avg Time/Day'), value: DATA.reading_days ? _duration(DATA.total_seconds / DATA.reading_days) : '—' },
+                { label: _t('book.mostTimeDay', 'Most Time/Day'), value: _duration(DATA.max_seconds_per_day) },
+                { label: _t('book.readingInfographic.sessions', 'Sessions'), value: _number(DATA.session_count, 0) },
+                { label: _t('book.readingInfographic.periods', 'Periods'), value: _number(DATA.period_count, 0) },
+                { label: _t('book.readingInfographic.status', 'Status'), value: _status(DATA.status) },
+            ];
+            if (!DATA.is_pct_format) {
+                metrics.splice(4, 0,
+                    { label: _t('book.avgPagesDay', 'Avg Pages/Day'), value: _number(DATA.avg_pages_per_day, 1) },
+                    { label: _t('book.mostPagesDay', 'Most Pages/Day'), value: _number(DATA.max_pages_per_day, 0) },
+                    { label: _t('book.avgPagesHour', 'Avg Pages/Hour'), value: _number(DATA.avg_pages_per_hour, 1) }
+                );
+            }
+
+            var metricsX = coverX + coverWidth + gap * 1.5;
+            var metricsWidth = width - pad - metricsX;
+            var columns = 3;
+            var rows = Math.ceil(metrics.length / columns);
+            var metricGap = Math.max(10, Math.round(width * 0.009));
+            var metricWidth = (metricsWidth - metricGap * (columns - 1)) / columns;
+            var metricHeight = (contentHeight - metricGap * (rows - 1)) / rows;
+            metrics.forEach(function (metric, index) {
+                var column = index % columns;
+                var row = Math.floor(index / columns);
+                var x = metricsX + column * (metricWidth + metricGap);
+                var y = contentTop + row * (metricHeight + metricGap);
+                ctx.fillStyle = 'rgba(30,46,56,0.94)';
+                ctx.strokeStyle = 'rgba(126,170,184,0.26)';
+                ctx.lineWidth = 1;
+                _rrect(ctx, x, y, metricWidth, metricHeight, 7);
+                ctx.fill();
+                ctx.stroke();
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+                ctx.font = '600 ' + Math.max(11, Math.round(height * 0.017)) + 'px system-ui,-apple-system,sans-serif';
+                ctx.fillStyle = SUB;
+                ctx.fillText(_trunc(ctx, metric.label.toUpperCase(), metricWidth - 28), x + 14, y + Math.round(metricHeight * 0.34));
+                ctx.font = '800 ' + Math.max(18, Math.round(height * 0.032)) + 'px system-ui,-apple-system,sans-serif';
+                ctx.fillStyle = TEXT;
+                ctx.fillText(_trunc(ctx, String(metric.value), metricWidth - 28), x + 14, y + Math.round(metricHeight * 0.70));
+            });
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '300 ' + Math.max(10, Math.round(height * 0.017)) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.18)';
+            ctx.fillText(
+                _t('book.readingInfographic.generatedWith', 'Generated with Librarium v{version}').replace('{version}', DATA.version),
+                width / 2,
+                height - footerHeight / 2
+            );
+
+            await new Promise(function (resolve) {
+                canvas.toBlob(function (blob) {
+                    if (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var link = document.createElement('a');
+                        var safeName = (DATA.name || 'book').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'book';
+                        link.download = 'librarium-' + safeName + '-reading-' + DATA.reading_number + '.png';
+                        link.href = url;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    resolve();
+                }, 'image/png');
+            });
+        } catch (error) {
+            console.error('Unable to generate reading infographic', error);
+            window.alert(_t('book.readingInfographic.error', 'Unable to generate the infographic.'));
+        } finally {
+            if (buttonLabel) buttonLabel.textContent = originalLabel;
+            if (button) button.disabled = false;
+            closeReadingInfographicModal();
+        }
+    };
+})();
+</script>
+
 <!-- ── Reading statistics summary ────────────────────────────────────── -->
 <h2 data-i18n="book.readingStats">Reading Stats</h2>{% if readings | length > 1 %} <span style="font-size: 0.75em; color: var(--lb-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}
 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">    {% if date_started and info.get('status') in ('reading', 'finished') %}
