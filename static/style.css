@@ -1023,13 +1023,13 @@ select.form-control { cursor: pointer; }
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
 }
-.edit-metadata-form .form-row {
+.book-metadata-form .form-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.edit-metadata-form .form-row > .form-group {
+.book-metadata-form .form-row > .form-group {
     min-width: 0;
 }
-.edit-metadata-form .classification-row {
+.book-metadata-form .classification-row {
     grid-template-columns: 1fr;
 }
 .classification-card {
@@ -1298,7 +1298,7 @@ select.form-control { cursor: pointer; }
     .author-photo-large { width: 140px; margin: 0 auto; }
     .meta-grid { grid-template-columns: 1fr; }
     .form-row { grid-template-columns: 1fr; }
-    .edit-metadata-form .form-row { grid-template-columns: 1fr; }
+    .book-metadata-form .form-row { grid-template-columns: 1fr; }
     .header-inner { flex-direction: column; gap: .5rem; }
     .source-panel-header { flex-direction: column; }
     .sources-map { height: 280px; }

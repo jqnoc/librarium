@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Currently Reading cards now preserve the original progress line, accent the percentage like estimated time left, keep matching metadata spacing, and omit seconds from read and estimated-left times
-- Edit Metadata now keeps Status in Basic Information, places the dedicated full-width Classification section between Series and Summary with chip-style editing and usable suggestion dropdowns, orders Publication Details into the requested three-column rows, groups Original Work into one three-column row, arranges Contributors into two three-column rows with Foreword/Introduction, Epilogue, and Contributing Author fields, and arranges Book Source fields into three-column rows while preserving existing Prologue Author data; paper-book bindings include Softcover
+- Add New Book and Edit Metadata now share the same ordered metadata form layout, including full-width Classification chip editing between Series and Summary, while preserving their mode-specific controls; Publication Details use the requested three-column rows, Original Work uses one three-column row, Contributors use two three-column rows with Foreword/Introduction, Epilogue, and Contributing Author fields, and Book Source fields use three-column rows while preserving existing Prologue Author data; paper-book bindings include Softcover
 - Books now store Genres separately from Tags, with independent Book Details displays and Dashboard and Global Stats clouds
 - Currently Reading dashboard cards now show an estimated time remaining after the reading progress
 - Words of the Day can now be edited directly from the Dashboard and saved to their books
