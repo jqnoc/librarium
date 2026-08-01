@@ -6845,6 +6845,32 @@ def book_detail(book_id: str):
             est_seconds = int(pages_remaining / avg_pages_per_hour * 3600)
             est_time_to_finish = _format_duration(est_seconds)
 
+    progress_timeline = []
+    if is_pct_format:
+        progress_by_date: dict[str, float] = {}
+        for session in cur_sessions:
+            if session["date"] and session.get("progress_pct") is not None:
+                progress = max(0.0, min(float(session["progress_pct"]), 100.0))
+                progress_by_date[session["date"]] = max(progress_by_date.get(session["date"], 0.0), progress)
+        for period in cur_periods:
+            progress_date = period.get("end_date") or period.get("start_date")
+            if progress_date and period.get("progress_pct") is not None:
+                progress = max(0.0, min(float(period["progress_pct"]), 100.0))
+                progress_by_date[progress_date] = max(progress_by_date.get(progress_date, 0.0), progress)
+        progress_timeline = [
+            {"date": day, "progress": round(progress, 1)}
+            for day, progress in sorted(progress_by_date.items())
+        ]
+    else:
+        cumulative_pages = 0
+        for day in sorted(daily_activity):
+            cumulative_pages += daily_activity[day]["pages"]
+            progress = (cumulative_pages / effective_pages * 100) if effective_pages > 0 else 0
+            progress_timeline.append({
+                "date": day,
+                "progress": round(min(progress, 100), 1),
+            })
+
     source_obj = None
     if info.get("source_id"):
         source_obj = _get_source_by_id(info["source_id"])
@@ -7034,6 +7060,7 @@ def book_detail(book_id: str):
             "avg_pages_per_day": avg_pages_per_day,
             "max_pages_per_day": max_pages_per_day,
             "max_seconds_per_day": _max_seconds_per_day,
+            "progress_timeline": progress_timeline,
             "avg_pages_per_hour": avg_pages_per_hour,
             "session_count": len(cur_sessions),
             "period_count": len(cur_periods),
