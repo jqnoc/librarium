@@ -351,13 +351,12 @@
                             {% endfor %}
                         </select>
                     </div>
-                </div>
-                <div class="form-row" id="price-row">
                     <div class="form-group">
-                        <label for="purchase_price" data-i18n="bookForm.price">Price</label>
-                        <input type="text" id="purchase_price" name="purchase_price" class="form-control" placeholder="e.g. 15.99€">
+                        <div id="price-row">
+                            <label for="purchase_price" data-i18n="bookForm.price">Price</label>
+                            <input type="text" id="purchase_price" name="purchase_price" class="form-control" placeholder="e.g. 15.99€">
+                        </div>
                     </div>
-                    <div class="form-group"></div>
                 </div>
             </div>
             <div id="borrowed-fields" style="display: none;">
@@ -371,9 +370,6 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="form-group"></div>
-                </div>
-                <div class="form-row">
                     <div class="form-group">
                         <label for="borrowed_start" data-i18n="bookForm.borrowedFrom">Borrowed From</label>
                         <input type="text" id="borrowed_start" name="borrowed_start" class="form-control">
