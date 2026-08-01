@@ -11,7 +11,26 @@
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     {% block head_extra %}{% endblock %}
     <script>
-        // No palette switching needed — single Librarium theme
+        (function () {
+            var theme = localStorage.getItem('librarium_theme') === 'dark' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        }());
+
+        function updateLibrariumThemeControl() {
+            var button = document.getElementById('themeToggle');
+            if (!button) return;
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            button.textContent = isDark ? '☀' : '☾';
+            button.setAttribute('aria-pressed', String(isDark));
+        }
+
+        function toggleLibrariumTheme() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var theme = isDark ? 'light' : 'dark';
+            localStorage.setItem('librarium_theme', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            updateLibrariumThemeControl();
+        }
     </script>
 </head>
 <body>
@@ -77,6 +96,7 @@
                 <a href="{{ url_for('activity') }}" data-i18n="nav.activity">Activity</a>
                 <a href="{{ url_for('sources_list') }}" data-i18n="nav.sources">Sources</a>
                 <a href="#" onclick="event.preventDefault();document.getElementById('addBookModal').style.display='flex'" data-i18n="nav.addBook">+ Add Book</a>
+                <button type="button" class="theme-toggle-btn" id="themeToggle" onclick="toggleLibrariumTheme()" title="Toggle dark mode" data-i18n-title="theme.toggle" data-i18n-aria-label="theme.toggle" aria-pressed="false">☾</button>
                 <span class="lang-toggle"><button class="lang-btn" data-lang="en">EN</button><span class="lang-sep">|</span><button class="lang-btn" data-lang="es">ES</button></span>
                 <script>
                 (function(){var l=localStorage.getItem('librarium_lang')||'en';document.querySelectorAll('.lang-btn').forEach(function(b){b.classList.toggle('active',b.dataset.lang===l);});})();

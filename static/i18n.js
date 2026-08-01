@@ -20,6 +20,7 @@
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
         'nav.minimize':     { en: 'Minimize Librarium', es: 'Minimizar Librarium' },
         'nav.close':        { en: 'Close Librarium', es: 'Cerrar Librarium' },
+        'theme.toggle':     { en: 'Toggle dark mode', es: 'Alternar modo oscuro' },
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
 
         // ── Library selector / management ───────────────────────────────
@@ -910,6 +911,13 @@
             var entry = translations[key];
             if (entry) el.title = entry[lang] || entry['en'];
         });
+
+        // Accessible labels
+        document.querySelectorAll('[data-i18n-aria-label]').forEach(function (el) {
+            var key = el.getAttribute('data-i18n-aria-label');
+            var entry = translations[key];
+            if (entry) el.setAttribute('aria-label', entry[lang] || entry['en']);
+        });
     }
 
     function updateToggleButtons(lang) {
@@ -1049,6 +1057,9 @@
         applyTranslations(lang);
         formatDates(lang);
         updateToggleButtons(lang);
+        if (typeof window.updateLibrariumThemeControl === 'function') {
+            window.updateLibrariumThemeControl();
+        }
 
         // Bind click handlers on language buttons (event delegation)
         document.addEventListener('click', function (e) {

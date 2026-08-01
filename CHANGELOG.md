@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
 - Dashboard now provides a taxonomy audit across Genres, Subgenres, Themes, Settings, Historical Periods, Subjects, and Audiences, with seven filterable clouds, one CSV listing every value with matching book counts and titles, and linked Library Health gaps
+- Add a persistent dark-mode theme toggle to the global header
 
 ### Changed
 - Currently Reading cards now preserve the original progress line, accent the percentage like estimated time left, keep matching metadata spacing, and omit seconds from read and estimated-left times
