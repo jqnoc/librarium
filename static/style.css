@@ -1029,6 +1029,131 @@ select.form-control { cursor: pointer; }
 .edit-metadata-form .form-row > .form-group {
     min-width: 0;
 }
+.edit-metadata-form .classification-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.classification-editor {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .35rem;
+    min-height: 2.7rem;
+    padding: .3rem .55rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    transition: border-color .15s, box-shadow .15s;
+}
+.classification-editor:focus-within {
+    border-color: var(--lb-orange);
+    box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
+.classification-chips {
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: .35rem;
+    min-width: 0;
+}
+.classification-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    max-width: 100%;
+    padding: .25rem .45rem .25rem .65rem;
+    border: 1px solid rgba(83, 125, 150, .25);
+    border-radius: 100px;
+    background: var(--lb-accent-faint);
+    color: var(--lb-dark);
+    font-size: .84rem;
+    line-height: 1.2;
+}
+.classification-chip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.classification-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--lb-deep-orange);
+    cursor: pointer;
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1;
+}
+.classification-chip-remove:hover,
+.classification-chip-remove:focus-visible {
+    background: var(--lb-deep-orange);
+    color: var(--lb-white);
+    outline: none;
+}
+.classification-input {
+    flex: 1 1 8rem;
+    min-width: 8rem;
+    width: auto;
+    padding: .35rem .15rem;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--lb-text);
+    font: inherit;
+}
+.classification-input::placeholder {
+    color: var(--lb-text-light);
+    opacity: .75;
+}
+.classification-suggestions {
+    position: absolute;
+    top: calc(100% + .3rem);
+    right: 0;
+    left: 0;
+    z-index: 100;
+    display: none;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: .25rem 0;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    box-shadow: var(--lb-shadow-lg);
+}
+.classification-suggestions.is-open {
+    display: block;
+}
+.classification-suggestion {
+    padding: .45rem .75rem;
+    color: var(--lb-text);
+    cursor: pointer;
+    font-size: .88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.classification-suggestion:hover,
+.classification-suggestion.is-active {
+    background: var(--lb-bg);
+    color: var(--lb-accent);
+}
+.classification-hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
 .btn {

@@ -31,33 +31,6 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="genres" data-i18n="bookForm.genres">Genres</label>
-                    <input type="text" id="genres" name="genres" class="form-control" list="genres-list" value="{{ info.get('genres', '') }}">
-                    <datalist id="genres-list">
-                        {% for v in suggestions.genres %}<option value="{{ v }}">{% endfor %}
-                    </datalist>
-                </div>
-                <div class="form-group">
-                    <label for="tags" data-i18n="bookForm.tags">Tags</label>
-                    <input type="text" id="tags" name="tags" class="form-control" list="tags-list" value="{{ info.get('tags', '') }}">
-                    <datalist id="tags-list">
-                        {% for v in suggestions.tags %}<option value="{{ v }}">{% endfor %}
-                    </datalist>
-                </div>
-                <div class="form-group">
-                    <label for="status" data-i18n="bookForm.status">Status</label>
-                    <select id="status" name="status" class="form-control">
-                        <option value="reading" {{ 'selected' if info.get('status') == 'reading' }} data-i18n="bookForm.statusReading">Reading</option>
-                        <option value="finished" {{ 'selected' if info.get('status') == 'finished' }} data-i18n="bookForm.statusFinished">Finished</option>
-                        <option value="not-started" {{ 'selected' if info.get('status') == 'not-started' }} data-i18n="bookForm.statusNotStarted">Not Started</option>
-                        <option value="abandoned" {{ 'selected' if info.get('status') == 'abandoned' }} data-i18n="bookForm.statusAbandoned">Abandoned</option>
-                        <option value="wishlist" {{ 'selected' if info.get('status') == 'wishlist' }} data-i18n="bookForm.statusWishlist">Wishlist</option>
-                        <option value="draft" {{ 'selected' if info.get('status') == 'draft' }} data-i18n="bookForm.statusDraft">Draft</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
                     <label for="language" data-i18n="bookForm.language">Language</label>
                     <input type="text" id="language" name="language" class="form-control" list="language-list" value="{{ info.get('language', '') }}">
                     <datalist id="language-list">
@@ -72,7 +45,71 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="form-group">
+                    <label for="status" data-i18n="bookForm.status">Status</label>
+                    <select id="status" name="status" class="form-control">
+                        <option value="reading" {{ 'selected' if info.get('status') == 'reading' }} data-i18n="bookForm.statusReading">Reading</option>
+                        <option value="finished" {{ 'selected' if info.get('status') == 'finished' }} data-i18n="bookForm.statusFinished">Finished</option>
+                        <option value="not-started" {{ 'selected' if info.get('status') == 'not-started' }} data-i18n="bookForm.statusNotStarted">Not Started</option>
+                        <option value="abandoned" {{ 'selected' if info.get('status') == 'abandoned' }} data-i18n="bookForm.statusAbandoned">Abandoned</option>
+                        <option value="wishlist" {{ 'selected' if info.get('status') == 'wishlist' }} data-i18n="bookForm.statusWishlist">Wishlist</option>
+                        <option value="draft" {{ 'selected' if info.get('status') == 'draft' }} data-i18n="bookForm.statusDraft">Draft</option>
+                    </select>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <h3 style="margin-top:0;" data-i18n="bookForm.classification">Classification</h3>
+            <div class="form-row classification-row">
+                <div class="form-group">
+                    <label for="genres-input" data-i18n="bookForm.genres">Genres</label>
+                    <div class="classification-editor" data-classification-editor data-field="genres">
+                        <div class="classification-chips" data-chips-container aria-live="polite">
+                            {% for value in (info.get('genres', '') or '').split(';') %}
+                            {% if value.strip() %}
+                            <span class="classification-chip">
+                                <span class="classification-chip-label">{{ value.strip() }}</span>
+                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <input type="text" id="genres-input" class="classification-input" data-chip-input autocomplete="off"
+                               placeholder="Add a genre" data-i18n-placeholder="bookForm.addGenre">
+                           <div class="classification-suggestions" data-classification-suggestions id="genres-suggestions" role="listbox" aria-label="Genre suggestions"></div>
+                    </div>
+                    <input type="hidden" id="genres" name="genres" value="{{ info.get('genres', '') }}">
+                    <datalist id="genres-list">
+                        {% for v in suggestions.genres %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="tags-input" data-i18n="bookForm.tags">Tags</label>
+                    <div class="classification-editor" data-classification-editor data-field="tags">
+                        <div class="classification-chips" data-chips-container aria-live="polite">
+                            {% for value in (info.get('tags', '') or '').split(';') %}
+                            {% if value.strip() %}
+                            <span class="classification-chip">
+                                <span class="classification-chip-label">{{ value.strip() }}</span>
+                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <input type="text" id="tags-input" class="classification-input" data-chip-input autocomplete="off"
+                               placeholder="Add a tag" data-i18n-placeholder="bookForm.addTag">
+                           <div class="classification-suggestions" data-classification-suggestions id="tags-suggestions" role="listbox" aria-label="Tag suggestions"></div>
+                    </div>
+                    <input type="hidden" id="tags" name="tags" value="{{ info.get('tags', '') }}">
+                    <datalist id="tags-list">
+                        {% for v in suggestions.tags %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <p class="classification-hint" data-i18n="bookForm.classificationHint">Add one item at a time, then press Enter or type a comma. Select an existing value from the suggestions.</p>
         </div>
     </div>
 
@@ -498,11 +535,223 @@ toggleSourceFields();
 
 {% block scripts %}
 <script>
-document.getElementById('add-series-btn').addEventListener('click', function() {
-    var tmpl = document.getElementById('series-row-template');
-    var clone = tmpl.content.cloneNode(true);
-    document.getElementById('series-entries').appendChild(clone);
-    if (window.librariumI18n) window.librariumI18n.apply();
-});
+(function () {
+    function normalize(value) {
+        return (value || '').trim().replace(/\s+/g, ' ');
+    }
+
+    function initClassificationEditor(editor) {
+        if (editor.dataset.initialized) return;
+        editor.dataset.initialized = 'true';
+
+        var field = editor.dataset.field;
+        var hidden = document.getElementById(field);
+        var input = editor.querySelector('[data-chip-input]');
+        var chips = editor.querySelector('[data-chips-container]');
+        var suggestionsBox = editor.querySelector('[data-classification-suggestions]');
+        var suggestions = Array.from(document.querySelectorAll('#' + field + '-list option')).map(function (option) {
+            return normalize(option.value);
+        }).filter(Boolean);
+        var visibleSuggestions = [];
+        var activeSuggestion = -1;
+
+        function values() {
+            return Array.from(chips.querySelectorAll('.classification-chip-label')).map(function (label) {
+                return normalize(label.textContent);
+            }).filter(Boolean);
+        }
+
+        function sync() {
+            hidden.value = values().join('; ');
+        }
+
+        function removeDuplicateChips() {
+            var seen = {};
+            Array.from(chips.querySelectorAll('.classification-chip')).forEach(function (chip) {
+                var label = chip.querySelector('.classification-chip-label');
+                var value = normalize(label && label.textContent);
+                var key = value.toLowerCase();
+                if (!value || seen[key]) {
+                    chip.remove();
+                    return;
+                }
+                seen[key] = true;
+            });
+        }
+
+        function hideSuggestions() {
+            suggestionsBox.innerHTML = '';
+            suggestionsBox.classList.remove('is-open');
+            suggestionsBox.setAttribute('aria-expanded', 'false');
+            visibleSuggestions = [];
+            activeSuggestion = -1;
+            input.removeAttribute('aria-activedescendant');
+        }
+
+        function updateActiveSuggestion() {
+            Array.from(suggestionsBox.querySelectorAll('[role="option"]')).forEach(function (item, index) {
+                item.classList.toggle('is-active', index === activeSuggestion);
+                item.setAttribute('aria-selected', index === activeSuggestion ? 'true' : 'false');
+            });
+            if (activeSuggestion >= 0 && visibleSuggestions[activeSuggestion]) {
+                input.setAttribute('aria-activedescendant', field + '-suggestion-' + activeSuggestion);
+            } else {
+                input.removeAttribute('aria-activedescendant');
+            }
+        }
+
+        function renderSuggestions() {
+            var typed = normalize(input.value).toLowerCase();
+            var existing = values().map(function (value) { return value.toLowerCase(); });
+            visibleSuggestions = suggestions.filter(function (value) {
+                var lower = value.toLowerCase();
+                return (!typed || lower.indexOf(typed) !== -1) && existing.indexOf(lower) === -1;
+            });
+            suggestionsBox.innerHTML = '';
+            activeSuggestion = -1;
+
+            if (!visibleSuggestions.length) {
+                hideSuggestions();
+                return;
+            }
+
+            visibleSuggestions.forEach(function (value, index) {
+                var item = document.createElement('div');
+                item.className = 'classification-suggestion';
+                item.id = field + '-suggestion-' + index;
+                item.setAttribute('role', 'option');
+                item.setAttribute('aria-selected', 'false');
+                item.textContent = value;
+                item.addEventListener('mousedown', function (event) {
+                    event.preventDefault();
+                    addValue(value);
+                    input.value = '';
+                    sync();
+                    hideSuggestions();
+                    input.focus();
+                });
+                suggestionsBox.appendChild(item);
+            });
+            suggestionsBox.classList.add('is-open');
+            suggestionsBox.setAttribute('aria-expanded', 'true');
+        }
+
+        function addValue(value) {
+            var normalized = normalize(value);
+            if (!normalized || values().some(function (item) {
+                return item.toLowerCase() === normalized.toLowerCase();
+            })) return;
+
+            var chip = document.createElement('span');
+            chip.className = 'classification-chip';
+            var label = document.createElement('span');
+            label.className = 'classification-chip-label';
+            label.textContent = normalized;
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'classification-chip-remove';
+            remove.setAttribute('data-remove-chip', '');
+            remove.setAttribute('aria-label', 'Remove ' + normalized);
+            remove.textContent = '×';
+            chip.appendChild(label);
+            chip.appendChild(remove);
+            chips.appendChild(chip);
+        }
+
+        function addInputValue(keepFocus) {
+            input.value.split(/[;,]/).forEach(addValue);
+            input.value = '';
+            sync();
+            if (keepFocus !== false) input.focus();
+            renderSuggestions();
+        }
+
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-controls', suggestionsBox.id);
+        suggestionsBox.setAttribute('aria-expanded', 'false');
+        removeDuplicateChips();
+        sync();
+
+        input.addEventListener('focus', renderSuggestions);
+        input.addEventListener('click', renderSuggestions);
+        input.addEventListener('input', function () {
+            if (/[;,]/.test(input.value)) {
+                addInputValue();
+                return;
+            }
+            renderSuggestions();
+        });
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowDown' && visibleSuggestions.length) {
+                event.preventDefault();
+                activeSuggestion = Math.min(activeSuggestion + 1, visibleSuggestions.length - 1);
+                updateActiveSuggestion();
+            } else if (event.key === 'ArrowUp' && visibleSuggestions.length) {
+                event.preventDefault();
+                activeSuggestion = Math.max(activeSuggestion - 1, 0);
+                updateActiveSuggestion();
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (activeSuggestion >= 0 && visibleSuggestions[activeSuggestion]) {
+                    addValue(visibleSuggestions[activeSuggestion]);
+                    input.value = '';
+                    sync();
+                    hideSuggestions();
+                    renderSuggestions();
+                } else {
+                    addInputValue();
+                }
+            } else if (event.key === ',' || event.key === ';') {
+                event.preventDefault();
+                addInputValue();
+            } else if (event.key === 'Backspace' && !input.value.trim()) {
+                var current = chips.lastElementChild;
+                if (current) {
+                    current.remove();
+                    sync();
+                    renderSuggestions();
+                }
+            } else if (event.key === 'Escape') {
+                hideSuggestions();
+            }
+        });
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (input.value.trim()) addInputValue(false);
+                hideSuggestions();
+            }, 120);
+        });
+        chips.addEventListener('click', function (event) {
+            var remove = event.target.closest('[data-remove-chip]');
+            if (!remove) return;
+            remove.closest('.classification-chip').remove();
+            sync();
+            renderSuggestions();
+            input.focus();
+        });
+        editor.addEventListener('click', function (event) {
+            if (event.target === editor || event.target === chips) input.focus();
+        });
+        var form = editor.closest('form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                if (input.value.trim()) addInputValue(false);
+                sync();
+            });
+        }
+    }
+
+    document.querySelectorAll('[data-classification-editor]').forEach(initClassificationEditor);
+}());
+
+var addSeriesButton = document.getElementById('add-series-btn');
+if (addSeriesButton) {
+    addSeriesButton.addEventListener('click', function() {
+        var tmpl = document.getElementById('series-row-template');
+        var clone = tmpl.content.cloneNode(true);
+        document.getElementById('series-entries').appendChild(clone);
+        if (window.librariumI18n) window.librariumI18n.apply();
+    });
+}
 </script>
 {% endblock %}
