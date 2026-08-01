@@ -891,7 +891,8 @@ def init_schema() -> None:
             audio_format              TEXT    DEFAULT NULL,
             total_time_seconds        INTEGER DEFAULT NULL,
             cover_thumb               BLOB    DEFAULT NULL,
-            tags                      TEXT    NOT NULL DEFAULT ''
+            tags                      TEXT    NOT NULL DEFAULT '',
+            genres                    TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS authors (
@@ -1018,6 +1019,7 @@ def _run_all_migrations() -> None:
     migrate_add_performance_indexes()
     migrate_remove_source_short_name()
     migrate_add_source_place_details()
+    migrate_add_genres()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1697,6 +1699,24 @@ def migrate_add_tags() -> None:
     db.commit()
     db.close()
     print(">> Migration complete - tags column added to books.")
+
+
+# ── Migration: Add genres column to books ───────────────────────────────
+def migrate_add_genres() -> None:
+    """Add a separate, initially empty genres column to books."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "genres" in cols:
+        db.close()
+        return
+    print(">> Migrating: adding genres column to books ...")
+    db.execute("ALTER TABLE books ADD COLUMN genres TEXT NOT NULL DEFAULT ''")
+    db.commit()
+    db.close()
+    print(">> Migration complete - genres column added to books.")
 
 
 # ── Migration: Normalize genre capitalization ───────────────────────────
@@ -3562,7 +3582,7 @@ def _build_index_per_reading(db, lib_ids):
     book_rows = db.execute(
         f"SELECT id, name, subtitle, author, status, pages, starting_page, "
         f"has_cover, cover_hash, publisher, language, publication_date, "
-        f"work_id, format, total_time_seconds, tags FROM books WHERE {lf}",
+        f"work_id, format, total_time_seconds, tags, genres FROM books WHERE {lf}",
         lp,
     ).fetchall()
     bk_map = {r["id"]: dict(r) for r in book_rows}
@@ -3708,6 +3728,7 @@ def _build_index_per_reading(db, lib_ids):
             "edition_count": edition_count,
             "reading_number": rnum,
             "tags": bk.get("tags", "") or "",
+            "genres": bk.get("genres", "") or "",
         })
 
     # Only show reading_number when a book appears more than once
@@ -3747,7 +3768,7 @@ def dashboard():
         dict(row)
         for row in db.execute(
             "SELECT id, name, author, pages, starting_page, status, source_type, work_id, "
-            "has_cover, cover_hash, format, tags, language, is_gift "
+            "has_cover, cover_hash, format, tags, genres, language, is_gift "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
         ).fetchall()
@@ -3765,6 +3786,7 @@ def dashboard():
     format_counts: dict[str, int] = Counter()
     source_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
+    genre_counts: dict[str, int] = Counter()
     author_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     rated_values: list[float] = []
@@ -3803,6 +3825,11 @@ def dashboard():
                 tag = tag.strip()
                 if tag:
                     tag_counts[tag] += 1
+        if br["genres"]:
+            for genre in br["genres"].split(";"):
+                genre = genre.strip()
+                if genre:
+                    genre_counts[genre] += 1
 
         avg_value = avg_ratings.get(br["id"])
         if avg_value is not None and avg_value > 0:
@@ -4028,6 +4055,7 @@ def dashboard():
             most_reread = {"name": rbk["name"], "id": rbk["id"], "count": reread_row["cnt"],
                            "has_cover": bool(rbk["has_cover"]), "cover_hash": rbk["cover_hash"] or ""}
 
+    top_genres = dict(Counter(genre_counts).most_common(20))
     top_tags = dict(Counter(tag_counts).most_common(20))
 
     # ── Series progress ──────────────────────────────────────────────────
@@ -4217,7 +4245,8 @@ def dashboard():
         # Format & source
         format_counts=dict(format_counts),
         source_counts=dict(source_counts),
-        # Tags
+        # Genres & tags
+        top_genres=top_genres,
         top_tags=top_tags,
         # Series
         series_progress=series_progress,
@@ -4263,6 +4292,7 @@ def index():
     show_editions = request.args.get("show_editions") or request.cookies.get("librarium_show_editions", "0")
     show_readings = request.args.get("show_readings") or request.cookies.get("librarium_show_readings", "0")
     tag_filter = request.args.get("tag", "").strip()
+    genre_filter = request.args.get("genre", "").strip()
     if show_editions != "1":
         show_readings = "0"
 
@@ -4289,6 +4319,7 @@ def index():
             b.format,
             b.total_time_seconds,
             b.tags,
+            b.genres,
             COALESCE(sess.total_pages, 0)   AS session_pages,
             COALESCE(sess.total_seconds, 0) AS session_seconds,
             COALESCE(sess.reading_days, 0)  AS reading_days,
@@ -4423,6 +4454,7 @@ def index():
                 "edition_count": edition_count,
                 "reading_number": None,
                 "tags": r["tags"] or "",
+                "genres": r["genres"] or "",
             })
 
     # Sorting helpers
@@ -4457,6 +4489,9 @@ def index():
     if tag_filter:
         tag_lower = tag_filter.lower()
         books = [b for b in books if tag_lower in [t.strip().lower() for t in b.get("tags", "").split(";") if t.strip()]]
+    if genre_filter:
+        genre_lower = genre_filter.lower()
+        books = [b for b in books if genre_lower in [g.strip().lower() for g in b.get("genres", "").split(";") if g.strip()]]
 
     if sort2 and sort2 != sort1:
         books.sort(key=lambda b: _sort_key_for(sort1, b) + _sort_key_for(sort2, b))
@@ -4472,6 +4507,7 @@ def index():
         show_editions=show_editions,
         show_readings=show_readings,
         tag_filter=tag_filter,
+        genre_filter=genre_filter,
     ))
     # Persist preferences in cookies (1 year expiry)
     resp.set_cookie("librarium_sort1", sort1, max_age=365*24*3600, samesite="Lax")
@@ -4736,7 +4772,7 @@ def global_stats():
     all_lib_books = [
         dict(row)
         for row in db.execute(
-            "SELECT id, name, status, tags, language, original_language, pages, publisher, has_cover, cover_hash, author "
+            "SELECT id, name, status, tags, genres, language, original_language, pages, publisher, has_cover, cover_hash, author "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
         ).fetchall()
@@ -4745,6 +4781,7 @@ def global_stats():
 
     status_counts: dict[str, int] = Counter()
     tag_counts: dict[str, int] = Counter()
+    genre_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
     publisher_counts: dict[str, int] = Counter()
@@ -4760,6 +4797,11 @@ def global_stats():
                 t = t.strip()
                 if t:
                     tag_counts[t] += 1
+        if bk["genres"]:
+            for genre in bk["genres"].split(";"):
+                genre = genre.strip()
+                if genre:
+                    genre_counts[genre] += 1
         if bk["language"]:
             language_counts[bk["language"]] += 1
         else:
@@ -4804,6 +4846,7 @@ def global_stats():
     author_counts_clean = _remove_unknown(dict(author_counts))
     status_chart_clean = {k: v for k, v in status_chart.items() if str(k).strip().lower() != 'unknown'}
 
+    genre_counts_clean = _remove_unknown(dict(genre_counts))
     tag_counts_clean = _remove_unknown(dict(tag_counts))
 
     # Prepare publisher chart data: show top N publishers and aggregate the rest as "Other" (computed from cleaned counts)
@@ -4838,6 +4881,7 @@ def global_stats():
         bought_years=bought_years,
         bought_data=bought_data,
         status_chart=status_chart_clean,
+        genre_counts=genre_counts_clean,
         tag_counts=tag_counts_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
@@ -7467,7 +7511,7 @@ def edit_metadata(book_id: str):
         text_fields = (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "tags",
+            "publication_date", "isbn", "publisher", "genres", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -7555,7 +7599,7 @@ def edit_metadata(book_id: str):
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
-                publisher=?, tags=?, summary=?, translator=?, illustrator=?,
+                publisher=?, genres=?, tags=?, summary=?, translator=?, illustrator=?,
                 editor=?, prologue_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
@@ -7568,7 +7612,7 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["tags"], info["summary"],
+            info["publisher"], info["genres"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["prologue_author"], info["status"],
             info["source_type"], info["source_id"],
@@ -7620,7 +7664,7 @@ def edit_metadata(book_id: str):
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "tags", "publisher",
+        "author", "genres", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     # Parse cover palette for the color picker
@@ -7943,7 +7987,7 @@ def new_book():
         for field in (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", "tags",
+            "publication_date", "isbn", "publisher", "genres", "tags",
             "summary", "translator", "illustrator",
             "editor", "prologue_author", "status",
             "format", "binding", "audio_format",
@@ -8076,6 +8120,7 @@ def new_book():
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
+        db.execute("UPDATE books SET genres = ? WHERE id = ?", (info["genres"], book_id))
 
         # Save full-size cover image to filesystem + Dropbox
         if _cover_blob_for_file:
@@ -8121,7 +8166,7 @@ def new_book():
     gift_sources = [s for s in sources if s["type"] in GIFT_SOURCE_TYPES]
     languages = _collect_languages()
     suggestions = _collect_field_values(
-        "author", "tags", "publisher",
+        "author", "genres", "tags", "publisher",
         "translator", "illustrator", "editor", "prologue_author",
     )
     all_series = [dict(r) for r in db.execute(
@@ -8142,13 +8187,13 @@ def new_book():
         if primary:
             parent_book_name = primary.get("name", "")
             for f in ("author", "original_title", "original_language",
-                      "original_publication_date", "tags", "summary",
+                      "original_publication_date", "genres", "tags", "summary",
                       "illustrator", "editor", "prologue_author"):
                 prefill[f] = primary.get(f, "")
 
     # Pre-fill from ISBN lookup (query params)
     for key in ("name", "subtitle", "author", "publisher", "isbn",
-                "publication_date", "tags", "pages", "cover_url"):
+                "publication_date", "genres", "tags", "pages", "cover_url"):
         val = request.args.get(key, "").strip()
         if val and key not in prefill:
             prefill[key] = val
@@ -8993,8 +9038,13 @@ def undo_delete_book():
                 publisher, genre, summary, translator, illustrator, editor, prologue_author,
                 status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
                 borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-                library_id, work_id, is_primary_edition)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                library_id, work_id, is_primary_edition, tags, genres)
+               VALUES (
+                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   ?, ?, ?, ?, ?, ?, ?, ?
+               )
             """,
             (book.get("id"), book.get("name"), book.get("subtitle", ""), book.get("slug"), book.get("author"),
              book.get("language"), book.get("original_title"), book.get("original_language"),
@@ -9007,7 +9057,8 @@ def undo_delete_book():
              book.get("borrowed_start"), book.get("borrowed_end"), book.get("is_gift"),
              book.get("has_cover"), book.get("cover"), book.get("cover_color"),
              book.get("cover_palette"), book.get("cover_hash"),
-             book.get("library_id"), book.get("work_id"), book.get("is_primary_edition", 1))
+             book.get("library_id"), book.get("work_id"), book.get("is_primary_edition", 1),
+             book.get("tags", ""), book.get("genres", ""))
         )
         
         # Re-insert readings

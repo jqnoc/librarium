@@ -650,6 +650,19 @@ function toggleDashboardWordEdit(wordId) {
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- Genre Cloud                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if top_genres %}
+<div class="dash-section">
+    <h2 class="dash-heading" data-i18n="dash.genreCloud">Genre Cloud</h2>
+    <div class="card">
+        <div class="card-body">
+            <div id="dashGenreCloud" class="word-cloud"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Tag Cloud                                                              -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 {% if top_tags %}
@@ -676,6 +689,7 @@ const readingBooks  = {{ reading_books | tojson }};
 const formatCounts  = {{ format_counts | tojson }};
 const sourceCounts  = {{ source_counts | tojson }};
 {% if language_counts %}const languageCounts = {{ language_counts | tojson }};{% endif %}
+{% if top_genres %}const topGenres = {{ top_genres | tojson }};{% endif %}
 {% if top_tags %}const topTags = {{ top_tags | tojson }};{% endif %}
 
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
@@ -1068,19 +1082,18 @@ makeDonut('sourceDonut', sourceCounts);
 {% if language_counts %}makeDonut('langDonut', languageCounts);{% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Tag Cloud (compact)
+// Genre and tag clouds (compact)
 // ═══════════════════════════════════════════════════════════════════════════
-{% if top_tags %}
-(function() {
-    const container = document.getElementById('dashTagCloud');
+function renderDashboardCloud(containerId, counts, filterKey) {
+    const container = document.getElementById(containerId);
     if (!container) return;
-    const entries = Object.entries(topTags).sort((a,b) => b[1] - a[1]);
+    const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]);
     if (entries.length === 0) return;
     const maxCount = entries[0][1], minCount = entries[entries.length-1][1];
     entries.forEach(([word, count]) => {
         const a = document.createElement('a');
         a.textContent = word;
-        a.href = '/library?tag=' + encodeURIComponent(word);
+        a.href = '/library?' + filterKey + '=' + encodeURIComponent(word);
         a.className = 'tag-cloud-pill';
         const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
         a.style.fontSize = (0.75 + ratio * 0.85) + 'rem';
@@ -1088,8 +1101,9 @@ makeDonut('sourceDonut', sourceCounts);
         a.title = word + ': ' + count;
         container.appendChild(a);
     });
-})();
-{% endif %}
+}
+{% if top_genres %}renderDashboardCloud('dashGenreCloud', topGenres, 'genre');{% endif %}
+{% if top_tags %}renderDashboardCloud('dashTagCloud', topTags, 'tag');{% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Dashboard cover strips dynamic sizing

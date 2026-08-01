@@ -273,7 +273,17 @@ function recalcAverage() {
 }
 document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
-<!-- ── Tags ───────────────────────────────────────────────────────────── -->
+<!-- ── Genres and tags ────────────────────────────────────────────────── -->
+{% set raw_genres = info.get('genres', '') or '' %}
+{% set genre_list = raw_genres.split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
+{% if genre_list %}
+<h2 data-i18n="book.genresSection">Genres</h2>
+<div class="tag-bubbles">
+    {% for genre in genre_list %}
+    <a href="{{ url_for('index', genre=genre) }}" class="tag-bubble">{{ genre }}</a>
+    {% endfor %}
+</div>
+{% endif %}
 {% set raw_tags = info.get('tags', '') or '' %}
 {% set tag_list = raw_tags.split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
 {% if tag_list %}

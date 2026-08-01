@@ -171,6 +171,16 @@
 </div>
 {% endif %}
 
+<!-- Genres word cloud -->
+{% if genre_counts %}
+<div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.genreCloud">Genre Cloud</h3>
+        <div id="genreCloud" class="word-cloud"></div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Tags word cloud -->
 {% if tag_counts %}
 <div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
@@ -720,7 +730,7 @@ const statusData = {{ status_chart | tojson }};
 makeHBar('statusBar', statusData, STATUS_COLORS, true, 2);
 
 // Word cloud renderer
-function renderWordCloud(containerId, countsObj) {
+function renderWordCloud(containerId, countsObj, filterKey) {
     const container = document.getElementById(containerId);
     if (!container || !countsObj) return;
     const entries = Object.entries(countsObj).sort((a, b) => b[1] - a[1]);
@@ -736,7 +746,7 @@ function renderWordCloud(containerId, countsObj) {
     entries.forEach(([word, count]) => {
         const a = document.createElement('a');
         a.textContent = word;
-        a.href = '/library?tag=' + encodeURIComponent(word);
+        a.href = '/library?' + filterKey + '=' + encodeURIComponent(word);
         a.className = 'tag-cloud-pill';
         const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
         const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
@@ -747,9 +757,14 @@ function renderWordCloud(containerId, countsObj) {
     });
 }
 
+{% if genre_counts %}
+const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
+renderWordCloud('genreCloud', FULL_GENRE_COUNTS, 'genre');
+{% endif %}
+
 {% if tag_counts %}
 const FULL_TAG_COUNTS = {{ tag_counts | tojson }};
-renderWordCloud('tagCloud', FULL_TAG_COUNTS);
+renderWordCloud('tagCloud', FULL_TAG_COUNTS, 'tag');
 {% endif %}
 
 // Language bar

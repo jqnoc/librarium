@@ -61,6 +61,13 @@
     </div>
 </div>
 
+{% if genre_filter %}
+<div style="margin: 0.75rem 0; padding: 0.5rem 1rem; background: var(--lb-accent-glow); border-radius: var(--lb-radius); display: inline-flex; align-items: center; gap: 0.5rem;">
+    <span data-i18n="index.filteringByGenre">Filtering by genre:</span>
+    <span class="tag-bubble" style="cursor: default;">{{ genre_filter }}</span>
+    <a href="{{ url_for('index') }}" style="color: var(--lb-deep-orange); font-weight: 600; text-decoration: none;" data-i18n="index.clearGenreFilter">✕ Clear</a>
+</div>
+{% endif %}
 {% if tag_filter %}
 <div style="margin: 0.75rem 0; padding: 0.5rem 1rem; background: var(--lb-accent-glow); border-radius: var(--lb-radius); display: inline-flex; align-items: center; gap: 0.5rem;">
     <span data-i18n="index.filteringByTag">Filtering by tag:</span>
