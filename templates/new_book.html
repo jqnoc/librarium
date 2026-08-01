@@ -446,7 +446,7 @@ function toggleGiftFields() {
     placeLbl.textContent = isGift ? t('bookForm.giftFrom') : t('bookForm.purchasePlace');
     placeLbl.setAttribute('data-i18n', isGift ? 'bookForm.giftFrom' : 'bookForm.purchasePlace');
     // Toggle price row visibility
-    document.getElementById('price-row').style.display = isGift ? 'none' : 'flex';
+    document.getElementById('price-row').style.display = isGift ? 'none' : '';
     // Toggle between purchase-source and gift-source selects
     document.getElementById('source_id_owned').style.display = isGift ? 'none' : '';
     document.getElementById('source_id_owned').disabled = isGift;
