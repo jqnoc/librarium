@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
-- Dashboard now provides a taxonomy audit across Genres, Themes, Settings, Historical Periods, Subjects, Audiences, and Forms, with seven filterable clouds, one CSV listing every value with matching book counts and titles, and linked Library Health gaps
+- Dashboard now provides a taxonomy audit across Genres, Subgenres, Themes, Settings, Historical Periods, Subjects, and Audiences, with seven filterable clouds, one CSV listing every value with matching book counts and titles, and linked Library Health gaps
 
 ### Changed
 - Currently Reading cards now preserve the original progress line, accent the percentage like estimated time left, keep matching metadata spacing, and omit seconds from read and estimated-left times
-- Add New Book and Edit Metadata now share the same ordered metadata form layout, including full-width Classification chip editing for Genres, Themes, Settings, Historical Periods, Subjects, Audiences, and Forms between Series and Summary, while preserving their mode-specific controls; Publication Details use the requested three-column rows, Original Work uses one three-column row, Contributors use two three-column rows with Foreword/Introduction, Epilogue, and Contributing Author fields, and Book Source fields use three-column rows while preserving existing Prologue Author data; paper-book bindings include Softcover
+- Add New Book and Edit Metadata now share the same ordered metadata form layout, including full-width Classification chip editing for Genres, Subgenres, Themes, Settings, Historical Periods, Subjects, and Audiences between Series and Summary, while preserving their mode-specific controls; Publication Details use the requested three-column rows, Original Work uses one three-column row, Contributors use two three-column rows with Foreword/Introduction, Epilogue, and Contributing Author fields, and Book Source fields use three-column rows while preserving existing Prologue Author data; paper-book bindings include Softcover
 - Books now store Genres separately from Tags, with independent Book Details displays and Dashboard and Global Stats clouds
 - Currently Reading dashboard cards now show an estimated time remaining after the reading progress
 - Words of the Day can now be edited directly from the Dashboard and saved to their books

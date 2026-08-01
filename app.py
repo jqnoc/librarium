@@ -97,6 +97,18 @@ TAXONOMY_FIELDS = (
         "missing_label": "books without genres",
     },
     {
+        "field": "forms",
+        "filter_param": "form",
+        "label": "Subgenres",
+        "label_key": "bookForm.forms",
+        "placeholder": "Add a subgenre",
+        "placeholder_key": "bookForm.addForm",
+        "cloud_key": "dash.formCloud",
+        "csv_label": "Subgenre",
+        "missing_key": "dash.noForms",
+        "missing_label": "books without subgenres",
+    },
+    {
         "field": "themes",
         "filter_param": "theme",
         "label": "Themes",
@@ -155,18 +167,6 @@ TAXONOMY_FIELDS = (
         "csv_label": "Audience",
         "missing_key": "dash.noAudiences",
         "missing_label": "books without audiences",
-    },
-    {
-        "field": "forms",
-        "filter_param": "form",
-        "label": "Forms",
-        "label_key": "bookForm.forms",
-        "placeholder": "Add a form",
-        "placeholder_key": "bookForm.addForm",
-        "cloud_key": "dash.formCloud",
-        "csv_label": "Form",
-        "missing_key": "dash.noForms",
-        "missing_label": "books without forms",
     },
 )
 TAXONOMY_FIELD_NAMES = tuple(item["field"] for item in TAXONOMY_FIELDS)
