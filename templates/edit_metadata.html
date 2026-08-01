@@ -44,8 +44,6 @@
                         {% for v in suggestions.tags %}<option value="{{ v }}">{% endfor %}
                     </datalist>
                 </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group">
                     <label for="status" data-i18n="bookForm.status">Status</label>
                     <select id="status" name="status" class="form-control">
@@ -111,31 +109,24 @@
                         </select>
                     </div>
                 </div>
-            </div>
-            <div class="form-row" id="pages-row" {% if info.get('format') == 'audiobook' %}style="display:none;"{% endif %}>
                 <div class="form-group">
-                    <label for="pages" data-i18n="bookForm.pages">Pages</label>
-                    <input type="number" id="pages" name="pages" class="form-control" value="{{ info.get('pages', 0) }}" min="1">
-                </div>
-                <div class="form-group" id="frontmatter-group" {% if info.get('format') == 'audiobook' %}style="display:none;"{% endif %}>
-                    <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
-                    <input type="number" id="starting_page" name="starting_page" class="form-control" value="{{ info.get('starting_page', 0) }}" min="0">
-                </div>
-            </div>
-            {% set tt = info.get('total_time_seconds') or 0 %}
-            <div class="form-row" id="total-time-row" {% if info.get('format') != 'audiobook' %}style="display:none;"{% endif %}>
-                <div class="form-group">
-                    <label data-i18n="bookForm.totalTime">Total Time</label>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <input type="number" id="total_time_hours" name="total_time_hours" class="form-control" min="0" value="{{ tt // 3600 }}" style="width:70px;">
-                        <span>h</span>
-                        <input type="number" id="total_time_minutes" name="total_time_minutes" class="form-control" min="0" max="59" value="{{ (tt % 3600) // 60 }}" style="width:70px;">
-                        <span>m</span>
-                        <input type="number" id="total_time_seconds" name="total_time_seconds" class="form-control" min="0" max="59" value="{{ tt % 60 }}" style="width:70px;">
-                        <span>s</span>
+                    <div id="pages-row" {% if info.get('format') == 'audiobook' %}style="display:none;"{% endif %}>
+                        <label for="pages" data-i18n="bookForm.pages">Pages</label>
+                        <input type="number" id="pages" name="pages" class="form-control" value="{{ info.get('pages', 0) }}" min="1">
+                    </div>
+                    {% set tt = info.get('total_time_seconds') or 0 %}
+                    <div id="total-time-row" {% if info.get('format') != 'audiobook' %}style="display:none;"{% endif %}>
+                        <label data-i18n="bookForm.totalTime">Total Time</label>
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <input type="number" id="total_time_hours" name="total_time_hours" class="form-control" min="0" value="{{ tt // 3600 }}" style="width:70px;">
+                            <span>h</span>
+                            <input type="number" id="total_time_minutes" name="total_time_minutes" class="form-control" min="0" max="59" value="{{ (tt % 3600) // 60 }}" style="width:70px;">
+                            <span>m</span>
+                            <input type="number" id="total_time_seconds" name="total_time_seconds" class="form-control" min="0" max="59" value="{{ tt % 60 }}" style="width:70px;">
+                            <span>s</span>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group"></div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -149,6 +140,12 @@
                     <label for="publication_date" data-i18n="bookForm.pubDate">Publication Date</label>
                     <input type="text" id="publication_date" name="publication_date" class="form-control" value="{{ info.get('publication_date', '') }}" placeholder="e.g. 2021, 2021-04-30, 1912-1915, ca. 1450, 4th Century B.C.">
                 </div>
+                <div class="form-group">
+                    <div id="frontmatter-group" {% if info.get('format') == 'audiobook' %}style="display:none;"{% endif %}>
+                        <label for="starting_page" data-i18n="bookForm.frontmatter">Frontmatter Pages</label>
+                        <input type="number" id="starting_page" name="starting_page" class="form-control" value="{{ info.get('starting_page', 0) }}" min="0">
+                    </div>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -158,8 +155,10 @@
                 <div class="form-group">
                     <label for="cover" data-i18n="bookForm.coverImage">Cover Image</label>
                     <input type="file" id="cover" name="cover" class="form-control" accept="image/*">
+                </div>
+                <div class="form-group">
                     {% if cover_palette %}
-                    <div style="margin-top: 0.5rem;">
+                    <div>
                         <label style="font-size: 0.85rem; color: var(--lb-text-light); display: block; margin-bottom: 0.3rem;">Gantt bar colour:</label>
                         <div style="display: flex; gap: 0.4rem; align-items: center;">
                             {% for color in cover_palette %}
