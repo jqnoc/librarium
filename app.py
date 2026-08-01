@@ -866,7 +866,9 @@ def init_schema() -> None:
             translator                TEXT    NOT NULL DEFAULT '',
             illustrator               TEXT    NOT NULL DEFAULT '',
             editor                    TEXT    NOT NULL DEFAULT '',
-            prologue_author           TEXT    NOT NULL DEFAULT '',
+            foreword_author           TEXT    NOT NULL DEFAULT '',
+            epilogue_author           TEXT    NOT NULL DEFAULT '',
+            contributing_author       TEXT    NOT NULL DEFAULT '',
             status                    TEXT    NOT NULL DEFAULT 'reading',
             source_type               TEXT    NOT NULL DEFAULT '',
             source_id                 TEXT    NOT NULL DEFAULT '',
@@ -1020,6 +1022,7 @@ def _run_all_migrations() -> None:
     migrate_remove_source_short_name()
     migrate_add_source_place_details()
     migrate_add_genres()
+    migrate_add_contributor_fields()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1717,6 +1720,44 @@ def migrate_add_genres() -> None:
     db.commit()
     db.close()
     print(">> Migration complete - genres column added to books.")
+
+
+# ── Migration: Rename and extend contributor fields ─────────────────────
+def migrate_add_contributor_fields() -> None:
+    """Rename prologue_author and add the remaining contributor fields."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    changed = False
+
+    if "foreword_author" not in cols:
+        if "prologue_author" in cols:
+            db.execute("ALTER TABLE books RENAME COLUMN prologue_author TO foreword_author")
+        else:
+            db.execute("ALTER TABLE books ADD COLUMN foreword_author TEXT NOT NULL DEFAULT ''")
+        changed = True
+        cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    elif "prologue_author" in cols:
+        db.execute("""
+            UPDATE books
+            SET foreword_author = prologue_author
+            WHERE (foreword_author IS NULL OR foreword_author = '')
+              AND prologue_author IS NOT NULL
+              AND prologue_author != ''
+        """)
+        changed = True
+
+    for column in ("epilogue_author", "contributing_author"):
+        if column not in cols:
+            db.execute(f"ALTER TABLE books ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+            changed = True
+
+    if changed:
+        db.commit()
+        print(">> Migration complete - contributor fields updated.")
+    db.close()
 
 
 # ── Migration: Normalize genre capitalization ───────────────────────────
@@ -7548,8 +7589,8 @@ def edit_metadata(book_id: str):
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
             "publication_date", "isbn", "publisher", "genres", "tags",
-            "summary", "translator", "illustrator",
-            "editor", "prologue_author", "status",
+            "summary", "translator", "illustrator", "editor",
+            "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
         )
         for field in text_fields:
@@ -7636,7 +7677,7 @@ def edit_metadata(book_id: str):
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
                 publisher=?, genres=?, tags=?, summary=?, translator=?, illustrator=?,
-                editor=?, prologue_author=?, status=?,
+                editor=?, foreword_author=?, epilogue_author=?, contributing_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
                 format=?, binding=?, audio_format=?, total_time_seconds=?,
@@ -7650,7 +7691,8 @@ def edit_metadata(book_id: str):
             info["pages"], info["starting_page"],
             info["publisher"], info["genres"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
-            info["editor"], info["prologue_author"], info["status"],
+            info["editor"], info["foreword_author"], info["epilogue_author"],
+            info["contributing_author"], info["status"],
             info["source_type"], info["source_id"],
             info["purchase_date"], info["purchase_price"],
             info["borrowed_start"], info["borrowed_end"],
@@ -7701,7 +7743,8 @@ def edit_metadata(book_id: str):
     languages = _collect_languages()
     suggestions = _collect_field_values(
         "author", "genres", "tags", "publisher",
-        "translator", "illustrator", "editor", "prologue_author",
+        "translator", "illustrator", "editor", "foreword_author",
+        "epilogue_author", "contributing_author",
     )
     # Parse cover palette for the color picker
     cover_palette = []
@@ -8024,8 +8067,8 @@ def new_book():
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
             "publication_date", "isbn", "publisher", "genres", "tags",
-            "summary", "translator", "illustrator",
-            "editor", "prologue_author", "status",
+            "summary", "translator", "illustrator", "editor",
+            "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
         ):
             info[field] = request.form.get(field, "").strip()
@@ -8132,12 +8175,13 @@ def new_book():
             INSERT INTO books
             (id, name, subtitle, author, slug, language, original_title, original_language,
              original_publication_date, publication_date, isbn, pages, starting_page,
-             publisher, tags, summary, translator, illustrator, editor, prologue_author,
+             publisher, tags, summary, translator, illustrator, editor,
+             foreword_author, epilogue_author, contributing_author,
              status, source_type, source_id, purchase_date, purchase_price,
              borrowed_start, borrowed_end, is_gift, has_cover, cover_color, cover_palette, cover_hash,
              cover_thumb, library_id, work_id, is_primary_edition,
              format, binding, audio_format, total_time_seconds)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             book_id, info["name"], info["subtitle"], info["author"], _slugify(info["name"]),
             info["language"], info["original_title"],
@@ -8146,7 +8190,8 @@ def new_book():
             info["pages"], info["starting_page"],
             info["publisher"], info["tags"], info["summary"],
             info["translator"], info["illustrator"],
-            info["editor"], info["prologue_author"], info["status"],
+            info["editor"], info["foreword_author"], info["epilogue_author"],
+            info["contributing_author"], info["status"],
             info["source_type"], info["source_id"],
             info["purchase_date"], info["purchase_price"],
             info["borrowed_start"], info["borrowed_end"],
@@ -8203,7 +8248,8 @@ def new_book():
     languages = _collect_languages()
     suggestions = _collect_field_values(
         "author", "genres", "tags", "publisher",
-        "translator", "illustrator", "editor", "prologue_author",
+        "translator", "illustrator", "editor", "foreword_author",
+        "epilogue_author", "contributing_author",
     )
     all_series = [dict(r) for r in db.execute(
         f"SELECT id, name FROM series WHERE {lf} ORDER BY name COLLATE NOCASE", lp
@@ -8224,7 +8270,8 @@ def new_book():
             parent_book_name = primary.get("name", "")
             for f in ("author", "original_title", "original_language",
                       "original_publication_date", "genres", "tags", "summary",
-                      "illustrator", "editor", "prologue_author"):
+                      "translator", "illustrator", "editor", "foreword_author",
+                      "epilogue_author", "contributing_author"):
                 prefill[f] = primary.get(f, "")
 
     # Pre-fill from ISBN lookup (query params)
@@ -9071,7 +9118,8 @@ def undo_delete_book():
             """INSERT INTO books 
                (id, name, subtitle, slug, author, language, original_title, original_language,
                 original_publication_date, publication_date, isbn, pages, starting_page,
-                publisher, genre, summary, translator, illustrator, editor, prologue_author,
+                publisher, genre, summary, translator, illustrator, editor,
+                foreword_author, epilogue_author, contributing_author,
                 status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
                 borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
                 library_id, work_id, is_primary_edition, tags, genres)
@@ -9079,7 +9127,7 @@ def undo_delete_book():
                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                   ?, ?, ?, ?, ?, ?, ?, ?
+                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                )
             """,
             (book.get("id"), book.get("name"), book.get("subtitle", ""), book.get("slug"), book.get("author"),
@@ -9088,7 +9136,8 @@ def undo_delete_book():
              book.get("isbn"), book.get("pages"), book.get("starting_page"),
              book.get("publisher"), book.get("genre"), book.get("summary"),
              book.get("translator"), book.get("illustrator"), book.get("editor"),
-             book.get("prologue_author"), book.get("status"), book.get("source_type"),
+             book.get("foreword_author"), book.get("epilogue_author"),
+             book.get("contributing_author"), book.get("status"), book.get("source_type"),
              book.get("source_id"), book.get("purchase_date"), book.get("purchase_price"),
              book.get("borrowed_start"), book.get("borrowed_end"), book.get("is_gift"),
              book.get("has_cover"), book.get("cover"), book.get("cover_color"),

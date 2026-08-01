@@ -143,10 +143,22 @@
                 <div class="meta-value">{{ info.get('editor') | format_authors }}</div>
             </div>
             {% endif %}
-            {% if info.get('prologue_author') and info.get('prologue_author') != 'N/A' %}
+            {% if info.get('foreword_author') and info.get('foreword_author') != 'N/A' %}
             <div class="meta-item">
-                <div class="meta-label" data-i18n="{{ 'book.prologueAuthors' if ';' in info.get('prologue_author', '') else 'book.prologueAuthor' }}">{{ 'Prologue Authors' if ';' in info.get('prologue_author', '') else 'Prologue Author' }}</div>
-                <div class="meta-value">{{ info.get('prologue_author') | format_authors }}</div>
+                <div class="meta-label" data-i18n="{{ 'book.forewordAuthors' if ';' in info.get('foreword_author', '') else 'book.forewordAuthor' }}">{{ 'Foreword/Introduction Authors' if ';' in info.get('foreword_author', '') else 'Foreword/Introduction Author' }}</div>
+                <div class="meta-value">{{ info.get('foreword_author') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('epilogue_author') and info.get('epilogue_author') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.epilogueAuthors' if ';' in info.get('epilogue_author', '') else 'book.epilogueAuthor' }}">{{ 'Epilogue Authors' if ';' in info.get('epilogue_author', '') else 'Epilogue Author' }}</div>
+                <div class="meta-value">{{ info.get('epilogue_author') | format_authors }}</div>
+            </div>
+            {% endif %}
+            {% if info.get('contributing_author') and info.get('contributing_author') != 'N/A' %}
+            <div class="meta-item">
+                <div class="meta-label" data-i18n="{{ 'book.contributingAuthors' if ';' in info.get('contributing_author', '') else 'book.contributingAuthor' }}">{{ 'Contributing Authors' if ';' in info.get('contributing_author', '') else 'Contributing Author' }}</div>
+                <div class="meta-value">{{ info.get('contributing_author') | format_authors }}</div>
             </div>
             {% endif %}
             <!-- ── Source ── -->

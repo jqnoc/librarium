@@ -196,11 +196,11 @@
                     <label for="original_language" data-i18n="bookForm.origLang">Original Language</label>
                     <input type="text" id="original_language" name="original_language" class="form-control" list="language-list" value="{{ info.get('original_language', '') }}">
                 </div>
-            </div>
-            <div class="form-group">
-                <label for="original_publication_date" data-i18n="bookForm.origPubDate">Original Publication Date</label>
-                <input type="text" id="original_publication_date" name="original_publication_date" class="form-control"
-                       value="{{ info.get('original_publication_date', '') }}" placeholder="e.g. 1835, 1835-01-15, 1912-1915, ca. 1450">
+                <div class="form-group">
+                    <label for="original_publication_date" data-i18n="bookForm.origPubDate">Original Publication Date</label>
+                    <input type="text" id="original_publication_date" name="original_publication_date" class="form-control"
+                           value="{{ info.get('original_publication_date', '') }}" placeholder="e.g. 1835, 1835-01-15, 1912-1915, ca. 1450">
+                </div>
             </div>
         </div>
     </div>
@@ -217,6 +217,13 @@
                     </datalist>
                 </div>
                 <div class="form-group">
+                    <label for="editor" data-i18n="bookForm.editor">Editor(s)</label>
+                    <input type="text" id="editor" name="editor" class="form-control" list="editor-list" value="{{ info.get('editor', '') }}">
+                    <datalist id="editor-list">
+                        {% for v in suggestions.editor %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
                     <label for="illustrator" data-i18n="bookForm.illustrator">Illustrator(s)</label>
                     <input type="text" id="illustrator" name="illustrator" class="form-control" list="illustrator-list" value="{{ info.get('illustrator', '') }}">
                     <datalist id="illustrator-list">
@@ -226,17 +233,24 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="editor" data-i18n="bookForm.editor">Editor(s)</label>
-                    <input type="text" id="editor" name="editor" class="form-control" list="editor-list" value="{{ info.get('editor', '') }}">
-                    <datalist id="editor-list">
-                        {% for v in suggestions.editor %}<option value="{{ v }}">{% endfor %}
+                    <label for="foreword_author" data-i18n="bookForm.forewordAuthor">Foreword/Introduction Author(s)</label>
+                    <input type="text" id="foreword_author" name="foreword_author" class="form-control" list="foreword_author-list" value="{{ info.get('foreword_author', '') }}">
+                    <datalist id="foreword_author-list">
+                        {% for v in suggestions.foreword_author %}<option value="{{ v }}">{% endfor %}
                     </datalist>
                 </div>
                 <div class="form-group">
-                    <label for="prologue_author" data-i18n="bookForm.prologueAuthor">Prologue Author(s)</label>
-                    <input type="text" id="prologue_author" name="prologue_author" class="form-control" list="prologue_author-list" value="{{ info.get('prologue_author', '') }}">
-                    <datalist id="prologue_author-list">
-                        {% for v in suggestions.prologue_author %}<option value="{{ v }}">{% endfor %}
+                    <label for="epilogue_author" data-i18n="bookForm.epilogueAuthor">Epilogue Author(s)</label>
+                    <input type="text" id="epilogue_author" name="epilogue_author" class="form-control" list="epilogue_author-list" value="{{ info.get('epilogue_author', '') }}">
+                    <datalist id="epilogue_author-list">
+                        {% for v in suggestions.epilogue_author %}<option value="{{ v }}">{% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="contributing_author" data-i18n="bookForm.contributingAuthor">Contributing Author(s)</label>
+                    <input type="text" id="contributing_author" name="contributing_author" class="form-control" list="contributing_author-list" value="{{ info.get('contributing_author', '') }}">
+                    <datalist id="contributing_author-list">
+                        {% for v in suggestions.contributing_author %}<option value="{{ v }}">{% endfor %}
                     </datalist>
                 </div>
             </div>
