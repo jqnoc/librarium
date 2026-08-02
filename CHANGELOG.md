@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add a read-only taxonomy audit report for all 445 classified books in the active JqnOC database, with exact current values and correction actions
+- Refresh the read-only taxonomy audit for the current 33 classified books in the active JqnOC database, preserve exact values and IDs, and mark the pre-cleanup 412-book report as superseded
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
 - Book Details now groups taxonomy values into one Classification section and shows up to ten same-library Similar Works ranked by shared classification items, with Settings controls for choosing which classification categories contribute
 - Dashboard now provides a taxonomy audit across Genres, Subgenres, Forms, Themes, Settings, Historical Periods, Subjects, and Audiences, with eight filterable clouds, one CSV listing every value with matching book counts and titles, and linked Library Health gaps
