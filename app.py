@@ -3624,6 +3624,67 @@ def _build_taxonomy_audit(books: list[dict]) -> tuple[dict[str, dict[str, int]],
     return counts, titles
 
 
+def _build_similar_works(db: sqlite3.Connection, book_id: str, book: dict) -> list[dict]:
+    """Return the ten same-library books with the most shared classifications."""
+    current_values = {
+        field: {
+            value.casefold(): value
+            for value in _split_taxonomy_values(book.get(field))
+        }
+        for field in TAXONOMY_FIELD_NAMES
+    }
+    if not any(current_values.values()):
+        return []
+
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    query = (
+        "SELECT id, name, subtitle, author, has_cover, cover_hash, work_id, "
+        f"{taxonomy_columns} FROM books WHERE library_id = ? AND id != ?"
+    )
+    query_params: list[object] = [book.get("library_id"), book_id]
+    if book.get("work_id"):
+        query += " AND (work_id IS NULL OR work_id != ?)"
+        query_params.append(book["work_id"])
+
+    similar: list[dict] = []
+    for row in db.execute(query, query_params).fetchall():
+        shared_items = []
+        shared_count = 0
+        for taxonomy_field in TAXONOMY_FIELDS:
+            field = taxonomy_field["field"]
+            candidate_values = {
+                value.casefold(): value
+                for value in _split_taxonomy_values(row[field])
+            }
+            shared_keys = current_values[field].keys() & candidate_values.keys()
+            if not shared_keys:
+                continue
+            shared_items.append({
+                "label": taxonomy_field["label"],
+                "label_key": taxonomy_field["label_key"],
+                "values": sorted(
+                    (current_values[field][key] for key in shared_keys),
+                    key=str.casefold,
+                ),
+            })
+            shared_count += len(shared_keys)
+
+        if shared_count:
+            similar.append({
+                "id": row["id"],
+                "name": row["name"],
+                "subtitle": row["subtitle"],
+                "author": row["author"],
+                "has_cover": bool(row["has_cover"]),
+                "cover_hash": row["cover_hash"] or "",
+                "shared_count": shared_count,
+                "shared_items": shared_items,
+            })
+
+    similar.sort(key=lambda item: (-item["shared_count"], (item["name"] or "").casefold()))
+    return similar[:10]
+
+
 # ── Edition helpers ──────────────────────────────────────────────────────
 def _get_work_id(book: dict) -> str:
     """Return the effective work ID for a book (its work_id or its own id if standalone)."""
@@ -7237,6 +7298,8 @@ def book_detail(book_id: str):
     # Build reading_id → reading_number map for template
     reading_num_map = {rr["id"]: rr["reading_number"] for rr in readings_rows}
 
+    similar_works = _build_similar_works(db, book_id, info)
+
     # Series info (many-to-many)
     series_list_book = []
     sr_rows = db.execute("""
@@ -7338,6 +7401,7 @@ def book_detail(book_id: str):
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
         taxonomy_fields=TAXONOMY_FIELDS,
+        similar_works=similar_works,
         quotes=[dict(r) for r in db.execute(
             "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
         ).fetchall()],

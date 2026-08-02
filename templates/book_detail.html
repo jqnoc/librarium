@@ -285,18 +285,61 @@ function recalcAverage() {
 }
 document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
-<!-- ── Taxonomy ───────────────────────────────────────────────────────── -->
+<!-- ── Classification ─────────────────────────────────────────────────── -->
+{% set has_classification = namespace(value=false) %}
 {% for taxonomy_field in taxonomy_fields %}
-{% set taxonomy_values = (info.get(taxonomy_field.field, '') or '').split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
-{% if taxonomy_values %}
-<h2 data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</h2>
-<div class="tag-bubbles">
-    {% for taxonomy_value in taxonomy_values %}
-    <a href="{{ url_for('index') }}?{{ taxonomy_field.filter_param }}={{ taxonomy_value | urlencode }}" class="tag-bubble">{{ taxonomy_value }}</a>
+{% if (info.get(taxonomy_field.field, '') or '').strip() %}
+{% set has_classification.value = true %}
+{% endif %}
+{% endfor %}
+{% if has_classification.value %}
+<h2 data-i18n="book.classification">Classification</h2>
+<div class="book-classification-grid">
+    {% for taxonomy_field in taxonomy_fields %}
+    {% set taxonomy_values = (info.get(taxonomy_field.field, '') or '').split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
+    {% if taxonomy_values %}
+    <div class="book-classification-group">
+        <h3 data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</h3>
+        <div class="tag-bubbles">
+            {% for taxonomy_value in taxonomy_values %}
+            <a href="{{ url_for('index') }}?{{ taxonomy_field.filter_param }}={{ taxonomy_value | urlencode }}" class="tag-bubble">{{ taxonomy_value }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     {% endfor %}
 </div>
 {% endif %}
-{% endfor %}
+<!-- ── Similar Works ──────────────────────────────────────────────────── -->
+{% if similar_works %}
+<h2 data-i18n="book.similarWorks">Similar Works</h2>
+<div class="similar-works-grid">
+    {% for similar in similar_works %}
+    <a href="{{ url_for('book_detail', book_id=similar.id) }}" class="card similar-work-card" style="text-decoration:none; color:inherit;">
+        <div class="similar-work-cover">
+            {% if similar.has_cover %}
+            <img src="{{ url_for('book_cover_thumb', book_id=similar.id, v=similar.cover_hash) }}" alt="{{ similar.name }}">
+            {% else %}
+            <span class="cover-placeholder">📖</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="book-title">{{ similar.name }}</div>
+            {% if similar.subtitle %}<div class="book-subtitle">{{ similar.subtitle }}</div>{% endif %}
+            <div class="book-author">{{ similar.author | format_authors }}</div>
+            <div class="similar-work-score">{{ similar.shared_count }} <span data-i18n="book.sharedItems">shared items</span></div>
+            <div class="similar-work-matches">
+                {% for match in similar.shared_items %}
+                <div class="similar-work-match">
+                    <span class="similar-work-match-category" data-i18n="{{ match.label_key }}">{{ match.label }}</span>: {{ match['values'] | join(', ') }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
 <!-- ── Readings timeline ─────────────────────────────────────────────── -->
 {% if readings %}
 <h2>Readings</h2>
