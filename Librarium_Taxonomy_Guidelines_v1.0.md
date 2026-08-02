@@ -89,13 +89,13 @@ They should never duplicate Genre.
 
 ### Purpose
 
-Themes describe the **abstract ideas, values, emotions, conflicts and philosophical questions** explored by the work.
+Themes describe the **ideas, lived human experiences, values, emotions, conflicts and philosophical questions** explored by the work.
 
 They answer:
 
 > **"What ideas does the book explore?"**
 
-Themes are **never concrete things.**
+Themes are **never concrete entities, domains, or topics.**
 
 ### Themes should contain
 
@@ -381,6 +381,38 @@ Audience should never describe quality or difficulty.
 
 This is the most important rule in the taxonomy.
 
+## One Important Realization
+
+While doing this audit, an important distinction emerged:
+
+**Themes do not have to be purely philosophical abstractions.** They can also be **human experiences**.
+
+Examples include:
+
+- Aging
+- Motherhood
+- Womanhood
+- Fear
+- Trauma
+- Desire
+
+These are not concrete entities, but neither are they purely philosophical concepts. They are recurring aspects of the human condition, and they work naturally as Themes.
+
+By contrast:
+
+- Horror Cinema
+- Film Criticism
+- Gender Studies
+- Cinema
+- Popular Culture
+
+are clearly **Subjects**, because they are identifiable fields, disciplines, or cultural objects.
+
+The guiding distinction is:
+
+- **Themes** = ideas and lived experiences
+- **Subjects** = concrete domains and topics
+
 ### Themes
 
 Answer:
@@ -485,7 +517,7 @@ When assigning a value, ask these questions in order:
 
 ---
 
-### Is it an abstract idea?
+### Is it an idea or lived human experience?
 
 → Theme
 
@@ -524,6 +556,18 @@ When assigning a value, ask these questions in order:
 - Reuse existing values whenever possible instead of creating new ones.
 - Every new value should be applicable to more than one book whenever feasible.
 - When in doubt between **Theme** and **Subject**, ask: *Is this an idea, or is it a thing?* If it is an idea, it belongs in **Themes**. If it is a thing, it belongs in **Subjects**.
+
+## Naming Convention for Future Consistency
+
+Avoid mixing semantic levels within a single controlled-vocabulary value. Each value should focus on one concept so that it remains reusable across different books.
+
+Prefer:
+
+- **Memory** instead of **Childhood Memories**
+- **Catharsis** or **Art as Catharsis** instead of **Film as Catharsis**
+- **Fear** plus **Horror Cinema** instead of a hybrid value such as **Fear and Cinema**
+
+Keeping concepts separate makes the controlled vocabulary easier to maintain, search, and reuse.
 
 ## Recommendation for version 2.0
 
