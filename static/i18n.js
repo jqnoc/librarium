@@ -431,7 +431,7 @@
         'bookForm.addSubject':      { en: 'Add a subject...',     es: 'Añadir una materia...' },
         'bookForm.addAudience':     { en: 'Add an audience...',   es: 'Añadir un público...' },
         'bookForm.addForm':         { en: 'Add a subgenre...',    es: 'Añadir un subgénero...' },
-        'bookForm.classificationHint': { en: 'Type a value and press Enter or comma to add it. Existing values are suggested as you type.', es: 'Escribe un valor y pulsa Intro o una coma para añadirlo. Los valores existentes aparecen como sugerencias.' },
+        'bookForm.classificationHint': { en: 'Type a value and press Enter or semicolon to add it. Existing values are suggested as you type.', es: 'Escribe un valor y pulsa Intro o punto y coma para añadirlo. Los valores existentes aparecen como sugerencias.' },
         'bookForm.tagsPlaceholder': { en: 'e.g. cozy; dark; slow-burn', es: 'ej. acogedor; oscuro; lento' },
         'bookForm.status':          { en: 'Status',              es: 'Estado' },
         'bookForm.statusReading':   { en: 'Reading',             es: 'Leyendo' },

@@ -81,6 +81,10 @@
         return (value || '').trim().replace(/\s+/g, ' ');
     }
 
+    function compareValues(leftValue, rightValue) {
+        return leftValue.localeCompare(rightValue, undefined, { sensitivity: 'base' });
+    }
+
     function initClassificationEditor(editor) {
         if (editor.dataset.initialized) return;
         editor.dataset.initialized = 'true';
@@ -93,7 +97,7 @@
         if (!hidden || !input || !chips || !suggestionsBox) return;
         var suggestions = Array.from(document.querySelectorAll('#' + field + '-list option')).map(function (option) {
             return normalize(option.value);
-        }).filter(Boolean);
+        }).filter(Boolean).sort(compareValues);
         var visibleSuggestions = [];
         var activeSuggestion = -1;
 
@@ -105,6 +109,21 @@
 
         function sync() {
             hidden.value = values().join('; ');
+        }
+
+        function sortChips() {
+            Array.from(chips.querySelectorAll('.classification-chip'))
+                .sort(function (leftChip, rightChip) {
+                    var leftLabel = leftChip.querySelector('.classification-chip-label');
+                    var rightLabel = rightChip.querySelector('.classification-chip-label');
+                    return compareValues(
+                        normalize(leftLabel && leftLabel.textContent),
+                        normalize(rightLabel && rightLabel.textContent)
+                    );
+                })
+                .forEach(function (chip) {
+                    chips.appendChild(chip);
+                });
         }
 
         function removeDuplicateChips() {
@@ -119,6 +138,7 @@
                 }
                 seen[key] = true;
             });
+            sortChips();
         }
 
         function hideSuggestions() {
@@ -195,10 +215,11 @@
             chip.appendChild(label);
             chip.appendChild(remove);
             chips.appendChild(chip);
+            sortChips();
         }
 
         function addInputValue(keepFocus) {
-            input.value.split(/[;,]/).forEach(addValue);
+            input.value.split(';').forEach(addValue);
             input.value = '';
             sync();
             if (keepFocus !== false) input.focus();
@@ -213,7 +234,7 @@
         input.addEventListener('focus', renderSuggestions);
         input.addEventListener('click', renderSuggestions);
         input.addEventListener('input', function () {
-            if (/[;,]/.test(input.value)) {
+            if (input.value.indexOf(';') !== -1) {
                 addInputValue();
                 return;
             }
@@ -239,7 +260,7 @@
                 } else {
                     addInputValue();
                 }
-            } else if (event.key === ',' || event.key === ';') {
+            } else if (event.key === ';') {
                 event.preventDefault();
                 addInputValue();
             } else if (event.key === 'Backspace' && !input.value.trim()) {

@@ -3594,7 +3594,7 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
                     part = part.strip()
                     if part:
                         buckets[f].add(part)
-    return {f: sorted(vals) for f, vals in buckets.items()}
+    return {f: sorted(vals, key=str.casefold) for f, vals in buckets.items()}
 
 
 def _split_taxonomy_values(raw: str | None) -> list[str]:
@@ -3607,6 +3607,11 @@ def _split_taxonomy_values(raw: str | None) -> list[str]:
             seen.add(value)
             values.append(value)
     return values
+
+
+def _normalize_taxonomy_values(raw: str | None) -> str:
+    """Return taxonomy values in a stable alphabetical, semicolon-delimited form."""
+    return "; ".join(sorted(_split_taxonomy_values(raw), key=str.casefold))
 
 
 def _build_taxonomy_audit(books: list[dict]) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, list[str]]]]:
@@ -7837,6 +7842,8 @@ def edit_metadata(book_id: str):
     if not book:
         abort(404)
     info = dict(book)
+    for field in TAXONOMY_FIELD_NAMES:
+        info[field] = _normalize_taxonomy_values(info.get(field))
 
     if request.method == "POST":
         text_fields = (
@@ -7848,7 +7855,8 @@ def edit_metadata(book_id: str):
             "format", "binding", "audio_format",
         )
         for field in text_fields:
-            info[field] = request.form.get(field, "").strip()
+            value = request.form.get(field, "").strip()
+            info[field] = _normalize_taxonomy_values(value) if field in TAXONOMY_FIELD_NAMES else value
         info["summary"] = sanitize_html(info["summary"])
         if info["format"] != "paper":
             info["binding"] = ""
@@ -8329,7 +8337,8 @@ def new_book():
             "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
         ):
-            info[field] = request.form.get(field, "").strip()
+            value = request.form.get(field, "").strip()
+            info[field] = _normalize_taxonomy_values(value) if field in TAXONOMY_FIELD_NAMES else value
         info["summary"] = sanitize_html(info["summary"])
         if info["format"] != "paper":
             info["binding"] = ""
