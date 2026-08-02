@@ -3674,7 +3674,7 @@ def _build_similar_works(
     book: dict,
     selected_fields: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    """Return the ten same-library books with the highest weighted similarity."""
+    """Return the ten same-library books with normalized weighted similarity."""
     active_fields = (
         TAXONOMY_FIELD_NAMES
         if selected_fields is None
@@ -3703,30 +3703,25 @@ def _build_similar_works(
         query += " AND (work_id IS NULL OR work_id != ?)"
         query_params.append(book["work_id"])
 
-    category_values = {field: set(current_values[field]) for field in active_fields}
-    category_query = f"SELECT {taxonomy_columns} FROM books WHERE library_id = ?"
-    for row in db.execute(category_query, (book.get("library_id"),)).fetchall():
-        for field in active_fields:
-            category_values[field].update(
-                value.casefold() for value in _split_taxonomy_values(row[field])
-            )
-    category_weights = {
-        field: 1 / len(values)
-        for field, values in category_values.items()
-        if values
-    }
-
+    current_norm_squared = sum(
+        1 / len(values) for values in current_values.values() if values
+    )
     similar: list[dict] = []
     for row in db.execute(query, query_params).fetchall():
         shared_items = []
         shared_count = 0
         weighted_score = 0.0
+        candidate_norm_squared = 0.0
         for taxonomy_field in active_taxonomy_fields:
             field = taxonomy_field["field"]
             candidate_values = {
                 value.casefold(): value
                 for value in _split_taxonomy_values(row[field])
             }
+            current_count = len(current_values[field])
+            candidate_count = len(candidate_values)
+            if candidate_count:
+                candidate_norm_squared += 1 / candidate_count
             shared_keys = current_values[field].keys() & candidate_values.keys()
             if not shared_keys:
                 continue
@@ -3739,9 +3734,14 @@ def _build_similar_works(
                 ),
             })
             shared_count += len(shared_keys)
-            weighted_score += len(shared_keys) * category_weights[field]
+            weighted_score += len(shared_keys) / (current_count * candidate_count)
 
         if shared_count:
+            normalization = math.sqrt(current_norm_squared * candidate_norm_squared)
+            similarity_score = (
+                weighted_score / normalization * 100
+                if normalization else 0.0
+            )
             similar.append({
                 "id": row["id"],
                 "name": row["name"],
@@ -3750,12 +3750,12 @@ def _build_similar_works(
                 "has_cover": bool(row["has_cover"]),
                 "cover_hash": row["cover_hash"] or "",
                 "shared_count": shared_count,
-                "weighted_score": weighted_score,
+                "similarity_score": max(0.0, min(100.0, similarity_score)),
                 "shared_items": shared_items,
             })
 
     similar.sort(key=lambda item: (
-        -item["weighted_score"],
+        -item["similarity_score"],
         -item["shared_count"],
         (item["name"] or "").casefold(),
     ))

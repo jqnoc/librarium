@@ -165,6 +165,7 @@
         'book.classification':  { en: 'Classification',       es: 'Clasificación' },
         'book.similarWorks':    { en: 'Similar Works',        es: 'Obras Similares' },
         'book.sharedItems':     { en: 'shared items',         es: 'elementos compartidos' },
+        'book.similarityScore': { en: 'similarity',            es: 'similitud' },
         'book.language':        { en: 'Language',             es: 'Idioma' },
         'book.publisher':       { en: 'Publisher',            es: 'Editorial' },
         'book.pubDate':         { en: 'Publication Date',     es: 'Fecha de Publicación' },
