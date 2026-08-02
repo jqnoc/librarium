@@ -14,37 +14,60 @@ A value should appear in **one category only**, unless there is a compelling sem
 
 ### Purpose
 
-Describes the book's **broadest literary or factual category**.
+Describes the book's **highest-level classification**.
 
 It answers:
 
-> **"What kind of book is this?"**
+> **"What fundamental kind of work is this?"**
 
-Genres should be few in number and highly reusable.
+Every book should have **exactly one major Genre**. Genres should be mutually exclusive, intuitive for browsing, and highly reusable.
 
-### Examples
+### Major Genres
 
-- Fiction
-- Non-Fiction
-- History
-- Philosophy
-- Science Fiction
 - Fantasy
-- Horror
+- Fiction
+- Science Fiction
+- Non-Fiction
 - Biography
-- Memoir
+
+These major Genres form two broad families:
+
+#### Fictional works
+
+- Fantasy
+- Fiction
+- Science Fiction
+
+#### Non-fictional works
+
+- Non-Fiction
+- Biography
+
+### Major Genre Examples
+
+| Genre | Examples |
+| --- | --- |
+| Fantasy | *The Lord of the Rings*, *Rhythm of War*, *A Game of Thrones* |
+| Fiction | *The Stranger*, *A Little Trickerie*, *Taras Bulba*, *Black Water* |
+| Science Fiction | *Rendezvous with Rama*, *Flowers for Algernon*, *Dune* |
+| Non-Fiction | *The Myth of Sisyphus*, *Conquest of the Useless*, *Scotland*, *Descripción de China* |
+| Biography | *Amerigo*, *Steve Jobs*, *Churchill* |
+
+### Biography as a Major Genre
+
+Strictly speaking, Biography is a subset of Non-Fiction because it is a factual account of a person's life. It is nevertheless promoted to major Genre status because biographies are commonly searched as a distinct category in libraries and bookshops. This makes discovery easier while preserving the factual nature of the work.
 
 ### Guidelines
 
-✔ Broad classifications only.
+✔ Assign exactly one major Genre to every book.
 
-✔ Usually one or two values.
+✔ Use the Genre to identify the fundamental kind of work, not its subject, period, style, or narrative technique.
 
-✘ Do not include national literatures.
+✘ Do not assign both Fantasy and Fiction, or both Biography and Non-Fiction. The major Genre must be mutually exclusive at the catalogue level.
 
-✘ Do not include academic disciplines.
+✘ Do not use History, Philosophy, Memoir, Horror, Literary Fiction, or Historical Fiction as major Genres. These belong in Subgenres.
 
-✘ Do not include stylistic labels.
+✘ Do not include national literatures, academic disciplines, or stylistic labels as major Genres.
 
 ---
 
@@ -58,18 +81,50 @@ It answers:
 
 > **"What specific kind of book is it?"**
 
-### Examples
+### Examples by Major Genre
 
-- Historical Thriller
-- Satirical Fiction
-- Gothic Fiction
-- Film Studies
-- Popular History
-- Travel Writing
-- Nature Writing
+#### Fantasy
+
+- Epic Fantasy
+- High Fantasy
+- Grimdark
+- Urban Fantasy
+- Sword and Sorcery
+
+#### Fiction
+
+- Historical Fiction
 - Literary Fiction
-- Japanese Literature
-- German-Language Literature
+- Gothic Fiction
+- Thriller
+- Romance
+- Horror
+- Satirical Fiction
+- Adventure Fiction
+
+#### Science Fiction
+
+- Hard Science Fiction
+- Space Opera
+- Dystopian Fiction
+- First Contact
+- Cyberpunk
+
+#### Non-Fiction
+
+- History
+- Philosophy
+- Memoir
+- Essay
+- Film Studies
+- Popular Science
+- Travel Writing
+
+#### Biography
+
+- Memoir
+- Autobiography
+- Collective Biography
 
 ### Guidelines
 
@@ -81,7 +136,7 @@ Subgenres include:
 - national literatures
 - publishing traditions
 
-They should never duplicate Genre.
+They refine the major Genre and should never be used as substitutes for it. In particular, Horror, Historical Fiction, Literary Fiction, Gothic Fiction, and Adventure Fiction are Subgenres rather than major Genres.
 
 ---
 
@@ -505,9 +560,11 @@ Answer:
 
 When assigning a value, ask these questions in order:
 
-### Is it the broad type of book?
+### What fundamental kind of work is it?
 
 → Genre
+
+Assign exactly one major Genre: Fantasy, Fiction, Science Fiction, Non-Fiction, or Biography.
 
 ---
 
