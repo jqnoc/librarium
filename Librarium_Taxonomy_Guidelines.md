@@ -65,7 +65,7 @@ Strictly speaking, Biography is a subset of Non-Fiction because it is a factual 
 
 ✘ Do not assign both Fantasy and Fiction, or both Biography and Non-Fiction. The major Genre must be mutually exclusive at the catalogue level.
 
-✘ Do not use History, Philosophy, Memoir, Horror, Literary Fiction, or Historical Fiction as major Genres. These belong in Subgenres.
+✘ Do not use History, Philosophy, Memoir, Horror, Literary Fiction, or Historical Fiction as major Genres. These belong in Subgenres or Forms.
 
 ✘ Do not include national literatures, academic disciplines, or stylistic labels as major Genres.
 
@@ -114,8 +114,6 @@ It answers:
 
 - History
 - Philosophy
-- Memoir
-- Essay
 - Film Studies
 - Popular Science
 - Travel Writing
@@ -131,16 +129,78 @@ It answers:
 Subgenres include:
 
 - literary movements
-- narrative forms
 - academic disciplines
 - national literatures
 - publishing traditions
+- critical classifications
 
 They refine the major Genre and should never be used as substitutes for it. In particular, Horror, Historical Fiction, Literary Fiction, Gothic Fiction, and Adventure Fiction are Subgenres rather than major Genres.
 
+Do not use presentation formats such as Essay, Novel, Novella, Short Story, Letters, Dialogue, Interview, Diary, Treatise, or Speech as Subgenres when they belong in Form. A term such as Memoir may remain a Subgenre when it identifies a literary tradition or classification, but it should not be duplicated without a clear reason.
+
 ---
 
-## 3. Themes
+## 3. Form
+
+### Purpose
+
+Describes **how the work is written or presented**.
+
+It answers:
+
+> **"What form does the work take?"**
+
+Form is separate from Genre, Subgenre, Themes, and Subjects. Genre identifies the broad kind of work; Form identifies its presentation or compositional mode. For example, an essay can be Non-Fiction with Philosophy as its Subgenre, while a novel can be Science Fiction with Psychological Fiction as its Subgenre.
+
+### Controlled Form values
+
+- Essay
+- Novel
+- Novella
+- Short Story
+- Memoir
+- Letters
+- Dialogue
+- Interview
+- Diary
+- Treatise
+- Speech
+
+### Guidelines
+
+Use the controlled Form values above whenever they fit. Prefer the singular controlled value, such as **Essay**, rather than creating synonyms such as Essays or Personal Essay.
+
+Forms may be combined when a work genuinely uses more than one presentation mode, but do not use Form for a subject, academic discipline, theme, setting, historical period, or literary classification. For example, Film Criticism belongs in Subgenres, while Cinema belongs in Subjects.
+
+### Examples
+
+#### *The Myth of Sisyphus*
+
+- Genre: Non-Fiction
+- Form: Essay
+- Subgenre: Philosophy; Existentialism
+
+#### *Conquest of the Useless*
+
+- Genre: Non-Fiction
+- Form: Diary
+- Subgenre: Memoir; Film Diary
+
+#### *Reina del grito*
+
+- Genre: Non-Fiction
+- Form: Essays
+- Subgenre: Film Criticism; Cultural Criticism
+
+#### *Flowers for Algernon*
+
+- Genre: Science Fiction
+- Form: Novel
+- Subgenre: Psychological Fiction; Epistolary Novel
+
+---
+
+## 4. Themes
 
 ### Purpose
 
@@ -255,7 +315,7 @@ Themes are **never concrete entities, domains, or topics.**
 
 ---
 
-## 4. Setting
+## 5. Setting
 
 ### Purpose
 
@@ -280,7 +340,7 @@ Do not use historical periods here.
 
 ---
 
-## 5. Historical Period
+## 6. Historical Period
 
 ### Purpose
 
@@ -308,7 +368,7 @@ Use the most specific historically meaningful period available.
 
 ---
 
-## 6. Subject
+## 7. Subject
 
 ### Purpose
 
@@ -413,7 +473,7 @@ These belong in Themes.
 
 ---
 
-## 7. Audience
+## 8. Audience
 
 ### Purpose
 
@@ -574,6 +634,14 @@ Assign exactly one major Genre: Fantasy, Fiction, Science Fiction, Non-Fiction, 
 
 ---
 
+### Is it the way the work is written or presented?
+
+→ Form
+
+Use a controlled value such as Essay, Novel, Diary, Interview, or Letters.
+
+---
+
 ### Is it an idea or lived human experience?
 
 → Theme
@@ -612,6 +680,7 @@ Assign exactly one major Genre: Fantasy, Fiction, Science Fiction, Non-Fiction, 
 - Avoid synonyms that duplicate existing controlled vocabulary.
 - Reuse existing values whenever possible instead of creating new ones.
 - Every new value should be applicable to more than one book whenever feasible.
+- Keep presentation modes in Forms and literary, academic, or critical classifications in Subgenres.
 - When in doubt between **Theme** and **Subject**, ask: *Is this an idea, or is it a thing?* If it is an idea, it belongs in **Themes**. If it is a thing, it belongs in **Subjects**.
 
 ## Naming Convention for Future Consistency

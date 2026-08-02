@@ -99,18 +99,32 @@ TAXONOMY_FIELDS = (
         "missing_label": "books without genres",
     },
     {
+        "field": "subgenres",
+        "filter_param": "subgenre",
+        "label": "Subgenres",
+        "label_key": "bookForm.subgenres",
+        "placeholder": "Add a subgenre",
+        "placeholder_key": "bookForm.addSubgenre",
+        "description": "A more specific literary, academic, or stylistic classification, including movements, disciplines, or national literatures.",
+        "description_key": "bookForm.subgenreDescription",
+        "cloud_key": "dash.subgenreCloud",
+        "csv_label": "Subgenre",
+        "missing_key": "dash.noSubgenres",
+        "missing_label": "books without subgenres",
+    },
+    {
         "field": "forms",
         "filter_param": "form",
-        "label": "Subgenres",
+        "label": "Forms",
         "label_key": "bookForm.forms",
-        "placeholder": "Add a subgenre",
+        "placeholder": "Add a form",
         "placeholder_key": "bookForm.addForm",
-        "description": "A more specific literary, academic, or stylistic classification, including forms, movements, disciplines, or national literatures.",
-        "description_key": "bookForm.subgenreDescription",
+        "description": "The way a work is written or presented, such as a novel, essay, diary, memoir, or letters.",
+        "description_key": "bookForm.formDescription",
         "cloud_key": "dash.formCloud",
-        "csv_label": "Subgenre",
+        "csv_label": "Form",
         "missing_key": "dash.noForms",
-        "missing_label": "books without subgenres",
+        "missing_label": "books without forms",
     },
     {
         "field": "themes",
@@ -998,12 +1012,13 @@ def init_schema() -> None:
             cover_thumb               BLOB    DEFAULT NULL,
             tags                      TEXT    NOT NULL DEFAULT '',
             genres                    TEXT    NOT NULL DEFAULT '',
+            subgenres                 TEXT    NOT NULL DEFAULT '',
+            forms                     TEXT    NOT NULL DEFAULT '',
             themes                    TEXT    NOT NULL DEFAULT '',
             settings                  TEXT    NOT NULL DEFAULT '',
             historical_periods        TEXT    NOT NULL DEFAULT '',
             subjects                  TEXT    NOT NULL DEFAULT '',
-            audiences                 TEXT    NOT NULL DEFAULT '',
-            forms                     TEXT    NOT NULL DEFAULT ''
+            audiences                 TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS authors (
@@ -1834,13 +1849,14 @@ def migrate_add_genres() -> None:
 
 # ── Migration: Add taxonomy classification columns ──────────────────────
 def migrate_add_taxonomy_fields() -> None:
-    """Add taxonomy fields and preserve existing tags as themes once."""
+    """Add taxonomy fields and split the former Subgenres field from Forms."""
     if not DB_PATH.exists():
         return
     db = sqlite3.connect(str(DB_PATH))
     db.row_factory = sqlite3.Row
     cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
     themes_was_missing = "themes" not in cols
+    legacy_forms_were_subgenres = "subgenres" not in cols and "forms" in cols
     added_columns: list[str] = []
 
     for column in TAXONOMY_FIELD_NAMES:
@@ -1858,7 +1874,17 @@ def migrate_add_taxonomy_fields() -> None:
               AND TRIM(tags) != ''
         """)
 
-    if added_columns:
+    if legacy_forms_were_subgenres:
+        db.execute("""
+            UPDATE books
+            SET subgenres = forms
+            WHERE (subgenres IS NULL OR TRIM(subgenres) = '')
+              AND forms IS NOT NULL
+              AND TRIM(forms) != ''
+        """)
+        db.execute("UPDATE books SET forms = '' WHERE forms IS NOT NULL AND TRIM(forms) != ''")
+
+    if added_columns or themes_was_missing or legacy_forms_were_subgenres:
         db.commit()
         print(">> Migration complete - taxonomy classification fields added.")
     db.close()
@@ -7938,8 +7964,8 @@ def edit_metadata(book_id: str):
                 name=?, subtitle=?, author=?, slug=?, language=?, original_title=?,
                 original_language=?, original_publication_date=?,
                 publication_date=?, isbn=?, pages=?, starting_page=?,
-                publisher=?, genres=?, themes=?, settings=?, historical_periods=?,
-                subjects=?, audiences=?, forms=?, tags=?, summary=?, translator=?, illustrator=?,
+                publisher=?, genres=?, subgenres=?, forms=?, themes=?, settings=?, historical_periods=?,
+                subjects=?, audiences=?, tags=?, summary=?, translator=?, illustrator=?,
                 editor=?, foreword_author=?, epilogue_author=?, contributing_author=?, status=?,
                 source_type=?, source_id=?, purchase_date=?, purchase_price=?,
                 borrowed_start=?, borrowed_end=?, is_gift=?,
@@ -7952,8 +7978,8 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genres"], info["themes"], info["settings"],
-            info["historical_periods"], info["subjects"], info["audiences"], info["forms"],
+            info["publisher"], info["genres"], info["subgenres"], info["forms"], info["themes"], info["settings"],
+            info["historical_periods"], info["subjects"], info["audiences"],
             info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["foreword_author"], info["epilogue_author"],
@@ -8470,11 +8496,11 @@ def new_book():
         ))
         db.execute("""
             UPDATE books
-            SET genres=?, themes=?, settings=?, historical_periods=?, subjects=?, audiences=?, forms=?
+            SET genres=?, subgenres=?, forms=?, themes=?, settings=?, historical_periods=?, subjects=?, audiences=?
             WHERE id=?
         """, (
-            info["genres"], info["themes"], info["settings"],
-            info["historical_periods"], info["subjects"], info["audiences"], info["forms"],
+            info["genres"], info["subgenres"], info["forms"], info["themes"], info["settings"],
+            info["historical_periods"], info["subjects"], info["audiences"],
             book_id,
         ))
 

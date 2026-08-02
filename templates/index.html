@@ -110,7 +110,7 @@ function updateSort() {
         url += `&sort2=${sort2}`;
     }
     const urlParams = new URLSearchParams(window.location.search);
-    ['tag', 'genre', 'theme', 'setting', 'historical_period', 'subject', 'audience', 'form', 'missing_taxonomy'].forEach(function(param) {
+    ['tag', 'genre', 'subgenre', 'form', 'theme', 'setting', 'historical_period', 'subject', 'audience', 'missing_taxonomy'].forEach(function(param) {
         const value = urlParams.get(param);
         if (value) url += `&${param}=${encodeURIComponent(value)}`;
     });
