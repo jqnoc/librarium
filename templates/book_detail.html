@@ -327,10 +327,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <div class="book-title">{{ similar.name }}</div>
             {% if similar.subtitle %}<div class="book-subtitle">{{ similar.subtitle }}</div>{% endif %}
             <div class="book-author">{{ similar.author | format_authors }}</div>
-            <div class="similar-work-score">
-                {{ "%.1f" | format(similar.similarity_score) }}% <span data-i18n="book.similarityScore">similarity</span>
-                <span class="similar-work-shared-count">({{ similar.shared_count }} <span data-i18n="book.sharedItems">shared items</span>)</span>
-            </div>
+            <div class="similar-work-score"><span data-i18n="book.similarityScore">Score:</span> {{ "%.2f" | format(similar.similarity_score) }}</div>
             <div class="similar-work-matches">
                 {% for match in similar.shared_items %}
                 <div class="similar-work-match">

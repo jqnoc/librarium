@@ -3674,7 +3674,7 @@ def _build_similar_works(
     book: dict,
     selected_fields: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    """Return the ten same-library books with normalized weighted similarity."""
+    """Return the ten same-library books with Tanimoto-normalized similarity."""
     active_fields = (
         TAXONOMY_FIELD_NAMES
         if selected_fields is None
@@ -3703,7 +3703,7 @@ def _build_similar_works(
         query += " AND (work_id IS NULL OR work_id != ?)"
         query_params.append(book["work_id"])
 
-    current_norm_squared = sum(
+    current_weight_sum = sum(
         1 / len(values) for values in current_values.values() if values
     )
     similar: list[dict] = []
@@ -3711,7 +3711,7 @@ def _build_similar_works(
         shared_items = []
         shared_count = 0
         weighted_score = 0.0
-        candidate_norm_squared = 0.0
+        candidate_weight_sum = 0.0
         for taxonomy_field in active_taxonomy_fields:
             field = taxonomy_field["field"]
             candidate_values = {
@@ -3721,7 +3721,7 @@ def _build_similar_works(
             current_count = len(current_values[field])
             candidate_count = len(candidate_values)
             if candidate_count:
-                candidate_norm_squared += 1 / candidate_count
+                candidate_weight_sum += 1 / candidate_count
             shared_keys = current_values[field].keys() & candidate_values.keys()
             if not shared_keys:
                 continue
@@ -3737,7 +3737,7 @@ def _build_similar_works(
             weighted_score += len(shared_keys) / (current_count * candidate_count)
 
         if shared_count:
-            normalization = math.sqrt(current_norm_squared * candidate_norm_squared)
+            normalization = current_weight_sum + candidate_weight_sum - weighted_score
             similarity_score = (
                 weighted_score / normalization * 100
                 if normalization else 0.0
