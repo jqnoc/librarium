@@ -114,6 +114,7 @@ It answers:
 
 - History
 - Philosophy
+- Memoir, when it identifies a literary classification rather than only a presentation Form
 - Film Studies
 - Popular Science
 - Travel Writing
