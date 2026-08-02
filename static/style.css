@@ -1097,6 +1097,12 @@ select.form-control { cursor: pointer; }
 .book-metadata-form .classification-row {
     grid-template-columns: 1fr;
 }
+.classification-description {
+    margin: .2rem 0 .45rem;
+    color: var(--lb-text-light);
+    font-size: .85rem;
+    line-height: 1.4;
+}
 .classification-card {
     overflow: visible;
 }

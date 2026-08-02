@@ -318,6 +318,7 @@
                 {% for taxonomy_field in taxonomy_fields %}
                 <div class="form-group">
                     <label id="{{ taxonomy_field.field }}-label" for="{{ taxonomy_field.field }}-input" data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</label>
+                    <p class="classification-description" data-i18n="{{ taxonomy_field.description_key }}">{{ taxonomy_field.description }}</p>
                     <div class="classification-editor" data-classification-editor data-field="{{ taxonomy_field.field }}">
                         <div class="classification-chips" data-chips-container aria-live="polite">
                             {% for value in (form_data.get(taxonomy_field.field, '') or '').split(';') %}
