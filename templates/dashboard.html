@@ -656,11 +656,11 @@ function toggleDashboardWordEdit(wordId) {
 {% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Taxonomy Audit                                                         -->
+<!-- Classification                                                         -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="dash-section">
     <div class="dash-taxonomy-heading">
-        <h2 class="dash-heading" data-i18n="dash.taxonomyAudit">Taxonomy Audit</h2>
+        <h2 class="dash-heading" data-i18n="dash.classification">Classification</h2>
         <button type="button" class="btn btn-secondary btn-sm"
                 onclick="downloadTaxonomyAudit(taxonomyAudit)"
                 data-i18n-title="dash.downloadTaxonomyAuditTitle">
@@ -673,7 +673,7 @@ function toggleDashboardWordEdit(wordId) {
             <div class="card-body">
                 <h3 class="dash-taxonomy-cloud-title" data-i18n="{{ taxonomy_cloud.cloud_key }}">{{ taxonomy_cloud.csv_label }} Cloud</h3>
                 <div id="dash-{{ taxonomy_cloud.field }}-cloud" class="word-cloud"></div>
-                {% if not taxonomy_cloud.top_counts %}
+                {% if not taxonomy_cloud.all_counts %}
                 <p class="dash-taxonomy-empty" data-i18n="dash.noTaxonomyValues">No values yet.</p>
                 {% endif %}
             </div>
@@ -1087,14 +1087,15 @@ makeDonut('sourceDonut', sourceCounts);
 {% if language_counts %}makeDonut('langDonut', languageCounts);{% endif %}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Genre and tag clouds (compact)
+// Classification clouds
 // ═══════════════════════════════════════════════════════════════════════════
 function renderDashboardCloud(containerId, counts, filterKey) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+    const entries = Object.entries(counts).sort((left, right) => left[0].localeCompare(right[0], undefined, { sensitivity: 'base' }));
     if (entries.length === 0) return;
-    const maxCount = entries[0][1], minCount = entries[entries.length-1][1];
+    const countValues = entries.map(entry => entry[1]);
+    const maxCount = Math.max(...countValues), minCount = Math.min(...countValues);
     entries.forEach(([word, count]) => {
         const a = document.createElement('a');
         a.textContent = word;
@@ -1108,7 +1109,7 @@ function renderDashboardCloud(containerId, counts, filterKey) {
     });
 }
 {% for taxonomy_cloud in taxonomy_clouds %}
-{% if taxonomy_cloud.top_counts %}renderDashboardCloud('dash-{{ taxonomy_cloud.field }}-cloud', {{ taxonomy_cloud.top_counts | tojson }}, '{{ taxonomy_cloud.filter_param }}');{% endif %}
+{% if taxonomy_cloud.all_counts %}renderDashboardCloud('dash-{{ taxonomy_cloud.field }}-cloud', {{ taxonomy_cloud.all_counts | tojson }}, '{{ taxonomy_cloud.filter_param }}');{% endif %}
 {% endfor %}
 
 // ═══════════════════════════════════════════════════════════════════════════

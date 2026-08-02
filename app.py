@@ -4387,10 +4387,8 @@ def dashboard():
     for taxonomy_field in TAXONOMY_FIELDS:
         field = taxonomy_field["field"]
         counts = taxonomy_counts[field]
-        top_counts = dict(sorted(
-            counts.items(), key=lambda item: (-item[1], item[0].casefold())
-        )[:20])
-        taxonomy_clouds.append({**taxonomy_field, "top_counts": top_counts})
+        all_counts = dict(sorted(counts.items(), key=lambda item: item[0].casefold()))
+        taxonomy_clouds.append({**taxonomy_field, "all_counts": all_counts})
         taxonomy_audit.append({
             "type": taxonomy_field["csv_label"],
             "counts": counts,

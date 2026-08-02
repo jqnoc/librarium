@@ -190,7 +190,7 @@ Forms may be combined when a work genuinely uses more than one presentation mode
 #### *Reina del grito*
 
 - Genre: Non-Fiction
-- Form: Essays
+- Form: Essay
 - Subgenre: Film Criticism; Cultural Criticism
 
 #### *Flowers for Algernon*

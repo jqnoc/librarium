@@ -808,7 +808,7 @@
         'dash.audienceCloud':       { en: 'Audience Cloud',        es: 'Nube de Públicos' },
         'dash.subgenreCloud':       { en: 'Subgenre Cloud',        es: 'Nube de Subgéneros' },
         'dash.formCloud':           { en: 'Form Cloud',             es: 'Nube de Formas' },
-        'dash.taxonomyAudit':       { en: 'Taxonomy Audit',        es: 'Auditoría Taxonómica' },
+        'dash.classification':     { en: 'Classification',        es: 'Clasificación' },
         'dash.downloadTaxonomyAudit': { en: 'Download taxonomy audit', es: 'Descargar auditoría taxonómica' },
         'dash.downloadTaxonomyAuditTitle': { en: 'Download every taxonomy value as CSV', es: 'Descargar todos los valores taxonómicos como CSV' },
         'dash.noTaxonomyValues':    { en: 'No values yet.',        es: 'Aún no hay valores.' },
