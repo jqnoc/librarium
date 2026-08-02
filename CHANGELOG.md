@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Author cards now show grammatically correct books-read bubbles and time-only bubbles, with sorting by both values
 
 ### Fixed
+- Classification suggestions now stay hidden until a focused line edit contains at least one letter and disappear when focus leaves the field
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
 - Books with Wishlist and Draft statuses are now excluded from the Books by Status Over Time chart
 

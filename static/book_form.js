@@ -167,10 +167,14 @@
 
         function renderSuggestions() {
             var typed = normalize(input.value).toLowerCase();
+            if (document.activeElement !== input || !/\p{L}/u.test(typed)) {
+                hideSuggestions();
+                return;
+            }
             var existing = values().map(function (value) { return value.toLowerCase(); });
             visibleSuggestions = suggestions.filter(function (value) {
                 var lower = value.toLowerCase();
-                return (!typed || lower.indexOf(typed) !== -1) && existing.indexOf(lower) === -1;
+                return lower.indexOf(typed) !== -1 && existing.indexOf(lower) === -1;
             });
             suggestionsBox.innerHTML = '';
             activeSuggestion = -1;
