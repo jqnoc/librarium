@@ -222,6 +222,107 @@
             window.addEventListener('load', updateLibrarySummary);
         })();
 
+        (function() {
+            function initialize() {
+            var selector = document.getElementById('similarWorksMultiSelect');
+            if (!selector) return;
+
+            var btn = document.getElementById('similarWorksMultiBtn');
+            var label = document.getElementById('similarWorksMultiLabel');
+            var dropdown = document.getElementById('similarWorksMultiDropdown');
+            var form = document.getElementById('similarWorksSettingsForm');
+            var checkboxes = Array.from(selector.querySelectorAll('input[data-similar-works-field]'));
+            var applyBtn = document.getElementById('applySimilarWorksSettings');
+            var cancelBtn = document.getElementById('cancelSimilarWorksSettings');
+            var initialSelected = checkboxes.filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+
+            function translate(key, fallback) {
+                if (window.librariumI18n && typeof window.librariumI18n.t === 'function') {
+                    return window.librariumI18n.t(key);
+                }
+                return fallback;
+            }
+
+            function getSelectedValues() {
+                return checkboxes.filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+            }
+
+            function hasSelectionChanged() {
+                var selected = getSelectedValues();
+                if (selected.length !== initialSelected.length) return true;
+                return selected.some(function(value) { return initialSelected.indexOf(value) === -1; });
+            }
+
+            function updateSummary() {
+                var selected = getSelectedValues();
+                if (selected.length === 0) {
+                    label.textContent = translate('settings.noCategories', 'No categories');
+                } else if (selected.length === checkboxes.length) {
+                    label.textContent = translate('settings.allCategories', 'All categories');
+                } else {
+                    label.textContent = selected.length + ' ' + translate('settings.categoriesSelected', 'categories selected');
+                }
+                applyBtn.disabled = !hasSelectionChanged();
+            }
+
+            function resetSelection() {
+                checkboxes.forEach(function(cb) {
+                    cb.checked = initialSelected.indexOf(cb.value) !== -1;
+                });
+                updateSummary();
+            }
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isOpen = !dropdown.classList.contains('open');
+                dropdown.classList.toggle('open', isOpen);
+                btn.setAttribute('aria-expanded', String(isOpen));
+            });
+
+            checkboxes.forEach(function(cb) {
+                cb.addEventListener('change', updateSummary);
+            });
+
+            cancelBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetSelection();
+                dropdown.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+            });
+
+            applyBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+
+            form.addEventListener('submit', function() {
+                applyBtn.disabled = true;
+            });
+
+            dropdown.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+
+            document.addEventListener('click', function() {
+                resetSelection();
+                dropdown.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+            });
+
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('lang-btn')) {
+                    window.setTimeout(updateSummary, 0);
+                }
+            });
+
+            window.addEventListener('load', updateSummary);
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initialize);
+            } else {
+                initialize();
+            }
+        })();
+
         function undoDelete(event) {
             event.preventDefault();
             var form = document.createElement('form');
@@ -359,6 +460,31 @@
                     <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dirHint">Leave empty to use the default location.</small>
                 </div>
                 {% endif %}
+
+                <hr>
+                <h4 data-i18n="settings.similarWorksTitle">Similar Works</h4>
+                <p class="settings-section-description" data-i18n="settings.similarWorksDescription">Choose which classification categories contribute to Similar Works.</p>
+                <form method="POST" action="{{ url_for('update_similar_works_settings') }}" id="similarWorksSettingsForm">
+                    <div class="settings-multi-select" id="similarWorksMultiSelect">
+                        <button type="button" class="settings-multi-btn" id="similarWorksMultiBtn" aria-haspopup="true" aria-expanded="false">
+                            <span data-i18n="settings.categoriesLabel">Classification categories</span>
+                            <span id="similarWorksMultiLabel">All categories</span>
+                            <span class="settings-multi-caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="settings-multi-dropdown" id="similarWorksMultiDropdown">
+                            {% for taxonomy_field in taxonomy_fields %}
+                            <label class="settings-multi-item">
+                                <input type="checkbox" name="similar_fields" value="{{ taxonomy_field.field }}" data-similar-works-field {% if taxonomy_field.field in similar_works_fields %}checked{% endif %}>
+                                <span data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</span>
+                            </label>
+                            {% endfor %}
+                            <div class="settings-multi-actions">
+                                <button type="button" class="btn btn-secondary btn-sm" id="cancelSimilarWorksSettings" data-i18n="form.cancel">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-sm" id="applySimilarWorksSettings" data-i18n="form.apply">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

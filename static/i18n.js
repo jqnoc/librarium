@@ -37,6 +37,12 @@
         'library.databasePath':  { en: 'Database Path',          es: 'Ruta de la Base de Datos' },
         'library.cloudStorage':  { en: 'Cloud Storage',          es: 'Almacenamiento en la Nube' },
         'library.dropboxPath':   { en: 'Apps/LibrariumApp/',     es: 'Apps/LibrariumApp/' },
+        'settings.similarWorksTitle': { en: 'Similar Works', es: 'Obras Similares' },
+        'settings.similarWorksDescription': { en: 'Choose which classification categories contribute to Similar Works.', es: 'Elige qué categorías de clasificación contribuyen a las obras similares.' },
+        'settings.categoriesLabel': { en: 'Classification categories', es: 'Categorías de clasificación' },
+        'settings.allCategories': { en: 'All categories', es: 'Todas las categorías' },
+        'settings.noCategories': { en: 'No categories', es: 'Ninguna categoría' },
+        'settings.categoriesSelected': { en: 'categories selected', es: 'categorías seleccionadas' },
 
         // ── Database backup ──────────────────────────────────────────────────────
         'backup.title':          { en: 'Database Backup',        es: 'Copia de Seguridad' },

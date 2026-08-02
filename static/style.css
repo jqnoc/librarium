@@ -293,6 +293,79 @@ img { max-width: 100%; height: auto; }
 }
 .library-manage-btn:hover { color: #fff; }
 
+/* ── Similar Works settings ──────────────────────────────────────────── */
+.settings-section-description {
+    margin: -0.35rem 0 0.65rem;
+    color: var(--lb-text-light);
+    font-size: .82rem;
+}
+.settings-multi-select {
+    position: relative;
+    width: 100%;
+}
+.settings-multi-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--lb-border);
+    border-radius: 5px;
+    background: var(--lb-white);
+    color: var(--lb-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: .88rem;
+    text-align: left;
+}
+.settings-multi-btn:hover { border-color: var(--lb-accent); }
+.settings-multi-btn > span:first-child { flex: 1; }
+.settings-multi-btn > span:nth-child(2) {
+    color: var(--lb-text-light);
+    white-space: nowrap;
+}
+.settings-multi-caret { font-size: .7rem; color: var(--lb-text-light); }
+.settings-multi-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    padding: 0.35rem 0 0;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: 6px;
+    box-shadow: var(--lb-shadow-lg);
+    z-index: 1200;
+}
+.settings-multi-dropdown.open { display: block; }
+.settings-multi-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.38rem 0.7rem;
+    color: var(--lb-text);
+    cursor: pointer;
+    font-size: .86rem;
+    user-select: none;
+}
+.settings-multi-item:hover { background: var(--lb-bg); }
+.settings-multi-item input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--lb-accent);
+    flex-shrink: 0;
+}
+.settings-multi-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.7rem 0.75rem 0.75rem;
+    margin-top: 0.35rem;
+    border-top: 1px solid var(--lb-border);
+}
+
 /* ── Library management modal ────────────────────────────────────────── */
 .modal-dialog {
     background: var(--lb-white);

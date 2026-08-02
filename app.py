@@ -2479,6 +2479,15 @@ def _get_selected_library_ids() -> list[int]:
     return selected
 
 
+def _get_similar_works_fields() -> tuple[str, ...]:
+    """Return taxonomy fields enabled for Similar Works comparisons."""
+    raw = request.cookies.get("librarium_similar_fields")
+    if raw is None:
+        return TAXONOMY_FIELD_NAMES
+    selected = {part.strip() for part in raw.split(",")}
+    return tuple(field for field in TAXONOMY_FIELD_NAMES if field in selected)
+
+
 def _lib_filter(lib_ids: list[int], col: str = "library_id") -> tuple[str, tuple]:
     """Return (sql_condition, params) for library filtering.
 
@@ -2565,7 +2574,7 @@ def _get_author_pen_names(author_name: str, canonical_map: dict[str, str] | None
 
 @app.context_processor
 def inject_library_context():
-    """Make selected_library_ids and all_libraries available in every template."""
+    """Make shared library and Similar Works settings available to templates."""
     try:
         db = get_db()
         lib_ids = _get_selected_library_ids()
@@ -2586,6 +2595,8 @@ def inject_library_context():
         return {
             "selected_library_ids": sel_ids,
             "all_libraries": all_lib_dicts,
+            "taxonomy_fields": TAXONOMY_FIELDS,
+            "similar_works_fields": _get_similar_works_fields(),
             "app_version": APP_VERSION,
             "current_user": current_user,
             "backup_dir": backup_dir,
@@ -2600,6 +2611,8 @@ def inject_library_context():
         return {
             "selected_library_ids": [],
             "all_libraries": [],
+            "taxonomy_fields": TAXONOMY_FIELDS,
+            "similar_works_fields": TAXONOMY_FIELD_NAMES,
             "app_version": APP_VERSION,
             "current_user": _get_valid_current_user() if request else "",
             "backup_dir": str(BACKUP_DIR),
@@ -3655,19 +3668,32 @@ def _build_taxonomy_audit(books: list[dict]) -> tuple[dict[str, dict[str, int]],
     return counts, titles
 
 
-def _build_similar_works(db: sqlite3.Connection, book_id: str, book: dict) -> list[dict]:
+def _build_similar_works(
+    db: sqlite3.Connection,
+    book_id: str,
+    book: dict,
+    selected_fields: tuple[str, ...] | None = None,
+) -> list[dict]:
     """Return the ten same-library books with the most shared classifications."""
+    active_fields = (
+        TAXONOMY_FIELD_NAMES
+        if selected_fields is None
+        else tuple(field for field in TAXONOMY_FIELD_NAMES if field in selected_fields)
+    )
+    if not active_fields:
+        return []
+    active_taxonomy_fields = [TAXONOMY_FIELDS_BY_NAME[field] for field in active_fields]
     current_values = {
         field: {
             value.casefold(): value
             for value in _split_taxonomy_values(book.get(field))
         }
-        for field in TAXONOMY_FIELD_NAMES
+        for field in active_fields
     }
     if not any(current_values.values()):
         return []
 
-    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    taxonomy_columns = ", ".join(active_fields)
     query = (
         "SELECT id, name, subtitle, author, has_cover, cover_hash, work_id, "
         f"{taxonomy_columns} FROM books WHERE library_id = ? AND id != ?"
@@ -3681,7 +3707,7 @@ def _build_similar_works(db: sqlite3.Connection, book_id: str, book: dict) -> li
     for row in db.execute(query, query_params).fetchall():
         shared_items = []
         shared_count = 0
-        for taxonomy_field in TAXONOMY_FIELDS:
+        for taxonomy_field in active_taxonomy_fields:
             field = taxonomy_field["field"]
             candidate_values = {
                 value.casefold(): value
@@ -7329,7 +7355,7 @@ def book_detail(book_id: str):
     # Build reading_id → reading_number map for template
     reading_num_map = {rr["id"]: rr["reading_number"] for rr in readings_rows}
 
-    similar_works = _build_similar_works(db, book_id, info)
+    similar_works = _build_similar_works(db, book_id, info, _get_similar_works_fields())
 
     # Series info (many-to-many)
     series_list_book = []
@@ -8712,6 +8738,17 @@ def switch_library():
     resp = make_response(redirect(request.referrer or url_for("index")))
     resp.set_cookie("librarium_library", cookie_val, max_age=60 * 60 * 24 * 365 * 5,
                      samesite="Lax", httponly=True)
+    return resp
+
+
+@app.route("/settings/similar-works", methods=["POST"])
+def update_similar_works_settings():
+    """Persist the taxonomy fields used by Similar Works comparisons."""
+    selected = set(request.form.getlist("similar_fields"))
+    cookie_val = ",".join(field for field in TAXONOMY_FIELD_NAMES if field in selected)
+    resp = make_response(redirect(request.referrer or url_for("index")))
+    resp.set_cookie("librarium_similar_fields", cookie_val, max_age=60 * 60 * 24 * 365 * 5,
+                    samesite="Lax", httponly=True)
     return resp
 
 
