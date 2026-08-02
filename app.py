@@ -3674,7 +3674,7 @@ def _build_similar_works(
     book: dict,
     selected_fields: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    """Return the ten same-library books with Tanimoto-normalized similarity."""
+    """Return the ten same-library books with field-balanced Dice similarity."""
     active_fields = (
         TAXONOMY_FIELD_NAMES
         if selected_fields is None
@@ -3703,26 +3703,56 @@ def _build_similar_works(
         query += " AND (work_id IS NULL OR work_id != ?)"
         query_params.append(book["work_id"])
 
-    current_weight_sum = sum(
-        1 / len(values) for values in current_values.values() if values
-    )
+    library_rows = db.execute(
+        f"SELECT {taxonomy_columns} FROM books WHERE library_id = ?",
+        (book.get("library_id"),),
+    ).fetchall()
+    library_book_count = len(library_rows)
+    document_frequencies = {field: Counter() for field in active_fields}
+    for library_row in library_rows:
+        for field in active_fields:
+            document_frequencies[field].update({
+                value.casefold()
+                for value in _split_taxonomy_values(library_row[field])
+            })
+
+    def value_idf(field: str, value: str) -> float:
+        document_frequency = document_frequencies[field].get(value.casefold(), 0)
+        return math.log1p(
+            (library_book_count - document_frequency + 0.5)
+            / (document_frequency + 0.5)
+        )
+
+    def value_weight(field: str, value: str) -> float:
+        return 1 + math.log1p(value_idf(field, value))
+
     similar: list[dict] = []
     for row in db.execute(query, query_params).fetchall():
         shared_items = []
         shared_count = 0
-        weighted_score = 0.0
-        candidate_weight_sum = 0.0
+        field_scores: list[float] = []
         for taxonomy_field in active_taxonomy_fields:
             field = taxonomy_field["field"]
             candidate_values = {
                 value.casefold(): value
                 for value in _split_taxonomy_values(row[field])
             }
-            current_count = len(current_values[field])
-            candidate_count = len(candidate_values)
-            if candidate_count:
-                candidate_weight_sum += 1 / candidate_count
-            shared_keys = current_values[field].keys() & candidate_values.keys()
+            current_field_values = current_values[field]
+            shared_keys = current_field_values.keys() & candidate_values.keys()
+            current_weight = sum(
+                value_weight(field, value) for value in current_field_values.values()
+            )
+            candidate_weight = sum(
+                value_weight(field, value) for value in candidate_values.values()
+            )
+            if current_weight or candidate_weight:
+                shared_weight = sum(
+                    value_weight(field, current_field_values[key])
+                    for key in shared_keys
+                )
+                field_scores.append(
+                    2 * shared_weight / (current_weight + candidate_weight)
+                )
             if not shared_keys:
                 continue
             shared_items.append({
@@ -3734,14 +3764,9 @@ def _build_similar_works(
                 ),
             })
             shared_count += len(shared_keys)
-            weighted_score += len(shared_keys) / (current_count * candidate_count)
 
-        if shared_count:
-            normalization = current_weight_sum + candidate_weight_sum - weighted_score
-            similarity_score = (
-                weighted_score / normalization * 100
-                if normalization else 0.0
-            )
+        if shared_count and field_scores:
+            similarity_score = sum(field_scores) / len(field_scores) * 100
             similar.append({
                 "id": row["id"],
                 "name": row["name"],
