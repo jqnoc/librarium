@@ -1,4 +1,7 @@
 (function () {
+    var classificationStates = {};
+    var classificationDragType = 'application/x-librarium-classification';
+
     function byId(id) {
         return document.getElementById(id);
     }
@@ -214,8 +217,21 @@
             remove.textContent = '\u00d7';
             chip.appendChild(label);
             chip.appendChild(remove);
+            chip.setAttribute('draggable', 'true');
             chips.appendChild(chip);
             sortChips();
+            return true;
+        }
+
+        function removeValue(value) {
+            var normalized = normalize(value).toLowerCase();
+            var matchingChip = Array.from(chips.querySelectorAll('.classification-chip')).find(function (chip) {
+                var label = chip.querySelector('.classification-chip-label');
+                return normalize(label && label.textContent).toLowerCase() === normalized;
+            });
+            if (!matchingChip) return false;
+            matchingChip.remove();
+            return true;
         }
 
         function addInputValue(keepFocus) {
@@ -225,6 +241,12 @@
             if (keepFocus !== false) input.focus();
             renderSuggestions();
         }
+
+        classificationStates[field] = {
+            removeValue: removeValue,
+            renderSuggestions: renderSuggestions,
+            sync: sync
+        };
 
         input.setAttribute('aria-autocomplete', 'list');
         input.setAttribute('aria-controls', suggestionsBox.id);
@@ -287,6 +309,67 @@
             sync();
             renderSuggestions();
             input.focus();
+        });
+        chips.addEventListener('dragstart', function (event) {
+            var chip = event.target.closest('.classification-chip');
+            if (!chip || !event.dataTransfer) return;
+            var label = chip.querySelector('.classification-chip-label');
+            var value = normalize(label && label.textContent);
+            if (!value) return;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData(classificationDragType, JSON.stringify({
+                field: field,
+                value: value
+            }));
+            event.dataTransfer.setData('text/plain', value);
+            chip.classList.add('is-dragging');
+            chip.setAttribute('aria-grabbed', 'true');
+        });
+        chips.addEventListener('dragend', function (event) {
+            var chip = event.target.closest('.classification-chip');
+            if (chip) {
+                chip.classList.remove('is-dragging');
+                chip.setAttribute('aria-grabbed', 'false');
+            }
+            document.querySelectorAll('[data-classification-editor].is-drop-target').forEach(function (target) {
+                target.classList.remove('is-drop-target');
+            });
+        });
+        editor.addEventListener('dragenter', function (event) {
+            if (!event.dataTransfer || Array.prototype.indexOf.call(event.dataTransfer.types, classificationDragType) === -1) return;
+            event.preventDefault();
+            editor.classList.add('is-drop-target');
+        });
+        editor.addEventListener('dragover', function (event) {
+            if (!event.dataTransfer || Array.prototype.indexOf.call(event.dataTransfer.types, classificationDragType) === -1) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            editor.classList.add('is-drop-target');
+        });
+        editor.addEventListener('dragleave', function (event) {
+            if (!event.relatedTarget || !editor.contains(event.relatedTarget)) {
+                editor.classList.remove('is-drop-target');
+            }
+        });
+        editor.addEventListener('drop', function (event) {
+            if (!event.dataTransfer || Array.prototype.indexOf.call(event.dataTransfer.types, classificationDragType) === -1) return;
+            event.preventDefault();
+            editor.classList.remove('is-drop-target');
+            var payload;
+            try {
+                payload = JSON.parse(event.dataTransfer.getData(classificationDragType));
+            } catch (error) {
+                return;
+            }
+            if (!payload || !payload.field || !payload.value || payload.field === field) return;
+            var sourceState = classificationStates[payload.field];
+            if (!sourceState) return;
+            addValue(payload.value);
+            sync();
+            sourceState.removeValue(payload.value);
+            sourceState.sync();
+            sourceState.renderSuggestions();
+            renderSuggestions();
         });
         editor.addEventListener('click', function (event) {
             if (event.target === editor || event.target === chips) input.focus();

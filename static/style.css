@@ -1127,6 +1127,10 @@ select.form-control { cursor: pointer; }
     border-color: var(--lb-orange);
     box-shadow: 0 0 0 3px var(--lb-accent-glow);
 }
+.classification-editor.is-drop-target {
+    border-color: var(--lb-orange);
+    box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
 .classification-chips {
     display: flex;
     flex: 0 1 auto;
@@ -1144,8 +1148,15 @@ select.form-control { cursor: pointer; }
     border-radius: 100px;
     background: var(--lb-accent-faint);
     color: var(--lb-dark);
+    cursor: grab;
     font-size: .84rem;
     line-height: 1.2;
+}
+.classification-chip:active {
+    cursor: grabbing;
+}
+.classification-chip.is-dragging {
+    opacity: .45;
 }
 .classification-chip-label {
     overflow: hidden;

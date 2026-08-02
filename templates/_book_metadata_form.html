@@ -323,7 +323,7 @@
                         <div class="classification-chips" data-chips-container aria-live="polite">
                             {% for value in (form_data.get(taxonomy_field.field, '') or '').split(';') %}
                             {% if value.strip() %}
-                            <span class="classification-chip">
+                            <span class="classification-chip" draggable="true" aria-grabbed="false">
                                 <span class="classification-chip-label">{{ value.strip() }}</span>
                                 <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">×</button>
                             </span>
@@ -341,7 +341,7 @@
                 </div>
                 {% endfor %}
             </div>
-            <p class="classification-hint" data-i18n="bookForm.classificationHint">Add one item at a time, then press Enter or type a semicolon to add another. Select an existing value from the suggestions.</p>
+            <p class="classification-hint" data-i18n="bookForm.classificationHint">Add one item at a time, then press Enter or type a semicolon to add another. You can also drag a value to another category.</p>
         </div>
     </div>
 
