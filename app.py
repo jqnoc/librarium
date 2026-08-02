@@ -199,6 +199,21 @@ TAXONOMY_FIELDS = (
 )
 TAXONOMY_FIELD_NAMES = tuple(item["field"] for item in TAXONOMY_FIELDS)
 TAXONOMY_FIELDS_BY_NAME = {item["field"]: item for item in TAXONOMY_FIELDS}
+CONTROLLED_FORM_VALUES = (
+    "Essay",
+    "Guide",
+    "Historical Monograph",
+    "Novel",
+    "Novella",
+    "Short Story",
+    "Memoir",
+    "Letters",
+    "Dialogue",
+    "Interview",
+    "Diary",
+    "Treatise",
+    "Speech",
+)
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
@@ -3633,7 +3648,13 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
                     part = part.strip()
                     if part:
                         buckets[f].add(part)
-    return {f: sorted(vals, key=str.casefold) for f, vals in buckets.items()}
+    suggestions = {f: sorted(vals, key=str.casefold) for f, vals in buckets.items()}
+    if "forms" in suggestions:
+        suggestions["forms"] = sorted(
+            set(suggestions["forms"]) | set(CONTROLLED_FORM_VALUES),
+            key=str.casefold,
+        )
+    return suggestions
 
 
 def _split_taxonomy_values(raw: str | None) -> list[str]:

@@ -156,6 +156,8 @@ Form is separate from Genre, Subgenre, Themes, and Subjects. Genre identifies th
 ### Controlled Form values
 
 - Essay
+- Guide
+- Historical Monograph
 - Novel
 - Novella
 - Short Story
