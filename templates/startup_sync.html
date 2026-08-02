@@ -4,13 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Librarium — Syncing…</title>
+    <script>
+    (function () {
+        var theme = localStorage.getItem('librarium_theme') === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    }());
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
-<body class="user-select-page startup-sync-page">
+<body class="user-select-page">
     <div class="user-select-container" style="text-align: center;">
         <div class="user-select-header">
             <img src="{{ url_for('static', filename='logo.svg') }}" alt="Librarium" class="user-select-logo">

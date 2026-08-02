@@ -3611,26 +3611,5 @@ html[data-theme="dark"] .modal-overlay {
     background: rgba(0, 0, 0, .62);
 }
 
-.startup-sync-page {
-    background: #F4F0E4 !important;
-    color: #2D2D44 !important;
-    color-scheme: light;
-}
-.startup-sync-page .user-select-container {
-    background: #FFFFFF !important;
-    color: #2D2D44 !important;
-}
-.startup-sync-page .user-select-header h1,
-.startup-sync-page .user-select-section h2 {
-    color: #2D2D44 !important;
-}
-.startup-sync-page .auth-description {
-    color: #6B7280 !important;
-}
-.startup-sync-page .auth-waiting-spinner {
-    border-color: #E5E7EB !important;
-    border-top-color: #EC8F8D !important;
-}
-
 
 
