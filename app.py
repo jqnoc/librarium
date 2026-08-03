@@ -1036,6 +1036,18 @@ def init_schema() -> None:
             audiences                 TEXT    NOT NULL DEFAULT ''
         );
 
+        CREATE TABLE IF NOT EXISTS work_taxonomy (
+            work_id            TEXT PRIMARY KEY,
+            genres             TEXT NOT NULL DEFAULT '',
+            subgenres          TEXT NOT NULL DEFAULT '',
+            forms              TEXT NOT NULL DEFAULT '',
+            themes             TEXT NOT NULL DEFAULT '',
+            settings           TEXT NOT NULL DEFAULT '',
+            historical_periods TEXT NOT NULL DEFAULT '',
+            subjects           TEXT NOT NULL DEFAULT '',
+            audiences          TEXT NOT NULL DEFAULT ''
+        );
+
         CREATE TABLE IF NOT EXISTS authors (
             name        TEXT    PRIMARY KEY,
             photo       BLOB,
@@ -1162,6 +1174,7 @@ def _run_all_migrations() -> None:
     migrate_add_source_place_details()
     migrate_add_genres()
     migrate_add_taxonomy_fields()
+    migrate_add_work_taxonomy()
     migrate_add_contributor_fields()
 
 
@@ -1902,6 +1915,76 @@ def migrate_add_taxonomy_fields() -> None:
     if added_columns or themes_was_missing or legacy_forms_were_subgenres:
         db.commit()
         print(">> Migration complete - taxonomy classification fields added.")
+    db.close()
+
+
+def migrate_add_work_taxonomy() -> None:
+    """Move classification for linked editions into one shared work record."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS work_taxonomy (
+            work_id            TEXT PRIMARY KEY,
+            genres             TEXT NOT NULL DEFAULT '',
+            subgenres          TEXT NOT NULL DEFAULT '',
+            forms              TEXT NOT NULL DEFAULT '',
+            themes             TEXT NOT NULL DEFAULT '',
+            settings           TEXT NOT NULL DEFAULT '',
+            historical_periods TEXT NOT NULL DEFAULT '',
+            subjects           TEXT NOT NULL DEFAULT '',
+            audiences          TEXT NOT NULL DEFAULT ''
+        )
+    """)
+
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    work_ids = [
+        row["work_id"]
+        for row in db.execute(
+            "SELECT DISTINCT work_id FROM books WHERE work_id IS NOT NULL AND TRIM(work_id) != ''"
+        ).fetchall()
+    ]
+    for work_id in work_ids:
+        values = {field: [] for field in TAXONOMY_FIELD_NAMES}
+        existing = db.execute(
+            f"SELECT {taxonomy_columns} FROM work_taxonomy WHERE work_id = ?",
+            (work_id,),
+        ).fetchone()
+        if existing:
+            for field in TAXONOMY_FIELD_NAMES:
+                values[field].append(existing[field] or "")
+
+        for book in db.execute(
+            f"SELECT {taxonomy_columns} FROM books WHERE work_id = ?",
+            (work_id,),
+        ).fetchall():
+            for field in TAXONOMY_FIELD_NAMES:
+                values[field].append(book[field] or "")
+
+        normalized = {
+            field: _merge_taxonomy_values(values[field])
+            for field in TAXONOMY_FIELD_NAMES
+        }
+        db.execute(
+            f"INSERT INTO work_taxonomy (work_id, {taxonomy_columns}) "
+            f"VALUES (?, {','.join('?' for _ in TAXONOMY_FIELD_NAMES)}) "
+            f"ON CONFLICT(work_id) DO UPDATE SET "
+            + ", ".join(f"{field}=excluded.{field}" for field in TAXONOMY_FIELD_NAMES),
+            (work_id, *(normalized[field] for field in TAXONOMY_FIELD_NAMES)),
+        )
+        db.execute(
+            f"UPDATE books SET {', '.join(f'{field}=?' for field in TAXONOMY_FIELD_NAMES)} "
+            "WHERE work_id = ?",
+            tuple("" for _ in TAXONOMY_FIELD_NAMES) + (work_id,),
+        )
+
+    db.execute(
+        "DELETE FROM work_taxonomy WHERE NOT EXISTS "
+        "(SELECT 1 FROM books WHERE books.work_id = work_taxonomy.work_id)"
+    )
+    db.commit()
     db.close()
 
 
@@ -3636,11 +3719,20 @@ def _collect_field_values(*fields: str) -> dict[str, list[str]]:
     safe_fields = [f for f in fields if re.match(r'^[a-z_]+$', f)]
     if not safe_fields:
         return {}
-    cols = ", ".join(safe_fields)
+    selected_columns = list(safe_fields)
+    needs_work_taxonomy = any(field in TAXONOMY_FIELD_NAMES for field in safe_fields)
+    if needs_work_taxonomy:
+        selected_columns.insert(0, "work_id")
+    cols = ", ".join(dict.fromkeys(selected_columns))
     lf, lp = _lib_filter(lib_ids)
     rows = db.execute(f"SELECT {cols} FROM books WHERE {lf}", lp).fetchall()
+    effective_rows = (
+        _apply_work_taxonomy_to_books(db, rows)
+        if needs_work_taxonomy
+        else [dict(row) for row in rows]
+    )
     buckets: dict[str, set[str]] = {f: set() for f in safe_fields}
-    for row in rows:
+    for row in effective_rows:
         for f in safe_fields:
             raw = (row[f] or "").strip()
             if raw:
@@ -3667,6 +3759,15 @@ def _split_taxonomy_values(raw: str | None) -> list[str]:
             seen.add(value)
             values.append(value)
     return values
+
+
+def _merge_taxonomy_values(raw_values: list[str | None]) -> str:
+    """Combine taxonomy strings without preserving duplicate values."""
+    values_by_key: dict[str, str] = {}
+    for raw in raw_values:
+        for value in _split_taxonomy_values(raw):
+            values_by_key.setdefault(value.casefold(), value)
+    return "; ".join(sorted(values_by_key.values(), key=str.casefold))
 
 
 def _normalize_taxonomy_values(raw: str | None) -> str:
@@ -3704,6 +3805,7 @@ def _build_similar_works(
     if not active_fields:
         return []
     active_taxonomy_fields = [TAXONOMY_FIELDS_BY_NAME[field] for field in active_fields]
+    book = _apply_work_taxonomy(db, book)
     current_values = {
         field: {
             value.casefold(): value
@@ -3716,7 +3818,7 @@ def _build_similar_works(
 
     taxonomy_columns = ", ".join(active_fields)
     query = (
-        "SELECT id, name, subtitle, author, has_cover, cover_hash, work_id, "
+        "SELECT id, name, subtitle, author, has_cover, cover_hash, work_id, is_primary_edition, "
         f"{taxonomy_columns} FROM books WHERE library_id = ? AND id != ?"
     )
     query_params: list[object] = [book.get("library_id"), book_id]
@@ -3724,10 +3826,19 @@ def _build_similar_works(
         query += " AND (work_id IS NULL OR work_id != ?)"
         query_params.append(book["work_id"])
 
-    library_rows = db.execute(
-        f"SELECT {taxonomy_columns} FROM books WHERE library_id = ?",
+    library_rows = _apply_work_taxonomy_to_books(db, db.execute(
+        f"SELECT id, work_id, is_primary_edition, {taxonomy_columns} FROM books WHERE library_id = ?",
         (book.get("library_id"),),
-    ).fetchall()
+    ).fetchall())
+    unique_library_rows: dict[str, dict] = {}
+    for library_row in library_rows:
+        work_key = library_row.get("work_id") or library_row["id"]
+        current = unique_library_rows.get(work_key)
+        if current is None or (
+            library_row.get("is_primary_edition") and not current.get("is_primary_edition")
+        ):
+            unique_library_rows[work_key] = library_row
+    library_rows = list(unique_library_rows.values())
     library_book_count = len(library_rows)
     document_frequencies = {field: Counter() for field in active_fields}
     for library_row in library_rows:
@@ -3748,7 +3859,20 @@ def _build_similar_works(
         return 1 + math.log1p(value_idf(field, value))
 
     similar: list[dict] = []
-    for row in db.execute(query, query_params).fetchall():
+    candidate_rows = _apply_work_taxonomy_to_books(
+        db,
+        db.execute(query, query_params).fetchall(),
+    )
+    unique_candidate_rows: dict[str, dict] = {}
+    for candidate_row in candidate_rows:
+        work_key = candidate_row.get("work_id") or candidate_row["id"]
+        current = unique_candidate_rows.get(work_key)
+        if current is None or (
+            candidate_row.get("is_primary_edition") and not current.get("is_primary_edition")
+        ):
+            unique_candidate_rows[work_key] = candidate_row
+    candidate_rows = list(unique_candidate_rows.values())
+    for row in candidate_rows:
         shared_items = []
         shared_count = 0
         field_scores: list[float] = []
@@ -3831,6 +3955,131 @@ def _get_primary_edition(db, work_id: str) -> dict | None:
         (work_id,),
     ).fetchone()
     return dict(row) if row else None
+
+
+def _load_work_taxonomy_map(db, work_ids: list[str | None]) -> dict[str, dict[str, str]]:
+    """Load shared classification keyed by work ID."""
+    unique_work_ids = [work_id for work_id in dict.fromkeys(work_ids) if work_id]
+    if not unique_work_ids:
+        return {}
+    placeholders = ",".join("?" * len(unique_work_ids))
+    columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    rows = db.execute(
+        f"SELECT work_id, {columns} FROM work_taxonomy WHERE work_id IN ({placeholders})",
+        unique_work_ids,
+    ).fetchall()
+    return {
+        row["work_id"]: {
+            field: row[field] or ""
+            for field in TAXONOMY_FIELD_NAMES
+        }
+        for row in rows
+    }
+
+
+def _apply_work_taxonomy(
+    db,
+    book: dict | sqlite3.Row,
+    taxonomy_map: dict[str, dict[str, str]] | None = None,
+) -> dict:
+    """Return a book mapping with its work-level classification applied."""
+    result = dict(book)
+    work_id = result.get("work_id")
+    if not work_id:
+        return result
+    if taxonomy_map is None:
+        taxonomy_map = _load_work_taxonomy_map(db, [work_id])
+    shared = taxonomy_map.get(work_id)
+    if shared:
+        result.update(shared)
+    return result
+
+
+def _apply_work_taxonomy_to_books(db, books: list[dict | sqlite3.Row]) -> list[dict]:
+    """Apply shared classification to a list of book mappings in one query."""
+    result = [dict(book) for book in books]
+    taxonomy_map = _load_work_taxonomy_map(db, [book.get("work_id") for book in result])
+    for book in result:
+        shared = taxonomy_map.get(book.get("work_id"))
+        if shared:
+            book.update(shared)
+    return result
+
+
+def _get_work_taxonomy(db, work_id: str) -> dict[str, str] | None:
+    """Return the canonical classification for a work, if it exists."""
+    return _load_work_taxonomy_map(db, [work_id]).get(work_id)
+
+
+def _set_book_taxonomy(db, book_id: str, values: dict[str, str]) -> None:
+    """Store classification on a standalone book."""
+    assignments = ", ".join(f"{field}=?" for field in TAXONOMY_FIELD_NAMES)
+    db.execute(
+        f"UPDATE books SET {assignments} WHERE id=?",
+        tuple(values.get(field, "") for field in TAXONOMY_FIELD_NAMES) + (book_id,),
+    )
+
+
+def _set_work_taxonomy(db, work_id: str, values: dict[str, str]) -> None:
+    """Replace a work's classification and clear edition-level copies."""
+    columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    normalized = {
+        field: _merge_taxonomy_values([values.get(field, "")])
+        for field in TAXONOMY_FIELD_NAMES
+    }
+    db.execute(
+        f"INSERT INTO work_taxonomy (work_id, {columns}) "
+        f"VALUES (?, {','.join('?' for _ in TAXONOMY_FIELD_NAMES)}) "
+        f"ON CONFLICT(work_id) DO UPDATE SET "
+        + ", ".join(f"{field}=excluded.{field}" for field in TAXONOMY_FIELD_NAMES),
+        (work_id, *(normalized[field] for field in TAXONOMY_FIELD_NAMES)),
+    )
+    assignments = ", ".join(f"{field}=?" for field in TAXONOMY_FIELD_NAMES)
+    db.execute(
+        f"UPDATE books SET {assignments} WHERE work_id=?",
+        tuple("" for _ in TAXONOMY_FIELD_NAMES) + (work_id,),
+    )
+
+
+def _merge_work_taxonomy(
+    db,
+    work_id: str,
+    source_work_ids: list[str | None] | None = None,
+) -> None:
+    """Merge existing work and edition values into one canonical work record."""
+    source_ids = [
+        candidate
+        for candidate in dict.fromkeys([work_id, *(source_work_ids or [])])
+        if candidate
+    ]
+    values = {field: [] for field in TAXONOMY_FIELD_NAMES}
+    taxonomy_map = _load_work_taxonomy_map(db, source_ids)
+    for source_id in source_ids:
+        shared = taxonomy_map.get(source_id)
+        if shared:
+            for field in TAXONOMY_FIELD_NAMES:
+                values[field].append(shared[field])
+
+    columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    for book in db.execute(
+        f"SELECT {columns} FROM books WHERE work_id=?",
+        (work_id,),
+    ).fetchall():
+        for field in TAXONOMY_FIELD_NAMES:
+            values[field].append(book[field] or "")
+
+    _set_work_taxonomy(
+        db,
+        work_id,
+        {field: _merge_taxonomy_values(values[field]) for field in TAXONOMY_FIELD_NAMES},
+    )
+    old_work_ids = [source_id for source_id in source_ids if source_id != work_id]
+    if old_work_ids:
+        placeholders = ",".join("?" * len(old_work_ids))
+        db.execute(
+            f"DELETE FROM work_taxonomy WHERE work_id IN ({placeholders})",
+            old_work_ids,
+        )
 
 
 # ── Source helpers ───────────────────────────────────────────────────────
@@ -3989,7 +4238,8 @@ def _build_index_per_reading(db, lib_ids):
         f"work_id, format, total_time_seconds, tags, {taxonomy_columns} FROM books WHERE {lf}",
         lp,
     ).fetchall()
-    bk_map = {r["id"]: dict(r) for r in book_rows}
+    effective_book_rows = _apply_work_taxonomy_to_books(db, book_rows)
+    bk_map = {book["id"]: book for book in effective_book_rows}
     bids = list(bk_map.keys())
     if not bids:
         return []
@@ -4169,15 +4419,15 @@ def dashboard():
     same_day_prev_year = f"{prev_year}-{today_str[5:]}"
     taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
 
-    primary_books = [
-        dict(row)
-        for row in db.execute(
+    primary_books = _apply_work_taxonomy_to_books(
+        db,
+        db.execute(
             "SELECT id, name, author, pages, starting_page, status, source_type, work_id, "
             f"has_cover, cover_hash, format, {taxonomy_columns}, language, is_gift "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
-        ).fetchall()
-    ]
+        ).fetchall(),
+    )
     primary_book_ids = [book["id"] for book in primary_books]
     avg_ratings = _load_avg_ratings_for_books(db, primary_book_ids)
     daily_data = _build_daily_activity_data(db, lf_b, lp_b)
@@ -4566,11 +4816,9 @@ def dashboard():
     taxonomy_missing_counts = {}
     for taxonomy_field in TAXONOMY_FIELDS:
         field = taxonomy_field["field"]
-        taxonomy_missing_counts[field] = db.execute(
-            f"SELECT COUNT(*) FROM books WHERE {lf} "
-            f"AND TRIM(COALESCE({field}, '')) = '' "
-            f"AND (work_id IS NULL OR is_primary_edition = 1)", lp
-        ).fetchone()[0]
+        taxonomy_missing_counts[field] = sum(
+            1 for book in primary_books if not (book.get(field) or "").strip()
+        )
     has_taxonomy_gaps = any(taxonomy_missing_counts.values())
     abandoned_count = db.execute(
         f"SELECT COUNT(*) FROM books WHERE {lf} AND status = 'abandoned' "
@@ -4803,7 +5051,8 @@ def index():
             ) GROUP BY book_id
         ) pct ON pct.book_id = b.id
         WHERE {lf_b}{edition_filter}
-    """, lp_b).fetchall()
+        """, lp_b).fetchall()
+        rows = _apply_work_taxonomy_to_books(db, rows)
 
         rating_avgs = _load_avg_ratings_for_books(db, [row["id"] for row in rows])
         edition_counts = _load_edition_counts_for_work_ids(
@@ -5196,14 +5445,14 @@ def global_stats():
     authors_read_data = [authors_read_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
-    all_lib_books = [
-        dict(row)
-        for row in db.execute(
-            "SELECT id, name, status, genres, themes, language, original_language, pages, publisher, has_cover, cover_hash, author "
+    all_lib_books = _apply_work_taxonomy_to_books(
+        db,
+        db.execute(
+            "SELECT id, name, status, work_id, genres, themes, language, original_language, pages, publisher, has_cover, cover_hash, author "
             f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
             lp,
-        ).fetchall()
-    ]
+        ).fetchall(),
+    )
     avg_ratings = _load_avg_ratings_for_books(db, [book["id"] for book in all_lib_books])
 
     status_counts: dict[str, int] = Counter()
@@ -6962,6 +7211,8 @@ def link_edition(book_id: str):
         flash("Target book not found.", "error")
         return redirect(url_for("book_detail", book_id=book_id))
 
+    source_work_ids = [book["work_id"], target["work_id"]]
+
     # Determine or create work_id
     work_id = book["work_id"] or target["work_id"]
     if not work_id:
@@ -6974,6 +7225,7 @@ def link_edition(book_id: str):
     # If the target already had other editions, absorb them too
     if target["work_id"] and target["work_id"] != work_id:
         db.execute("UPDATE books SET work_id = ? WHERE work_id = ?", (work_id, target["work_id"]))
+    _merge_work_taxonomy(db, work_id, source_work_ids)
     db.commit()
     flash("Books linked as editions of the same work.", "success")
     return redirect(url_for("book_detail", book_id=book_id))
@@ -6989,6 +7241,10 @@ def unlink_edition(book_id: str):
 
     work_id = book["work_id"]
     was_primary = bool(book["is_primary_edition"])
+    _merge_work_taxonomy(db, work_id)
+    shared_taxonomy = _get_work_taxonomy(db, work_id) or {
+        field: "" for field in TAXONOMY_FIELD_NAMES
+    }
 
     # Make this book standalone
     db.execute("UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE id = ?", (book_id,))
@@ -7007,7 +7263,22 @@ def unlink_edition(book_id: str):
         "SELECT COUNT(*) AS c FROM books WHERE work_id = ?", (work_id,)
     ).fetchone()["c"]
     if remaining_count == 1:
-        db.execute("UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE work_id = ?", (work_id,))
+        remaining = db.execute(
+            "SELECT id FROM books WHERE work_id = ? LIMIT 1", (work_id,)
+        ).fetchone()
+        db.execute(
+            "UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE work_id = ?",
+            (work_id,),
+        )
+        if remaining:
+            _set_book_taxonomy(db, remaining["id"], shared_taxonomy)
+        db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (work_id,))
+    elif remaining_count > 1:
+        _set_book_taxonomy(db, book_id, shared_taxonomy)
+    else:
+        db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (work_id,))
+    if remaining_count == 1:
+        _set_book_taxonomy(db, book_id, shared_taxonomy)
 
     db.commit()
     flash("Book unlinked from edition group.", "success")
@@ -7041,7 +7312,7 @@ def book_detail(book_id: str):
         abort(404)
 
     # Build an info dict that the template accesses via info.get(...)
-    info = dict(book)
+    info = _apply_work_taxonomy(db, book)
 
     # ── Load all readings ──
     readings_rows = db.execute(
@@ -7957,7 +8228,8 @@ def edit_metadata(book_id: str):
     book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
-    info = dict(book)
+    info = _apply_work_taxonomy(db, book)
+    shared_work_id = book["work_id"]
     for field in TAXONOMY_FIELD_NAMES:
         info[field] = _normalize_taxonomy_values(info.get(field))
 
@@ -8068,8 +8340,8 @@ def edit_metadata(book_id: str):
             info["original_language"], info["original_publication_date"],
             info["publication_date"], info["isbn"],
             info["pages"], info["starting_page"],
-            info["publisher"], info["genres"], info["subgenres"], info["forms"], info["themes"], info["settings"],
-            info["historical_periods"], info["subjects"], info["audiences"],
+            info["publisher"],
+            *([""] * len(TAXONOMY_FIELD_NAMES) if shared_work_id else [info[field] for field in TAXONOMY_FIELD_NAMES]),
             info["tags"], info["summary"],
             info["translator"], info["illustrator"],
             info["editor"], info["foreword_author"], info["epilogue_author"],
@@ -8083,6 +8355,12 @@ def edit_metadata(book_id: str):
             info["library_id"],
             book_id,
         ))
+        if shared_work_id:
+            _set_work_taxonomy(
+                db,
+                shared_work_id,
+                {field: info[field] for field in TAXONOMY_FIELD_NAMES},
+            )
         db.commit()
 
         # Sync reading status with book status
@@ -8584,15 +8862,22 @@ def new_book():
             info["format"], info["binding"], info["audio_format"],
             info["total_time_seconds"],
         ))
-        db.execute("""
-            UPDATE books
-            SET genres=?, subgenres=?, forms=?, themes=?, settings=?, historical_periods=?, subjects=?, audiences=?
-            WHERE id=?
-        """, (
-            info["genres"], info["subgenres"], info["forms"], info["themes"], info["settings"],
-            info["historical_periods"], info["subjects"], info["audiences"],
-            book_id,
-        ))
+        if link_work_id:
+            _set_work_taxonomy(
+                db,
+                link_work_id,
+                {field: info[field] for field in TAXONOMY_FIELD_NAMES},
+            )
+        else:
+            db.execute("""
+                UPDATE books
+                SET genres=?, subgenres=?, forms=?, themes=?, settings=?, historical_periods=?, subjects=?, audiences=?
+                WHERE id=?
+            """, (
+                info["genres"], info["subgenres"], info["forms"], info["themes"], info["settings"],
+                info["historical_periods"], info["subjects"], info["audiences"],
+                book_id,
+            ))
 
         # Save full-size cover image to filesystem + Dropbox
         if _cover_blob_for_file:
@@ -8658,6 +8943,7 @@ def new_book():
             if primary:
                 primary = dict(primary)
         if primary:
+            primary = _apply_work_taxonomy(db, primary)
             parent_book_name = primary.get("name", "")
             for f in ("author", "original_title", "original_language",
                       "original_publication_date", *TAXONOMY_FIELD_NAMES, "summary",
@@ -8945,12 +9231,43 @@ def delete_library(lib_id: int):
     lib_name = row["name"]
     # Delete all data belonging to this library
     book_ids = [r["id"] for r in db.execute("SELECT id FROM books WHERE library_id = ?", (lib_id,)).fetchall()]
+    work_ids = [
+        r["work_id"]
+        for r in db.execute(
+            "SELECT DISTINCT work_id FROM books WHERE library_id = ? AND work_id IS NOT NULL",
+            (lib_id,),
+        ).fetchall()
+    ]
+    work_taxonomy = {}
+    for work_id in work_ids:
+        _merge_work_taxonomy(db, work_id)
+        work_taxonomy[work_id] = _get_work_taxonomy(db, work_id) or {
+            field: "" for field in TAXONOMY_FIELD_NAMES
+        }
     for bid in book_ids:
         db.execute("DELETE FROM sessions WHERE book_id = ?", (bid,))
         db.execute("DELETE FROM periods WHERE book_id = ?", (bid,))
         db.execute("DELETE FROM ratings WHERE book_id = ?", (bid,))
         db.execute("DELETE FROM readings WHERE book_id = ?", (bid,))
     db.execute("DELETE FROM books WHERE library_id = ?", (lib_id,))
+    for work_id in work_ids:
+        remaining = db.execute(
+            "SELECT id, is_primary_edition FROM books WHERE work_id = ? "
+            "ORDER BY is_primary_edition DESC, name COLLATE NOCASE",
+            (work_id,),
+        ).fetchall()
+        if not remaining:
+            db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (work_id,))
+        elif len(remaining) == 1:
+            remaining_id = remaining[0]["id"]
+            db.execute(
+                "UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE id = ?",
+                (remaining_id,),
+            )
+            _set_book_taxonomy(db, remaining_id, work_taxonomy[work_id])
+            db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (work_id,))
+        elif not any(row["is_primary_edition"] for row in remaining):
+            db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (remaining[0]["id"],))
     db.execute("DELETE FROM libraries WHERE id = ?", (lib_id,))
     db.commit()
     # Remove the deleted library from the selection cookie
@@ -9453,8 +9770,21 @@ def delete_book(book_id: str):
     book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
-    
-    book_dict = dict(book)
+
+    work_id = book["work_id"]
+    if work_id:
+        _merge_work_taxonomy(db, work_id)
+        book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    book_dict = _apply_work_taxonomy(db, book)
+    work_members = []
+    if work_id:
+        work_members = [
+            dict(row)
+            for row in db.execute(
+                "SELECT id, is_primary_edition FROM books WHERE work_id = ? AND id != ?",
+                (work_id, book_id),
+            ).fetchall()
+        ]
     # Fetch all related data
     readings = db.execute("SELECT * FROM readings WHERE book_id = ?", (book_id,)).fetchall()
     readings_data = [dict(r) for r in readings]
@@ -9472,26 +9802,35 @@ def delete_book(book_id: str):
         "sessions": sessions_data,
         "periods": periods_data,
         "ratings": ratings_data,
+        "work_taxonomy": _get_work_taxonomy(db, work_id) if work_id else None,
+        "work_members": work_members,
     }
     session["deleted_book_backup"] = backup
     session.modified = True
 
-    # Edition handling: if deleting a primary edition, promote another
+    # Edition handling: keep shared classification with the remaining work.
     wid = book_dict.get("work_id")
-    if wid and book_dict.get("is_primary_edition"):
-        other = db.execute(
-            "SELECT id FROM books WHERE work_id = ? AND id != ? LIMIT 1",
+    if wid:
+        _merge_work_taxonomy(db, wid)
+        shared_taxonomy = _get_work_taxonomy(db, wid) or {
+            field: "" for field in TAXONOMY_FIELD_NAMES
+        }
+        remaining_books = db.execute(
+            "SELECT id FROM books WHERE work_id = ? AND id != ? ORDER BY is_primary_edition DESC, name COLLATE NOCASE",
             (wid, book_id),
-        ).fetchone()
-        if other:
-            db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (other["id"],))
-            # If only one edition remains after deletion, dissolve the group
-            remaining = db.execute(
-                "SELECT COUNT(*) AS c FROM books WHERE work_id = ? AND id != ?",
-                (wid, book_id),
-            ).fetchone()["c"]
-            if remaining == 1:
-                db.execute("UPDATE books SET work_id = NULL WHERE work_id = ? AND id != ?", (wid, book_id))
+        ).fetchall()
+        if len(remaining_books) == 1:
+            remaining_id = remaining_books[0]["id"]
+            db.execute(
+                "UPDATE books SET work_id = NULL, is_primary_edition = 1 WHERE id = ?",
+                (remaining_id,),
+            )
+            _set_book_taxonomy(db, remaining_id, shared_taxonomy)
+            db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (wid,))
+        elif len(remaining_books) > 1 and book_dict.get("is_primary_edition"):
+            db.execute("UPDATE books SET is_primary_edition = 1 WHERE id = ?", (remaining_books[0]["id"],))
+        elif not remaining_books:
+            db.execute("DELETE FROM work_taxonomy WHERE work_id = ?", (wid,))
     
     # Delete from DB
     db.execute("DELETE FROM readings WHERE book_id = ?", (book_id,))
@@ -9515,75 +9854,55 @@ def undo_delete_book():
     db = get_db()
     
     try:
-        # Re-insert book
         book = backup["book"]
+        def restore_rows(table: str, rows: list[dict]) -> None:
+            if not rows:
+                return
+            table_columns = [
+                row["name"]
+                for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+            ]
+            columns = [column for column in table_columns if column in rows[0]]
+            column_sql = ", ".join(columns)
+            placeholders = ", ".join("?" for _ in columns)
+            for row in rows:
+                db.execute(
+                    f"INSERT INTO {table} ({column_sql}) VALUES ({placeholders})",
+                    [row.get(column) for column in columns],
+                )
+
+        book_columns = [
+            row["name"]
+            for row in db.execute("PRAGMA table_info(books)").fetchall()
+            if row["name"] in book
+        ]
+        columns = ", ".join(book_columns)
+        placeholders = ", ".join("?" for _ in book_columns)
         db.execute(
-            """INSERT INTO books 
-               (id, name, subtitle, slug, author, language, original_title, original_language,
-                original_publication_date, publication_date, isbn, pages, starting_page,
-                publisher, genre, summary, translator, illustrator, editor,
-                foreword_author, epilogue_author, contributing_author,
-                status, source_type, source_id, purchase_date, purchase_price, borrowed_start,
-                borrowed_end, is_gift, has_cover, cover, cover_color, cover_palette, cover_hash,
-                library_id, work_id, is_primary_edition, tags, genres)
-               VALUES (
-                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-               )
-            """,
-            (book.get("id"), book.get("name"), book.get("subtitle", ""), book.get("slug"), book.get("author"),
-             book.get("language"), book.get("original_title"), book.get("original_language"),
-             book.get("original_publication_date"), book.get("publication_date"),
-             book.get("isbn"), book.get("pages"), book.get("starting_page"),
-             book.get("publisher"), book.get("genre"), book.get("summary"),
-             book.get("translator"), book.get("illustrator"), book.get("editor"),
-             book.get("foreword_author"), book.get("epilogue_author"),
-             book.get("contributing_author"), book.get("status"), book.get("source_type"),
-             book.get("source_id"), book.get("purchase_date"), book.get("purchase_price"),
-             book.get("borrowed_start"), book.get("borrowed_end"), book.get("is_gift"),
-             book.get("has_cover"), book.get("cover"), book.get("cover_color"),
-             book.get("cover_palette"), book.get("cover_hash"),
-             book.get("library_id"), book.get("work_id"), book.get("is_primary_edition", 1),
-             book.get("tags", ""), book.get("genres", ""))
+            f"INSERT INTO books ({columns}) VALUES ({placeholders})",
+            [book.get(column) for column in book_columns],
         )
-        
-        # Re-insert readings
-        for reading in backup["readings"]:
+
+        work_id = book.get("work_id")
+        if work_id:
+            for member in backup.get("work_members", []):
+                db.execute(
+                    "UPDATE books SET work_id = ?, is_primary_edition = ? WHERE id = ?",
+                    (work_id, member.get("is_primary_edition", 0), member.get("id")),
+                )
             db.execute(
-                "INSERT INTO readings (id, book_id, reading_number, status, notes) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (reading.get("id"), reading.get("book_id"), reading.get("reading_number"),
-                 reading.get("status"), reading.get("notes"))
+                "UPDATE books SET work_id = ?, is_primary_edition = ? WHERE id = ?",
+                (work_id, book.get("is_primary_edition", 1), book.get("id")),
             )
-        
-        # Re-insert sessions
-        for sess in backup["sessions"]:
-            db.execute(
-                "INSERT INTO sessions (id, date, book_id, pages_read, reading_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (sess.get("id"), sess.get("date"), sess.get("book_id"),
-                 sess.get("pages_read"), sess.get("reading_id"))
-            )
-        
-        # Re-insert periods
-        for period in backup["periods"]:
-            db.execute(
-                "INSERT INTO periods (id, start_date, end_date, book_id, reading_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (period.get("id"), period.get("start_date"), period.get("end_date"),
-                 period.get("book_id"), period.get("reading_id"))
-            )
-        
-        # Re-insert ratings
-        for rating in backup["ratings"]:
-            db.execute(
-                "INSERT INTO ratings (book_id, category, score_raw, notes) "
-                "VALUES (?, ?, ?, ?)",
-                (rating.get("book_id"), rating.get("category"), rating.get("score_raw"),
-                 rating.get("notes"))
-            )
+            taxonomy = backup.get("work_taxonomy") or {
+                field: book.get(field, "") for field in TAXONOMY_FIELD_NAMES
+            }
+            _set_work_taxonomy(db, work_id, taxonomy)
+
+        restore_rows("readings", backup["readings"])
+        restore_rows("sessions", backup["sessions"])
+        restore_rows("periods", backup["periods"])
+        restore_rows("ratings", backup["ratings"])
         
         db.commit()
         book_name = backup["book"].get("name", "Book")

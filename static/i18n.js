@@ -506,6 +506,7 @@
         'bookForm.addBookBtn':      { en: '📚 Add Book',         es: '📚 Añadir Libro' },
         'bookForm.addingEditionOf': { en: 'Adding new edition of:', es: 'Añadiendo nueva edición de:' },
         'bookForm.editionHint':     { en: 'Work-level fields (author, original work info, classification) are pre-filled. Edition-level fields (language, publisher, pages, cover) are for this specific edition.', es: 'Los campos a nivel de obra (autor, información original y clasificación) están pre-rellenados. Los campos a nivel de edición (idioma, editorial, páginas, portada) son para esta edición específica.' },
+        'bookForm.sharedClassificationHint': { en: 'Classification is shared by all editions of this work. Changes here update every linked edition.', es: 'La clasificación se comparte entre todas las ediciones de esta obra. Los cambios aquí actualizan cada edición vinculada.' },
         'bookForm.saveChanges':     { en: '💾 Save Changes',     es: '💾 Guardar Cambios' },
         'bookForm.seriesSection':   { en: 'Series',                es: 'Serie' },
         'bookForm.seriesName':      { en: 'Series Name',           es: 'Nombre de la Serie' },
