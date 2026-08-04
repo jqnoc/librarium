@@ -7435,6 +7435,10 @@ def book_detail(book_id: str):
             r_total_pages = r_sess_pages + r_per_pages
             r_total_secs  = r_sess_secs + r_per_secs
 
+        r_avg_pages_per_hour = 0.0
+        if r_total_secs > 0 and not is_pct_format:
+            r_avg_pages_per_hour = r_total_pages / (r_total_secs / 3600)
+
         sess_dates   = [s["date"] for s in r_sessions if s["date"]]
         per_starts   = [p["start_date"] for p in r_periods if p.get("start_date")]
         per_ends     = [(p.get("end_date") or p.get("start_date")) for p in r_periods if p.get("start_date")]
@@ -7448,6 +7452,7 @@ def book_detail(book_id: str):
             "notes": rr["notes"],
             "total_pages": r_total_pages,
             "total_time": _format_duration(r_total_secs),
+            "avg_pages_per_hour": r_avg_pages_per_hour,
             "session_count": len(r_sessions),
             "date_started": _fmt_date(first_raw) if first_raw else None,
             "date_finished": _fmt_date(last_raw) if last_raw and rr["status"] == "finished" else None,
