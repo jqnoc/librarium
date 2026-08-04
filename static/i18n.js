@@ -19,6 +19,8 @@
         'nav.sources':      { en: 'Sources',      es: 'Fuentes' },
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
         'nav.minimize':     { en: 'Minimize Librarium', es: 'Minimizar Librarium' },
+        'nav.maximize':     { en: 'Maximize Librarium', es: 'Maximizar Librarium' },
+        'nav.restore':      { en: 'Restore Librarium',  es: 'Restaurar Librarium' },
         'nav.close':        { en: 'Close Librarium', es: 'Cerrar Librarium' },
         'theme.toggle':     { en: 'Toggle dark mode', es: 'Alternar modo oscuro' },
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },

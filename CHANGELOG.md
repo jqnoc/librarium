@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add timed Reading-card sessions for page-based readings with book identity, live page ranges using page deltas, Space-bar pause/resume control, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, and X-only closing
 - Add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, including actual time read today when available, shown only for the selected reading in progress
 - Add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
+- Add maximized startup with a native maximize/restore control and draggable blue title bar
 - Add Book Details Classification and configurable Similar Works ranked across selected taxonomy categories and grouped by linked work
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen

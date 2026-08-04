@@ -129,6 +129,7 @@ img { max-width: 100%; height: auto; }
     top: 0;
     z-index: 100;
     box-shadow: var(--lb-shadow-lg);
+    -webkit-app-region: drag;
 }
 
 .header-inner {
@@ -137,6 +138,17 @@ img { max-width: 100%; height: auto; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    -webkit-app-region: drag;
+}
+
+.site-header a,
+.site-header button,
+.site-header input,
+.site-header label,
+.site-header .library-multi-select,
+.site-header .lang-toggle,
+.site-header .header-nav {
+    -webkit-app-region: no-drag;
 }
 
 .site-title {
@@ -518,8 +530,9 @@ img { max-width: 100%; height: auto; }
     outline: none;
 }
 
-/* ── Close & Minimize buttons ──────────────────────────────────────────── */
+/* ── Window controls ───────────────────────────────────────────────────── */
 .app-minimize-btn,
+.app-maximize-btn,
 .app-close-btn {
     background: transparent;
     border: 1px solid rgba(255,255,255,.25);
@@ -534,6 +547,11 @@ img { max-width: 100%; height: auto; }
     font-family: inherit;
 }
 .app-minimize-btn:hover {
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border-color: rgba(255,255,255,.5);
+}
+.app-maximize-btn:hover {
     background: rgba(255,255,255,.15);
     color: #fff;
     border-color: rgba(255,255,255,.5);

@@ -102,6 +102,9 @@
                 (function(){var l=localStorage.getItem('librarium_lang')||'en';document.querySelectorAll('.lang-btn').forEach(function(b){b.classList.toggle('active',b.dataset.lang===l);});})();
                 </script>
                 <button type="button" class="app-minimize-btn" onclick="librariumMinimize()" title="Minimize Librarium" data-i18n-title="nav.minimize">─</button>
+                <button type="button" class="app-maximize-btn" id="appMaximizeBtn" onclick="librariumToggleMaximize()" title="Maximize Librarium" data-i18n-title="nav.maximize" data-i18n-aria-label="nav.maximize">
+                    <span id="appWindowStateIcon" aria-hidden="true">&#9633;</span>
+                </button>
                 <button type="button" class="app-close-btn" onclick="librariumQuit()" title="Close Librarium" data-i18n-title="nav.close">✕</button>
             </nav>
         </div>
@@ -337,6 +340,38 @@
                 window.librarium.minimize();
             }
         }
+
+        function updateLibrariumWindowState(isMaximized) {
+            var button = document.getElementById('appMaximizeBtn');
+            var icon = document.getElementById('appWindowStateIcon');
+            if (!button || !icon) return;
+            var key = isMaximized ? 'nav.restore' : 'nav.maximize';
+            button.setAttribute('data-i18n-title', key);
+            button.setAttribute('data-i18n-aria-label', key);
+            button.title = window.librariumI18n && typeof window.librariumI18n.t === 'function'
+                ? window.librariumI18n.t(key)
+                : (isMaximized ? 'Restore Librarium' : 'Maximize Librarium');
+            button.setAttribute('aria-label', button.title);
+            icon.textContent = isMaximized ? '\u2750' : '\u25A1';
+        }
+
+        function librariumToggleMaximize() {
+            if (window.librarium && window.librarium.toggleMaximize) {
+                window.librarium.toggleMaximize();
+            }
+        }
+
+        (function initializeLibrariumWindowControls() {
+            if (!window.librarium) return;
+            if (typeof window.librarium.onWindowStateChanged === 'function') {
+                window.librarium.onWindowStateChanged(updateLibrariumWindowState);
+            }
+            if (typeof window.librarium.getWindowState === 'function') {
+                window.librarium.getWindowState().then(function (state) {
+                    updateLibrariumWindowState(Boolean(state && state.isMaximized));
+                });
+            }
+        })();
 
         function librariumQuit() {
             var overlay = document.getElementById('shutdownOverlay');

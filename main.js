@@ -2,7 +2,7 @@
  * Librarium — Electron main process
  *
  * Spawns the Flask backend as a child process, waits for it to become
- * ready, then opens the app in a frameless fullscreen BrowserWindow.
+ * ready, then opens the app in a frameless maximized BrowserWindow.
  */
 
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
@@ -118,6 +118,11 @@ function hideShutdownOverlay() {
     .catch(() => {});
 }
 
+function notifyWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("window-state-changed", mainWindow.isMaximized());
+}
+
 /**
  * Poll the Flask port until it accepts a TCP connection.
  * Retries up to `retries` times with `interval` ms between attempts.
@@ -186,7 +191,7 @@ async function createWindow() {
     backgroundColor: "#2a4a5a",
     show: false,
     frame: false,
-    fullscreen: true,
+    maximizable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -196,11 +201,16 @@ async function createWindow() {
     },
   });
 
+  mainWindow.on("maximize", notifyWindowState);
+  mainWindow.on("unmaximize", notifyWindowState);
+
   mainWindow.loadURL(`http://127.0.0.1:${flaskPort}`);
 
   // Show window once the page has finished loading (avoids white flash)
   mainWindow.once("ready-to-show", () => {
+    mainWindow.maximize();
     mainWindow.show();
+    notifyWindowState();
     if (splashWindow) {
       splashWindow.close();
       splashWindow = null;
@@ -240,6 +250,19 @@ ipcMain.on("app-quit", () => {
 ipcMain.on("app-minimize", () => {
   if (mainWindow) mainWindow.minimize();
 });
+
+ipcMain.on("app-toggle-maximize", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow.maximize();
+  }
+});
+
+ipcMain.handle("app-window-state", () => ({
+  isMaximized: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized()),
+}));
 
 // ── App lifecycle ───────────────────────────────────────────────────────
 app.whenReady().then(createWindow);
