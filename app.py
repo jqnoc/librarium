@@ -7596,6 +7596,7 @@ def book_detail(book_id: str):
                 pages_at_start_of_today = pages_remaining + today_pages_read
                 planned_pages_today = pages_at_start_of_today / total_plan_days
                 pages_today = max(planned_pages_today - today_pages_read, 0)
+                today_goal_reached = today_pages_read >= planned_pages_today
                 remaining_days = total_plan_days - 1
                 pages_after_today = max(pages_remaining - pages_today, 0)
                 pages_per_remaining_day = (
@@ -7615,6 +7616,7 @@ def book_detail(book_id: str):
                     "pages_remaining": pages_remaining,
                     "today_pages_read": today_pages_read,
                     "today_time_read": today_time_read,
+                    "today_goal_reached": today_goal_reached,
                     "pages_today": pages_today,
                     "pages_per_remaining_day": pages_per_remaining_day,
                     "time_today": _plan_time(pages_today),
@@ -8307,6 +8309,23 @@ def import_bookly(book_id: str):
 # ═══════════════════════════════════════════════════════════════════════════
 # Routes – Metadata editing
 # ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/book/<book_id>/classification/clear", methods=["POST"])
+def clear_classification(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT id, work_id FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+
+    empty_classification = {field: "" for field in TAXONOMY_FIELD_NAMES}
+    if book["work_id"]:
+        _set_work_taxonomy(db, book["work_id"], empty_classification)
+    else:
+        _set_book_taxonomy(db, book_id, empty_classification)
+    db.commit()
+    flash("Book classification cleared.", "success")
+    return redirect(url_for("book_detail", book_id=book_id))
+
 
 @app.route("/book/<book_id>/edit", methods=["GET", "POST"])
 def edit_metadata(book_id: str):

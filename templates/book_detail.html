@@ -294,7 +294,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 {% endfor %}
 {% if has_classification.value %}
-<h2 data-i18n="book.classification">Classification</h2>
+<div class="classification-section-header">
+    <h2 data-i18n="book.classification">Classification</h2>
+    <button type="button" class="btn btn-danger btn-sm" onclick="openCleanClassificationModal()" data-i18n="book.cleanClassification">Clean Classification</button>
+</div>
 <div class="book-classification-grid">
     {% for taxonomy_field in taxonomy_fields %}
     {% set taxonomy_values = (info.get(taxonomy_field.field, '') or '').split(';') | map('trim') | select | list | sort(case_sensitive=false) %}
@@ -309,6 +312,20 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
     {% endif %}
     {% endfor %}
+</div>
+<div class="modal-overlay classification-clean-modal-overlay" id="cleanClassificationModal"
+     role="dialog" aria-modal="true" aria-labelledby="clean-classification-title"
+     onclick="if (event.target === this) closeCleanClassificationModal()">
+    <div class="modal-box classification-clean-modal-box">
+        <h3 id="clean-classification-title" data-i18n="book.cleanClassification">Clean Classification</h3>
+        <p data-i18n="book.cleanClassificationWarning">This will remove all values from every classification category. This cannot be undone.</p>
+        <div class="btn-group">
+            <form method="POST" action="{{ url_for('clear_classification', book_id=book_id) }}">
+                <button type="submit" class="btn btn-danger" data-i18n="book.cleanClassificationConfirm">Yes, Clean Classification</button>
+            </form>
+            <button type="button" class="btn btn-secondary" onclick="closeCleanClassificationModal()" data-i18n="form.cancel">Cancel</button>
+        </div>
+    </div>
 </div>
 {% endif %}
 <!-- ── Similar Works ──────────────────────────────────────────────────── -->
@@ -1207,7 +1224,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="finish-plan-days">
         <div class="finish-plan-day finish-plan-day-today">
             <div class="finish-plan-day-label" data-i18n="book.finishPlanToday">Today</div>
+            {% if finish_plan.today_goal_reached %}
+            <div class="finish-plan-primary finish-plan-goal-reached"><strong data-i18n="book.finishPlanTodayGoalReached">Today's reading goal reached! ✅</strong></div>
+            {% else %}
             <div class="finish-plan-primary"><strong>{{ "%.1f" | format(finish_plan.pages_today) }}</strong> <span data-i18n="book.finishPlanPages">pages</span></div>
+            {% endif %}
             <div class="finish-plan-time">{% if finish_plan.time_today %}<span data-i18n="book.finishPlanPlannedTime">Planned time</span>: {{ finish_plan.time_today }}{% elif finish_plan.today_time_read %}<span data-i18n="book.finishPlanTimeReadToday">Time read today</span>: {{ finish_plan.today_time_read }}{% else %}<span data-i18n="book.finishPlanNoPace">No timed sessions</span>{% endif %}</div>
             {% if finish_plan.today_pages_read > 0 %}
             <div class="finish-plan-already-read"><span data-i18n="book.finishPlanAlreadyRead">Already read today</span>: {{ finish_plan.today_pages_read }}</div>
@@ -1804,6 +1825,16 @@ flatpickr('.date-input', {
 function toggleEdit(idx) {
     const row = document.getElementById('session-edit-' + idx);
     row.classList.toggle('active');
+}
+
+function openCleanClassificationModal() {
+    var modal = document.getElementById('cleanClassificationModal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeCleanClassificationModal() {
+    var modal = document.getElementById('cleanClassificationModal');
+    if (modal) modal.classList.remove('active');
 }
 
 function togglePeriodEdit(idx) {
