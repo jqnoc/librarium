@@ -7560,7 +7560,10 @@ def book_detail(book_id: str):
 
     today = date.today()
     today_iso = today.isoformat()
-    today_pages_read = daily_activity.get(today_iso, {}).get("pages", 0)
+    today_activity = daily_activity.get(today_iso, {})
+    today_pages_read = today_activity.get("pages", 0)
+    today_seconds_read = today_activity.get("seconds", 0)
+    today_time_read = _format_duration(today_seconds_read) if today_seconds_read > 0 else ""
     planning_avg_pages_per_hour = 0.0
     if book_session_totals["seconds"] > 0 and not is_pct_format:
         planning_avg_pages_per_hour = book_session_totals["pages"] / (book_session_totals["seconds"] / 3600)
@@ -7582,6 +7585,7 @@ def book_detail(book_id: str):
                     "remaining_days": total_plan_days - 1,
                     "pages_remaining": 0,
                     "today_pages_read": today_pages_read,
+                    "today_time_read": today_time_read,
                     "pages_today": 0,
                     "pages_per_remaining_day": 0,
                     "time_today": "",
@@ -7610,6 +7614,7 @@ def book_detail(book_id: str):
                     "remaining_days": remaining_days,
                     "pages_remaining": pages_remaining,
                     "today_pages_read": today_pages_read,
+                    "today_time_read": today_time_read,
                     "pages_today": pages_today,
                     "pages_per_remaining_day": pages_per_remaining_day,
                     "time_today": _plan_time(pages_today),
