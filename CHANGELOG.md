@@ -8,31 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Book Details Reading cards now offer a blurred in-app stopwatch for page-based readings in progress, with book identity, corrected live start and estimated end pages, pause-to-edit page spinboxes, direct Save Session timing, selected-reading attachment, and an X-only close action
-- Book Details now supports a persisted expected finish date with an inclusive daily page and time plan based on today's progress and book-wide session pace, using the same heading style as its reading sections and showing only for the selected reading in progress
-- Refresh the read-only taxonomy audit for the current 33 classified books in the active JqnOC database, preserve exact values and IDs, and mark the pre-cleanup 412-book report as superseded
-- Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
-- Book Details now groups taxonomy values into one Classification section and shows up to ten same-library Similar Works ranked by field-balanced, BM25-smoothed and compressed value-rarity weighted Dice similarity scores from 0 to 100, displayed to two decimals, with Settings controls for choosing which classification categories contribute
-- Dashboard now provides a taxonomy audit across Genres, Subgenres, Forms, Themes, Settings, Historical Periods, Subjects, and Audiences, with eight filterable clouds, one CSV listing every value with matching book counts and titles, and linked Library Health gaps
-- Add a persistent dark-mode theme toggle to the global header, with the startup sync loading screen matching the last selected theme while the Electron splash retains its fixed palette
+- add timed Reading-card sessions for page-based readings with book identity, live page ranges, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, and X-only closing
+- add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, shown only for the selected reading in progress
+- add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
+- add Book Details Classification and configurable Similar Works ranked across selected taxonomy categories and grouped by linked work
+- add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
+- add a persistent dark-mode toggle for the global header and startup-sync loading screen
 
 ### Changed
-- Store classification once per linked work, migrate existing edition values into the canonical work record, keep linked editions synchronized when edited or unlinked, and deduplicate Similar Works by effective work
-- Consolidate the v1.0 taxonomy guidelines into the canonical guide and remove the duplicate copy
-- Currently Reading cards now preserve the original progress line, accent the percentage like estimated time left, keep matching metadata spacing, and omit seconds from read and estimated-left times
-- Add New Book and Edit Metadata now share the same ordered metadata form layout, including full-width Classification chip editing for alphabetically sorted Genres, Subgenres, Forms, Themes, Settings, Historical Periods, Subjects, and Audiences with concise descriptions of each category's distinct purpose, semicolon-delimited values, comma-containing value support, and drag-and-drop movement between categories, while migrating legacy Subgenre values into the new Subgenres field and preserving their mode-specific controls; Publication Details use the requested three-column rows, Original Work uses one three-column row, Contributors use two three-column rows with Foreword/Introduction, Epilogue, and Contributing Author fields, and Book Source fields use three-column rows while preserving existing Prologue Author data; paper-book bindings include Softcover
-- Form autocomplete now includes the controlled values `Guide` and `Historical Monograph` alongside the existing presentation forms
-- Taxonomy guidelines now define five mutually exclusive major Genres, separate presentation Forms from Subgenres, promote Biography for discoverability, and move Horror, Historical Fiction, Literary Fiction, and other finer classifications into Subgenres
-- Correct the `Reina del grito` Form example to use the singular controlled value `Essay`
-- Dashboard Classification now shows every category value alphabetically in full-width clouds while retaining count-proportional bubble sizing
-- Books now store Genres separately from Tags, with independent Book Details displays and Dashboard and Global Stats clouds
-- Currently Reading dashboard cards now show an estimated time remaining after the reading progress
-- Words of the Day can now be edited directly from the Dashboard and saved to their books
-- Top Rated Dashboard now shows up to 25 highest-rated books while keeping the same height limit as Recent Activity and Last Books Acquired
-- Author cards now show grammatically correct books-read bubbles and time-only bubbles, with sorting by both values
+- store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
+- reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
+- consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, and document controlled values
+- separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
+- refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
+- allow Words of the Day to be edited directly from the Dashboard and saved to their books
+- expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
+- improve Author cards with grammatical reading metrics and sorting by books read or time read
 
 ### Fixed
-- Classification suggestions now stay hidden until a focused line edit contains at least one letter and disappear when focus leaves the field
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
 - Books with Wishlist and Draft statuses are now excluded from the Books by Status Over Time chart
 

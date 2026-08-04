@@ -513,6 +513,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     function updatePageEstimate() {
         var pages = estimatedPages();
         var endPage = pages > 0 ? state.startPage + pages - 1 : state.startPage;
+        if (state.pageInputsEditable) return;
         getElement('readingSessionStartPage').value = state.startPage;
         getElement('readingSessionEndPage').value = endPage;
         getElement('readingSessionPages').value = pages;
