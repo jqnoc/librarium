@@ -520,7 +520,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     function updatePageEstimate() {
         var pages = estimatedPages();
-        var endPage = pages > 0 ? state.startPage + pages - 1 : state.startPage;
+        var endPage = state.startPage + pages;
         if (state.pageInputsEditable) return;
         getElement('readingSessionStartPage').value = state.startPage;
         getElement('readingSessionEndPage').value = endPage;
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             getElement('readingSessionPages').value = 0;
             return;
         }
-        getElement('readingSessionPages').value = Math.max(0, endPage - startPage + 1);
+        getElement('readingSessionPages').value = Math.max(0, endPage - startPage);
     }
 
     function updatePaceLabel() {
