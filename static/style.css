@@ -1494,7 +1494,10 @@ select.form-control { cursor: pointer; }
     justify-content: space-between;
     gap: 1.5rem;
 }
-.finish-plan-header h2 { margin: 0; }
+.finish-plan-header h3 {
+    margin: 0;
+    color: var(--lb-deep-orange);
+}
 .finish-plan-description {
     margin: .35rem 0 0;
     color: var(--lb-text-light);

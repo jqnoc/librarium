@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Book Details now supports a persisted expected finish date with an inclusive daily page and time plan based on today's progress and book-wide session pace
+- Book Details now supports a persisted expected finish date with an inclusive daily page and time plan based on today's progress and book-wide session pace, using the same heading style as its reading sections and showing only for the selected reading in progress
 - Refresh the read-only taxonomy audit for the current 33 classified books in the active JqnOC database, preserve exact values and IDs, and mark the pre-cleanup 412-book report as superseded
 - Book Details now offers a reading-specific infographic export with dates, rating, pages, reading pace, time, reading days, a separate subtitle and author hierarchy, a cumulative progress timeline, and the selected book cover
 - Book Details now groups taxonomy values into one Classification section and shows up to ten same-library Similar Works ranked by field-balanced, BM25-smoothed and compressed value-rarity weighted Dice similarity scores from 0 to 100, displayed to two decimals, with Settings controls for choosing which classification categories contribute

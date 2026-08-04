@@ -7842,6 +7842,7 @@ def book_detail(book_id: str):
         today_iso=today_iso,
         expected_finish_date=expected_finish_date,
         finish_plan=finish_plan,
+        current_reading_status=current_reading["status"] or "",
         reading_days=reading_days,
         avg_pages_per_day=avg_pages_per_day,
         avg_pages_per_hour=avg_pages_per_hour,

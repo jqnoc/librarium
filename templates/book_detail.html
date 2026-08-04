@@ -907,11 +907,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% endif %}
 </div>
 
-{% if not is_pct_format %}
+{% if not is_pct_format and current_reading_status == 'reading' %}
 <section id="finish-plan" class="finish-plan-panel">
     <div class="finish-plan-header">
         <div>
-            <h2 data-i18n="book.finishPlan">Finish Plan</h2>
+            <h3 data-i18n="book.finishPlan">Finish Plan</h3>
             <p class="finish-plan-description" data-i18n="book.finishPlanDescription">Set an expected finish date to plan the remaining pages and reading time.</p>
         </div>
         <form method="POST" action="{{ url_for('save_finish_plan', book_id=book_id) }}" class="finish-plan-form">
