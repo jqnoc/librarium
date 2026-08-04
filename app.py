@@ -1033,7 +1033,8 @@ def init_schema() -> None:
             settings                  TEXT    NOT NULL DEFAULT '',
             historical_periods        TEXT    NOT NULL DEFAULT '',
             subjects                  TEXT    NOT NULL DEFAULT '',
-            audiences                 TEXT    NOT NULL DEFAULT ''
+            audiences                 TEXT    NOT NULL DEFAULT '',
+            expected_finish_date      TEXT    NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS work_taxonomy (
@@ -1176,6 +1177,7 @@ def _run_all_migrations() -> None:
     migrate_add_taxonomy_fields()
     migrate_add_work_taxonomy()
     migrate_add_contributor_fields()
+    migrate_add_expected_finish_date()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2432,6 +2434,20 @@ def migrate_add_source_place_details() -> None:
         db.commit()
         print(">> Migration complete — sources now include place metadata.")
 
+    db.close()
+
+
+def migrate_add_expected_finish_date() -> None:
+    """Add the per-book expected finish date used by reading plans."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if "expected_finish_date" not in cols:
+        db.execute("ALTER TABLE books ADD COLUMN expected_finish_date TEXT NOT NULL DEFAULT ''")
+        db.commit()
+        print(">> Migration complete — books now support expected finish dates.")
     db.close()
 
 
@@ -7530,12 +7546,71 @@ def book_detail(book_id: str):
             remaining_content = audiobook_total * (1 - progress_pct / 100)
             est_time_to_finish = _format_duration(int(remaining_content))
     else:
-        if effective_pages > 0 and total_pages > 0:
+        if effective_pages > 0:
             progress_pct = min(total_pages / effective_pages * 100, 100.0)
             pages_remaining = max(effective_pages - total_pages, 0)
         if pages_remaining > 0 and avg_pages_per_hour > 0 and status == "reading":
             est_seconds = int(pages_remaining / avg_pages_per_hour * 3600)
             est_time_to_finish = _format_duration(est_seconds)
+
+    today = date.today()
+    today_iso = today.isoformat()
+    today_pages_read = daily_activity.get(today_iso, {}).get("pages", 0)
+    planning_avg_pages_per_hour = 0.0
+    if book_session_totals["seconds"] > 0 and not is_pct_format:
+        planning_avg_pages_per_hour = book_session_totals["pages"] / (book_session_totals["seconds"] / 3600)
+
+    expected_finish_date = info.get("expected_finish_date", "") or ""
+    finish_plan = None
+    if not is_pct_format and expected_finish_date:
+        try:
+            target_date = date.fromisoformat(expected_finish_date)
+        except ValueError:
+            target_date = None
+
+        if target_date and target_date >= today:
+            total_plan_days = (target_date - today).days + 1
+            if pages_remaining <= 0:
+                finish_plan = {
+                    "complete": True,
+                    "total_days": total_plan_days,
+                    "remaining_days": total_plan_days - 1,
+                    "pages_remaining": 0,
+                    "today_pages_read": today_pages_read,
+                    "pages_today": 0,
+                    "pages_per_remaining_day": 0,
+                    "time_today": "",
+                    "time_per_remaining_day": "",
+                    "avg_pages_per_hour": planning_avg_pages_per_hour,
+                }
+            else:
+                pages_at_start_of_today = pages_remaining + today_pages_read
+                planned_pages_today = pages_at_start_of_today / total_plan_days
+                pages_today = max(planned_pages_today - today_pages_read, 0)
+                remaining_days = total_plan_days - 1
+                pages_after_today = max(pages_remaining - pages_today, 0)
+                pages_per_remaining_day = (
+                    pages_after_today / remaining_days if remaining_days > 0 else 0
+                )
+
+                def _plan_time(pages: float) -> str:
+                    if pages <= 0 or planning_avg_pages_per_hour <= 0:
+                        return ""
+                    seconds = math.ceil(pages / planning_avg_pages_per_hour * 3600)
+                    return _format_duration(seconds)
+
+                finish_plan = {
+                    "complete": False,
+                    "total_days": total_plan_days,
+                    "remaining_days": remaining_days,
+                    "pages_remaining": pages_remaining,
+                    "today_pages_read": today_pages_read,
+                    "pages_today": pages_today,
+                    "pages_per_remaining_day": pages_per_remaining_day,
+                    "time_today": _plan_time(pages_today),
+                    "time_per_remaining_day": _plan_time(pages_per_remaining_day),
+                    "avg_pages_per_hour": planning_avg_pages_per_hour,
+                }
 
     progress_timeline = []
     if is_pct_format:
@@ -7764,6 +7839,9 @@ def book_detail(book_id: str):
         effective_pages=effective_pages,
         has_cover=bool(info.get("has_cover")),
         last_date=last_date,
+        today_iso=today_iso,
+        expected_finish_date=expected_finish_date,
+        finish_plan=finish_plan,
         reading_days=reading_days,
         avg_pages_per_day=avg_pages_per_day,
         avg_pages_per_hour=avg_pages_per_hour,
@@ -8432,6 +8510,39 @@ def edit_metadata(book_id: str):
                            all_series=all_series, book_series_entries=book_series_entries,
                            taxonomy_fields=TAXONOMY_FIELDS,
                            is_secondary_edition=bool(info.get("work_id") and not info.get("is_primary_edition")))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Finish plan
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/book/<book_id>/finish-plan", methods=["POST"])
+def save_finish_plan(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+
+    expected_finish_date = ""
+    if not request.form.get("clear"):
+        expected_finish_date = _normalize_input_date(request.form.get("expected_finish_date", ""))
+    if expected_finish_date:
+        try:
+            target_date = date.fromisoformat(expected_finish_date)
+        except ValueError:
+            flash("Invalid expected finish date.", "error")
+            return redirect(url_for("book_detail", book_id=book_id, _anchor="finish-plan"))
+        if target_date < date.today():
+            flash("Expected finish date cannot be in the past.", "error")
+            return redirect(url_for("book_detail", book_id=book_id, _anchor="finish-plan"))
+
+    db.execute(
+        "UPDATE books SET expected_finish_date = ? WHERE id = ?",
+        (expected_finish_date, book_id),
+    )
+    db.commit()
+    flash("Expected finish date updated." if expected_finish_date else "Expected finish date cleared.", "success")
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="finish-plan"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
