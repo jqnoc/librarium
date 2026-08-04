@@ -424,7 +424,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <p class="reading-session-pace" id="readingSessionPace"></p>
         <div class="reading-session-controls" id="readingSessionControls">
             <button type="button" class="btn btn-primary" id="readingSessionPlayButton" onclick="playReadingSession()">
-                <span aria-hidden="true">&#9654;</span> <span data-i18n="book.readingSessionPlay">Play</span>
+                <span id="readingSessionPlayIcon" aria-hidden="true">&#9654;</span> <span id="readingSessionPlayLabel" data-i18n="book.readingSessionPlay">Play</span>
             </button>
             <button type="button" class="btn btn-secondary" id="readingSessionPauseButton" onclick="pauseReadingSession()">
                 <span aria-hidden="true">&#10074;&#10074;</span> <span data-i18n="book.readingSessionPause">Pause</span>
@@ -490,6 +490,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionPlayButton').disabled = state.running;
         getElement('readingSessionPauseButton').disabled = !state.running;
         getElement('readingSessionSaveButton').disabled = !state.hasStarted;
+        var canResume = state.hasStarted && !state.running;
+        var playLabel = getElement('readingSessionPlayLabel');
+        playLabel.dataset.i18n = canResume ? 'book.readingSessionResume' : 'book.readingSessionPlay';
+        playLabel.textContent = translate(
+            canResume ? 'book.readingSessionResume' : 'book.readingSessionPlay',
+            canResume ? 'Resume' : 'Play'
+        );
+        getElement('readingSessionPlayIcon').textContent = '\u25B6';
     }
 
     function setPageInputsEditable(editable) {
@@ -613,6 +621,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
+    document.addEventListener('keydown', function (event) {
+        var modal = getElement('readingSessionModal');
+        if (!modal.classList.contains('active') || event.repeat || event.code !== 'Space') return;
+        event.preventDefault();
+        if (state.running) window.pauseReadingSession();
+        else window.playReadingSession();
+    });
 
 })();
 </script>

@@ -8,22 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- add timed Reading-card sessions for page-based readings with book identity, live page ranges, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, and X-only closing
-- add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, shown only for the selected reading in progress
-- add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
-- add Book Details Classification and configurable Similar Works ranked across selected taxonomy categories and grouped by linked work
-- add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
-- add a persistent dark-mode toggle for the global header and startup-sync loading screen
+- Add timed Reading-card sessions for page-based readings with book identity, live page ranges, Space-bar pause/resume control, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, and X-only closing
+- Add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, shown only for the selected reading in progress
+- Add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
+- Add Book Details Classification and configurable Similar Works ranked across selected taxonomy categories and grouped by linked work
+- Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
+- Add a persistent dark-mode toggle for the global header and startup-sync loading screen
 
 ### Changed
-- store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
-- reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
-- consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, and document controlled values
-- separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
-- refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
-- allow Words of the Day to be edited directly from the Dashboard and saved to their books
-- expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
-- improve Author cards with grammatical reading metrics and sorting by books read or time read
+- Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
+- Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
+- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, and document controlled values
+- Separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
+- Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
+- Allow Words of the Day to be edited directly from the Dashboard and saved to their books
+- Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
+- Improve Author cards with grammatical reading metrics and sorting by books read or time read
 
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases

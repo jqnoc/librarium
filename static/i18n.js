@@ -278,6 +278,7 @@
         'book.startReadingSession': { en: 'Start Reading Session', es: 'Iniciar Sesión de Lectura' },
         'book.readingSessionFor':   { en: 'Reading',               es: 'Lectura' },
         'book.readingSessionPlay':  { en: 'Play',                  es: 'Iniciar' },
+        'book.readingSessionResume': { en: 'Resume',               es: 'Reanudar' },
         'book.readingSessionPause': { en: 'Pause',                 es: 'Pausar' },
         'book.readingSessionSave': { en: 'Save Session',            es: 'Guardar Sesión' },
         'book.readingSessionStartPage': { en: 'Start Page',          es: 'Página Inicial' },
