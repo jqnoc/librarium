@@ -22,6 +22,7 @@
     </div>
 
     <div>
+
         <div class="meta-grid">
             <!-- ── Core info ── -->
             <div class="meta-item">
@@ -365,6 +366,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <div style="font-size: 0.85rem; margin-top: 0.25rem;">
                 {% if is_pct_format %}{{ "%.1f" | format(rd.total_pages) }}% · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% else %}{{ rd.total_pages }} pages · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% endif %}
             </div>
+            {% if rd.status == 'reading' and not is_pct_format %}
+            <div style="margin-top: 0.75rem;">
+                <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
+                        onclick="event.preventDefault(); event.stopPropagation(); openReadingSessionModal({{ rd.id }}, {{ rd.reading_number }})">
+                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.startReadingSession">Start Reading Session</span>
+                </button>
+            </div>
+            {% endif %}
             {% if readings | length > 1 %}
             <div style="margin-top: 0.5rem; text-align: right;">
                 <form method="POST" action="{{ url_for('delete_reading', book_id=book_id, reading_id=rd.id) }}" style="display:inline;"
@@ -380,6 +389,168 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% endfor %}
 </div>
 {% endif %}
+
+<div id="readingSessionModal" class="modal-overlay reading-session-modal-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="reading-session-title"
+     onclick="if(event.target===this)closeReadingSessionModal()">
+    <div class="modal-box reading-session-modal-box" onclick="event.stopPropagation()">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-title" class="reading-session-title" data-i18n="book.readingSessionTitle">Reading Session</h3>
+        <p class="reading-session-reading" id="readingSessionReading"></p>
+        <div class="reading-session-stopwatch" id="readingSessionStopwatch">00:00:00</div>
+        <div class="reading-session-controls" id="readingSessionControls">
+            <button type="button" class="btn btn-primary" id="readingSessionPlayButton" onclick="playReadingSession()">
+                <span aria-hidden="true">&#9654;</span> <span data-i18n="book.readingSessionPlay">Play</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="readingSessionPauseButton" onclick="pauseReadingSession()">
+                <span aria-hidden="true">&#10074;&#10074;</span> <span data-i18n="book.readingSessionPause">Pause</span>
+            </button>
+            <button type="button" class="btn btn-danger" id="readingSessionStopButton" onclick="stopReadingSession()">
+                <span aria-hidden="true">&#9632;</span> <span data-i18n="book.readingSessionStop">Stop</span>
+            </button>
+        </div>
+        <form id="readingSessionResult" class="reading-session-result" method="POST" action="{{ url_for('add_session', book_id=book_id) }}">
+            <input type="hidden" name="reading_id" id="readingSessionReadingId">
+            <input type="hidden" name="date" value="{{ today_iso }}">
+            <input type="hidden" name="hours" id="readingSessionHours" value="0">
+            <input type="hidden" name="minutes" id="readingSessionMinutes" value="0">
+            <input type="hidden" name="seconds" id="readingSessionSeconds" value="0">
+            <div class="form-group">
+                <label for="readingSessionPages" data-i18n="book.readingSessionPagesLabel">Pages Read</label>
+                <input type="number" class="form-control" id="readingSessionPages" name="pages" min="1" step="1" required>
+            </div>
+            <div class="reading-session-result-actions">
+                <button type="button" class="btn btn-secondary" onclick="cancelReadingSessionResult()" data-i18n="form.cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary"><span data-i18n="book.readingSessionSave">Save Session</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function () {
+    var state = {
+        readingId: null,
+        readingNumber: null,
+        elapsedSeconds: 0,
+        startedAt: null,
+        timerId: null,
+        running: false,
+    };
+
+    function translate(key, fallback) {
+        var i18n = window.librariumI18n;
+        return i18n && typeof i18n.t === 'function' ? i18n.t(key) : fallback;
+    }
+
+    function formatElapsed(totalSeconds) {
+        var total = Math.max(0, Math.floor(totalSeconds || 0));
+        var hours = Math.floor(total / 3600);
+        var minutes = Math.floor((total % 3600) / 60);
+        var seconds = total % 60;
+        return [hours, minutes, seconds].map(function (value) {
+            return String(value).padStart(2, '0');
+        }).join(':');
+    }
+
+    function getElement(id) {
+        return document.getElementById(id);
+    }
+
+    function updateElapsed() {
+        if (state.running && state.startedAt !== null) {
+            state.elapsedSeconds = Math.floor((Date.now() - state.startedAt) / 1000);
+        }
+        getElement('readingSessionStopwatch').textContent = formatElapsed(state.elapsedSeconds);
+    }
+
+    function updateControls() {
+        getElement('readingSessionPlayButton').disabled = state.running;
+        getElement('readingSessionPauseButton').disabled = !state.running;
+    }
+
+    function clearTimer() {
+        if (state.timerId !== null) {
+            window.clearInterval(state.timerId);
+            state.timerId = null;
+        }
+    }
+
+    function setResultVisible(visible) {
+        getElement('readingSessionControls').classList.toggle('is-hidden', visible);
+        getElement('readingSessionResult').classList.toggle('active', visible);
+    }
+
+    window.openReadingSessionModal = function (readingId, readingNumber) {
+        state.readingId = readingId;
+        state.readingNumber = readingNumber;
+        state.elapsedSeconds = 0;
+        state.startedAt = null;
+        state.running = false;
+        clearTimer();
+        getElement('readingSessionReading').textContent = translate('book.readingSessionFor', 'Reading') + ' #' + readingNumber;
+        getElement('readingSessionReadingId').value = readingId;
+        getElement('readingSessionPages').value = '';
+        getElement('readingSessionStopwatch').textContent = formatElapsed(0);
+        setResultVisible(false);
+        updateControls();
+        getElement('readingSessionModal').classList.add('active');
+        document.body.classList.add('reading-session-modal-open');
+        getElement('readingSessionPlayButton').focus();
+    };
+
+    window.closeReadingSessionModal = function () {
+        clearTimer();
+        state.running = false;
+        state.startedAt = null;
+        state.elapsedSeconds = 0;
+        setResultVisible(false);
+        getElement('readingSessionModal').classList.remove('active');
+        document.body.classList.remove('reading-session-modal-open');
+        updateControls();
+    };
+
+    window.playReadingSession = function () {
+        if (state.running) return;
+        state.startedAt = Date.now() - (state.elapsedSeconds * 1000);
+        state.running = true;
+        updateControls();
+        updateElapsed();
+        state.timerId = window.setInterval(updateElapsed, 250);
+    };
+
+    window.pauseReadingSession = function () {
+        if (!state.running) return;
+        updateElapsed();
+        state.running = false;
+        state.startedAt = null;
+        clearTimer();
+        updateControls();
+    };
+
+    window.stopReadingSession = function () {
+        if (state.running) window.pauseReadingSession();
+        updateElapsed();
+        var total = Math.max(0, Math.floor(state.elapsedSeconds));
+        getElement('readingSessionHours').value = Math.floor(total / 3600);
+        getElement('readingSessionMinutes').value = Math.floor((total % 3600) / 60);
+        getElement('readingSessionSeconds').value = total % 60;
+        setResultVisible(true);
+        getElement('readingSessionPages').focus();
+    };
+
+    window.cancelReadingSessionResult = function () {
+        setResultVisible(false);
+        updateControls();
+        getElement('readingSessionStopButton').focus();
+    };
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && getElement('readingSessionModal').classList.contains('active')) {
+            window.closeReadingSessionModal();
+        }
+    });
+})();
+</script>
 <!-- ── Reading infographic ──────────────────────────────────────────── -->
 {% if readings and reading_infographic %}
 <div style="margin-top: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--lb-border); display: flex; justify-content: center;">

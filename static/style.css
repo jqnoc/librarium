@@ -2017,6 +2017,79 @@ select.form-control { cursor: pointer; }
     justify-content: flex-end;
 }
 
+/* ── Reading session modal ─────────────────────────────────────────────── */
+body.reading-session-modal-open { overflow: hidden; }
+.reading-session-modal-overlay {
+    z-index: 100000;
+    background: rgba(17, 31, 38, .48);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+.reading-session-modal-box {
+    position: relative;
+    width: min(430px, 92vw);
+    max-width: none;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.reading-session-modal-close {
+    position: absolute;
+    top: .7rem;
+    right: .8rem;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--lb-text-light);
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.reading-session-modal-close:hover {
+    background: var(--lb-light-bg);
+    color: var(--lb-text);
+}
+.reading-session-title {
+    margin: 0 0 .35rem;
+    color: var(--lb-deep-orange);
+}
+.reading-session-reading {
+    margin: 0;
+    color: var(--lb-text-light);
+    font-size: .9rem;
+}
+.reading-session-stopwatch {
+    margin: 1.5rem 0;
+    color: var(--lb-text);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(2.5rem, 10vw, 4rem);
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.reading-session-controls,
+.reading-session-result-actions {
+    display: flex;
+    justify-content: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+}
+.reading-session-controls .btn,
+.reading-session-result-actions .btn {
+    min-width: 105px;
+}
+.reading-session-controls .btn:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+.reading-session-controls.is-hidden { display: none; }
+.reading-session-result { display: none; text-align: left; }
+.reading-session-result.active { display: block; }
+.reading-session-result .form-group { margin-bottom: 1rem; }
+.reading-session-result-actions { justify-content: flex-end; }
+.reading-session-trigger { white-space: nowrap; }
+
 /* ── Source radio group ─────────────────────────────────────────────────────────── */
 .source-radio-group {
     display: flex;

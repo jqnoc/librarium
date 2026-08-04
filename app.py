@@ -8558,6 +8558,24 @@ def add_session(book_id: str):
         abort(404)
 
     book_fmt = book["format"] or "paper"
+    requested_reading_id = request.form.get("reading_id", "").strip()
+    if requested_reading_id:
+        try:
+            requested_reading_id = int(requested_reading_id)
+        except ValueError:
+            flash("Invalid reading.", "error")
+            return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
+        reading = db.execute(
+            "SELECT id, status FROM readings WHERE id = ? AND book_id = ?",
+            (requested_reading_id, book_id),
+        ).fetchone()
+        if not reading or reading["status"] != "reading":
+            flash("This reading is not currently in progress.", "error")
+            return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
+        reading_id = reading["id"]
+    else:
+        reading_id = _get_current_reading_id(db, book_id)
+
     date = _normalize_input_date(request.form.get("date", ""))
     try:
         hours_val = int(request.form.get("hours", "0").strip() or 0)
@@ -8568,7 +8586,6 @@ def add_session(book_id: str):
         return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
 
     dur_seconds = hours_val * 3600 + minutes_val * 60 + seconds_val
-    reading_id = _get_current_reading_id(db, book_id)
 
     if book_fmt in ("audiobook", "ebook"):
         try:
