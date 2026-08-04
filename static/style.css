@@ -2133,11 +2133,40 @@ body.reading-session-modal-open { overflow: hidden; }
     text-transform: uppercase;
     letter-spacing: .04em;
 }
-.reading-session-page-stat strong {
+.reading-session-page-stat label {
+    color: var(--lb-text-light);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.reading-session-page-input {
+    width: 5.5rem;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: .2rem .25rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
     color: var(--lb-deep-orange);
+    font: inherit;
     font-size: 1.35rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
+    text-align: center;
+}
+.reading-session-page-input:not(:disabled) {
+    border-color: var(--lb-border);
+    background: var(--lb-card-bg);
+}
+.reading-session-page-input:focus {
+    outline: none;
+    border-color: var(--lb-orange);
+    box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
+.reading-session-page-input:disabled {
+    cursor: not-allowed;
+    opacity: 1;
 }
 .reading-session-page-arrow {
     color: var(--lb-text-light);

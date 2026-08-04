@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% if rd.status == 'reading' and not is_pct_format %}
             <div style="margin-top: 0.75rem;">
                 <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
-                        onclick="event.preventDefault(); event.stopPropagation(); openReadingSessionModal({{ rd.id }}, {{ rd.reading_number }}, {{ info.get('starting_page', 0)|int + rd.total_pages|int + 1 }}, {{ '%.6f'|format(rd.avg_pages_per_hour|float) }})">
+                    onclick="event.preventDefault(); event.stopPropagation(); openReadingSessionModal({{ rd.id }}, {{ rd.reading_number }}, {{ info.get('starting_page', 0)|int + rd.total_pages|int }}, {{ '%.6f'|format(rd.avg_pages_per_hour|float) }})">
                     <span aria-hidden="true">&#9654;</span> <span data-i18n="book.startReadingSession">Start Reading Session</span>
                 </button>
             </div>
@@ -412,13 +412,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="reading-session-stopwatch" id="readingSessionStopwatch">00:00:00</div>
         <div class="reading-session-page-range" aria-live="polite">
             <div class="reading-session-page-stat">
-                <span data-i18n="book.readingSessionStartPage">Start Page</span>
-                <strong id="readingSessionStartPage">--</strong>
+                <label for="readingSessionStartPage" data-i18n="book.readingSessionStartPage">Start Page</label>
+                <input type="number" class="reading-session-page-input" id="readingSessionStartPage" min="1" step="1" disabled>
             </div>
             <span class="reading-session-page-arrow" aria-hidden="true">&#8594;</span>
             <div class="reading-session-page-stat">
-                <span data-i18n="book.readingSessionEndPage">End Page</span>
-                <strong id="readingSessionEndPage">--</strong>
+                <label for="readingSessionEndPage" data-i18n="book.readingSessionEndPage">End Page</label>
+                <input type="number" class="reading-session-page-input" id="readingSessionEndPage" min="1" step="1" disabled>
             </div>
         </div>
         <p class="reading-session-pace" id="readingSessionPace"></p>
@@ -454,6 +454,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         timerId: null,
         running: false,
         hasStarted: false,
+        pageInputsEditable: false,
         startPage: 1,
         pace: 0,
     };
@@ -491,6 +492,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionSaveButton').disabled = !state.hasStarted;
     }
 
+    function setPageInputsEditable(editable) {
+        state.pageInputsEditable = editable;
+        getElement('readingSessionStartPage').disabled = !editable;
+        getElement('readingSessionEndPage').disabled = !editable;
+    }
+
     function clearTimer() {
         if (state.timerId !== null) {
             window.clearInterval(state.timerId);
@@ -506,9 +513,23 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     function updatePageEstimate() {
         var pages = estimatedPages();
         var endPage = pages > 0 ? state.startPage + pages - 1 : state.startPage;
-        getElement('readingSessionStartPage').textContent = state.startPage;
-        getElement('readingSessionEndPage').textContent = state.pace > 0 ? endPage : '\u2014';
+        getElement('readingSessionStartPage').value = state.startPage;
+        getElement('readingSessionEndPage').value = endPage;
         getElement('readingSessionPages').value = pages;
+    }
+
+    function syncEditedPageRange() {
+        var startInput = getElement('readingSessionStartPage');
+        var endInput = getElement('readingSessionEndPage');
+        var startPage = parseInt(startInput.value, 10);
+        var endPage = parseInt(endInput.value, 10);
+        if (!Number.isFinite(startPage) || startPage < 1) return;
+        state.startPage = startPage;
+        if (!Number.isFinite(endPage)) {
+            getElement('readingSessionPages').value = 0;
+            return;
+        }
+        getElement('readingSessionPages').value = Math.max(0, endPage - startPage + 1);
     }
 
     function updatePaceLabel() {
@@ -528,9 +549,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         state.startedAt = null;
         state.running = false;
         state.hasStarted = false;
+        state.pageInputsEditable = false;
         state.startPage = Math.max(1, Number(startPage) || 1);
         state.pace = Math.max(0, Number(pace) || 0);
         clearTimer();
+        setPageInputsEditable(false);
         getElement('readingSessionReading').textContent = translate('book.readingSessionFor', 'Reading') + ' #' + readingNumber;
         getElement('readingSessionReadingId').value = readingId;
         getElement('readingSessionStopwatch').textContent = formatElapsed(0);
@@ -547,6 +570,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         state.running = false;
         state.startedAt = null;
         state.elapsedSeconds = 0;
+        state.hasStarted = false;
+        setPageInputsEditable(false);
         getElement('readingSessionModal').classList.remove('active');
         document.body.classList.remove('reading-session-modal-open');
         updateControls();
@@ -555,8 +580,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     window.playReadingSession = function () {
         if (state.running) return;
         state.startedAt = Date.now() - (state.elapsedSeconds * 1000);
+        syncEditedPageRange();
         state.running = true;
         state.hasStarted = true;
+        setPageInputsEditable(false);
         updateControls();
         updateElapsed();
         state.timerId = window.setInterval(updateElapsed, 250);
@@ -568,6 +595,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         state.running = false;
         state.startedAt = null;
         clearTimer();
+        setPageInputsEditable(true);
         updateControls();
     };
 
@@ -578,9 +606,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionHours').value = Math.floor(total / 3600);
         getElement('readingSessionMinutes').value = Math.floor((total % 3600) / 60);
         getElement('readingSessionSeconds').value = total % 60;
-        getElement('readingSessionPages').value = estimatedPages();
+        syncEditedPageRange();
         return state.hasStarted;
     };
+
+    getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
+    getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
 
 })();
 </script>
