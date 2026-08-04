@@ -391,9 +391,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% endif %}
 
 <div id="readingSessionModal" class="modal-overlay reading-session-modal-overlay"
-     role="dialog" aria-modal="true" aria-labelledby="reading-session-title"
-     onclick="if(event.target===this)closeReadingSessionModal()">
-    <div class="modal-box reading-session-modal-box" onclick="event.stopPropagation()">
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-title">
+    <div class="modal-box reading-session-modal-box">
         <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionModal()" aria-label="Close">&times;</button>
         <h3 id="reading-session-title" class="reading-session-title" data-i18n="book.readingSessionTitle">Reading Session</h3>
         <p class="reading-session-reading" id="readingSessionReading"></p>
@@ -544,11 +543,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionStopButton').focus();
     };
 
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && getElement('readingSessionModal').classList.contains('active')) {
-            window.closeReadingSessionModal();
-        }
-    });
 })();
 </script>
 <!-- ── Reading infographic ──────────────────────────────────────────── -->
