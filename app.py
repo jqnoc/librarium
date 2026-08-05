@@ -7884,6 +7884,7 @@ def book_detail(book_id: str):
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
         taxonomy_fields=TAXONOMY_FIELDS,
+        suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
         similar_works=similar_works,
         quotes=[dict(r) for r in db.execute(
             "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
@@ -8309,6 +8310,25 @@ def import_bookly(book_id: str):
 # ═══════════════════════════════════════════════════════════════════════════
 # Routes – Metadata editing
 # ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/book/<book_id>/classification", methods=["POST"])
+def save_classification(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT id, work_id FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+
+    values = {
+        field: _normalize_taxonomy_values(request.form.get(field, ""))
+        for field in TAXONOMY_FIELD_NAMES
+    }
+    if book["work_id"]:
+        _set_work_taxonomy(db, book["work_id"], values)
+    else:
+        _set_book_taxonomy(db, book_id, values)
+    db.commit()
+    return jsonify({"ok": True})
+
 
 @app.route("/book/<book_id>/classification/clear", methods=["POST"])
 def clear_classification(book_id: str):

@@ -288,6 +288,8 @@
         'book.readingSessionResume': { en: 'Resume',               es: 'Reanudar' },
         'book.readingSessionPause': { en: 'Pause',                 es: 'Pausar' },
         'book.readingSessionSave': { en: 'Save Session',            es: 'Guardar Sesión' },
+        'book.readingSessionClassificationSave': { en: 'Save Classification', es: 'Guardar clasificación' },
+        'book.readingSessionClassificationError': { en: 'Classification could not be saved. Try again.', es: 'No se pudo guardar la clasificación. Inténtalo de nuevo.' },
         'book.readingSessionStartPage': { en: 'Start Page',          es: 'Página Inicial' },
         'book.readingSessionEndPage': { en: 'End Page',              es: 'Página Final' },
         'book.readingSessionPace': { en: 'Average pace',             es: 'Ritmo medio' },

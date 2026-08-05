@@ -2078,6 +2078,61 @@ body.reading-session-modal-open { overflow: hidden; }
     border: 1px solid var(--lb-border);
     box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
 }
+.reading-session-classification-modal-overlay {
+    z-index: 100001;
+    background: rgba(17, 31, 38, .58);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+.reading-session-classification-modal-box {
+    position: relative;
+    width: min(720px, 94vw);
+    max-width: none;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    text-align: left;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.reading-session-classification-title {
+    margin: 0 2rem 1.25rem 0;
+    color: var(--lb-dark);
+    font-size: 1.2rem;
+}
+.reading-session-classification-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+.reading-session-classification-field {
+    min-width: 0;
+}
+.reading-session-classification-field > label {
+    display: block;
+    margin-bottom: .2rem;
+    color: var(--lb-text);
+    font-size: .9rem;
+    font-weight: 700;
+}
+.reading-session-classification-field .classification-description {
+    margin: .2rem 0 .45rem;
+    font-size: .75rem;
+    line-height: 1.35;
+}
+.reading-session-classification-error {
+    min-height: 1.25rem;
+    margin: .8rem 0 0;
+    color: var(--lb-abandoned);
+    font-size: .82rem;
+}
+.reading-session-classification-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .6rem;
+    margin-top: .4rem;
+}
 .reading-session-modal-close {
     position: absolute;
     top: .7rem;
@@ -2242,6 +2297,11 @@ body.reading-session-modal-open { overflow: hidden; }
 @media (max-width: 480px) {
     .reading-session-modal-box { padding: 1.25rem; }
     .reading-session-controls .btn { flex: 1 1 90px; min-width: 0; }
+}
+
+@media (max-width: 640px) {
+    .reading-session-classification-modal-box { padding: 1.25rem; }
+    .reading-session-classification-grid { grid-template-columns: 1fr; }
 }
 
 /* ── Source radio group ─────────────────────────────────────────────────────────── */
