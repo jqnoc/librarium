@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             modeButton.textContent = translate('book.readingSessionNewThought', 'New Thought');
         } else {
             form.action = form.dataset.addAction;
-            text.value = '';
+            text.value = '### ';
             page.value = '';
             label.dataset.i18n = 'book.readingSessionWritingNewThought';
             label.textContent = translate('book.readingSessionWritingNewThought', 'Writing a new thought');
@@ -1134,6 +1134,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
+    getElement('readingSessionThoughtText').addEventListener('keydown', function (event) {
+        if (!event.ctrlKey || event.key !== 'Enter') return;
+        event.preventDefault();
+        this.setRangeText('\n- ', this.selectionStart, this.selectionEnd, 'end');
+    });
     window.addEventListener('resize', syncReadingSessionButtonWidths);
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
