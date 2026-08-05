@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
@@ -82,6 +83,23 @@ MAX_BACKUPS = 5
 DB_PATH = DATA_DIR / "librarium.db"
 
 APP_VERSION = "2.2.0-beta"
+
+DICTIONARY_SOURCES = (
+    {"key": "free_dictionary", "label": "Free Dictionary API", "label_key": "book.dictionarySourceFreeDictionary"},
+    {"key": "wiktionary", "label": "Wiktionary", "label_key": "book.dictionarySourceWiktionary"},
+)
+DICTIONARY_LANGUAGES = (
+    {"code": "en", "label": "English", "label_key": "book.dictionaryLanguageEnglish"},
+    {"code": "es", "label": "Spanish", "label_key": "book.dictionaryLanguageSpanish"},
+    {"code": "fr", "label": "French", "label_key": "book.dictionaryLanguageFrench"},
+    {"code": "de", "label": "German", "label_key": "book.dictionaryLanguageGerman"},
+    {"code": "it", "label": "Italian", "label_key": "book.dictionaryLanguageItalian"},
+    {"code": "pt", "label": "Portuguese", "label_key": "book.dictionaryLanguagePortuguese"},
+)
+DICTIONARY_LANGUAGE_CODES = {item["code"] for item in DICTIONARY_LANGUAGES}
+DICTIONARY_LANGUAGE_ALIASES = {
+    item["label"].casefold(): item["code"] for item in DICTIONARY_LANGUAGES
+}
 
 TAXONOMY_FIELDS = (
     {
@@ -669,6 +687,26 @@ def sanitize_html(raw: str) -> str:
     s = _Sanitiser()
     s.feed(raw)
     return s.get_clean()
+
+
+class _PlainTextExtractor(HTMLParser):
+    """Extract readable text from dictionary API HTML fragments."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+
+    def handle_data(self, data):
+        self._parts.append(data)
+
+    def get_text(self) -> str:
+        return re.sub(r"\s+", " ", " ".join(self._parts)).strip()
+
+
+def _dictionary_plain_text(raw: str) -> str:
+    parser = _PlainTextExtractor()
+    parser.feed(raw or "")
+    return parser.get_text()
 
 
 # ── Markdown renderer (for thoughts) ───────────────────────────────────
@@ -7813,6 +7851,11 @@ def book_detail(book_id: str):
         f"SELECT id, name, language FROM books WHERE library_id = ? AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASE",
         [info["library_id"]] + exclude_ids,
     ).fetchall()
+    latest_thought_row = db.execute(
+        "SELECT id, text, page FROM thoughts WHERE book_id = ? ORDER BY id DESC LIMIT 1",
+        (book_id,),
+    ).fetchone()
+    latest_thought = dict(latest_thought_row) if latest_thought_row else None
 
     return render_template(
         "book_detail.html",
@@ -7885,6 +7928,10 @@ def book_detail(book_id: str):
         all_linkable_books=all_linkable_books,
         taxonomy_fields=TAXONOMY_FIELDS,
         suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
+        latest_thought=latest_thought,
+        dictionary_sources=DICTIONARY_SOURCES,
+        dictionary_languages=DICTIONARY_LANGUAGES,
+        dictionary_default_language=_dictionary_language_code(info.get("language", "")),
         similar_works=similar_works,
         quotes=[dict(r) for r in db.execute(
             "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
@@ -7990,6 +8037,164 @@ def save_ratings(book_id: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Routes – Public dictionary helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _dictionary_language_code(value: str) -> str:
+    normalized = (value or "").strip().casefold()
+    if normalized in DICTIONARY_LANGUAGE_CODES:
+        return normalized
+    return DICTIONARY_LANGUAGE_ALIASES.get(normalized, "en")
+
+
+def _fetch_public_json(url: str) -> dict | list:
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": f"Librarium/{APP_VERSION}"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
+        payload = response.read(2_000_000)
+    return json.loads(payload.decode("utf-8"))
+
+
+def _unique_dictionary_values(values: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        normalized = _dictionary_plain_text(value)
+        key = normalized.casefold()
+        if normalized and key not in seen:
+            seen.add(key)
+            result.append(normalized)
+    return result
+
+
+def _parse_free_dictionary_result(data: list) -> tuple[list[str], list[str]]:
+    definitions = []
+    synonyms = []
+    for entry in data if isinstance(data, list) else []:
+        for meaning in entry.get("meanings", []):
+            part_of_speech = _dictionary_plain_text(meaning.get("partOfSpeech", ""))
+            for definition_data in meaning.get("definitions", []):
+                text = _dictionary_plain_text(definition_data.get("definition", ""))
+                if text:
+                    definitions.append(
+                        f"{part_of_speech}: {text}" if part_of_speech else text
+                    )
+                synonyms.extend(meaning.get("synonyms", []))
+                synonyms.extend(definition_data.get("synonyms", []))
+                if len(definitions) >= 12:
+                    break
+            if len(definitions) >= 12:
+                break
+        if len(definitions) >= 12:
+            break
+    return definitions, _unique_dictionary_values(synonyms)
+
+
+def _parse_wiktionary_result(data: dict, language: str) -> tuple[list[str], list[str]]:
+    entries = data.get(language, []) if isinstance(data, dict) else []
+    if not entries and language != "en" and isinstance(data, dict):
+        entries = data.get("en", [])
+
+    definitions = []
+    synonyms = []
+    for entry in entries if isinstance(entries, list) else []:
+        part_of_speech = _dictionary_plain_text(entry.get("partOfSpeech", ""))
+        for definition_data in entry.get("definitions", []):
+            text = _dictionary_plain_text(definition_data.get("definition", ""))
+            if text:
+                definitions.append(
+                    f"{part_of_speech}: {text}" if part_of_speech else text
+                )
+            synonyms.extend(definition_data.get("synonyms", []))
+            if len(definitions) >= 12:
+                break
+        if len(definitions) >= 12:
+            break
+    return definitions, _unique_dictionary_values(synonyms)
+
+
+@app.route("/api/dictionary_lookup")
+def dictionary_lookup():
+    word = request.args.get("word", "").strip()
+    source = request.args.get("source", "free_dictionary").strip()
+    language = request.args.get("language", "en").strip().casefold()
+    source_keys = {item["key"] for item in DICTIONARY_SOURCES}
+    if not word:
+        return jsonify({"error": "Enter a word to look up."}), 400
+    if len(word) > 120:
+        return jsonify({"error": "The word is too long."}), 400
+    if source not in source_keys:
+        return jsonify({"error": "Unknown dictionary source."}), 400
+    if language not in DICTIONARY_LANGUAGE_CODES:
+        return jsonify({"error": "Unknown dictionary language."}), 400
+
+    encoded_word = urllib.parse.quote(word, safe="")
+    if source == "free_dictionary":
+        lookup_url = f"https://api.dictionaryapi.dev/api/v2/entries/{language}/{encoded_word}"
+    else:
+        lookup_url = f"https://{language}.wiktionary.org/api/rest_v1/page/definition/{encoded_word}"
+
+    try:
+        data = _fetch_public_json(lookup_url)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return jsonify({"error": "Word not found."}), 404
+        return jsonify({"error": "The dictionary service returned an error."}), 502
+    except (urllib.error.URLError, json.JSONDecodeError, OSError):
+        return jsonify({"error": "Could not reach the dictionary service."}), 502
+
+    if source == "free_dictionary":
+        definitions, synonyms = _parse_free_dictionary_result(data)
+    else:
+        definitions, synonyms = _parse_wiktionary_result(data, language)
+    if not definitions:
+        return jsonify({"error": "No definition was found."}), 404
+
+    source_label = next(
+        item["label"] for item in DICTIONARY_SOURCES if item["key"] == source
+    )
+    return jsonify({
+        "ok": True,
+        "word": word,
+        "definition": "\n".join(definitions),
+        "synonyms": ", ".join(synonyms),
+        "source": source_label,
+    })
+
+
+@app.route("/api/dictionary_translate")
+def dictionary_translate():
+    word = request.args.get("word", "").strip()
+    source_language = request.args.get("source_language", "en").strip().casefold()
+    target_language = request.args.get("target_language", "").strip().casefold()
+    if not word:
+        return jsonify({"error": "Enter a word to translate."}), 400
+    if source_language not in DICTIONARY_LANGUAGE_CODES:
+        return jsonify({"error": "Unknown source language."}), 400
+    if target_language not in DICTIONARY_LANGUAGE_CODES:
+        return jsonify({"error": "Choose a target language."}), 400
+    if source_language == target_language:
+        return jsonify({"error": "Choose a language different from the source."}), 400
+
+    query = urllib.parse.urlencode({
+        "q": word,
+        "langpair": f"{source_language}|{target_language}",
+    })
+    try:
+        data = _fetch_public_json(f"https://api.mymemory.translated.net/get?{query}")
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, OSError):
+        return jsonify({"error": "Could not reach the translation service."}), 502
+
+    response_data = data.get("responseData", {}) if isinstance(data, dict) else {}
+    translated = _dictionary_plain_text(response_data.get("translatedText", ""))
+    if not translated or str(data.get("responseStatus", "200")) != "200":
+        return jsonify({"error": "No translation was found."}), 404
+    return jsonify({"ok": True, "translation": translated})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Routes – Annotation CRUD (Quotes, Thoughts, Words)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -8033,6 +8238,9 @@ def delete_quote(book_id: str, qid: int):
 
 # ── Thoughts ──
 
+def _annotation_wants_json() -> bool:
+    return "application/json" in request.headers.get("Accept", "").lower()
+
 @app.route("/book/<book_id>/thoughts/add", methods=["POST"])
 def add_thought(book_id: str):
     db = get_db()
@@ -8040,11 +8248,17 @@ def add_thought(book_id: str):
         abort(404)
     text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
-    page = int(page_str) if page_str else None
+    page = int(page_str) if page_str.isdigit() else None
     if text:
-        db.execute("INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
-                   (book_id, text, page))
+        cursor = db.execute(
+            "INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
+            (book_id, text, page),
+        )
         db.commit()
+        if _annotation_wants_json():
+            return jsonify({"ok": True, "id": cursor.lastrowid})
+    elif _annotation_wants_json():
+        return jsonify({"ok": False, "error": "Thought text is required."}), 400
     return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
 
 
@@ -8053,11 +8267,19 @@ def edit_thought(book_id: str, tid: int):
     db = get_db()
     text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
-    page = int(page_str) if page_str else None
+    page = int(page_str) if page_str.isdigit() else None
     if text:
-        db.execute("UPDATE thoughts SET text = ?, page = ? WHERE id = ? AND book_id = ?",
-                   (text, page, tid, book_id))
+        cursor = db.execute(
+            "UPDATE thoughts SET text = ?, page = ? WHERE id = ? AND book_id = ?",
+            (text, page, tid, book_id),
+        )
         db.commit()
+        if _annotation_wants_json():
+            if cursor.rowcount == 0:
+                return jsonify({"ok": False, "error": "Thought not found."}), 404
+            return jsonify({"ok": True, "id": tid})
+    elif _annotation_wants_json():
+        return jsonify({"ok": False, "error": "Thought text is required."}), 400
     return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
 
 
@@ -8084,14 +8306,24 @@ def add_word(book_id: str):
     if not translation:
         translation_language = ""
     elif not translation_language:
+        if _annotation_wants_json():
+            return jsonify({
+                "ok": False,
+                "error": "Choose a translation language before saving a translated word.",
+            }), 400
         flash("Choose a translation language before saving a translated word.", "error")
         return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
-    if word:
-        db.execute(
-            "INSERT INTO words (book_id, word, definition, synonyms, translation, translation_language) VALUES (?, ?, ?, ?, ?, ?)",
-            (book_id, word, definition, synonyms, translation, translation_language),
-        )
-        db.commit()
+    if not word or not definition:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": "Word and definition are required."}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+    cursor = db.execute(
+        "INSERT INTO words (book_id, word, definition, synonyms, translation, translation_language) VALUES (?, ?, ?, ?, ?, ?)",
+        (book_id, word, definition, synonyms, translation, translation_language),
+    )
+    db.commit()
+    if _annotation_wants_json():
+        return jsonify({"ok": True, "id": cursor.lastrowid})
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
 
 

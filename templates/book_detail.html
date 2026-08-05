@@ -449,6 +449,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()">
                 <span aria-hidden="true">&#9776;</span> <span data-i18n="book.classification">Classification</span>
             </button>
+            <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
+                <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()">
+                <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAddThought">Add Thought</span>
+            </button>
             <button type="submit" form="readingSessionForm" class="btn btn-primary" id="readingSessionSaveButton">
                 <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSave">Save Session</span>
             </button>
@@ -510,8 +516,120 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </form>
     </div>
 </div>
+<div id="readingSessionWordModal" class="modal-overlay reading-session-annotation-modal-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="reading-session-word-title"
+     onclick="if (event.target === this) closeReadingSessionWordModal()">
+    <div class="modal-box reading-session-annotation-modal-box reading-session-word-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionWordModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-word-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddWord">Add Word</h3>
+        <form id="readingSessionWordForm" method="POST" action="{{ url_for('add_word', book_id=book_id) }}"
+              onsubmit="return saveReadingSessionWord(event)">
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionWord" data-i18n="book.wordPlaceholder">Word</label>
+                <input type="text" id="readingSessionWord" name="word" class="form-control" required autocomplete="off"
+                       placeholder="Word" data-i18n-placeholder="book.wordPlaceholder">
+            </div>
+            <div class="reading-session-dictionary-tools">
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionWordDictionarySource" data-i18n="book.dictionarySource">Dictionary source</label>
+                    <select id="readingSessionWordDictionarySource" class="form-control">
+                        {% for source in dictionary_sources %}
+                        <option value="{{ source.key }}" data-i18n="{{ source.label_key }}">{{ source.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionWordSourceLanguage" data-i18n="book.dictionaryLanguage">Dictionary language</label>
+                    <select id="readingSessionWordSourceLanguage" class="form-control">
+                        {% for language in dictionary_languages %}
+                        <option value="{{ language.code }}" data-i18n="{{ language.label_key }}"{% if language.code == dictionary_default_language %} selected{% endif %}>{{ language.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" class="btn btn-secondary reading-session-dictionary-button" id="readingSessionWordLookupButton" onclick="lookupReadingSessionWord()">
+                    <span aria-hidden="true">&#128269;</span> <span data-i18n="book.dictionaryLookup">Look Up</span>
+                </button>
+            </div>
+            <p id="readingSessionWordDictionaryStatus" class="reading-session-dictionary-status" role="status" aria-live="polite"></p>
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionWordDefinition" data-i18n="book.definitionPlaceholder">Definition</label>
+                <textarea id="readingSessionWordDefinition" name="definition" rows="4" class="form-control" required
+                          placeholder="Definition..." data-i18n-placeholder="book.definitionPlaceholder"></textarea>
+            </div>
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionWordSynonyms" data-i18n="book.synonyms">Synonyms</label>
+                <input type="text" id="readingSessionWordSynonyms" name="synonyms" class="form-control"
+                       placeholder="Synonyms..." data-i18n-placeholder="book.synonymsPlaceholder">
+            </div>
+            <div class="reading-session-word-translation">
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionWordTranslationLanguage" data-i18n="book.translationLanguagePlaceholder">Translation language</label>
+                    <select id="readingSessionWordTranslationLanguage" class="form-control">
+                        <option value="" data-i18n="book.translationLanguagePlaceholder">Translation language</option>
+                        {% for language in dictionary_languages %}
+                        <option value="{{ language.code }}" data-language-label="{{ language.label }}" data-i18n="{{ language.label_key }}">{{ language.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="translation_language" id="readingSessionWordTranslationLanguageValue">
+                </div>
+                <button type="button" class="btn btn-secondary reading-session-translate-button" id="readingSessionWordTranslateButton" onclick="translateReadingSessionWord()">
+                    <span aria-hidden="true">&#8644;</span> <span data-i18n="book.dictionaryTranslate">Translate</span>
+                </button>
+                <div class="reading-session-annotation-field reading-session-translation-value">
+                    <label for="readingSessionWordTranslation" data-i18n="book.translation">Translation</label>
+                    <input type="text" id="readingSessionWordTranslation" name="translation" class="form-control"
+                           placeholder="Translation..." data-i18n-placeholder="book.translationPlaceholder">
+                </div>
+            </div>
+            <p id="readingSessionWordError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
+            <div class="reading-session-annotation-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeReadingSessionWordModal()" data-i18n="form.cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="readingSessionWordSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveWord">Save Word</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="readingSessionThoughtModal" class="modal-overlay reading-session-annotation-modal-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="reading-session-thought-title"
+     onclick="if (event.target === this) closeReadingSessionThoughtModal()">
+    <div class="modal-box reading-session-annotation-modal-box reading-session-thought-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionThoughtModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-thought-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddThought">Add Thought</h3>
+        <div class="reading-session-thought-mode-row">
+            <p id="readingSessionThoughtModeLabel" class="reading-session-thought-mode-label" data-i18n="book.readingSessionEditingLastThought">Editing the last saved thought</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="readingSessionThoughtModeButton" onclick="toggleReadingSessionThoughtMode()" data-i18n="book.readingSessionNewThought">New Thought</button>
+        </div>
+        <form id="readingSessionThoughtForm" method="POST" action="{{ url_for('add_thought', book_id=book_id) }}"
+              data-add-action="{{ url_for('add_thought', book_id=book_id) }}"
+              data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/thoughts/"
+              onsubmit="return saveReadingSessionThought(event)">
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionThoughtText" data-i18n="book.thoughtTextPlaceholder">Your thought</label>
+                <textarea id="readingSessionThoughtText" name="text" rows="7" class="form-control" required
+                          placeholder="Your thought..." data-i18n-placeholder="book.thoughtTextPlaceholder">{% if latest_thought %}{{ latest_thought.get('text', '') }}{% endif %}</textarea>
+            </div>
+            <div class="reading-session-thought-page-row">
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionThoughtPage" data-i18n="book.pagePlaceholder">Page</label>
+                    <input type="number" id="readingSessionThoughtPage" name="page" class="form-control" min="1"{% if latest_thought and latest_thought.get('page') %} value="{{ latest_thought.get('page') }}"{% endif %}
+                           placeholder="Page" data-i18n-placeholder="book.pagePlaceholder">
+                </div>
+            </div>
+            <p id="readingSessionThoughtError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
+            <div class="reading-session-annotation-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeReadingSessionThoughtModal()" data-i18n="form.cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="readingSessionThoughtSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveThought">Save Thought</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 <script>
 (function () {
+    var initialLatestThought = {{ latest_thought | tojson }};
     var state = {
         readingId: null,
         readingNumber: null,
@@ -525,6 +643,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         pace: 0,
         classificationWasRunning: false,
         classificationSaving: false,
+        quickModalWasRunning: false,
+        quickModalSaving: false,
+        latestThought: initialLatestThought,
+        thoughtMode: initialLatestThought ? 'edit' : 'new',
     };
 
     function translate(key, fallback) {
@@ -544,6 +666,86 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     function getElement(id) {
         return document.getElementById(id);
+    }
+
+    function setModalError(id, message) {
+        var element = getElement(id);
+        if (element) element.textContent = message || '';
+    }
+
+    function beginQuickModal(modalId, errorId) {
+        var sessionModal = getElement('readingSessionModal');
+        var modal = getElement(modalId);
+        if (!sessionModal || !modal || !sessionModal.classList.contains('active')) return false;
+        state.quickModalWasRunning = state.running;
+        state.quickModalSaving = false;
+        if (state.running) window.pauseReadingSession();
+        setModalError(errorId, '');
+        modal.classList.add('active');
+        return true;
+    }
+
+    function finishQuickModal(modalId, shouldResume) {
+        var modal = getElement(modalId);
+        state.quickModalSaving = false;
+        state.quickModalWasRunning = false;
+        if (modal) modal.classList.remove('active');
+        if (shouldResume) window.playReadingSession();
+    }
+
+    function fetchAnnotationJson(url, form) {
+        return fetch(url, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+                if (!response.ok || !payload.ok) {
+                    var error = new Error(payload.error || 'The annotation could not be saved.');
+                    error.payload = payload;
+                    throw error;
+                }
+                return payload;
+            });
+        });
+    }
+
+    function selectedTranslationLanguage() {
+        var select = getElement('readingSessionWordTranslationLanguage');
+        var hidden = getElement('readingSessionWordTranslationLanguageValue');
+        if (!select || !hidden) return;
+        var option = select.options[select.selectedIndex];
+        hidden.value = select.value && option ? (option.dataset.languageLabel || option.textContent.trim()) : '';
+    }
+
+    function setThoughtMode(mode) {
+        if (mode === 'edit' && !state.latestThought) mode = 'new';
+        state.thoughtMode = mode;
+        var form = getElement('readingSessionThoughtForm');
+        var text = getElement('readingSessionThoughtText');
+        var page = getElement('readingSessionThoughtPage');
+        var label = getElement('readingSessionThoughtModeLabel');
+        var modeButton = getElement('readingSessionThoughtModeButton');
+        if (!form || !text || !page || !label || !modeButton) return;
+
+        if (mode === 'edit') {
+            form.action = form.dataset.editActionPrefix + state.latestThought.id + '/edit';
+            text.value = state.latestThought.text || '';
+            page.value = state.latestThought.page || '';
+            label.dataset.i18n = 'book.readingSessionEditingLastThought';
+            label.textContent = translate('book.readingSessionEditingLastThought', 'Editing the last saved thought');
+            modeButton.dataset.i18n = 'book.readingSessionNewThought';
+            modeButton.textContent = translate('book.readingSessionNewThought', 'New Thought');
+        } else {
+            form.action = form.dataset.addAction;
+            text.value = '';
+            page.value = '';
+            label.dataset.i18n = 'book.readingSessionWritingNewThought';
+            label.textContent = translate('book.readingSessionWritingNewThought', 'Writing a new thought');
+            modeButton.dataset.i18n = 'book.readingSessionEditLastThought';
+            modeButton.textContent = translate('book.readingSessionEditLastThought', 'Edit Last Thought');
+        }
+        modeButton.style.display = state.latestThought ? '' : 'none';
     }
 
     function updateElapsed() {
@@ -704,6 +906,167 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         return false;
     };
 
+    window.openReadingSessionWordModal = function () {
+        var form = getElement('readingSessionWordForm');
+        if (!form || !beginQuickModal('readingSessionWordModal', 'readingSessionWordError')) return;
+        form.reset();
+        selectedTranslationLanguage();
+        setModalError('readingSessionWordError', '');
+        setModalError('readingSessionWordDictionaryStatus', '');
+        getElement('readingSessionWordSaveButton').disabled = false;
+        getElement('readingSessionWordLookupButton').disabled = false;
+        getElement('readingSessionWordTranslateButton').disabled = false;
+        getElement('readingSessionWord').focus();
+    };
+
+    window.closeReadingSessionWordModal = function () {
+        if (state.quickModalSaving) return;
+        var modal = getElement('readingSessionWordModal');
+        if (modal) modal.classList.remove('active');
+        state.quickModalWasRunning = false;
+    };
+
+    window.lookupReadingSessionWord = function () {
+        var word = getElement('readingSessionWord').value.trim();
+        var source = getElement('readingSessionWordDictionarySource').value;
+        var language = getElement('readingSessionWordSourceLanguage').value;
+        var button = getElement('readingSessionWordLookupButton');
+        if (!word) {
+            setModalError('readingSessionWordError', translate('book.dictionaryWordRequired', 'Enter a word first.'));
+            getElement('readingSessionWord').focus();
+            return;
+        }
+        setModalError('readingSessionWordError', '');
+        setModalError('readingSessionWordDictionaryStatus', translate('book.dictionaryLookingUp', 'Looking up...'));
+        button.disabled = true;
+        var query = new URLSearchParams({ word: word, source: source, language: language });
+        fetch('/api/dictionary_lookup?' + query.toString()).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+                if (!response.ok || !payload.ok) throw new Error(payload.error || 'Dictionary lookup failed.');
+                return payload;
+            });
+        }).then(function (payload) {
+            getElement('readingSessionWord').value = payload.word || word;
+            getElement('readingSessionWordDefinition').value = payload.definition || '';
+            getElement('readingSessionWordSynonyms').value = payload.synonyms || '';
+            setModalError('readingSessionWordDictionaryStatus', translate('book.dictionaryFoundIn', 'Found in') + ' ' + payload.source + '.');
+        }).catch(function (error) {
+            setModalError('readingSessionWordDictionaryStatus', '');
+            setModalError('readingSessionWordError', error.message || translate('book.dictionaryLookupError', 'Dictionary lookup failed.'));
+        }).finally(function () {
+            button.disabled = false;
+        });
+    };
+
+    window.translateReadingSessionWord = function () {
+        var word = getElement('readingSessionWord').value.trim();
+        var sourceLanguage = getElement('readingSessionWordSourceLanguage').value;
+        var targetLanguage = getElement('readingSessionWordTranslationLanguage').value;
+        var button = getElement('readingSessionWordTranslateButton');
+        selectedTranslationLanguage();
+        if (!word) {
+            setModalError('readingSessionWordError', translate('book.dictionaryWordRequired', 'Enter a word first.'));
+            getElement('readingSessionWord').focus();
+            return;
+        }
+        if (!targetLanguage) {
+            setModalError('readingSessionWordError', translate('book.dictionaryTargetRequired', 'Choose a translation language first.'));
+            getElement('readingSessionWordTranslationLanguage').focus();
+            return;
+        }
+        setModalError('readingSessionWordError', '');
+        button.disabled = true;
+        var query = new URLSearchParams({
+            word: word,
+            source_language: sourceLanguage,
+            target_language: targetLanguage
+        });
+        fetch('/api/dictionary_translate?' + query.toString()).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+                if (!response.ok || !payload.ok) throw new Error(payload.error || 'Translation failed.');
+                return payload;
+            });
+        }).then(function (payload) {
+            getElement('readingSessionWordTranslation').value = payload.translation || '';
+        }).catch(function (error) {
+            setModalError('readingSessionWordError', error.message || translate('book.dictionaryTranslationError', 'Translation failed.'));
+        }).finally(function () {
+            button.disabled = false;
+        });
+    };
+
+    window.saveReadingSessionWord = function (event) {
+        event.preventDefault();
+        var form = getElement('readingSessionWordForm');
+        var shouldResume = state.quickModalWasRunning;
+        selectedTranslationLanguage();
+        state.quickModalSaving = true;
+        getElement('readingSessionWordSaveButton').disabled = true;
+        getElement('readingSessionWordLookupButton').disabled = true;
+        getElement('readingSessionWordTranslateButton').disabled = true;
+        setModalError('readingSessionWordError', '');
+        fetchAnnotationJson(form.action, form).then(function () {
+            finishQuickModal('readingSessionWordModal', shouldResume);
+        }).catch(function (error) {
+            state.quickModalSaving = false;
+            getElement('readingSessionWordSaveButton').disabled = false;
+            getElement('readingSessionWordLookupButton').disabled = false;
+            getElement('readingSessionWordTranslateButton').disabled = false;
+            setModalError('readingSessionWordError', error.message || translate('book.readingSessionSaveError', 'The word could not be saved.'));
+        });
+        return false;
+    };
+
+    window.openReadingSessionThoughtModal = function () {
+        if (!beginQuickModal('readingSessionThoughtModal', 'readingSessionThoughtError')) return;
+        setThoughtMode(state.latestThought ? 'edit' : 'new');
+        getElement('readingSessionThoughtSaveButton').disabled = false;
+        getElement('readingSessionThoughtText').focus();
+    };
+
+    window.closeReadingSessionThoughtModal = function () {
+        if (state.quickModalSaving) return;
+        var modal = getElement('readingSessionThoughtModal');
+        if (modal) modal.classList.remove('active');
+        state.quickModalWasRunning = false;
+    };
+
+    window.toggleReadingSessionThoughtMode = function () {
+        setThoughtMode(state.thoughtMode === 'edit' ? 'new' : 'edit');
+        getElement('readingSessionThoughtText').focus();
+    };
+
+    window.saveReadingSessionThought = function (event) {
+        event.preventDefault();
+        var form = getElement('readingSessionThoughtForm');
+        var text = getElement('readingSessionThoughtText');
+        var page = getElement('readingSessionThoughtPage');
+        var shouldResume = state.quickModalWasRunning;
+        if (!text.value.trim()) {
+            setModalError('readingSessionThoughtError', translate('book.thoughtRequired', 'Thought text is required.'));
+            text.focus();
+            return false;
+        }
+        state.quickModalSaving = true;
+        getElement('readingSessionThoughtSaveButton').disabled = true;
+        setModalError('readingSessionThoughtError', '');
+        var savedText = text.value;
+        var savedPage = page.value ? Number(page.value) : null;
+        fetchAnnotationJson(form.action, form).then(function (payload) {
+            state.latestThought = {
+                id: payload.id,
+                text: savedText,
+                page: savedPage,
+            };
+            finishQuickModal('readingSessionThoughtModal', shouldResume);
+        }).catch(function (error) {
+            state.quickModalSaving = false;
+            getElement('readingSessionThoughtSaveButton').disabled = false;
+            setModalError('readingSessionThoughtError', error.message || translate('book.readingSessionSaveError', 'The thought could not be saved.'));
+        });
+        return false;
+    };
+
     window.closeReadingSessionModal = function () {
         clearTimer();
         state.running = false;
@@ -756,7 +1119,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
         var classificationModal = getElement('readingSessionClassificationModal');
-        if (!modal.classList.contains('active') || (classificationModal && classificationModal.classList.contains('active'))
+        var wordModal = getElement('readingSessionWordModal');
+        var thoughtModal = getElement('readingSessionThoughtModal');
+        if (!modal.classList.contains('active')
+            || (classificationModal && classificationModal.classList.contains('active'))
+            || (wordModal && wordModal.classList.contains('active'))
+            || (thoughtModal && thoughtModal.classList.contains('active'))
             || event.repeat || event.code !== 'Space') return;
         event.preventDefault();
         if (state.running) window.pauseReadingSession();
@@ -2003,6 +2371,8 @@ document.addEventListener('DOMContentLoaded', function() {
     irt('add-quote-text');
     imt('add-thought-text');
     irt('add-word-def');
+    imt('readingSessionThoughtText');
+    irt('readingSessionWordDefinition');
     // Edit-form textareas
     document.querySelectorAll('textarea[id^="edit-quote-"]').forEach(function(ta) { irt(ta.id); });
     document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { imt(ta.id); });

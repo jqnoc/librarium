@@ -2294,6 +2294,103 @@ body.reading-session-modal-open { overflow: hidden; }
 .reading-session-form { display: none; }
 .reading-session-trigger { white-space: nowrap; }
 
+.reading-session-annotation-modal-overlay {
+    z-index: 100002;
+    background: rgba(17, 31, 38, .64);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+.reading-session-annotation-modal-box {
+    position: relative;
+    width: min(700px, 94vw);
+    max-width: none;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    text-align: left;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.reading-session-annotation-title {
+    margin: 0 2rem 1.25rem 0;
+    color: var(--lb-dark);
+    font-size: 1.2rem;
+}
+.reading-session-annotation-field {
+    min-width: 0;
+}
+.reading-session-annotation-field > label {
+    display: block;
+    margin-bottom: .3rem;
+    color: var(--lb-text);
+    font-size: .82rem;
+    font-weight: 700;
+}
+.reading-session-dictionary-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: .7rem;
+    margin: .9rem 0 .4rem;
+}
+.reading-session-dictionary-button,
+.reading-session-translate-button {
+    white-space: nowrap;
+}
+.reading-session-dictionary-button:disabled,
+.reading-session-translate-button:disabled,
+.reading-session-annotation-actions .btn:disabled {
+    cursor: wait;
+    opacity: .55;
+}
+.reading-session-annotation-modal-box .reading-session-dictionary-status {
+    min-height: 1.1rem;
+    margin: .2rem 0 .75rem;
+    color: var(--lb-text-light);
+    font-size: .78rem;
+}
+.reading-session-word-translation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: .7rem;
+    margin-top: .9rem;
+}
+.reading-session-translation-value {
+    min-width: 0;
+}
+.reading-session-annotation-modal-box .reading-session-annotation-error {
+    min-height: 1.25rem;
+    margin: .8rem 0 0;
+    color: var(--lb-abandoned);
+    font-size: .82rem;
+}
+.reading-session-annotation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .6rem;
+    margin-top: .4rem;
+}
+.reading-session-thought-mode-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin: -.45rem 0 1rem;
+    padding-bottom: .75rem;
+    border-bottom: 1px solid var(--lb-border);
+}
+.reading-session-annotation-modal-box .reading-session-thought-mode-label {
+    margin: 0;
+    color: var(--lb-text-light);
+    font-size: .8rem;
+}
+.reading-session-thought-page-row {
+    max-width: 150px;
+    margin-top: .9rem;
+}
+
 @media (max-width: 480px) {
     .reading-session-modal-box { padding: 1.25rem; }
     .reading-session-controls .btn { flex: 1 1 90px; min-width: 0; }
@@ -2302,6 +2399,13 @@ body.reading-session-modal-open { overflow: hidden; }
 @media (max-width: 640px) {
     .reading-session-classification-modal-box { padding: 1.25rem; }
     .reading-session-classification-grid { grid-template-columns: 1fr; }
+    .reading-session-annotation-modal-box { padding: 1.25rem; }
+    .reading-session-dictionary-tools,
+    .reading-session-word-translation { grid-template-columns: 1fr; }
+    .reading-session-dictionary-button,
+    .reading-session-translate-button { width: 100%; }
+    .reading-session-thought-mode-row { align-items: flex-start; flex-direction: column; }
+    .reading-session-thought-page-row { max-width: none; }
 }
 
 /* ── Source radio group ─────────────────────────────────────────────────────────── */
