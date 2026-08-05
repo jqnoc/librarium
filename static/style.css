@@ -2170,6 +2170,7 @@ body.reading-session-modal-open { overflow: hidden; }
 .reading-session-page-stat {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: .15rem;
     color: var(--lb-text-light);
     font-size: .75rem;
