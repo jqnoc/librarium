@@ -2291,17 +2291,22 @@ body.reading-session-modal-open { overflow: hidden; }
     gap: .6rem;
 }
 .reading-session-session-controls {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     justify-content: center;
 }
 .reading-session-controls .btn {
     box-sizing: border-box;
     width: max-content;
-    min-width: 0;
+    min-width: var(--reading-session-button-min-width, 0px);
     min-height: 2.75rem;
     justify-content: center;
     padding: .55rem .6rem;
     line-height: 1.15;
     white-space: nowrap;
+}
+.reading-session-session-controls .btn {
+    width: 100%;
 }
 .reading-session-controls .btn:disabled {
     cursor: not-allowed;

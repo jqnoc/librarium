@@ -768,6 +768,25 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionPlayIcon').textContent = '\u25B6';
     }
 
+    function syncReadingSessionButtonWidths() {
+        var modal = getElement('readingSessionModal');
+        var controls = getElement('readingSessionControls');
+        var saveButton = getElement('readingSessionSaveButton');
+        if (!modal || !controls || !saveButton || !modal.classList.contains('active')) return;
+        controls.style.removeProperty('--reading-session-button-min-width');
+        var previousInlineWidth = saveButton.style.width;
+        saveButton.style.width = 'max-content';
+        var saveWidth = Math.ceil(saveButton.getBoundingClientRect().width);
+        if (previousInlineWidth) {
+            saveButton.style.width = previousInlineWidth;
+        } else {
+            saveButton.style.removeProperty('width');
+        }
+        if (saveWidth > 0) {
+            controls.style.setProperty('--reading-session-button-min-width', saveWidth + 'px');
+        }
+    }
+
     function setPageInputsEditable(editable) {
         state.pageInputsEditable = editable;
         getElement('readingSessionStartPage').disabled = !editable;
@@ -841,6 +860,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         updateControls();
         getElement('readingSessionModal').classList.add('active');
         document.body.classList.add('reading-session-modal-open');
+        syncReadingSessionButtonWidths();
         getElement('readingSessionPlayButton').focus();
     };
 
@@ -1114,6 +1134,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
+    window.addEventListener('resize', syncReadingSessionButtonWidths);
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
         var classificationModal = getElement('readingSessionClassificationModal');
