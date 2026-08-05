@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
-- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, and document controlled values
+- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, and document controlled values including Epic as a canonical Form
 - Separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
 - Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
 - Allow Words of the Day to be edited directly from the Dashboard and saved to their books

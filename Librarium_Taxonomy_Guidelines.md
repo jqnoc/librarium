@@ -156,8 +156,9 @@ Form is separate from Genre, Subgenre, Themes, and Subjects. Genre identifies th
 ### Controlled Form values
 
 - Essay
+- Epic
 - Guide
-- Historical Monograph
+- Monograph
 - Novel
 - Novella
 - Short Story
@@ -172,6 +173,8 @@ Form is separate from Genre, Subgenre, Themes, and Subjects. Genre identifies th
 ### Guidelines
 
 Use the controlled Form values above whenever they fit. Prefer the singular controlled value, such as **Essay**, rather than creating synonyms such as Essays or Personal Essay.
+
+Use **Epic** for extended narrative works rooted in oral or traditional storytelling that were later compiled or written down. This is a Form, not the **Epic Fantasy** Subgenre.
 
 Forms may be combined when a work genuinely uses more than one presentation mode, but do not use Form for a subject, academic discipline, theme, setting, historical period, or literary classification. For example, Film Criticism belongs in Subgenres, while Cinema belongs in Subjects.
 
