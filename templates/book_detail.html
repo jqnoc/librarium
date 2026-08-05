@@ -1135,9 +1135,17 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionThoughtText').addEventListener('keydown', function (event) {
-        if (!event.ctrlKey || event.key !== 'Enter') return;
+        if (!event.ctrlKey) return;
+        var prefix = '';
+        if (event.key === 'Enter') {
+            prefix = '\n- ';
+        } else if (event.key === '\u00e7' || event.key === '\u00c7') {
+            prefix = '\n#### ';
+        } else {
+            return;
+        }
         event.preventDefault();
-        this.setRangeText('\n- ', this.selectionStart, this.selectionEnd, 'end');
+        this.setRangeText(prefix, this.selectionStart, this.selectionEnd, 'end');
     });
     window.addEventListener('resize', syncReadingSessionButtonWidths);
     document.addEventListener('keydown', function (event) {
