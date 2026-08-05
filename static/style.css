@@ -2279,13 +2279,17 @@ body.reading-session-modal-open { overflow: hidden; }
     text-align: center;
 }
 .reading-session-controls {
-    display: flex;
-    justify-content: center;
+    display: grid;
     gap: .6rem;
-    flex-wrap: wrap;
+}
+.reading-session-control-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .6rem;
 }
 .reading-session-controls .btn {
-    min-width: 105px;
+    width: 100%;
+    min-width: 0;
 }
 .reading-session-controls .btn:disabled {
     cursor: not-allowed;
@@ -2393,7 +2397,7 @@ body.reading-session-modal-open { overflow: hidden; }
 
 @media (max-width: 480px) {
     .reading-session-modal-box { padding: 1.25rem; }
-    .reading-session-controls .btn { flex: 1 1 90px; min-width: 0; }
+    .reading-session-controls .btn { padding-left: .35rem; padding-right: .35rem; font-size: .82rem; }
 }
 
 @media (max-width: 640px) {

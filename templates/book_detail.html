@@ -440,24 +440,28 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
         <p class="reading-session-pace" id="readingSessionPace"></p>
         <div class="reading-session-controls" id="readingSessionControls">
-            <button type="button" class="btn btn-primary" id="readingSessionPlayButton" onclick="playReadingSession()">
-                <span id="readingSessionPlayIcon" aria-hidden="true">&#9654;</span> <span id="readingSessionPlayLabel" data-i18n="book.readingSessionPlay">Play</span>
-            </button>
-            <button type="button" class="btn btn-secondary" id="readingSessionPauseButton" onclick="pauseReadingSession()">
-                <span aria-hidden="true">&#10074;&#10074;</span> <span data-i18n="book.readingSessionPause">Pause</span>
-            </button>
-            <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()">
-                <span aria-hidden="true">&#9776;</span> <span data-i18n="book.classification">Classification</span>
-            </button>
-            <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
-                <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
-            </button>
-            <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()">
-                <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAddThought">Add Thought</span>
-            </button>
-            <button type="submit" form="readingSessionForm" class="btn btn-primary" id="readingSessionSaveButton">
-                <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSave">Save Session</span>
-            </button>
+            <div class="reading-session-control-row reading-session-annotation-controls">
+                <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
+                    <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()">
+                    <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAddThought">Add Thought</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()">
+                    <span aria-hidden="true">&#9776;</span> <span data-i18n="book.classification">Classification</span>
+                </button>
+            </div>
+            <div class="reading-session-control-row reading-session-session-controls">
+                <button type="button" class="btn btn-primary" id="readingSessionPlayButton" onclick="playReadingSession()">
+                    <span id="readingSessionPlayIcon" aria-hidden="true">&#9654;</span> <span id="readingSessionPlayLabel" data-i18n="book.readingSessionPlay">Play</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="readingSessionPauseButton" onclick="pauseReadingSession()">
+                    <span aria-hidden="true">&#10074;&#10074;</span> <span data-i18n="book.readingSessionPause">Pause</span>
+                </button>
+                <button type="submit" form="readingSessionForm" class="btn btn-primary" id="readingSessionSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSave">Save Session</span>
+                </button>
+            </div>
         </div>
         <form id="readingSessionForm" class="reading-session-form" method="POST" action="{{ url_for('add_session', book_id=book_id) }}"
               onsubmit="return prepareReadingSession()">
@@ -471,8 +475,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 </div>
 <div id="readingSessionClassificationModal" class="modal-overlay reading-session-classification-modal-overlay"
-     role="dialog" aria-modal="true" aria-labelledby="reading-session-classification-title"
-     onclick="if (event.target === this) closeReadingSessionClassificationModal()">
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-classification-title">
     <div class="modal-box reading-session-classification-modal-box">
         <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionClassificationModal()" aria-label="Close">&times;</button>
         <h3 id="reading-session-classification-title" class="reading-session-classification-title" data-i18n="book.classification">Classification</h3>
@@ -508,7 +511,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </div>
             <p id="readingSessionClassificationError" class="reading-session-classification-error" role="alert" aria-live="polite"></p>
             <div class="reading-session-classification-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeReadingSessionClassificationModal()" data-i18n="form.cancel">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="readingSessionClassificationSaveButton">
                     <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionClassificationSave">Save Classification</span>
                 </button>
@@ -517,8 +519,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 </div>
 <div id="readingSessionWordModal" class="modal-overlay reading-session-annotation-modal-overlay"
-     role="dialog" aria-modal="true" aria-labelledby="reading-session-word-title"
-     onclick="if (event.target === this) closeReadingSessionWordModal()">
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-word-title">
     <div class="modal-box reading-session-annotation-modal-box reading-session-word-modal-box">
         <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionWordModal()" aria-label="Close">&times;</button>
         <h3 id="reading-session-word-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddWord">Add Word</h3>
@@ -583,7 +584,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </div>
             <p id="readingSessionWordError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
             <div class="reading-session-annotation-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeReadingSessionWordModal()" data-i18n="form.cancel">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="readingSessionWordSaveButton">
                     <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveWord">Save Word</span>
                 </button>
@@ -592,8 +592,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 </div>
 <div id="readingSessionThoughtModal" class="modal-overlay reading-session-annotation-modal-overlay"
-     role="dialog" aria-modal="true" aria-labelledby="reading-session-thought-title"
-     onclick="if (event.target === this) closeReadingSessionThoughtModal()">
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-thought-title">
     <div class="modal-box reading-session-annotation-modal-box reading-session-thought-modal-box">
         <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionThoughtModal()" aria-label="Close">&times;</button>
         <h3 id="reading-session-thought-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddThought">Add Thought</h3>
@@ -619,7 +618,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </div>
             <p id="readingSessionThoughtError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
             <div class="reading-session-annotation-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeReadingSessionThoughtModal()" data-i18n="form.cancel">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="readingSessionThoughtSaveButton">
                     <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveThought">Save Thought</span>
                 </button>

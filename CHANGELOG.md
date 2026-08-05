@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add timed Reading-card sessions for page-based readings with book identity, centered live page ranges using page deltas, Space-bar pause/resume control, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, X-only closing, an in-session classification dialog that pauses while editing and resumes after saving, and paused Add Word/Add Thought dialogs with public dictionary lookup, translation, latest-thought editing, and New Thought flow
+- Add timed Reading-card sessions for page-based readings with book identity, centered live page ranges using page deltas, Space-bar pause/resume control, pause-to-edit spinboxes that preserve manual adjustments when saved, selected-reading attachment, X-only closing, two-row controls with annotation actions above session actions, and paused Classification/Add Word/Add Thought dialogs that close only through their X buttons or successful saves, with public dictionary lookup, translation, latest-thought editing, and New Thought flow
 - Add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, including actual time read today and a success state when today's goal is reached, shown only for the selected reading in progress
 - Add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
 - Add maximized startup with a native maximize/restore control and draggable blue title bar
