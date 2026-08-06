@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add persisted expected finish dates with inclusive daily page and time plans based on today's progress and reading pace, including actual time read today and a success state when today's goal is reached, shown only for the selected reading in progress
 - Add selected-reading infographic exports with the cover, reading dates, rating, progress, pace, time, and reading-day statistics
 - Add maximized startup with a native maximize/restore control and draggable blue title bar
-- Add Book Details Classification with a confirmation flow to clear every category, plus configurable Similar Works ranked across selected taxonomy categories and grouped by linked work
+- Add Book Details Classification with a confirmation flow to clear every category, plus configurable Similar Works ranked across selected taxonomy categories and grouped by linked work using pooled value-level Dice scoring so broader overlaps are not outranked by sparse exact matches
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
 

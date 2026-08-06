@@ -3929,7 +3929,9 @@ def _build_similar_works(
     for row in candidate_rows:
         shared_items = []
         shared_count = 0
-        field_scores: list[float] = []
+        total_current_weight = 0.0
+        total_candidate_weight = 0.0
+        total_shared_weight = 0.0
         for taxonomy_field in active_taxonomy_fields:
             field = taxonomy_field["field"]
             candidate_values = {
@@ -3949,9 +3951,9 @@ def _build_similar_works(
                     value_weight(field, current_field_values[key])
                     for key in shared_keys
                 )
-                field_scores.append(
-                    2 * shared_weight / (current_weight + candidate_weight)
-                )
+                total_current_weight += current_weight
+                total_candidate_weight += candidate_weight
+                total_shared_weight += shared_weight
             if not shared_keys:
                 continue
             shared_items.append({
@@ -3964,8 +3966,9 @@ def _build_similar_works(
             })
             shared_count += len(shared_keys)
 
-        if shared_count and field_scores:
-            similarity_score = sum(field_scores) / len(field_scores) * 100
+        total_weight = total_current_weight + total_candidate_weight
+        if shared_count and total_weight:
+            similarity_score = 2 * total_shared_weight / total_weight * 100
             similar.append({
                 "id": row["id"],
                 "name": row["name"],
