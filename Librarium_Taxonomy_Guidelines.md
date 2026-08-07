@@ -1,4 +1,4 @@
-# Librarium Taxonomy Guidelines (v1.0)
+# Librarium Taxonomy Guidelines (v2.0)
 
 ## Purpose
 
@@ -101,6 +101,7 @@ It answers:
 - Horror
 - Satirical Fiction
 - Adventure Fiction
+- Coming-of-Age Fiction
 
 #### Science Fiction
 
@@ -135,7 +136,32 @@ Subgenres include:
 - publishing traditions
 - critical classifications
 
-They refine the major Genre and should never be used as substitutes for it. In particular, Horror, Historical Fiction, Literary Fiction, Gothic Fiction, and Adventure Fiction are Subgenres rather than major Genres.
+They refine the major Genre and should never be used as substitutes for it. In particular, Horror, Historical Fiction, Literary Fiction, Gothic Fiction, Adventure Fiction, and Coming-of-Age Fiction are Subgenres rather than major Genres.
+
+Do not normalize apparently synonymous values mechanically. First verify the book's Genre and the semantic role of the value. For example, `Adventure` may be normalized to **Adventure Fiction** only when it is actually functioning as a Fiction Subgenre; an `Adventure` value on a Non-Fiction work must not be converted into Adventure Fiction. Likewise, `Coming-of-Age` may be a Theme rather than a Subgenre.
+
+### Controlled naming: Adventure Fiction
+
+Prefer **Adventure Fiction** over the shorter `Adventure` when the value is a Fiction Subgenre. Adventure Fiction should describe works in which adventure is a defining narrative mode: journeys, exploration, quests, survival, physical danger, unfamiliar environments, or sustained encounters with challenges.
+
+Do not assign Adventure Fiction merely because a work contains travel, action, battles, danger, or one exciting episode. Most importantly, **Adventure Fiction is a fictional literary classification and cannot be used as the Subgenre of a Non-Fiction work**.
+
+Example: *Conquest of the Useless* by Werner Herzog is Non-Fiction. If it has an existing `Adventure` value, that value must not be mechanically changed to Adventure Fiction. It should instead be removed or replaced according to the Non-Fiction taxonomy.
+
+### Controlled naming: Coming-of-Age Fiction
+
+Prefer **Coming-of-Age Fiction** over the shorter `Coming-of-Age` when the value is functioning as a Fiction Subgenre. Use it when the transition from childhood or adolescence toward adulthood is a defining structural or literary characteristic of the work.
+
+Do not assign Coming-of-Age Fiction merely because a character matures, learns lessons, undergoes psychological development, or appears at different ages. The work itself must meaningfully belong to the coming-of-age literary tradition.
+
+`Coming-of-Age` without `Fiction` should generally not be used as a Fiction Subgenre. When it describes maturation as a recurring human experience, it belongs in Themes.
+
+Examples:
+
+- *Northern Lights* → Coming-of-Age Fiction is appropriate.
+- *Harry Potter and the Philosopher's Stone* → Coming-of-Age Fiction may be an appropriate secondary Subgenre alongside Fantasy.
+- *It* → Coming-of-Age may be a Theme, but it should not automatically become Coming-of-Age Fiction.
+- *Rhythm of War* → character development alone is not sufficient reason to classify it as Coming-of-Age Fiction.
 
 Do not use presentation formats such as Essay, Novel, Novella, Short Story, Letters, Dialogue, Interview, Diary, Treatise, or Speech as Subgenres when they belong in Form. A term such as Memoir may remain a Subgenre when it identifies a literary tradition or classification, but it should not be duplicated without a clear reason.
 
@@ -626,6 +652,27 @@ Answer:
 
 When assigning a value, ask these questions in order:
 
+### Taxonomy audit rule: validate before normalizing
+
+When auditing existing values, work **book by book**, not by mechanical find-and-replace. Before changing a value, determine:
+
+1. the book's Genre;
+2. the category in which the existing value is being used;
+3. whether the proposed replacement has the same semantic level;
+4. whether the replacement actually describes the work as a whole rather than one plot element.
+
+Examples:
+
+- `Adventure` + Fiction → may become **Adventure Fiction** after review.
+- `Adventure` + Non-Fiction → must **not** become Adventure Fiction.
+- `Coming-of-Age` + Fiction → review whether it is a Theme or the Subgenre **Coming-of-Age Fiction**.
+- A novel containing a journey is not automatically Adventure Fiction.
+- A novel containing childhood and adult sections is not automatically Coming-of-Age Fiction.
+- A novel containing battles is not automatically Military Fiction.
+- A novel containing a crime is not automatically Crime Fiction.
+
+The classification must describe the work as a whole.
+
 ### What fundamental kind of work is it?
 
 → Genre
@@ -684,6 +731,8 @@ Use a controlled value such as Essay, Novel, Diary, Interview, or Letters.
 - Use singular nouns unless a plural is the accepted term (e.g. **Meteorology**, **Cats in Literature**, **World War II**).
 - Prefer established historical and academic terms over descriptive phrases.
 - Avoid synonyms that duplicate existing controlled vocabulary.
+- Prefer explicit controlled Subgenre names such as **Adventure Fiction** and **Coming-of-Age Fiction** over ambiguous shorthand when the literary classification is intended.
+- Never perform mechanical synonym replacement without checking Genre and semantic category first.
 - Reuse existing values whenever possible instead of creating new ones.
 - Every new value should be applicable to more than one book whenever feasible.
 - Keep presentation modes in Forms and literary, academic, or critical classifications in Subgenres.
