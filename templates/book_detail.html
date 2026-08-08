@@ -662,6 +662,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 <script>
 (function () {
+    var readingSessionBookId = {{ book_id | tojson }};
     var initialLatestThought = {{ latest_thought | tojson }};
     var state = {
         readingId: null,
@@ -749,6 +750,56 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         if (!select || !hidden) return;
         var option = select.options[select.selectedIndex];
         hidden.value = select.value && option ? (option.dataset.languageLabel || option.textContent.trim()) : '';
+    }
+
+    function readingSessionWordPreferencesKey() {
+        return 'librarium.readingSessionWordPreferences.' + readingSessionBookId;
+    }
+
+    function restoreReadingSessionWordPreferences() {
+        var preferences;
+        try {
+            preferences = JSON.parse(window.localStorage.getItem(readingSessionWordPreferencesKey()) || '{}');
+        } catch (error) {
+            preferences = {};
+        }
+
+        [
+            ['readingSessionWordDictionarySource', preferences.dictionarySource],
+            ['readingSessionWordSourceLanguage', preferences.dictionaryLanguage],
+            ['readingSessionWordTranslationLanguage', preferences.translationLanguage]
+        ].forEach(function (entry) {
+            var select = getElement(entry[0]);
+            if (!select || entry[1] === undefined) return;
+            var optionValues = Array.from(select.options).map(function (option) { return option.value; });
+            if (optionValues.indexOf(entry[1]) !== -1) select.value = entry[1];
+        });
+        selectedTranslationLanguage();
+    }
+
+    function persistReadingSessionWordPreferences() {
+        var preferences = {
+            dictionarySource: getElement('readingSessionWordDictionarySource').value,
+            dictionaryLanguage: getElement('readingSessionWordSourceLanguage').value,
+            translationLanguage: getElement('readingSessionWordTranslationLanguage').value
+        };
+        try {
+            window.localStorage.setItem(readingSessionWordPreferencesKey(), JSON.stringify(preferences));
+        } catch (error) {
+        }
+        selectedTranslationLanguage();
+    }
+
+    function initReadingSessionWordPreferences() {
+        [
+            'readingSessionWordDictionarySource',
+            'readingSessionWordSourceLanguage',
+            'readingSessionWordTranslationLanguage'
+        ].forEach(function (id) {
+            var select = getElement(id);
+            if (select) select.addEventListener('change', persistReadingSessionWordPreferences);
+        });
+        restoreReadingSessionWordPreferences();
     }
 
     function setThoughtMode(mode) {
@@ -1002,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var form = getElement('readingSessionWordForm');
         if (!form || !beginQuickModal('readingSessionWordModal', 'readingSessionWordError')) return;
         form.reset();
+        restoreReadingSessionWordPreferences();
         selectedTranslationLanguage();
         setModalError('readingSessionWordError', '');
         setModalError('readingSessionWordDictionaryStatus', '');
@@ -1239,6 +1291,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         else window.playReadingSession();
     });
 
+    initReadingSessionWordPreferences();
 })();
 </script>
 <!-- ── Reading infographic ──────────────────────────────────────────── -->
