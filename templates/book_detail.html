@@ -1468,88 +1468,62 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             ctx.textBaseline = 'alphabetic';
             ctx.font = '600 ' + Math.max(11, Math.round(height * 0.017)) + 'px system-ui,-apple-system,sans-serif';
             ctx.fillStyle = SUB;
-            ctx.fillText(_t('book.readingInfographic.progressTimeline', 'Progress Timeline').toUpperCase(), timelineX + 14, timelineY + Math.round(timelineHeight * 0.25));
+            ctx.fillText(_t('book.readingTimeline', 'Reading Timeline').toUpperCase(), timelineX + 14, timelineY + Math.round(timelineHeight * 0.25));
 
-            var timelinePoints = DATA.progress_timeline || [];
-            var chartX = timelineX + 42;
-            var chartY = timelineY + Math.round(timelineHeight * 0.38);
-            var chartWidth = timelineWidth - 64;
-            var chartHeight = Math.max(18, Math.round(timelineHeight * 0.35));
-            var chartBottom = chartY + chartHeight;
-            ctx.strokeStyle = 'rgba(126,170,184,0.18)';
-            ctx.lineWidth = 1;
-            [0, 50, 100].forEach(function (level) {
-                var gridY = chartBottom - chartHeight * level / 100;
-                ctx.beginPath();
-                ctx.moveTo(chartX, gridY);
-                ctx.lineTo(chartX + chartWidth, gridY);
-                ctx.stroke();
-            });
-            ctx.font = '500 ' + Math.max(9, Math.round(height * 0.013)) + 'px system-ui,-apple-system,sans-serif';
-            ctx.fillStyle = SUB;
-            ctx.textAlign = 'right';
-            ctx.fillText('100%', chartX - 8, chartY + 4);
-            ctx.fillText('0%', chartX - 8, chartBottom + 4);
+            var readingTimeline = DATA.reading_timeline;
+            var timelineReading = readingTimeline && readingTimeline.readings && readingTimeline.readings[0];
+            var timelineDays = Number(readingTimeline && readingTimeline.total_days) || 0;
+            var chartX = timelineX + 14;
+            var chartWidth = timelineWidth - 28;
+            var trackY = timelineY + Math.round(timelineHeight * 0.46);
+            var trackHeight = Math.max(12, Math.round(height * 0.018));
 
-            if (timelinePoints.length) {
-                var plottedPoints = timelinePoints.map(function (point, index) {
-                    var pointX = timelinePoints.length === 1
-                        ? chartX + chartWidth / 2
-                        : chartX + chartWidth * index / (timelinePoints.length - 1);
-                    var pointProgress = Math.max(0, Math.min(Number(point.progress) || 0, 100));
-                    return {
-                        x: pointX,
-                        y: chartBottom - chartHeight * pointProgress / 100,
-                        progress: pointProgress,
-                        date: point.date,
-                    };
-                });
-                var area = ctx.createLinearGradient(0, chartY, 0, chartBottom);
-                area.addColorStop(0, 'rgba(68,161,148,0.28)');
-                area.addColorStop(1, 'rgba(68,161,148,0.02)');
-                ctx.beginPath();
-                ctx.moveTo(plottedPoints[0].x, chartBottom);
-                plottedPoints.forEach(function (point) { ctx.lineTo(point.x, point.y); });
-                ctx.lineTo(plottedPoints[plottedPoints.length - 1].x, chartBottom);
-                ctx.closePath();
-                ctx.fillStyle = area;
+            if (timelineReading && timelineDays > 0) {
+                ctx.fillStyle = 'rgba(126,170,184,0.12)';
+                _rrect(ctx, chartX, trackY, chartWidth, trackHeight, 3);
                 ctx.fill();
 
-                ctx.beginPath();
-                plottedPoints.forEach(function (point, index) {
-                    if (index === 0) ctx.moveTo(point.x, point.y);
-                    else ctx.lineTo(point.x, point.y);
-                });
-                ctx.strokeStyle = ACCENT;
-                ctx.lineWidth = Math.max(2, Math.round(height * 0.004));
-                ctx.stroke();
-                plottedPoints.forEach(function (point) {
-                    ctx.beginPath();
-                    ctx.fillStyle = GOLD;
-                    ctx.arc(point.x, point.y, Math.max(3, Math.round(height * 0.006)), 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = CARD;
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                });
+                var timelineColor = readingTimeline.color || ACCENT;
+                var rangeStart = Math.max(0, Math.min(timelineDays - 1, Number(timelineReading.start_day) || 0));
+                var rangeEnd = Math.max(rangeStart, Math.min(timelineDays - 1, Number(timelineReading.end_day) || rangeStart));
+                var rangeX = chartX + chartWidth * rangeStart / timelineDays;
+                var rangeWidth = chartWidth * (rangeEnd - rangeStart + 1) / timelineDays;
 
-                var firstPoint = plottedPoints[0];
-                var lastPoint = plottedPoints[plottedPoints.length - 1];
+                ctx.fillStyle = timelineColor;
+                ctx.globalAlpha = 0.15;
+                _rrect(ctx, rangeX, trackY, rangeWidth, trackHeight, 3);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                (timelineReading.segments || []).forEach(function (segment) {
+                    var segmentStart = Math.max(0, Math.min(timelineDays - 1, Number(segment.start) || 0));
+                    var segmentEnd = Math.max(segmentStart, Math.min(timelineDays - 1, Number(segment.end) || segmentStart));
+                    var segmentX = chartX + chartWidth * segmentStart / timelineDays;
+                    var segmentWidth = Math.max(chartWidth * 0.0025, chartWidth * (segmentEnd - segmentStart + 1) / timelineDays);
+                    ctx.globalAlpha = 0.85;
+                    _rrect(ctx, segmentX, trackY, segmentWidth, trackHeight, 3);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+
+                var startLabel = readingTimeline.start_label || DATA.date_started;
+                var endLabel = readingTimeline.end_label || DATA.date_finished || startLabel;
                 ctx.font = '600 ' + Math.max(9, Math.round(height * 0.013)) + 'px system-ui,-apple-system,sans-serif';
                 ctx.fillStyle = SUB;
-                ctx.textAlign = 'left';
-                ctx.fillText(_trunc(ctx, _date(firstPoint.date), timelineWidth * 0.25), chartX, timelineY + timelineHeight - 12);
-                ctx.textAlign = 'right';
-                ctx.fillText(_trunc(ctx, _date(lastPoint.date), timelineWidth * 0.25), chartX + chartWidth, timelineY + timelineHeight - 12);
-                ctx.font = '800 ' + Math.max(12, Math.round(height * 0.019)) + 'px system-ui,-apple-system,sans-serif';
-                ctx.fillStyle = TEXT;
-                ctx.textAlign = 'right';
-                ctx.fillText(_number(lastPoint.progress, 1) + '%', timelineX + timelineWidth - 14, timelineY + Math.round(timelineHeight * 0.25));
+                if (startLabel === endLabel) {
+                    ctx.textAlign = 'center';
+                    ctx.fillText(_trunc(ctx, _date(startLabel), chartWidth * 0.4), chartX + chartWidth / 2, timelineY + timelineHeight - 12);
+                } else {
+                    ctx.textAlign = 'left';
+                    ctx.fillText(_trunc(ctx, _date(startLabel), chartWidth * 0.35), chartX, timelineY + timelineHeight - 12);
+                    ctx.textAlign = 'right';
+                    ctx.fillText(_trunc(ctx, _date(endLabel), chartWidth * 0.35), chartX + chartWidth, timelineY + timelineHeight - 12);
+                }
             } else {
                 ctx.font = '500 ' + Math.max(10, Math.round(height * 0.015)) + 'px system-ui,-apple-system,sans-serif';
                 ctx.fillStyle = SUB;
                 ctx.textAlign = 'center';
-                ctx.fillText(_t('book.readingInfographic.noProgressData', 'No progress data'), timelineX + timelineWidth / 2, chartY + chartHeight / 2);
+                ctx.fillText(_t('book.readingInfographic.noTimelineData', 'No reading timeline data'), timelineX + timelineWidth / 2, trackY + trackHeight / 2);
             }
 
             ctx.textAlign = 'center';
