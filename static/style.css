@@ -2290,6 +2290,9 @@ body.reading-session-modal-open { overflow: hidden; }
     grid-template-columns: repeat(3, max-content);
     gap: .6rem;
 }
+.reading-session-annotation-controls {
+    grid-template-columns: repeat(2, max-content);
+}
 .reading-session-session-controls {
     width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2411,6 +2414,10 @@ body.reading-session-modal-open { overflow: hidden; }
     max-width: 150px;
     margin-top: .9rem;
 }
+.reading-session-quote-page-row {
+    max-width: 150px;
+    margin-top: .9rem;
+}
 
 @media (max-width: 480px) {
     .reading-session-modal-box {
@@ -2422,6 +2429,9 @@ body.reading-session-modal-open { overflow: hidden; }
     }
     .reading-session-control-row {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .reading-session-annotation-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .reading-session-controls .btn {
         width: 100%;

@@ -441,11 +441,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <p class="reading-session-pace" id="readingSessionPace"></p>
         <div class="reading-session-controls" id="readingSessionControls">
             <div class="reading-session-control-row reading-session-annotation-controls">
-                <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
-                    <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddQuoteButton" onclick="openReadingSessionQuoteModal()">
+                    <span aria-hidden="true">&#10077;</span> <span data-i18n="book.readingSessionAddQuote">Add Quote</span>
                 </button>
                 <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()">
                     <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAddThought">Add Thought</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
+                    <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
                 </button>
                 <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()">
                     <span aria-hidden="true">&#9776;</span> <span data-i18n="book.classification">Classification</span>
@@ -513,6 +516,34 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <div class="reading-session-classification-actions">
                 <button type="submit" class="btn btn-primary" id="readingSessionClassificationSaveButton">
                     <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionClassificationSave">Save Classification</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="readingSessionQuoteModal" class="modal-overlay reading-session-annotation-modal-overlay"
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-quote-title">
+    <div class="modal-box reading-session-annotation-modal-box reading-session-quote-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionQuoteModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-quote-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddQuote">Add Quote</h3>
+        <form id="readingSessionQuoteForm" method="POST" action="{{ url_for('add_quote', book_id=book_id) }}"
+              onsubmit="return saveReadingSessionQuote(event)">
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionQuoteText" data-i18n="book.readingSessionQuoteText">Quote</label>
+                <textarea id="readingSessionQuoteText" name="text" rows="7" class="form-control" required
+                          placeholder="Quote text..." data-i18n-placeholder="book.quoteTextPlaceholder"></textarea>
+            </div>
+            <div class="reading-session-quote-page-row">
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionQuotePage" data-i18n="book.pagePlaceholder">Page</label>
+                    <input type="number" id="readingSessionQuotePage" name="page" class="form-control" min="1"
+                           placeholder="Page" data-i18n-placeholder="book.pagePlaceholder">
+                </div>
+            </div>
+            <p id="readingSessionQuoteError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
+            <div class="reading-session-annotation-actions">
+                <button type="submit" class="btn btn-primary" id="readingSessionQuoteSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveQuote">Save Quote</span>
                 </button>
             </div>
         </form>
@@ -924,6 +955,45 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         return false;
     };
 
+    window.openReadingSessionQuoteModal = function () {
+        var form = getElement('readingSessionQuoteForm');
+        if (!form || !beginQuickModal('readingSessionQuoteModal', 'readingSessionQuoteError')) return;
+        form.reset();
+        setModalError('readingSessionQuoteError', '');
+        getElement('readingSessionQuoteSaveButton').disabled = false;
+        getElement('readingSessionQuoteText').focus();
+    };
+
+    window.closeReadingSessionQuoteModal = function () {
+        if (state.quickModalSaving) return;
+        var modal = getElement('readingSessionQuoteModal');
+        if (modal) modal.classList.remove('active');
+        state.quickModalWasRunning = false;
+    };
+
+    window.saveReadingSessionQuote = function (event) {
+        event.preventDefault();
+        var form = getElement('readingSessionQuoteForm');
+        var text = getElement('readingSessionQuoteText');
+        var shouldResume = state.quickModalWasRunning;
+        if (!text.value.trim()) {
+            setModalError('readingSessionQuoteError', translate('book.quoteRequired', 'Quote text is required.'));
+            text.focus();
+            return false;
+        }
+        state.quickModalSaving = true;
+        getElement('readingSessionQuoteSaveButton').disabled = true;
+        setModalError('readingSessionQuoteError', '');
+        fetchAnnotationJson(form.action, form).then(function () {
+            finishQuickModal('readingSessionQuoteModal', shouldResume);
+        }).catch(function (error) {
+            state.quickModalSaving = false;
+            getElement('readingSessionQuoteSaveButton').disabled = false;
+            setModalError('readingSessionQuoteError', error.message || translate('book.readingSessionSaveError', 'The quote could not be saved.'));
+        });
+        return false;
+    };
+
     window.openReadingSessionWordModal = function () {
         var form = getElement('readingSessionWordForm');
         if (!form || !beginQuickModal('readingSessionWordModal', 'readingSessionWordError')) return;
@@ -1151,10 +1221,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
         var classificationModal = getElement('readingSessionClassificationModal');
+        var quoteModal = getElement('readingSessionQuoteModal');
         var wordModal = getElement('readingSessionWordModal');
         var thoughtModal = getElement('readingSessionThoughtModal');
         if (!modal.classList.contains('active')
             || (classificationModal && classificationModal.classList.contains('active'))
+            || (quoteModal && quoteModal.classList.contains('active'))
             || (wordModal && wordModal.classList.contains('active'))
             || (thoughtModal && thoughtModal.classList.contains('active'))
             || event.repeat || event.code !== 'Space') return;

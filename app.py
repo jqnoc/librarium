@@ -8184,11 +8184,15 @@ def add_quote(book_id: str):
         abort(404)
     text = sanitize_html(request.form.get("text", "").strip())
     page_str = request.form.get("page", "").strip()
-    page = int(page_str) if page_str else None
+    page = int(page_str) if page_str.isdigit() else None
     if text:
-        db.execute("INSERT INTO quotes (book_id, text, page) VALUES (?, ?, ?)",
-                   (book_id, text, page))
+        cursor = db.execute("INSERT INTO quotes (book_id, text, page) VALUES (?, ?, ?)",
+                            (book_id, text, page))
         db.commit()
+        if _annotation_wants_json():
+            return jsonify({"ok": True, "id": cursor.lastrowid})
+    elif _annotation_wants_json():
+        return jsonify({"ok": False, "error": "Quote text is required."}), 400
     return redirect(url_for("book_detail", book_id=book_id, _anchor="quotes"))
 
 
