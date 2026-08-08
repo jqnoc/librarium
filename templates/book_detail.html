@@ -1343,12 +1343,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             var dateLine = _t('book.readingInfographic.started', 'Started') + ': ' + _date(DATA.date_started) +
                 '  |  ' + _t('book.readingInfographic.finished', 'Finished') + ': ' +
                 (DATA.date_finished ? _date(DATA.date_finished) : _t('book.readingInfographic.inProgress', 'In progress'));
-            ctx.fillText(_trunc(ctx, dateLine, contentWidth * 0.72), pad, Math.round(height * 0.175));
 
             ctx.textAlign = 'right';
-            ctx.font = '700 ' + Math.round(height * 0.031) + 'px system-ui,-apple-system,sans-serif';
-            ctx.fillStyle = TEXT;
-            ctx.fillText(_t('book.readingInfographic.header', 'Reading summary') + ' #' + DATA.reading_number, width - pad, Math.round(height * 0.10));
+            ctx.font = '600 ' + Math.round(height * 0.021) + 'px system-ui,-apple-system,sans-serif';
+            ctx.fillStyle = SUB;
+            ctx.fillText(_trunc(ctx, dateLine, contentWidth * 0.42), width - pad, Math.round(height * 0.10));
 
             var separator = ctx.createLinearGradient(pad, 0, pad + contentWidth * 0.6, 0);
             separator.addColorStop(0, ACCENT);
