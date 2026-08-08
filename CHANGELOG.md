@@ -91,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard, library, activity, and yearly stats routes now share normalized daily-activity helpers, bulk rating/edition lookups, and new SQLite indexes so period-aware summaries render with fewer repeated queries
 
 ### Fixed
-- Quote of the Day on the Dashboard now renders curly quotes correctly instead of showing literal `\u201c` / `\u201d` escape sequences; also fixes HTML formatting within quotes being escaped
+- Quote of the Day on the Dashboard and book-detail quotes now render curly quotes correctly instead of showing literal `\u201c` / `\u201d` escape sequences; also fixes HTML formatting within quotes being escaped
 - Library filter, sort, and tag controls now correctly stay on the `/library` page instead of redirecting to the Dashboard
 - Tag Cloud links in the Stats page now navigate to the Library filtered by that tag instead of the Dashboard
 - New Book and Edit Metadata pages now support the legacy `window.librariumI18n.apply()` call path again, and missing translation keys for `nav.minimize`, `book.colTime`, and the 404 dashboard CTA are now defined consistently

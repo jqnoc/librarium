@@ -1900,7 +1900,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% for q in quotes %}
     <div class="annotation-card annotation-quote" id="quote-{{ q.id }}">
         <div class="annotation-body">
-            <div class="annotation-text">{% if info.get('language', '')|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}\u201c{{ q.text | safe }}\u201d{% endif %}</div>
+            <div class="annotation-text">{% if info.get('language', '')|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}&ldquo;{{ q.text | safe }}&rdquo;{% endif %}</div>
             {% if q.page %}<div class="annotation-page">p. {{ q.page }}</div>{% endif %}
         </div>
         <div class="annotation-actions">
