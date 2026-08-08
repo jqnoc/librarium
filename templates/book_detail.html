@@ -1537,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             }
 
             var metrics = [
-                { label: _t('book.readingInfographic.overallRating', 'Overall Rating'), value: DATA.rating > 0 ? _number(DATA.rating, 2) + ' / 5' : '—' },
+                { label: _t('book.readingInfographic.overallRating', 'Overall Rating'), value: DATA.rating > 0 ? _number(DATA.rating, 2) : '—', rating: DATA.rating > 0 ? Number(DATA.rating) : null },
                 { label: DATA.is_pct_format ? _t('book.progress', 'Progress') : _t('book.pagesRead', 'Pages Read'), value: DATA.is_pct_format ? _number(DATA.progress_pct, 1) + '%' : _number(DATA.total_pages, 0) },
                 { label: _t('book.totalTime', 'Total Time'), value: _duration(DATA.total_seconds) },
                 { label: _t('book.readingDays', 'Reading Days'), value: _number(DATA.reading_days, 0) },
@@ -1576,9 +1576,41 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 ctx.font = '600 ' + Math.max(11, Math.round(height * 0.017)) + 'px system-ui,-apple-system,sans-serif';
                 ctx.fillStyle = SUB;
                 ctx.fillText(_trunc(ctx, metric.label.toUpperCase(), metricWidth - 28), x + 14, y + Math.round(metricHeight * 0.34));
-                ctx.font = '800 ' + Math.max(18, Math.round(height * 0.032)) + 'px system-ui,-apple-system,sans-serif';
-                ctx.fillStyle = TEXT;
-                ctx.fillText(_trunc(ctx, String(metric.value), metricWidth - 28), x + 14, y + Math.round(metricHeight * 0.70));
+                var ratingValue = Number(metric.rating);
+                if (Number.isFinite(ratingValue) && ratingValue > 0) {
+                    var ratingFontSize = Math.max(18, Math.round(height * 0.032));
+                    var ratingText = '\u2605 ' + _number(ratingValue, 2);
+                    var ratingPaddingX = Math.round(ratingFontSize * 0.55);
+                    var ratingPaddingY = Math.round(ratingFontSize * 0.38);
+                    ctx.save();
+                    ctx.font = '700 ' + ratingFontSize + 'px system-ui,-apple-system,sans-serif';
+                    var ratingWidth = ctx.measureText(ratingText).width + ratingPaddingX * 2;
+                    var ratingHeight = ratingFontSize + ratingPaddingY * 2;
+                    var ratingX = x + (metricWidth - ratingWidth) / 2;
+                    var ratingY = y + metricHeight * 0.70 - ratingHeight / 2;
+                    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+                    ctx.shadowBlur = 5;
+                    ctx.fillStyle = '#FFF8E1';
+                    _rrect(ctx, ratingX, ratingY, ratingWidth, ratingHeight, ratingHeight / 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = '#FFE082';
+                    ctx.lineWidth = 1;
+                    _rrect(ctx, ratingX, ratingY, ratingWidth, ratingHeight, ratingHeight / 2);
+                    ctx.stroke();
+                    ctx.textBaseline = 'middle';
+                    ctx.textAlign = 'left';
+                    var starWidth = ctx.measureText('\u2605 ').width;
+                    ctx.fillStyle = '#e3bc37';
+                    ctx.fillText('\u2605 ', ratingX + ratingPaddingX, ratingY + ratingHeight / 2);
+                    ctx.fillStyle = '#537D96';
+                    ctx.fillText(_number(ratingValue, 2), ratingX + ratingPaddingX + starWidth, ratingY + ratingHeight / 2);
+                    ctx.restore();
+                } else {
+                    ctx.font = '800 ' + Math.max(18, Math.round(height * 0.032)) + 'px system-ui,-apple-system,sans-serif';
+                    ctx.fillStyle = TEXT;
+                    ctx.fillText(_trunc(ctx, String(metric.value), metricWidth - 28), x + 14, y + Math.round(metricHeight * 0.70));
+                }
             });
 
             var timelineX = metricsX;
