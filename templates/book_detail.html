@@ -441,17 +441,21 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <p class="reading-session-pace" id="readingSessionPace"></p>
         <div class="reading-session-controls" id="readingSessionControls">
             <div class="reading-session-control-row reading-session-annotation-controls">
-                <button type="button" class="btn btn-secondary" id="readingSessionAddQuoteButton" onclick="openReadingSessionQuoteModal()">
-                    <span aria-hidden="true">&#10077;</span> <span data-i18n="book.readingSessionAddQuote">Add Quote</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddQuoteButton" onclick="openReadingSessionQuoteModal()"
+                        data-i18n-title="book.readingSessionAddQuote">
+                    <span aria-hidden="true">&#10077;</span> <span data-i18n="book.readingSessionQuote">Quote</span>
                 </button>
-                <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()">
-                    <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAddThought">Add Thought</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()"
+                        data-i18n-title="book.readingSessionAddThought">
+                    <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionThought">Thought</span>
                 </button>
-                <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()">
-                    <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionAddWord">Add Word</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()"
+                        data-i18n-title="book.readingSessionAddWord">
+                    <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionWord">Word</span>
                 </button>
-                <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()">
-                    <span aria-hidden="true">&#9776;</span> <span data-i18n="book.classification">Classification</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()"
+                        data-i18n-title="book.classification">
+                    <span aria-hidden="true">&#9776;</span> <span data-i18n="book.readingSessionClassify">Classify</span>
                 </button>
             </div>
             <div class="reading-session-control-row reading-session-session-controls">
@@ -2446,6 +2450,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var imt = window.librariumI18n.initMarkdownToolbar;
     // Add-form textareas
     irt('add-quote-text');
+    irt('readingSessionQuoteText');
     imt('add-thought-text');
     irt('add-word-def');
     imt('readingSessionThoughtText');

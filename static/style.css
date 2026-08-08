@@ -2291,7 +2291,9 @@ body.reading-session-modal-open { overflow: hidden; }
     gap: .6rem;
 }
 .reading-session-annotation-controls {
-    grid-template-columns: repeat(2, max-content);
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .3rem;
 }
 .reading-session-session-controls {
     width: 100%;
@@ -2307,6 +2309,12 @@ body.reading-session-modal-open { overflow: hidden; }
     padding: .55rem .6rem;
     line-height: 1.15;
     white-space: nowrap;
+}
+.reading-session-annotation-controls .btn {
+    width: 100%;
+    min-width: 0;
+    padding: .48rem .22rem;
+    font-size: .72rem;
 }
 .reading-session-session-controls .btn {
     width: 100%;
@@ -2431,7 +2439,7 @@ body.reading-session-modal-open { overflow: hidden; }
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .reading-session-annotation-controls {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
     .reading-session-controls .btn {
         width: 100%;
