@@ -35,6 +35,12 @@ suite** — all verification is manual.
 
 ---
 
+## 1.1 Classification Requests
+
+Whenever the user asks to classify, extend, audit, normalize, or improve a book's classification, always read and follow `Librarium_Taxonomy_Guidelines.md` before proposing or applying values. Treat that guide as the canonical taxonomy authority, including its category boundaries, controlled vocabulary, naming preferences, and exceptions. Compare against existing classified books only after applying the guide, and do not rely on ad hoc or remembered classification conventions when they conflict with it.
+
+---
+
 ## 2. Architecture
 
 ### 2.1 Electron shell

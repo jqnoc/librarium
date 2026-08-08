@@ -140,6 +140,12 @@ They refine the major Genre and should never be used as substitutes for it. In p
 
 Do not normalize apparently synonymous values mechanically. First verify the book's Genre and the semantic role of the value. For example, `Adventure` may be normalized to **Adventure Fiction** only when it is actually functioning as a Fiction Subgenre; an `Adventure` value on a Non-Fiction work must not be converted into Adventure Fiction. Likewise, `Coming-of-Age` may be a Theme rather than a Subgenre.
 
+### Controlled naming: High Fantasy
+
+Prefer **High Fantasy** over `Secondary World Fantasy`. For this taxonomy, both labels describe the same broad Fantasy Subgenre: fantasy set in an invented secondary world. **High Fantasy** is the canonical and more widely recognized term; `Secondary World Fantasy` is not a controlled value.
+
+When auditing an existing Fantasy classification, remove `Secondary World Fantasy` and retain **High Fantasy** when the work is genuinely High Fantasy. Do not assign both values, and do not introduce `Secondary World Fantasy` in new classifications. A secondary-world setting should still be considered alongside the work's overall literary mode before assigning High Fantasy.
+
 ### Controlled naming: Adventure Fiction
 
 Prefer **Adventure Fiction** over the shorter `Adventure` when the value is a Fiction Subgenre. Adventure Fiction should describe works in which adventure is a defining narrative mode: journeys, exploration, quests, survival, physical danger, unfamiliar environments, or sustained encounters with challenges.
@@ -731,7 +737,7 @@ Use a controlled value such as Essay, Novel, Diary, Interview, or Letters.
 - Use singular nouns unless a plural is the accepted term (e.g. **Meteorology**, **Cats in Literature**, **World War II**).
 - Prefer established historical and academic terms over descriptive phrases.
 - Avoid synonyms that duplicate existing controlled vocabulary.
-- Prefer explicit controlled Subgenre names such as **Adventure Fiction** and **Coming-of-Age Fiction** over ambiguous shorthand when the literary classification is intended.
+- Prefer explicit controlled Subgenre names such as **High Fantasy**, **Adventure Fiction**, and **Coming-of-Age Fiction** over ambiguous shorthand when the literary classification is intended.
 - Never perform mechanical synonym replacement without checking Genre and semantic category first.
 - Reuse existing values whenever possible instead of creating new ones.
 - Every new value should be applicable to more than one book whenever feasible.

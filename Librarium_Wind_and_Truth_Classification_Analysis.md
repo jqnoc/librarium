@@ -28,9 +28,10 @@ The record should not be accepted unchanged, however. The main issues are:
 
 1. `Settings` and `Historical Periods` are empty even though this is a large-scale secondary-world novel with established library vocabulary for Roshar and the fictional era of the Everstorm.
 2. Ten values are duplicated across Themes and Subjects. Most of those values answer the Theme question and should be removed from Subjects; `Mental Health` and `Slavery` are better retained as Subjects; `War` needs one deliberate category decision.
-3. `Prophecies` is a likely wording inconsistency. The library already uses the singular `Prophecy` on comparable fantasy books.
-4. `Magic` and `Magic Systems`, `Gods` and `Godhood`, and `Warfare` and `Epic Warfare` are not invalid duplicates, but they overlap enough to require a conscious level-of-specificity decision.
-5. A few terms are new to the current vocabulary (`Armor`, `Godhood`, `Kingdoms`, `Military Leadership`, and `Weapons`). New values are acceptable when they describe the work accurately, but they should be retained only if they are useful beyond one isolated record.
+3. `Secondary World Fantasy` duplicates `High Fantasy` and should be removed. `High Fantasy` is the preferred canonical Subgenre.
+4. `Prophecies` is a likely wording inconsistency. The library already uses the singular `Prophecy` on comparable fantasy books.
+5. `Magic` and `Magic Systems`, `Gods` and `Godhood`, and `Warfare` and `Epic Warfare` are not invalid duplicates, but they overlap enough to require a conscious level-of-specificity decision.
+6. A few terms are new to the current vocabulary (`Armor`, `Godhood`, `Kingdoms`, `Military Leadership`, and `Weapons`). New values are acceptable when they describe the work accurately, but they should be retained only if they are useful beyond one isolated record.
 
 My recommended direction is to keep the classification rich, remove category duplication, add the missing setting and period information, change `Prophecies` to `Prophecy`, and leave the genuinely semantic choices for manual confirmation rather than forcing mechanical normalization.
 
@@ -39,7 +40,7 @@ My recommended direction is to keep the classification rich, remove category dup
 | Field | Current values | Assessment |
 | --- | --- | --- |
 | Genre | `Fantasy` | Correct and canonical; exactly one major Genre |
-| Subgenres | `Epic Fantasy`; `High Fantasy`; `Military Fantasy`; `Secondary World Fantasy` | Strong and locally established; mild overlap but no obvious invalid value |
+| Subgenres | `Epic Fantasy`; `High Fantasy`; `Military Fantasy`; `Secondary World Fantasy` | Three values are appropriate; remove the redundant non-canonical `Secondary World Fantasy` and retain `High Fantasy` |
 | Form | `Novel` | Correct controlled Form |
 | Themes | 39 values, listed below | Mostly appropriate; several duplicates with Subjects and a few overlapping concepts |
 | Settings | *(empty)* | Clear omission for a secondary-world novel |
@@ -58,23 +59,19 @@ My recommended direction is to keep the classification rich, remove category dup
 
 ### Subgenres
 
-All four values are already established in the library:
+The current record has four values, but the canonical cleaned set has three. The following values are established in the library:
 
 - `Epic Fantasy` appears on 13 other classified records.
 - `High Fantasy` appears on 7 other classified records.
 - `Military Fantasy` appears on 3 other classified records.
-- `Secondary World Fantasy` appears on 8 other classified records.
-
 They describe different aspects of the same work:
 
 - `Epic Fantasy` describes scale and narrative scope.
 - `High Fantasy` describes the conventional secondary-world, mythic fantasy mode.
 - `Military Fantasy` describes the sustained military focus.
-- `Secondary World Fantasy` describes the invented-world setting.
+`High Fantasy` is the canonical term for the secondary-world fantasy meaning represented by the deprecated `Secondary World Fantasy` value. The two labels should not coexist. The fact that both currently appear on records such as `Oathbringer` is legacy data to clean up, not a reason to retain both.
 
-There is some semantic nesting between `High Fantasy` and `Secondary World Fantasy`, and between `Epic Fantasy` and `High Fantasy`, but this is not a phrasing inconsistency. The same combinations already appear in the Sanderson shelf, especially on `Oathbringer`.
-
-**Recommendation:** keep all four unless the project later adopts a rule limiting each book to one value per Subgenre family. Do not replace them with `Adventure Fantasy`: that is a different emphasis and is not necessary merely because the novel contains journeys or battles.
+**Recommendation:** keep `Epic Fantasy`, `High Fantasy`, and `Military Fantasy`; remove `Secondary World Fantasy`. Do not replace them with `Adventure Fantasy`: that is a different emphasis and is not necessary merely because the novel contains journeys or battles.
 
 ### Form
 
@@ -173,7 +170,6 @@ These target values match established local forms:
 - `Epic Fantasy`
 - `High Fantasy`
 - `Military Fantasy`
-- `Secondary World Fantasy`
 - `Novel`
 - `Cosmere`
 - `Epic Warfare`
@@ -201,7 +197,7 @@ These target values match established local forms:
 | `Military Leadership` | No exact existing value | New but semantically clear; keep if leadership in military command is a distinct topic from Theme `Leadership` |
 | `Godhood` | No exact existing value | New but distinct from `Gods` and `Immortality`; keep only if divine status is a developed subject |
 
-The target does not need to adopt every wording choice from `Rhythm of War`. In particular, `Rhythm of War` uses `Destiny`, while other books use `Fate`. This is a candidate vocabulary family, not proof that one of the two is wrong.
+The target does not need to adopt every wording choice from `Rhythm of War`. In particular, `Rhythm of War` uses `Destiny`, while other books use `Fate`. This is a candidate vocabulary family, not proof that one of the two is wrong. By contrast, `Secondary World Fantasy` is now explicitly non-canonical and should be replaced by `High Fantasy` in Fantasy classifications.
 
 ## Existing classified books that may benefit from the target vocabulary
 
@@ -213,7 +209,7 @@ This is the strongest existing comparison point. It already uses many target Sub
 
 Recommended review:
 
-- Add `Secondary World Fantasy` to Subgenres. It is an established label on related Stormlight books and describes this novel accurately.
+- Keep `High Fantasy` as the canonical Subgenre and do not add `Secondary World Fantasy`; the latter is a legacy synonym that should be removed from existing Fantasy records.
 - Add `Stormlight Archive` to Subjects. `Oathbringer`, `Dawnshard`, and `Rhythm of War` already use that series label, while `The Way of Kings` currently lacks it.
 - Add setting `Roshar`, using the same spelling as the other Stormlight records. The current empty Settings field is a more important omission than any generic Theme.
 - Keep `War` and `Slavery` as Subjects if they are retained under the category policy; do not add duplicate Theme copies merely to mirror `Wind and Truth`.
@@ -221,11 +217,12 @@ Recommended review:
 
 ### Oathbringer - Brandon Sanderson
 
-`Oathbringer` already has the same four Subgenres as the target and already uses `Epic Warfare`, `Magic Systems`, `Military Strategy`, `Mythology`, `Oaths`, `Religion`, `Stormlight Archive`, and related Cosmere Subjects. Its Themes already include `Family`, `Trauma`, `Moral Responsibility`, `Reconciliation`, `Unity`, and most of the target's central moral vocabulary.
+`Oathbringer` currently has the same four Subgenres as the target and already uses `Epic Warfare`, `Magic Systems`, `Military Strategy`, `Mythology`, `Oaths`, `Religion`, `Stormlight Archive`, and related Cosmere Subjects. Its Themes already include `Family`, `Trauma`, `Moral Responsibility`, `Reconciliation`, `Unity`, and most of the target's central moral vocabulary.
 
 Recommended review:
 
 - Add `Guilt` as a Theme if the classification is intended to capture Dalinar's defining psychological arc; this is a strong content-based candidate, not a mechanical carry-over.
+- Remove `Secondary World Fantasy` and retain `High Fantasy` as the canonical Subgenre.
 - Add settings `Roshar`, `Urithiru`, and `Shadesmar` where they are materially used. `Rhythm of War` already demonstrates those established setting values.
 - Consider adding `Era of the Everstorm` as a Historical Period if the same fictional chronology policy is adopted for `Wind and Truth`.
 - Do not add generic `War` or `Warfare` merely because the book contains battles; `Epic Warfare` and `Siege Warfare` already describe its military Subjects more precisely.
@@ -244,7 +241,7 @@ Recommended review:
 
 ### Dawnshard - Brandon Sanderson
 
-`Dawnshard` already shares `Cosmere`, `Stormlight Archive`, and `Magic Systems` with the target and, unlike the larger Stormlight novels, has populated Settings: `Aimia`, `Roshar`, `Sleepless Islands`, and `The Reshi Sea`.
+`Dawnshard` already shares `Cosmere`, `Stormlight Archive`, and `Magic Systems` with the target and, unlike the larger Stormlight novels, has populated Settings: `Aimia`, `Roshar`, `Sleepless Islands`, and `The Reshi Sea`. Its `Secondary World Fantasy` value should be treated as legacy and replaced by `High Fantasy` if that record is being normalized.
 
 Recommended review:
 
@@ -307,7 +304,7 @@ These matches show that the terms are reusable, but they do not by themselves pr
 A conservative cleaned version would look like this:
 
 - Genre: `Fantasy`
-- Subgenres: `Epic Fantasy; High Fantasy; Military Fantasy; Secondary World Fantasy`
+- Subgenres: `Epic Fantasy; High Fantasy; Military Fantasy`
 - Form: `Novel`
 - Settings: at least `Roshar`; add only materially used named locations such as `Urithiru`, `Shinovar`, or `Shadesmar`
 - Historical Periods: `Era of the Everstorm` if fictional eras are part of the catalog policy; otherwise leave empty rather than using a real-world period
@@ -319,10 +316,11 @@ Subjects should retain concrete world, political, military, religious, and Cosme
 
 ## Priority order
 
-1. Add `Roshar` to Settings and decide whether `Era of the Everstorm` belongs in Historical Periods.
-2. Remove Theme/Subject duplicates using the recommended category split.
-3. Change `Prophecies` to `Prophecy` unless the plural is intentional.
-4. Reduce `Magic`/`Magic Systems` and `Epic Warfare`/`Warfare` only if the broader values add no independent filtering value.
-5. Confirm the new generic Subjects `Armor`, `Godhood`, `Kingdoms`, `Military Leadership`, and `Weapons` against the novel before retaining them.
-6. Review `The Way of Kings`, `Oathbringer`, and `Rhythm of War` using the focused recommendations above; do not propagate the whole target classification to the rest of the library.
-7. Re-run the duplicate audit after manual changes so the catalog can distinguish resolved duplicates from intentional category distinctions.
+1. Remove `Secondary World Fantasy` and retain `High Fantasy` as the canonical Subgenre.
+2. Add `Roshar` to Settings and decide whether `Era of the Everstorm` belongs in Historical Periods.
+3. Remove Theme/Subject duplicates using the recommended category split.
+4. Change `Prophecies` to `Prophecy` unless the plural is intentional.
+5. Reduce `Magic`/`Magic Systems` and `Epic Warfare`/`Warfare` only if the broader values add no independent filtering value.
+6. Confirm the new generic Subjects `Armor`, `Godhood`, `Kingdoms`, `Military Leadership`, and `Weapons` against the novel before retaining them.
+7. Review `The Way of Kings`, `Oathbringer`, and `Rhythm of War` using the focused recommendations above; do not propagate the whole target classification to the rest of the library.
+8. Re-run the duplicate audit after manual changes so the catalog can distinguish resolved duplicates from intentional category distinctions.
