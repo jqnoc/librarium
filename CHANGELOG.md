@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
 - Books with Wishlist and Draft statuses are now excluded from the Books by Status Over Time chart
+- Restore the compact global header layout after moving the Reading Session character selector into its dialog
 
 ## [2.1.0] — 2026-07-11
 
