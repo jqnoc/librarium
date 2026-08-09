@@ -3933,6 +3933,18 @@ body.reading-session-modal-open { overflow: hidden; }
     font-weight: 400;
 }
 
+.annotation-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.annotation-section-heading h2 {
+    margin-bottom: 0;
+}
+
 .annotations-list {
     display: flex;
     flex-direction: column;

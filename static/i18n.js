@@ -944,6 +944,8 @@
         // ── Annotations (Quotes, Thoughts, Words, Characters) ─────────
         'book.quotes':              { en: 'Quotes',                es: 'Citas' },
         'book.thoughts':            { en: 'Thoughts',              es: 'Reflexiones' },
+        'book.exportThoughtsMarkdown': { en: 'Download Markdown',   es: 'Descargar Markdown' },
+        'book.exportThoughtsMarkdownTitle': { en: 'Download thoughts as Markdown', es: 'Descargar reflexiones como Markdown' },
         'book.words':               { en: 'Words',                 es: 'Palabras' },
         'book.characters':          { en: 'Characters',             es: 'Personajes' },
         'book.noQuotes':            { en: 'No quotes yet.',        es: 'Aún no hay citas.' },

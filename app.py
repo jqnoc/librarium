@@ -8264,6 +8264,49 @@ def delete_quote(book_id: str, qid: int):
 def _annotation_wants_json() -> bool:
     return "application/json" in request.headers.get("Accept", "").lower()
 
+def _thoughts_markdown(book_title: str, thoughts) -> str:
+    title = re.sub(r"[\r\n]+", " ", (book_title or "Untitled")).strip() or "Untitled"
+    lines = [f"# {title}", "", "## Thoughts", ""]
+    current_page = object()
+    for thought in thoughts:
+        page = thought["page"]
+        if page != current_page:
+            page_label = f"Page {page}" if page is not None else "Page not specified"
+            if len(lines) > 4:
+                lines.extend(["", ""])
+            lines.extend([f"## {page_label}", ""])
+            current_page = page
+        lines.append(thought["text"] or "")
+        lines.extend(["", "<!-- End thought -->"])
+    return "\n".join(lines) + "\n"
+
+
+def _thoughts_markdown_filename(book_title: str) -> str:
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", book_title or "book")
+    filename = re.sub(r"\s+", " ", filename).strip(" .")[:120]
+    return f"{filename or 'book'} - thoughts.md"
+
+
+@app.route("/book/<book_id>/thoughts/export")
+def export_thoughts_markdown(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+    thoughts = db.execute(
+        "SELECT text, page FROM thoughts WHERE book_id = ? "
+        "ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page, id",
+        (book_id,),
+    ).fetchall()
+    response = make_response(_thoughts_markdown(book["name"], thoughts))
+    filename = urllib.parse.quote(_thoughts_markdown_filename(book["name"]), safe="")
+    response.headers["Content-Type"] = "text/markdown; charset=utf-8"
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="thoughts.md"; filename*=UTF-8\'\'{filename}'
+    )
+    return response
+
+
 @app.route("/book/<book_id>/thoughts/add", methods=["POST"])
 def add_thought(book_id: str):
     db = get_db()

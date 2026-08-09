@@ -2220,7 +2220,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 
 <!-- ── Thoughts ──────────────────────────────────────────────────────── -->
-<h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
+<div class="annotation-section-heading">
+    <h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
+    <a href="{{ url_for('export_thoughts_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+       title="Download thoughts as Markdown" data-i18n-title="book.exportThoughtsMarkdownTitle">
+        <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportThoughtsMarkdown">Download Markdown</span>
+    </a>
+</div>
 
 {% if thoughts %}
 <div class="annotations-list">
