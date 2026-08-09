@@ -4227,7 +4227,9 @@ body.reading-session-modal-open { overflow: hidden; }
     gap: 0.5rem;
 }
 
+.annotation-add-form input[type="text"],
 .annotation-add-form textarea {
+    box-sizing: border-box;
     width: 100%;
     font-family: inherit;
     font-size: 0.92rem;
