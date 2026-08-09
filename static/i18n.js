@@ -297,6 +297,8 @@
         'book.readingSessionNewCharacter': { en: 'New Character',        es: 'Nuevo personaje' },
         'book.readingSessionEditCharacter': { en: 'Edit Character',      es: 'Editar personaje' },
         'book.readingSessionSaveCharacter': { en: 'Save Character',      es: 'Guardar personaje' },
+        'book.readingSessionSelectCharacter': { en: 'Existing character', es: 'Personaje existente' },
+        'book.readingSessionChooseCharacter': { en: 'Choose an existing character', es: 'Elige un personaje existente' },
         'book.readingSessionNoCharacters': { en: 'No characters yet.',   es: 'Aún no hay personajes.' },
         'book.readingSessionClassify': { en: 'Classify',                es: 'Clasificar' },
         'book.readingSessionQuoteText': { en: 'Quote',                es: 'Cita' },
