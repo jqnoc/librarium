@@ -8267,17 +8267,10 @@ def _annotation_wants_json() -> bool:
 def _thoughts_markdown(book_title: str, thoughts) -> str:
     title = re.sub(r"[\r\n]+", " ", (book_title or "Untitled")).strip() or "Untitled"
     lines = [f"# {title}", "", "## Thoughts", ""]
-    current_page = object()
-    for thought in thoughts:
-        page = thought["page"]
-        if page != current_page:
-            page_label = f"Page {page}" if page is not None else "Page not specified"
-            if len(lines) > 4:
-                lines.extend(["", ""])
-            lines.extend([f"## {page_label}", ""])
-            current_page = page
+    for index, thought in enumerate(thoughts):
+        if index:
+            lines.extend(["", ""])
         lines.append(thought["text"] or "")
-        lines.extend(["", "<!-- End thought -->"])
     return "\n".join(lines) + "\n"
 
 

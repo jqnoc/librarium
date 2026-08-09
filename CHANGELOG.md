@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Book Details Classification with a confirmation flow to clear every category, plus configurable Similar Works ranked across selected taxonomy categories and grouped by linked work using pooled value-level Dice scoring so broader overlaps are not outranked by sparse exact matches
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
-- Add a UTF-8 Markdown download for each book's thoughts, grouped by page while preserving Markdown headings inside each thought
+- Add a UTF-8 Markdown download for each book's thoughts, sorted by page while preserving Markdown headings inside each thought
 - Add book character annotations with Name, Description, and Biography fields, consistent annotation form styling, Book Details CRUD controls, and Reading Session creation/editing from a character selector inside the dialog
 
 ### Changed
