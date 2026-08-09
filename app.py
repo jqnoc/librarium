@@ -1169,6 +1169,14 @@ def init_schema() -> None:
             translation TEXT   NOT NULL DEFAULT '',
             translation_language TEXT NOT NULL DEFAULT ''
         );
+
+        CREATE TABLE IF NOT EXISTS characters (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id     TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name        TEXT    NOT NULL DEFAULT '',
+            description TEXT    NOT NULL DEFAULT '',
+            biography   TEXT    NOT NULL DEFAULT ''
+        );
     """)
     # Insert the default "Books" library for fresh databases
     if db.execute("SELECT COUNT(*) FROM libraries").fetchone()[0] == 0:
@@ -1216,6 +1224,7 @@ def _run_all_migrations() -> None:
     migrate_add_work_taxonomy()
     migrate_add_contributor_fields()
     migrate_add_expected_finish_date()
+    migrate_add_characters()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2487,6 +2496,33 @@ def migrate_add_expected_finish_date() -> None:
         db.commit()
         print(">> Migration complete — books now support expected finish dates.")
     db.close()
+
+
+def migrate_add_characters() -> None:
+    """Add book-scoped character annotations."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    existing = db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = 'characters'"
+    ).fetchone()
+    if existing:
+        db.close()
+        return
+
+    db.execute("""
+        CREATE TABLE characters (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id     TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name        TEXT    NOT NULL DEFAULT '',
+            description TEXT    NOT NULL DEFAULT '',
+            biography   TEXT    NOT NULL DEFAULT ''
+        )
+    """)
+    db.commit()
+    db.close()
+    print(">> Migration complete - character annotations table created.")
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -7833,6 +7869,11 @@ def book_detail(book_id: str):
         (book_id,),
     ).fetchone()
     latest_thought = dict(latest_thought_row) if latest_thought_row else None
+    characters = [dict(row) for row in db.execute(
+        "SELECT id, name, description, biography FROM characters "
+        "WHERE book_id = ? ORDER BY name COLLATE NOCASE, id",
+        (book_id,),
+    ).fetchall()]
 
     return render_template(
         "book_detail.html",
@@ -7906,6 +7947,7 @@ def book_detail(book_id: str):
         taxonomy_fields=TAXONOMY_FIELDS,
         suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
         latest_thought=latest_thought,
+        characters=characters,
         dictionary_sources=DICTIONARY_SOURCES,
         dictionary_languages=DICTIONARY_LANGUAGES,
         dictionary_default_language=_dictionary_language_code(info.get("language", "")),
@@ -8342,6 +8384,72 @@ def delete_word(book_id: str, wid: int):
     db.execute("DELETE FROM words WHERE id = ? AND book_id = ?", (wid, book_id))
     db.commit()
     return redirect(url_for("book_detail", book_id=book_id, _anchor="words"))
+
+
+@app.route("/book/<book_id>/characters/add", methods=["POST"])
+def add_character(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+
+    name = request.form.get("name", "").strip()
+    description = request.form.get("description", "").strip()
+    biography = request.form.get("biography", "").strip()
+    if not name:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": "Character name is required."}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+    cursor = db.execute(
+        "INSERT INTO characters (book_id, name, description, biography) VALUES (?, ?, ?, ?)",
+        (book_id, name, description, biography),
+    )
+    db.commit()
+    row = db.execute(
+        "SELECT id, name, description, biography FROM characters WHERE id = ? AND book_id = ?",
+        (cursor.lastrowid, book_id),
+    ).fetchone()
+    if _annotation_wants_json():
+        return jsonify({"ok": True, "character": dict(row)})
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+
+@app.route("/book/<book_id>/characters/<int:cid>/edit", methods=["POST"])
+def edit_character(book_id: str, cid: int):
+    db = get_db()
+    name = request.form.get("name", "").strip()
+    description = request.form.get("description", "").strip()
+    biography = request.form.get("biography", "").strip()
+    if not name:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": "Character name is required."}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+    cursor = db.execute(
+        "UPDATE characters SET name = ?, description = ?, biography = ? "
+        "WHERE id = ? AND book_id = ?",
+        (name, description, biography, cid, book_id),
+    )
+    db.commit()
+    if cursor.rowcount == 0:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": "Character not found."}), 404
+        abort(404)
+    row = db.execute(
+        "SELECT id, name, description, biography FROM characters WHERE id = ? AND book_id = ?",
+        (cid, book_id),
+    ).fetchone()
+    if _annotation_wants_json():
+        return jsonify({"ok": True, "character": dict(row)})
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+
+@app.route("/book/<book_id>/characters/<int:cid>/delete", methods=["POST"])
+def delete_character(book_id: str, cid: int):
+    db = get_db()
+    db.execute("DELETE FROM characters WHERE id = ? AND book_id = ?", (cid, book_id))
+    db.commit()
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
 
 # ── Bookly PDF Import ──

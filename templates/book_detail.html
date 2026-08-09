@@ -453,6 +453,19 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                         data-i18n-title="book.readingSessionAddWord">
                     <span aria-hidden="true">&#128214;</span> <span data-i18n="book.readingSessionWord">Word</span>
                 </button>
+                <div class="reading-session-character-menu" id="readingSessionCharacterMenu">
+                    <button type="button" class="btn btn-secondary" id="readingSessionCharacterButton"
+                            onclick="toggleReadingSessionCharacterMenu(event)"
+                            data-i18n-title="book.readingSessionCharacters"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="readingSessionCharacterDropdown">
+                        <span aria-hidden="true">&#128100;</span> <span data-i18n="book.readingSessionCharacters">Characters</span> <span class="reading-session-character-caret" aria-hidden="true">&#9662;</span>
+                    </button>
+                    <div class="reading-session-character-dropdown" id="readingSessionCharacterDropdown" role="menu">
+                        <div id="readingSessionCharacterOptions"></div>
+                        <button type="button" class="reading-session-character-new" role="menuitem"
+                                onclick="openReadingSessionCharacterModal(null)" data-i18n="book.readingSessionNewCharacter">+ New Character</button>
+                    </div>
+                </div>
                 <button type="button" class="btn btn-secondary" id="readingSessionClassificationButton" onclick="openReadingSessionClassificationModal()"
                         data-i18n-title="book.classification">
                     <span aria-hidden="true">&#9776;</span> <span data-i18n="book.readingSessionClassify">Classify</span>
@@ -660,10 +673,44 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </form>
     </div>
 </div>
+<div id="readingSessionCharacterModal" class="modal-overlay reading-session-annotation-modal-overlay"
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-character-title">
+    <div class="modal-box reading-session-annotation-modal-box reading-session-character-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionCharacterModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-character-title" class="reading-session-annotation-title" data-i18n="book.readingSessionNewCharacter">New Character</h3>
+        <form id="readingSessionCharacterForm" method="POST" action="{{ url_for('add_character', book_id=book_id) }}"
+              data-add-action="{{ url_for('add_character', book_id=book_id) }}"
+              data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/characters/"
+              onsubmit="return saveReadingSessionCharacter(event)">
+            <div class="reading-session-annotation-field">
+                <label for="readingSessionCharacterName" data-i18n="book.characterName">Name</label>
+                <input type="text" id="readingSessionCharacterName" name="name" class="form-control" required
+                       placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
+                <label for="readingSessionCharacterDescription" data-i18n="book.characterDescription">Description</label>
+                <textarea id="readingSessionCharacterDescription" name="description" rows="3" class="form-control"
+                          placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
+                <label for="readingSessionCharacterBiography" data-i18n="book.characterBiography">Biography</label>
+                <textarea id="readingSessionCharacterBiography" name="biography" rows="7" class="form-control"
+                          placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder"></textarea>
+            </div>
+            <p id="readingSessionCharacterError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
+            <div class="reading-session-annotation-actions">
+                <button type="submit" class="btn btn-primary" id="readingSessionCharacterSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveCharacter">Save Character</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 <script>
 (function () {
     var readingSessionBookId = {{ book_id | tojson }};
     var initialLatestThought = {{ latest_thought | tojson }};
+    var initialCharacters = {{ characters | tojson }};
     var state = {
         readingId: null,
         readingNumber: null,
@@ -681,6 +728,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         quickModalSaving: false,
         latestThought: initialLatestThought,
         thoughtMode: initialLatestThought ? 'edit' : 'new',
+        characters: Array.isArray(initialCharacters) ? initialCharacters : [],
+        characterMode: 'new',
     };
 
     function translate(key, fallback) {
@@ -802,6 +851,49 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         restoreReadingSessionWordPreferences();
     }
 
+    function closeReadingSessionCharacterMenu() {
+        var menu = getElement('readingSessionCharacterMenu');
+        var button = getElement('readingSessionCharacterButton');
+        if (menu) menu.classList.remove('is-open');
+        if (button) button.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderReadingSessionCharacterMenu() {
+        var options = getElement('readingSessionCharacterOptions');
+        if (!options) return;
+        options.innerHTML = '';
+        if (!state.characters.length) {
+            var empty = document.createElement('div');
+            empty.className = 'reading-session-character-empty';
+            empty.textContent = translate('book.readingSessionNoCharacters', 'No characters yet.');
+            options.appendChild(empty);
+            return;
+        }
+        state.characters.forEach(function (character) {
+            var option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'reading-session-character-option';
+            option.setAttribute('role', 'menuitem');
+            option.title = character.name || '';
+            option.textContent = character.name || translate('book.untitledCharacter', 'Untitled character');
+            option.addEventListener('click', function () {
+                window.openReadingSessionCharacterModal(character.id);
+            });
+            options.appendChild(option);
+        });
+    }
+
+    window.toggleReadingSessionCharacterMenu = function (event) {
+        if (event) event.stopPropagation();
+        var menu = getElement('readingSessionCharacterMenu');
+        var button = getElement('readingSessionCharacterButton');
+        if (!menu || !button) return;
+        var open = !menu.classList.contains('is-open');
+        if (open) renderReadingSessionCharacterMenu();
+        menu.classList.toggle('is-open', open);
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
     function setThoughtMode(mode) {
         if (mode === 'edit' && !state.latestThought) mode = 'new';
         state.thoughtMode = mode;
@@ -852,25 +944,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             canResume ? 'Resume' : 'Play'
         );
         getElement('readingSessionPlayIcon').textContent = '\u25B6';
-    }
-
-    function syncReadingSessionButtonWidths() {
-        var modal = getElement('readingSessionModal');
-        var controls = getElement('readingSessionControls');
-        var saveButton = getElement('readingSessionSaveButton');
-        if (!modal || !controls || !saveButton || !modal.classList.contains('active')) return;
-        controls.style.removeProperty('--reading-session-button-min-width');
-        var previousInlineWidth = saveButton.style.width;
-        saveButton.style.width = 'max-content';
-        var saveWidth = Math.ceil(saveButton.getBoundingClientRect().width);
-        if (previousInlineWidth) {
-            saveButton.style.width = previousInlineWidth;
-        } else {
-            saveButton.style.removeProperty('width');
-        }
-        if (saveWidth > 0) {
-            controls.style.setProperty('--reading-session-button-min-width', saveWidth + 'px');
-        }
     }
 
     function setPageInputsEditable(editable) {
@@ -946,8 +1019,76 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         updateControls();
         getElement('readingSessionModal').classList.add('active');
         document.body.classList.add('reading-session-modal-open');
-        syncReadingSessionButtonWidths();
+        closeReadingSessionCharacterMenu();
         getElement('readingSessionPlayButton').focus();
+    };
+
+    window.openReadingSessionCharacterModal = function (characterId) {
+        var form = getElement('readingSessionCharacterForm');
+        if (!form || !beginQuickModal('readingSessionCharacterModal', 'readingSessionCharacterError')) return;
+        closeReadingSessionCharacterMenu();
+        var character = state.characters.find(function (item) {
+            return String(item.id) === String(characterId);
+        });
+        state.characterMode = character ? 'edit' : 'new';
+        form.action = character
+            ? form.dataset.editActionPrefix + character.id + '/edit'
+            : form.dataset.addAction;
+        getElement('readingSessionCharacterName').value = character ? (character.name || '') : '';
+        getElement('readingSessionCharacterDescription').value = character ? (character.description || '') : '';
+        getElement('readingSessionCharacterBiography').value = character ? (character.biography || '') : '';
+        var title = getElement('reading-session-character-title');
+        if (title) {
+            title.dataset.i18n = character ? 'book.readingSessionEditCharacter' : 'book.readingSessionNewCharacter';
+            title.textContent = translate(
+                character ? 'book.readingSessionEditCharacter' : 'book.readingSessionNewCharacter',
+                character ? 'Edit Character' : 'New Character'
+            );
+        }
+        getElement('readingSessionCharacterSaveButton').disabled = false;
+        getElement('readingSessionCharacterName').focus();
+    };
+
+    window.closeReadingSessionCharacterModal = function () {
+        if (state.quickModalSaving) return;
+        var modal = getElement('readingSessionCharacterModal');
+        if (modal) modal.classList.remove('active');
+        state.quickModalWasRunning = false;
+    };
+
+    window.saveReadingSessionCharacter = function (event) {
+        event.preventDefault();
+        var form = getElement('readingSessionCharacterForm');
+        var name = getElement('readingSessionCharacterName');
+        var shouldResume = state.quickModalWasRunning;
+        if (!name.value.trim()) {
+            setModalError('readingSessionCharacterError', translate('book.characterRequired', 'Character name is required.'));
+            name.focus();
+            return false;
+        }
+        state.quickModalSaving = true;
+        getElement('readingSessionCharacterSaveButton').disabled = true;
+        setModalError('readingSessionCharacterError', '');
+        fetchAnnotationJson(form.action, form).then(function (payload) {
+            var saved = payload.character;
+            if (state.characterMode === 'edit') {
+                state.characters = state.characters.map(function (character) {
+                    return String(character.id) === String(saved.id) ? saved : character;
+                });
+            } else {
+                state.characters.push(saved);
+            }
+            state.characters.sort(function (left, right) {
+                return String(left.name || '').localeCompare(String(right.name || ''), undefined, { sensitivity: 'base' });
+            });
+            renderReadingSessionCharacterMenu();
+            finishQuickModal('readingSessionCharacterModal', shouldResume);
+        }).catch(function (error) {
+            state.quickModalSaving = false;
+            getElement('readingSessionCharacterSaveButton').disabled = false;
+            setModalError('readingSessionCharacterError', error.message || translate('book.readingSessionSaveError', 'The character could not be saved.'));
+        });
+        return false;
     };
 
     window.openReadingSessionClassificationModal = function () {
@@ -1273,19 +1414,26 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         event.preventDefault();
         this.setRangeText(prefix, this.selectionStart, this.selectionEnd, 'end');
     });
-    window.addEventListener('resize', syncReadingSessionButtonWidths);
+    document.addEventListener('click', function (event) {
+        var menu = getElement('readingSessionCharacterMenu');
+        if (menu && !menu.contains(event.target)) closeReadingSessionCharacterMenu();
+    });
+    renderReadingSessionCharacterMenu();
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
         var classificationModal = getElement('readingSessionClassificationModal');
         var quoteModal = getElement('readingSessionQuoteModal');
         var wordModal = getElement('readingSessionWordModal');
         var thoughtModal = getElement('readingSessionThoughtModal');
+        var characterModal = getElement('readingSessionCharacterModal');
         if (!modal.classList.contains('active')
             || (classificationModal && classificationModal.classList.contains('active'))
             || (quoteModal && quoteModal.classList.contains('active'))
             || (wordModal && wordModal.classList.contains('active'))
             || (thoughtModal && thoughtModal.classList.contains('active'))
+            || (characterModal && characterModal.classList.contains('active'))
             || event.repeat || event.code !== 'Space') return;
+        if (event.target.closest && event.target.closest('.reading-session-character-menu')) return;
         event.preventDefault();
         if (state.running) window.pauseReadingSession();
         else window.playReadingSession();
@@ -1976,6 +2124,72 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 </div>
 {% endif %}
+
+<!-- ── Characters ────────────────────────────────────────────────────── -->
+<h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
+
+{% if characters %}
+<div class="annotations-list annotations-characters">
+    {% for character in characters %}
+    <div class="annotation-card annotation-character" id="character-{{ character.id }}">
+        <div class="annotation-body">
+            <div class="annotation-character-name">{{ character.name }}</div>
+            {% if character.description %}
+            <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
+            <div class="annotation-character-text">{{ character.description }}</div>
+            {% endif %}
+            {% if character.biography %}
+            <div class="annotation-character-field-label" data-i18n="book.characterBiography">Biography</div>
+            <div class="annotation-character-text">{{ character.biography }}</div>
+            {% endif %}
+        </div>
+        <div class="annotation-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})"
+                                        data-i18n-title="form.edit" data-i18n-aria-label="form.edit" aria-label="Edit">&#9998;</button>
+            <form method="POST" action="{{ url_for('delete_character', book_id=book_id, cid=character.id) }}" style="display:inline;"
+                                    onsubmit="return confirm(window.librariumI18n.t('book.deleteCharacterConfirm'))">
+                                <button type="submit" class="btn btn-danger btn-sm" data-i18n-title="form.delete" data-i18n-aria-label="form.delete" aria-label="Delete">&#128465;</button>
+            </form>
+        </div>
+        <div class="annotation-edit-row" id="character-edit-{{ character.id }}">
+            <form method="POST" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form">
+                <label for="edit-character-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
+                <input type="text" id="edit-character-name-{{ character.id }}" name="name" value="{{ character.name }}" required
+                       placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+                <label for="edit-character-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
+                <textarea id="edit-character-description-{{ character.id }}" name="description" rows="3"
+                          placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
+                <label for="edit-character-biography-{{ character.id }}" data-i18n="book.characterBiography">Biography</label>
+                <textarea id="edit-character-biography-{{ character.id }}" name="biography" rows="6"
+                          placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder">{{ character.biography }}</textarea>
+                <div class="annotation-character-form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})" data-i18n="form.cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noCharacters">No characters yet.</p>
+</div>
+{% endif %}
+
+<div class="add-annotation-panel">
+    <form method="POST" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form">
+        <label for="add-character-name" data-i18n="book.characterName">Name</label>
+        <input type="text" id="add-character-name" name="name" required placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+        <label for="add-character-description" data-i18n="book.characterDescription">Description</label>
+        <textarea id="add-character-description" name="description" rows="2" placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
+        <label for="add-character-biography" data-i18n="book.characterBiography">Biography</label>
+        <textarea id="add-character-biography" name="biography" rows="4" placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder"></textarea>
+        <div class="annotation-character-form-actions">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addCharacterBtn">+ Add Character</button>
+        </div>
+    </form>
+</div>
 
 <!-- ── Quotes ────────────────────────────────────────────────────────── -->
 <h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>

@@ -2070,8 +2070,11 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .reading-session-modal-box {
     position: relative;
-    width: fit-content;
-    max-width: calc(100vw - 2rem);
+    width: min(580px, calc(100vw - 2rem));
+    max-width: none;
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
     box-sizing: border-box;
     padding: 1.5rem;
     text-align: left;
@@ -2180,13 +2183,18 @@ body.reading-session-modal-open { overflow: hidden; }
     font-size: 1.6rem;
 }
 .reading-session-book-info {
+    flex: 1 1 auto;
     min-width: 0;
 }
 .reading-session-title {
     margin: 0 0 .35rem;
     color: var(--lb-deep-orange);
     font-size: 1.2rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
     overflow-wrap: anywhere;
+    overflow: hidden;
 }
 .reading-session-modal-box .reading-session-subtitle,
 .reading-session-modal-box .reading-session-author {
@@ -2281,18 +2289,19 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .reading-session-controls {
     display: grid;
-    width: max-content;
+    width: 100%;
     max-width: 100%;
     gap: .6rem;
 }
 .reading-session-control-row {
     display: grid;
-    grid-template-columns: repeat(3, max-content);
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: .6rem;
 }
 .reading-session-annotation-controls {
     width: 100%;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: .3rem;
 }
 .reading-session-session-controls {
@@ -2302,8 +2311,8 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .reading-session-controls .btn {
     box-sizing: border-box;
-    width: max-content;
-    min-width: var(--reading-session-button-min-width, 0px);
+    width: 100%;
+    min-width: 0;
     min-height: 2.75rem;
     justify-content: center;
     padding: .55rem .6rem;
@@ -2315,6 +2324,11 @@ body.reading-session-modal-open { overflow: hidden; }
     min-width: 0;
     padding: .48rem .22rem;
     font-size: .72rem;
+    white-space: normal;
+}
+.reading-session-annotation-controls .btn > span:not([aria-hidden]) {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .reading-session-session-controls .btn {
     width: 100%;
@@ -2322,6 +2336,69 @@ body.reading-session-modal-open { overflow: hidden; }
 .reading-session-controls .btn:disabled {
     cursor: not-allowed;
     opacity: .45;
+}
+.reading-session-character-menu {
+    position: relative;
+    min-width: 0;
+}
+.reading-session-character-menu > .btn {
+    width: 100%;
+}
+.reading-session-character-caret {
+    margin-left: .15rem;
+    font-size: .7em;
+}
+.reading-session-character-dropdown {
+    position: absolute;
+    top: calc(100% + .35rem);
+    left: 0;
+    z-index: 4;
+    display: none;
+    width: max-content;
+    min-width: 100%;
+    max-width: min(260px, calc(100vw - 3rem));
+    max-height: 16rem;
+    overflow-y: auto;
+    padding: .3rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-card-bg);
+    box-shadow: var(--lb-shadow);
+}
+.reading-session-character-menu.is-open .reading-session-character-dropdown {
+    display: block;
+}
+.reading-session-character-option,
+.reading-session-character-new {
+    display: block;
+    width: 100%;
+    padding: .5rem .65rem;
+    border: none;
+    border-radius: calc(var(--lb-radius) - 1px);
+    background: transparent;
+    color: var(--lb-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: .82rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+.reading-session-character-option:hover,
+.reading-session-character-new:hover {
+    background: var(--lb-light-bg);
+}
+.reading-session-character-new {
+    margin-top: .25rem;
+    border-top: 1px solid var(--lb-border);
+    border-radius: 0;
+    color: var(--lb-deep-orange);
+    font-weight: 700;
+}
+.reading-session-character-empty {
+    padding: .55rem .65rem;
+    color: var(--lb-text-light);
+    font-size: .8rem;
+    white-space: nowrap;
 }
 .reading-session-form { display: none; }
 .reading-session-trigger { white-space: nowrap; }
@@ -2343,6 +2420,9 @@ body.reading-session-modal-open { overflow: hidden; }
     background: var(--lb-card-bg);
     border: 1px solid var(--lb-border);
     box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.reading-session-annotation-modal-box.reading-session-character-modal-box {
+    width: min(580px, 94vw);
 }
 .reading-session-annotation-title {
     margin: 0 2rem 1.25rem 0;
@@ -2439,7 +2519,7 @@ body.reading-session-modal-open { overflow: hidden; }
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .reading-session-annotation-controls {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
     }
     .reading-session-controls .btn {
         width: 100%;
@@ -3915,6 +3995,29 @@ body.reading-session-modal-open { overflow: hidden; }
     opacity: 0.7;
 }
 
+.annotation-character-name {
+    padding-right: 5rem;
+    color: var(--lb-deep-orange);
+    font-size: 1.08rem;
+    font-weight: 700;
+}
+
+.annotation-character-field-label {
+    margin-top: .35rem;
+    color: var(--lb-text-light);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.annotation-character-text {
+    color: var(--lb-text);
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
 .annotation-page {
     font-size: 0.82rem;
     color: var(--lb-text-light);
@@ -3971,6 +4074,40 @@ body.reading-session-modal-open { overflow: hidden; }
     border-radius: var(--lb-radius);
     background: var(--lb-white);
     color: var(--lb-text);
+}
+
+.annotation-character-form {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: .45rem;
+}
+
+.annotation-character-form label {
+    color: var(--lb-text-light);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.annotation-character-form input[type="text"],
+.annotation-character-form textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    flex: none;
+}
+
+.annotation-character-form textarea {
+    resize: vertical;
+}
+
+.annotation-character-form-actions {
+    display: flex;
+    gap: .5rem;
+    justify-content: flex-end;
+    margin-top: .25rem;
 }
 
 /* Words styling */

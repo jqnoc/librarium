@@ -17,16 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Book Details Classification with a confirmation flow to clear every category, plus configurable Similar Works ranked across selected taxonomy categories and grouped by linked work using pooled value-level Dice scoring so broader overlaps are not outranked by sparse exact matches
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
+- Add book character annotations with Name, Description, and Biography fields, Book Details CRUD controls, and Reading Session creation/editing from a character dropdown
 
 ### Changed
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
-- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Secondary World Fantasy, and document controlled values including Epic as a canonical Form; require classification requests to follow the guide in Copilot instructions
+- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, and document controlled values including Epic as a canonical Form; require classification requests to follow the guide in Copilot instructions
 - Separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
 - Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
 - Allow Words of the Day to be edited directly from the Dashboard and saved to their books
 - Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
 - Improve Author cards with grammatical reading metrics and sorting by books read or time read
+- Make Reading Session annotation controls use five equal-width columns, keep session controls in three equal-width columns, and stabilize the responsive dialog width for long book titles
 
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases

@@ -85,7 +85,6 @@ It answers:
 
 #### Fantasy
 
-- Epic Fantasy
 - High Fantasy
 - Grimdark
 - Urban Fantasy
@@ -142,9 +141,11 @@ Do not normalize apparently synonymous values mechanically. First verify the boo
 
 ### Controlled naming: High Fantasy
 
-Prefer **High Fantasy** over `Secondary World Fantasy`. For this taxonomy, both labels describe the same broad Fantasy Subgenre: fantasy set in an invented secondary world. **High Fantasy** is the canonical and more widely recognized term; `Secondary World Fantasy` is not a controlled value.
+For this taxonomy, treat `Epic Fantasy`, **High Fantasy**, and `Secondary World Fantasy` as equivalent labels for the same broad Fantasy Subgenre family. **High Fantasy** is the only canonical controlled value; `Epic Fantasy` and `Secondary World Fantasy` are legacy or non-canonical synonyms.
 
-When auditing an existing Fantasy classification, remove `Secondary World Fantasy` and retain **High Fantasy** when the work is genuinely High Fantasy. Do not assign both values, and do not introduce `Secondary World Fantasy` in new classifications. A secondary-world setting should still be considered alongside the work's overall literary mode before assigning High Fantasy.
+When auditing an existing Fantasy classification, replace `Epic Fantasy` and `Secondary World Fantasy` with **High Fantasy** when the work is genuinely in this Subgenre family. Do not assign any of the three labels together, and do not introduce the two non-canonical labels in new classifications. A secondary-world setting and an epic narrative scale may support **High Fantasy**, but they should be evaluated alongside the work's overall literary mode rather than treated as separate Subgenres.
+
+Do not confuse the valid Form **Epic** with the non-canonical Subgenre label `Epic Fantasy`: **Epic** describes an extended narrative work rooted in oral or traditional storytelling, while the Subgenre must be recorded as **High Fantasy** when applicable.
 
 ### Controlled naming: Adventure Fiction
 
@@ -206,7 +207,7 @@ Form is separate from Genre, Subgenre, Themes, and Subjects. Genre identifies th
 
 Use the controlled Form values above whenever they fit. Prefer the singular controlled value, such as **Essay**, rather than creating synonyms such as Essays or Personal Essay.
 
-Use **Epic** for extended narrative works rooted in oral or traditional storytelling that were later compiled or written down. This is a Form, not the **Epic Fantasy** Subgenre.
+Use **Epic** for extended narrative works rooted in oral or traditional storytelling that were later compiled or written down. This is a Form, not a Fantasy Subgenre. Do not use `Epic Fantasy` as a Subgenre; the canonical value for that synonym family is **High Fantasy**.
 
 Forms may be combined when a work genuinely uses more than one presentation mode, but do not use Form for a subject, academic discipline, theme, setting, historical period, or literary classification. For example, Film Criticism belongs in Subgenres, while Cinema belongs in Subjects.
 
