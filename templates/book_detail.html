@@ -2279,51 +2279,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
-<!-- ── Quotes ────────────────────────────────────────────────────────── -->
-<h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>
-
-{% if quotes %}
-<div class="annotations-list">
-    {% for q in quotes %}
-    <div class="annotation-card annotation-quote" id="quote-{{ q.id }}">
-        <div class="annotation-body">
-            <div class="annotation-text">{% if info.get('language', '')|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}&ldquo;{{ q.text | safe }}&rdquo;{% endif %}</div>
-            {% if q.page %}<div class="annotation-page">p. {{ q.page }}</div>{% endif %}
-        </div>
-        <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})">✏️</button>
-            <form method="POST" action="{{ url_for('delete_quote', book_id=book_id, qid=q.id) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete this quote?');">
-                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
-            </form>
-        </div>
-        <div class="annotation-edit-row" id="quote-edit-{{ q.id }}">
-            <form method="POST" action="{{ url_for('edit_quote', book_id=book_id, qid=q.id) }}" class="annotation-edit-form">
-                <textarea id="edit-quote-{{ q.id }}" name="text" rows="3" required>{{ q.text }}</textarea>
-                <input type="number" name="page" value="{{ q.page or '' }}" placeholder="Page" min="1" style="width:80px;">
-                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})" data-i18n="form.cancel">Cancel</button>
-            </form>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="empty-state" style="padding: 1rem;">
-    <p data-i18n="book.noQuotes">No quotes yet.</p>
-</div>
-{% endif %}
-
-<div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_quote', book_id=book_id) }}" class="annotation-add-form">
-        <textarea id="add-quote-text" name="text" rows="2" required placeholder="Quote text..." data-i18n-placeholder="book.quoteTextPlaceholder"></textarea>
-        <div class="annotation-add-row">
-            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
-            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addQuoteBtn">+ Add Quote</button>
-        </div>
-    </form>
-</div>
-
 <!-- ── Thoughts ──────────────────────────────────────────────────────── -->
 <div class="annotation-section-heading">
     <h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
@@ -2371,6 +2326,51 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="annotation-add-row">
             <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
             <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addThoughtBtn">+ Add Thought</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Quotes ────────────────────────────────────────────────────────── -->
+<h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>
+
+{% if quotes %}
+<div class="annotations-list">
+    {% for q in quotes %}
+    <div class="annotation-card annotation-quote" id="quote-{{ q.id }}">
+        <div class="annotation-body">
+            <div class="annotation-text">{% if info.get('language', '')|lower in ('spanish', 'español', 'galician', 'gallego', 'galego') %}«{{ q.text | safe }}»{% else %}&ldquo;{{ q.text | safe }}&rdquo;{% endif %}</div>
+            {% if q.page %}<div class="annotation-page">p. {{ q.page }}</div>{% endif %}
+        </div>
+        <div class="annotation-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})">✏️</button>
+            <form method="POST" action="{{ url_for('delete_quote', book_id=book_id, qid=q.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Delete this quote?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+        </div>
+        <div class="annotation-edit-row" id="quote-edit-{{ q.id }}">
+            <form method="POST" action="{{ url_for('edit_quote', book_id=book_id, qid=q.id) }}" class="annotation-edit-form">
+                <textarea id="edit-quote-{{ q.id }}" name="text" rows="3" required>{{ q.text }}</textarea>
+                <input type="number" name="page" value="{{ q.page or '' }}" placeholder="Page" min="1" style="width:80px;">
+                <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('quote', {{ q.id }})" data-i18n="form.cancel">Cancel</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noQuotes">No quotes yet.</p>
+</div>
+{% endif %}
+
+<div class="add-annotation-panel">
+    <form method="POST" action="{{ url_for('add_quote', book_id=book_id) }}" class="annotation-add-form">
+        <textarea id="add-quote-text" name="text" rows="2" required placeholder="Quote text..." data-i18n-placeholder="book.quoteTextPlaceholder"></textarea>
+        <div class="annotation-add-row">
+            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addQuoteBtn">+ Add Quote</button>
         </div>
     </form>
 </div>

@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve Author cards with grammatical reading metrics and sorting by books read or time read
 - Make Reading Session annotation controls use five equal-width columns, keep session controls in three equal-width columns, and stabilize the responsive dialog width for long book titles
 - Match the spacing between annotation section headings and their first cards
+- Swap the Quotes and Thoughts sections on the Book Details page
 
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
