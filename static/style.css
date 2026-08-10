@@ -4042,69 +4042,100 @@ body.reading-session-modal-open { overflow: hidden; }
     font-weight: 700;
 }
 
-.annotation-character-badges {
+.annotation-character-classification {
     display: flex;
-    flex-wrap: wrap;
-    gap: .45rem .75rem;
+    flex-direction: column;
+    gap: .3rem;
     padding-right: 5rem;
 }
 
-.annotation-character-badge-group {
+.annotation-character-classification-field {
     display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: .25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .2rem;
 }
 
-.annotation-character-badge-label {
-    color: var(--lb-text-light);
-    font-size: .68rem;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+.annotation-character-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
 }
 
 .character-badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.45rem;
-    padding: .12rem .5rem;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    font-size: .72rem;
-    font-weight: 700;
-    line-height: 1.2;
     white-space: nowrap;
 }
 
 .character-importance-main {
-    color: var(--lb-orange);
-    background: rgba(68, 161, 148, .15);
-    border-color: rgba(68, 161, 148, .35);
+    background: #ECFDF5;
+    color: #047857;
+    border-color: #A7F3D0;
 }
 
 .character-importance-supporting {
-    color: var(--lb-deep-orange);
-    background: rgba(83, 125, 150, .15);
-    border-color: rgba(83, 125, 150, .35);
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-color: #BFDBFE;
 }
 
 .character-importance-minor {
-    color: var(--lb-accent);
-    background: rgba(236, 143, 141, .15);
-    border-color: rgba(236, 143, 141, .35);
+    background: #FFFBEB;
+    color: #B45309;
+    border-color: #FDE68A;
 }
 
 .character-importance-background {
-    color: var(--lb-text-light);
-    background: var(--lb-light-bg);
-    border-color: var(--lb-border);
+    background: #F3F4F6;
+    color: #4B5563;
+    border-color: #D1D5DB;
 }
 
-.character-role-badge {
-    color: var(--lb-text);
-    background: var(--lb-card-bg);
-    border-color: var(--lb-border);
+.character-role-protagonist {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-color: #BFDBFE;
+}
+
+.character-role-antagonist {
+    background: #FEF2F2;
+    color: #B91C1C;
+    border-color: #FECACA;
+}
+
+.character-role-narrator {
+    background: #F3E8FF;
+    color: #7E22CE;
+    border-color: #DDD6FE;
+}
+
+.character-role-mentor {
+    background: #ECFDF5;
+    color: #047857;
+    border-color: #A7F3D0;
+}
+
+.character-role-rival {
+    background: #FFFBEB;
+    color: #B45309;
+    border-color: #FDE68A;
+}
+
+.character-role-love-interest {
+    background: #FCE7F3;
+    color: #BE185D;
+    border-color: #F9A8D4;
+}
+
+.character-role-foil {
+    background: #ECFEFF;
+    color: #0E7490;
+    border-color: #A5F3FC;
+}
+
+.character-role-other {
+    background: #F3F4F6;
+    color: #4B5563;
+    border-color: #D1D5DB;
 }
 
 .annotation-character {
@@ -4674,6 +4705,51 @@ html[data-theme="dark"] .badge.status-draft {
     background: #2B373C;
     color: #B7C4C8;
     border-color: #53656C;
+}
+
+html[data-theme="dark"] .character-importance-main,
+html[data-theme="dark"] .character-role-mentor {
+    background: #153C35;
+    color: #8BE0C2;
+    border-color: #287C68;
+}
+html[data-theme="dark"] .character-importance-supporting,
+html[data-theme="dark"] .character-role-protagonist {
+    background: #173554;
+    color: #A5CCFF;
+    border-color: #2B5F91;
+}
+html[data-theme="dark"] .character-importance-minor,
+html[data-theme="dark"] .character-role-rival {
+    background: #4A3916;
+    color: #F8D889;
+    border-color: #846820;
+}
+html[data-theme="dark"] .character-importance-background,
+html[data-theme="dark"] .character-role-other {
+    background: #2B373C;
+    color: #B7C4C8;
+    border-color: #53656C;
+}
+html[data-theme="dark"] .character-role-antagonist {
+    background: #4A2428;
+    color: #FFB0B5;
+    border-color: #8C3B45;
+}
+html[data-theme="dark"] .character-role-narrator {
+    background: #30254B;
+    color: #D0B8FF;
+    border-color: #604B91;
+}
+html[data-theme="dark"] .character-role-love-interest {
+    background: #4D243C;
+    color: #FFB4D5;
+    border-color: #8F456C;
+}
+html[data-theme="dark"] .character-role-foil {
+    background: #153E48;
+    color: #8DE7F2;
+    border-color: #287A87;
 }
 
 html[data-theme="dark"] .flash-success {
