@@ -1,4 +1,35 @@
 {% extends "base.html" %}
+{% macro character_importance_field(field_id, selected_importance) %}
+<label for="{{ field_id }}" data-i18n="book.characterImportance">Importance</label>
+<select id="{{ field_id }}" name="importance" class="form-control" required data-character-importance>
+    {% for importance in character_importance_options %}
+    <option value="{{ importance.value }}" data-i18n="{{ importance.label_key }}"{% if importance.value == selected_importance %} selected{% endif %}>{{ importance.value }}</option>
+    {% endfor %}
+</select>
+{% endmacro %}
+
+{% macro character_roles_field(field_id, selected_roles) %}
+<div class="character-role-picker" data-character-role-picker>
+    <span class="character-role-picker-label" id="{{ field_id }}-label" data-i18n="book.characterRole">Role</span>
+    <details class="character-role-picker-details">
+        <summary class="character-role-picker-summary" aria-labelledby="{{ field_id }}-label">
+            <span data-character-role-summary-text></span>
+            <span class="character-role-picker-caret" aria-hidden="true">&#9662;</span>
+        </summary>
+        <div class="character-role-picker-menu">
+            {% for role in character_role_options %}
+            <label class="character-role-option" for="{{ field_id }}-{{ loop.index }}">
+                <input type="checkbox" id="{{ field_id }}-{{ loop.index }}" name="roles" value="{{ role.value }}"
+                       data-character-role-checkbox{% if role.value in selected_roles %} checked{% endif %}>
+                <span data-i18n="{{ role.label_key }}">{{ role.value }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </details>
+    <p class="character-role-error" data-character-role-error role="alert" aria-live="polite"></p>
+</div>
+{% endmacro %}
+
 {% block title %}{{ info.get('name', 'Book') }}{% if info.get('subtitle') %} – {{ info.get('subtitle') }}{% endif %} – Librarium{% endblock %}
 
 {% block content %}
@@ -691,6 +722,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                        placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
             </div>
             <div class="reading-session-annotation-field reading-session-character-field">
+                {{ character_importance_field('readingSessionCharacterImportance', 'Supporting') }}
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
+                {{ character_roles_field('readingSessionCharacterRoles', ['Other']) }}
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
                 <label for="readingSessionCharacterDescription" data-i18n="book.characterDescription">Description</label>
                 <textarea id="readingSessionCharacterDescription" name="description" rows="3" class="form-control"
                           placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
@@ -758,6 +795,64 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var element = getElement(id);
         if (element) element.textContent = message || '';
     }
+
+    function updateCharacterRoleSummary(picker) {
+        if (!picker) return;
+        var labels = Array.from(picker.querySelectorAll('[data-character-role-checkbox]:checked')).map(function (checkbox) {
+            var label = checkbox.closest('label');
+            var text = label ? label.querySelector('[data-i18n]') : null;
+            return text ? text.textContent.trim() : checkbox.value;
+        });
+        var summary = picker.querySelector('[data-character-role-summary-text]');
+        if (summary) {
+            summary.textContent = labels.length
+                ? labels.join(', ')
+                : translate('book.characterRoleChoose', 'Select one or more roles');
+        }
+    }
+
+    function initializeCharacterRolePickers() {
+        document.querySelectorAll('[data-character-role-picker]').forEach(function (picker) {
+            if (!picker.dataset.rolePickerInitialized) {
+                picker.dataset.rolePickerInitialized = 'true';
+                picker.querySelectorAll('[data-character-role-checkbox]').forEach(function (checkbox) {
+                    checkbox.addEventListener('change', function () {
+                        updateCharacterRoleSummary(picker);
+                        picker.classList.remove('has-error');
+                        var error = picker.querySelector('[data-character-role-error]');
+                        if (error) error.textContent = '';
+                    });
+                });
+            }
+            updateCharacterRoleSummary(picker);
+        });
+    }
+
+    function setCharacterRoleSelection(form, roles) {
+        var selectedRoles = Array.isArray(roles) ? roles : [];
+        form.querySelectorAll('[data-character-role-checkbox]').forEach(function (checkbox) {
+            checkbox.checked = selectedRoles.indexOf(checkbox.value) !== -1;
+        });
+        updateCharacterRoleSummary(form.querySelector('[data-character-role-picker]'));
+    }
+
+    window.validateCharacterRoleForm = function (form) {
+        var picker = form ? form.querySelector('[data-character-role-picker]') : null;
+        if (!picker) return true;
+        var hasRole = picker.querySelector('[data-character-role-checkbox]:checked');
+        if (hasRole) {
+            picker.classList.remove('has-error');
+            var existingError = picker.querySelector('[data-character-role-error]');
+            if (existingError) existingError.textContent = '';
+            return true;
+        }
+        picker.classList.add('has-error');
+        var details = picker.querySelector('details');
+        if (details) details.open = true;
+        var error = picker.querySelector('[data-character-role-error]');
+        if (error) error.textContent = translate('book.characterRoleRequired', 'At least one role is required.');
+        return false;
+    };
 
     function beginQuickModal(modalId, errorId) {
         var sessionModal = getElement('readingSessionModal');
@@ -877,6 +972,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             ? form.dataset.editActionPrefix + character.id + '/edit'
             : form.dataset.addAction;
         getElement('readingSessionCharacterName').value = character ? (character.name || '') : '';
+        getElement('readingSessionCharacterImportance').value = character ? character.importance : 'Supporting';
+        setCharacterRoleSelection(form, character ? character.roles : ['Other']);
         getElement('readingSessionCharacterDescription').value = character ? (character.description || '') : '';
         getElement('readingSessionCharacterBiography').value = character ? (character.biography || '') : '';
         var title = getElement('reading-session-character-title');
@@ -1054,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             name.focus();
             return false;
         }
+        if (!window.validateCharacterRoleForm(form)) return false;
         state.quickModalSaving = true;
         getElement('readingSessionCharacterSaveButton').disabled = true;
         setModalError('readingSessionCharacterError', '');
@@ -1405,6 +1503,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         this.setRangeText(prefix, this.selectionStart, this.selectionEnd, 'end');
     });
     renderReadingSessionCharacterSelect();
+    initializeCharacterRolePickers();
+    document.addEventListener('DOMContentLoaded', initializeCharacterRolePickers);
+    document.addEventListener('click', function (event) {
+        if (event.target.closest && event.target.closest('.lang-btn')) {
+            window.setTimeout(initializeCharacterRolePickers, 0);
+        }
+    });
     document.addEventListener('keydown', function (event) {
         var modal = getElement('readingSessionModal');
         var classificationModal = getElement('readingSessionClassificationModal');
@@ -2121,6 +2226,24 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false">
         <div class="annotation-body">
             <div class="annotation-character-name">{{ character.name }}</div>
+            <div class="annotation-character-badges">
+                <div class="annotation-character-badge-group">
+                    <span class="annotation-character-badge-label" data-i18n="book.characterImportance">Importance</span>
+                    {% for importance in character_importance_options %}
+                    {% if importance.value == character.importance %}
+                    <span class="character-badge character-importance-{{ importance.value | lower }}" data-i18n="{{ importance.label_key }}">{{ importance.value }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="annotation-character-badge-group">
+                    <span class="annotation-character-badge-label" data-i18n="book.characterRole">Role</span>
+                    {% for role in character_role_options %}
+                    {% if role.value in character.roles %}
+                    <span class="character-badge character-role-badge" data-i18n="{{ role.label_key }}">{{ role.value }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
             {% if character.description %}
             <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
             <div class="annotation-character-text">{{ character.description }}</div>
@@ -2139,10 +2262,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </form>
         </div>
         <div class="annotation-edit-row" id="character-edit-{{ character.id }}">
-            <form method="POST" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form">
+                        <form method="POST" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form"
+                                    onsubmit="return window.validateCharacterRoleForm(this)">
                 <label for="edit-character-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
                 <input type="text" id="edit-character-name-{{ character.id }}" name="name" value="{{ character.name }}" required
                        placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+                                {{ character_importance_field('edit-character-importance-' ~ character.id, character.importance) }}
+                                {{ character_roles_field('edit-character-roles-' ~ character.id, character.roles) }}
                 <label for="edit-character-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
                 <textarea id="edit-character-description-{{ character.id }}" name="description" rows="3"
                           placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
@@ -2266,9 +2392,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
 
 <div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form">
+    <form method="POST" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form"
+          onsubmit="return window.validateCharacterRoleForm(this)">
         <label for="add-character-name" data-i18n="book.characterName">Name</label>
         <input type="text" id="add-character-name" name="name" required placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+        {{ character_importance_field('add-character-importance', 'Supporting') }}
+        {{ character_roles_field('add-character-roles', ['Other']) }}
         <label for="add-character-description" data-i18n="book.characterDescription">Description</label>
         <textarea id="add-character-description" name="description" rows="2" placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
         <label for="add-character-biography" data-i18n="book.characterBiography">Biography</label>

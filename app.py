@@ -84,6 +84,69 @@ DB_PATH = DATA_DIR / "librarium.db"
 
 APP_VERSION = "2.2.0-beta"
 
+CHARACTER_IMPORTANCE_OPTIONS = (
+    {"value": "Main", "label_key": "book.characterImportanceMain"},
+    {"value": "Supporting", "label_key": "book.characterImportanceSupporting"},
+    {"value": "Minor", "label_key": "book.characterImportanceMinor"},
+    {"value": "Background", "label_key": "book.characterImportanceBackground"},
+)
+CHARACTER_ROLE_OPTIONS = (
+    {"value": "Protagonist", "label_key": "book.characterRoleProtagonist"},
+    {"value": "Antagonist", "label_key": "book.characterRoleAntagonist"},
+    {"value": "Narrator", "label_key": "book.characterRoleNarrator"},
+    {"value": "Mentor", "label_key": "book.characterRoleMentor"},
+    {"value": "Rival", "label_key": "book.characterRoleRival"},
+    {"value": "Love interest", "label_key": "book.characterRoleLoveInterest"},
+    {"value": "Foil", "label_key": "book.characterRoleFoil"},
+    {"value": "Other", "label_key": "book.characterRoleOther"},
+)
+CHARACTER_IMPORTANCE_VALUES = {item["value"] for item in CHARACTER_IMPORTANCE_OPTIONS}
+CHARACTER_ROLE_VALUES = {item["value"] for item in CHARACTER_ROLE_OPTIONS}
+DEFAULT_CHARACTER_IMPORTANCE = "Supporting"
+DEFAULT_CHARACTER_ROLES = ("Other",)
+
+
+def _normalise_character_importance(value: str | None) -> str:
+    value = (value or "").strip()
+    return value if value in CHARACTER_IMPORTANCE_VALUES else DEFAULT_CHARACTER_IMPORTANCE
+
+
+def _normalise_character_roles(raw_roles) -> list[str]:
+    if isinstance(raw_roles, str):
+        try:
+            raw_roles = json.loads(raw_roles)
+        except (TypeError, ValueError):
+            raw_roles = []
+    if not isinstance(raw_roles, (list, tuple, set)):
+        raw_roles = []
+    selected_roles = {str(role).strip() for role in raw_roles}
+    roles = [item["value"] for item in CHARACTER_ROLE_OPTIONS if item["value"] in selected_roles]
+    return roles or list(DEFAULT_CHARACTER_ROLES)
+
+
+def _character_roles_from_request() -> list[str]:
+    selected_roles = {
+        role.strip() for role in request.form.getlist("roles") if role.strip()
+    }
+    return [item["value"] for item in CHARACTER_ROLE_OPTIONS if item["value"] in selected_roles]
+
+
+def _character_form_values() -> tuple[str | None, list[str], str | None]:
+    importance = request.form.get("importance", "").strip()
+    if importance not in CHARACTER_IMPORTANCE_VALUES:
+        return None, [], "A valid character importance is required."
+    roles = _character_roles_from_request()
+    if not roles:
+        return importance, [], "At least one character role is required."
+    return importance, roles, None
+
+
+def _character_from_row(row: sqlite3.Row) -> dict:
+    character = dict(row)
+    character["importance"] = _normalise_character_importance(character.get("importance"))
+    character["roles"] = _normalise_character_roles(character.get("roles"))
+    return character
+
 DICTIONARY_SOURCES = (
     {"key": "free_dictionary", "label": "Free Dictionary API", "label_key": "book.dictionarySourceFreeDictionary"},
     {"key": "wiktionary", "label": "Wiktionary", "label_key": "book.dictionarySourceWiktionary"},
@@ -1176,7 +1239,9 @@ def init_schema() -> None:
             display_order INTEGER NOT NULL DEFAULT 0,
             name        TEXT    NOT NULL DEFAULT '',
             description TEXT    NOT NULL DEFAULT '',
-            biography   TEXT    NOT NULL DEFAULT ''
+            biography   TEXT    NOT NULL DEFAULT '',
+            importance  TEXT    NOT NULL DEFAULT 'Supporting',
+            roles       TEXT    NOT NULL DEFAULT '["Other"]'
         );
     """)
     # Insert the default "Books" library for fresh databases
@@ -1227,6 +1292,7 @@ def _run_all_migrations() -> None:
     migrate_add_expected_finish_date()
     migrate_add_characters()
     migrate_add_character_order()
+    migrate_add_character_metadata()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2549,6 +2615,24 @@ def migrate_add_character_order() -> None:
             next_orders[book_id] = display_order + 1
         db.commit()
         print(">> Migration complete - character display order added.")
+    db.close()
+
+
+def migrate_add_character_metadata() -> None:
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [row[1] for row in db.execute("PRAGMA table_info(characters)").fetchall()]
+    if "importance" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN importance TEXT NOT NULL DEFAULT 'Supporting'"
+        )
+    if "roles" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN roles TEXT NOT NULL DEFAULT '[\"Other\"]'"
+        )
+    db.commit()
     db.close()
 
 
@@ -7896,8 +7980,8 @@ def book_detail(book_id: str):
         (book_id,),
     ).fetchone()
     latest_thought = dict(latest_thought_row) if latest_thought_row else None
-    characters = [dict(row) for row in db.execute(
-        "SELECT id, display_order, name, description, biography FROM characters "
+    characters = [_character_from_row(row) for row in db.execute(
+        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
         "WHERE book_id = ? ORDER BY display_order, name COLLATE NOCASE, id",
         (book_id,),
     ).fetchall()]
@@ -7975,6 +8059,8 @@ def book_detail(book_id: str):
         suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
         latest_thought=latest_thought,
         characters=characters,
+        character_importance_options=CHARACTER_IMPORTANCE_OPTIONS,
+        character_role_options=CHARACTER_ROLE_OPTIONS,
         dictionary_sources=DICTIONARY_SOURCES,
         dictionary_languages=DICTIONARY_LANGUAGES,
         dictionary_default_language=_dictionary_language_code(info.get("language", "")),
@@ -8462,6 +8548,11 @@ def add_character(book_id: str):
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": "Character name is required."}), 400
         return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    importance, roles, validation_error = _character_form_values()
+    if validation_error:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": validation_error}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
     next_order = db.execute(
         "SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order "
@@ -8469,18 +8560,18 @@ def add_character(book_id: str):
         (book_id,),
     ).fetchone()["next_order"]
     cursor = db.execute(
-        "INSERT INTO characters (book_id, display_order, name, description, biography) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (book_id, next_order, name, description, biography),
+        "INSERT INTO characters (book_id, display_order, name, description, biography, importance, roles) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (book_id, next_order, name, description, biography, importance, json.dumps(roles)),
     )
     db.commit()
     row = db.execute(
-        "SELECT id, display_order, name, description, biography FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cursor.lastrowid, book_id),
     ).fetchone()
     if _annotation_wants_json():
-        return jsonify({"ok": True, "character": dict(row)})
+        return jsonify({"ok": True, "character": _character_from_row(row)})
     return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
 
@@ -8532,11 +8623,16 @@ def edit_character(book_id: str, cid: int):
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": "Character name is required."}), 400
         return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    importance, roles, validation_error = _character_form_values()
+    if validation_error:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": validation_error}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
     cursor = db.execute(
-        "UPDATE characters SET name = ?, description = ?, biography = ? "
+        "UPDATE characters SET name = ?, description = ?, biography = ?, importance = ?, roles = ? "
         "WHERE id = ? AND book_id = ?",
-        (name, description, biography, cid, book_id),
+        (name, description, biography, importance, json.dumps(roles), cid, book_id),
     )
     db.commit()
     if cursor.rowcount == 0:
@@ -8544,12 +8640,12 @@ def edit_character(book_id: str, cid: int):
             return jsonify({"ok": False, "error": "Character not found."}), 404
         abort(404)
     row = db.execute(
-        "SELECT id, display_order, name, description, biography FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cid, book_id),
     ).fetchone()
     if _annotation_wants_json():
-        return jsonify({"ok": True, "character": dict(row)})
+        return jsonify({"ok": True, "character": _character_from_row(row)})
     return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
 

@@ -4042,6 +4042,71 @@ body.reading-session-modal-open { overflow: hidden; }
     font-weight: 700;
 }
 
+.annotation-character-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem .75rem;
+    padding-right: 5rem;
+}
+
+.annotation-character-badge-group {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .25rem;
+}
+
+.annotation-character-badge-label {
+    color: var(--lb-text-light);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.character-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: .12rem .5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.character-importance-main {
+    color: var(--lb-orange);
+    background: rgba(68, 161, 148, .15);
+    border-color: rgba(68, 161, 148, .35);
+}
+
+.character-importance-supporting {
+    color: var(--lb-deep-orange);
+    background: rgba(83, 125, 150, .15);
+    border-color: rgba(83, 125, 150, .35);
+}
+
+.character-importance-minor {
+    color: var(--lb-accent);
+    background: rgba(236, 143, 141, .15);
+    border-color: rgba(236, 143, 141, .35);
+}
+
+.character-importance-background {
+    color: var(--lb-text-light);
+    background: var(--lb-light-bg);
+    border-color: var(--lb-border);
+}
+
+.character-role-badge {
+    color: var(--lb-text);
+    background: var(--lb-card-bg);
+    border-color: var(--lb-border);
+}
+
 .annotation-character {
     cursor: grab;
 }
@@ -4159,6 +4224,110 @@ body.reading-session-modal-open { overflow: hidden; }
 
 .annotation-character-form textarea {
     resize: vertical;
+}
+
+.character-role-picker {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    position: relative;
+}
+
+.character-role-picker-label {
+    color: var(--lb-text-light);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.character-role-picker-details {
+    position: relative;
+}
+
+.character-role-picker-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    width: 100%;
+    min-height: 2.35rem;
+    padding: .45rem .65rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+    cursor: pointer;
+    list-style: none;
+}
+
+.character-role-picker-summary::-webkit-details-marker {
+    display: none;
+}
+
+.character-role-picker-summary:hover,
+.character-role-picker-details[open] .character-role-picker-summary {
+    border-color: var(--lb-orange);
+}
+
+.character-role-picker-caret {
+    flex-shrink: 0;
+    color: var(--lb-text-light);
+    font-size: .75rem;
+}
+
+.character-role-picker-menu {
+    position: absolute;
+    top: calc(100% + .3rem);
+    right: 0;
+    left: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .2rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: .45rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    box-shadow: var(--lb-shadow-lg);
+}
+
+.character-role-option,
+.annotation-character-form .character-role-option {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+    padding: .35rem .4rem;
+    border-radius: var(--lb-radius);
+    color: var(--lb-text);
+    cursor: pointer;
+    font-size: .88rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.character-role-option:hover {
+    background: var(--lb-light-bg);
+}
+
+.character-role-option input {
+    flex: 0 0 auto;
+    accent-color: var(--lb-orange);
+}
+
+.character-role-error {
+    min-height: 1.1rem;
+    margin: 0;
+    color: var(--lb-error);
+    font-size: .8rem;
+}
+
+.character-role-picker.has-error .character-role-picker-summary {
+    border-color: var(--lb-error);
 }
 
 .annotation-character-form-actions {
