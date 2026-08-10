@@ -1173,6 +1173,7 @@ def init_schema() -> None:
         CREATE TABLE IF NOT EXISTS characters (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id     TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            display_order INTEGER NOT NULL DEFAULT 0,
             name        TEXT    NOT NULL DEFAULT '',
             description TEXT    NOT NULL DEFAULT '',
             biography   TEXT    NOT NULL DEFAULT ''
@@ -1225,6 +1226,7 @@ def _run_all_migrations() -> None:
     migrate_add_contributor_fields()
     migrate_add_expected_finish_date()
     migrate_add_characters()
+    migrate_add_character_order()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2523,6 +2525,31 @@ def migrate_add_characters() -> None:
     db.commit()
     db.close()
     print(">> Migration complete - character annotations table created.")
+
+
+def migrate_add_character_order() -> None:
+    """Add and backfill the manual display order for character annotations."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(characters)").fetchall()]
+    if "display_order" not in cols:
+        db.execute("ALTER TABLE characters ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0")
+        rows = db.execute(
+            "SELECT id, book_id FROM characters ORDER BY book_id, name COLLATE NOCASE, id"
+        ).fetchall()
+        next_orders: dict[str, int] = {}
+        for character_id, book_id in rows:
+            display_order = next_orders.get(book_id, 0)
+            db.execute(
+                "UPDATE characters SET display_order = ? WHERE id = ?",
+                (display_order, character_id),
+            )
+            next_orders[book_id] = display_order + 1
+        db.commit()
+        print(">> Migration complete - character display order added.")
+    db.close()
 
 
 # ── Cover colour helper ─────────────────────────────────────────────────
@@ -7870,8 +7897,8 @@ def book_detail(book_id: str):
     ).fetchone()
     latest_thought = dict(latest_thought_row) if latest_thought_row else None
     characters = [dict(row) for row in db.execute(
-        "SELECT id, name, description, biography FROM characters "
-        "WHERE book_id = ? ORDER BY name COLLATE NOCASE, id",
+        "SELECT id, display_order, name, description, biography FROM characters "
+        "WHERE book_id = ? ORDER BY display_order, name COLLATE NOCASE, id",
         (book_id,),
     ).fetchall()]
 
@@ -8436,17 +8463,62 @@ def add_character(book_id: str):
             return jsonify({"ok": False, "error": "Character name is required."}), 400
         return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
+    next_order = db.execute(
+        "SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order "
+        "FROM characters WHERE book_id = ?",
+        (book_id,),
+    ).fetchone()["next_order"]
     cursor = db.execute(
-        "INSERT INTO characters (book_id, name, description, biography) VALUES (?, ?, ?, ?)",
-        (book_id, name, description, biography),
+        "INSERT INTO characters (book_id, display_order, name, description, biography) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (book_id, next_order, name, description, biography),
     )
     db.commit()
     row = db.execute(
-        "SELECT id, name, description, biography FROM characters WHERE id = ? AND book_id = ?",
+        "SELECT id, display_order, name, description, biography FROM characters "
+        "WHERE id = ? AND book_id = ?",
         (cursor.lastrowid, book_id),
     ).fetchone()
     if _annotation_wants_json():
         return jsonify({"ok": True, "character": dict(row)})
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+
+@app.route("/book/<book_id>/characters/reorder", methods=["POST"])
+def reorder_characters(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+
+    payload = request.get_json(silent=True)
+    character_ids = payload.get("character_ids") if isinstance(payload, dict) else None
+    if character_ids is None:
+        character_ids = request.form.getlist("character_ids[]") or request.form.getlist("character_ids")
+    if not isinstance(character_ids, list):
+        character_ids = list(character_ids) if character_ids else []
+
+    try:
+        ordered_ids = [int(character_id) for character_id in character_ids]
+    except (TypeError, ValueError):
+        ordered_ids = []
+
+    current_ids = {
+        row["id"]
+        for row in db.execute("SELECT id FROM characters WHERE book_id = ?", (book_id,)).fetchall()
+    }
+    if len(ordered_ids) != len(set(ordered_ids)) or set(ordered_ids) != current_ids:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": "Invalid character order."}), 400
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+
+    for display_order, character_id in enumerate(ordered_ids):
+        db.execute(
+            "UPDATE characters SET display_order = ? WHERE id = ? AND book_id = ?",
+            (display_order, character_id, book_id),
+        )
+    db.commit()
+    if _annotation_wants_json():
+        return jsonify({"ok": True})
     return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
 
@@ -8472,7 +8544,8 @@ def edit_character(book_id: str, cid: int):
             return jsonify({"ok": False, "error": "Character not found."}), 404
         abort(404)
     row = db.execute(
-        "SELECT id, name, description, biography FROM characters WHERE id = ? AND book_id = ?",
+        "SELECT id, display_order, name, description, biography FROM characters "
+        "WHERE id = ? AND book_id = ?",
         (cid, book_id),
     ).fetchone()
     if _annotation_wants_json():

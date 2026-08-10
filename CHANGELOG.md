@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
 - Add a UTF-8 Markdown download for each book's thoughts, sorted by page while preserving Markdown headings inside each thought
-- Add book character annotations with Name, Description, and Biography fields, consistent annotation form styling, Book Details CRUD controls, and Reading Session creation/editing from a character selector inside the dialog
+- Add book character annotations with Name, Description, and Biography fields, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, and Reading Session creation/editing from a character selector inside the dialog
 
 ### Changed
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
 - Improve Author cards with grammatical reading metrics and sorting by books read or time read
 - Make Reading Session annotation controls use five equal-width columns, keep session controls in three equal-width columns, and stabilize the responsive dialog width for long book titles
+- Match the spacing between annotation section headings and their first cards
 
 ### Fixed
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases

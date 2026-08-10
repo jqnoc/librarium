@@ -1067,6 +1067,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 state.characters.push(saved);
             }
             state.characters.sort(function (left, right) {
+                var orderDifference = Number(left.display_order || 0) - Number(right.display_order || 0);
+                if (orderDifference) return orderDifference;
                 return String(left.name || '').localeCompare(String(right.name || ''), undefined, { sensitivity: 'base' });
             });
             renderReadingSessionCharacterSelect(saved.id);
@@ -2112,9 +2114,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
 
 {% if characters %}
-<div class="annotations-list annotations-characters">
+<div class="annotations-list annotations-characters" data-character-list
+    data-reorder-url="{{ url_for('reorder_characters', book_id=book_id) }}">
     {% for character in characters %}
-    <div class="annotation-card annotation-character" id="character-{{ character.id }}">
+    <div class="annotation-card annotation-character" id="character-{{ character.id }}"
+        data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false">
         <div class="annotation-body">
             <div class="annotation-character-name">{{ character.name }}</div>
             {% if character.description %}
@@ -2159,6 +2163,107 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <p data-i18n="book.noCharacters">No characters yet.</p>
 </div>
 {% endif %}
+
+<script>
+(function () {
+    var list = document.querySelector('[data-character-list]');
+    if (!list) return;
+
+    var draggedCard = null;
+    var originalOrder = [];
+    var dropCompleted = false;
+
+    function cards() {
+        return Array.from(list.querySelectorAll('[data-character-id]'));
+    }
+
+    function order() {
+        return cards().map(function (card) { return card.dataset.characterId; });
+    }
+
+    function restoreOrder(savedOrder) {
+        savedOrder.forEach(function (card) { list.appendChild(card); });
+    }
+
+    function isActionTarget(target) {
+        return Boolean(target && target.closest && target.closest(
+            '.annotation-actions, .annotation-edit-row, button, form, input, textarea, select, a'
+        ));
+    }
+
+    function persistOrder(previousOrder) {
+        var currentOrder = order();
+        if (currentOrder.join(',') === previousOrder.map(function (card) {
+            return card.dataset.characterId;
+        }).join(',')) return;
+
+        fetch(list.dataset.reorderUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ character_ids: currentOrder })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+                if (!response.ok || !payload.ok) throw new Error(payload.error || 'Character order could not be saved.');
+            });
+        }).catch(function (error) {
+            restoreOrder(previousOrder);
+            console.error(error);
+        });
+    }
+
+    list.addEventListener('dragstart', function (event) {
+        var card = event.target.closest ? event.target.closest('[data-character-id]') : null;
+        if (!card || !list.contains(card) || isActionTarget(event.target)) {
+            event.preventDefault();
+            return;
+        }
+        draggedCard = card;
+        originalOrder = cards();
+        dropCompleted = false;
+        card.classList.add('is-dragging');
+        card.setAttribute('aria-grabbed', 'true');
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', card.dataset.characterId);
+        }
+    });
+
+    list.addEventListener('dragover', function (event) {
+        if (!draggedCard) return;
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+
+        var target = event.target.closest ? event.target.closest('[data-character-id]') : null;
+        if (!target || target === draggedCard || !list.contains(target)) return;
+        var midpoint = target.getBoundingClientRect().top + target.offsetHeight / 2;
+        if (event.clientY < midpoint) {
+            if (draggedCard !== target.previousElementSibling) list.insertBefore(draggedCard, target);
+        } else if (draggedCard !== target.nextElementSibling) {
+            list.insertBefore(draggedCard, target.nextElementSibling);
+        }
+    });
+
+    list.addEventListener('drop', function (event) {
+        if (!draggedCard) return;
+        event.preventDefault();
+        dropCompleted = true;
+        persistOrder(originalOrder.slice());
+    });
+
+    list.addEventListener('dragend', function () {
+        if (!draggedCard) return;
+        if (!dropCompleted) restoreOrder(originalOrder);
+        draggedCard.classList.remove('is-dragging');
+        draggedCard.setAttribute('aria-grabbed', 'false');
+        draggedCard = null;
+        originalOrder = [];
+        dropCompleted = false;
+    });
+}());
+</script>
 
 <div class="add-annotation-panel">
     <form method="POST" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form">

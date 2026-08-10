@@ -3939,6 +3939,7 @@ body.reading-session-modal-open { overflow: hidden; }
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .annotation-section-heading h2 {
@@ -4039,6 +4040,24 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-deep-orange);
     font-size: 1.08rem;
     font-weight: 700;
+}
+
+.annotation-character {
+    cursor: grab;
+}
+
+.annotation-character:active,
+.annotation-character.is-dragging {
+    cursor: grabbing;
+}
+
+.annotation-character.is-dragging {
+    opacity: .55;
+}
+
+.annotation-character .annotation-actions,
+.annotation-character .annotation-edit-row {
+    cursor: default;
 }
 
 .annotation-character-field-label {
