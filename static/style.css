@@ -4036,24 +4036,19 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 .annotation-character-name {
-    padding-right: 5rem;
+    min-width: 0;
     color: var(--lb-deep-orange);
     font-size: 1.08rem;
     font-weight: 700;
+    overflow-wrap: anywhere;
 }
 
-.annotation-character-classification {
+.annotation-character-heading {
     display: flex;
-    flex-direction: column;
-    gap: .3rem;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .4rem .5rem;
     padding-right: 5rem;
-}
-
-.annotation-character-classification-field {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: .2rem;
 }
 
 .annotation-character-badges {

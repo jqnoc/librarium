@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a Dashboard taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
 - Add a UTF-8 Markdown download for each book's thoughts, sorted by page while preserving Markdown headings inside each thought
-- Add book character annotations with Name, Description, Biography, required Importance, multi-select Role fields, translated colored badges, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, and Reading Session creation/editing from a character selector inside the dialog
+- Add book character annotations with Name, Description, Biography, required Importance, multi-select Role fields, inline unlabeled translated colored badges, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, and Reading Session creation/editing from a character selector inside the dialog
 
 ### Changed
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked

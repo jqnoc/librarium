@@ -2225,27 +2225,19 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="annotation-card annotation-character" id="character-{{ character.id }}"
         data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false">
         <div class="annotation-body">
-            <div class="annotation-character-name">{{ character.name }}</div>
-            <div class="annotation-character-classification">
-                <div class="annotation-character-classification-field">
-                    <div class="annotation-character-field-label" data-i18n="book.characterImportance">Importance</div>
-                    <div class="annotation-character-badges">
+            <div class="annotation-character-heading">
+                <div class="annotation-character-name">{{ character.name }}</div>
+                <div class="annotation-character-badges">
                     {% for importance in character_importance_options %}
                     {% if importance.value == character.importance %}
                     <span class="badge character-badge character-importance-{{ importance.value | lower }}" data-i18n="{{ importance.label_key }}">{{ importance.value }}</span>
                     {% endif %}
                     {% endfor %}
-                </div>
-                </div>
-                <div class="annotation-character-classification-field">
-                    <div class="annotation-character-field-label" data-i18n="book.characterRole">Role</div>
-                    <div class="annotation-character-badges">
                     {% for role in character_role_options %}
                     {% if role.value in character.roles %}
                     <span class="badge character-badge character-role-{{ role.value | lower | replace(' ', '-') }}" data-i18n="{{ role.label_key }}">{{ role.value }}</span>
                     {% endif %}
                     {% endfor %}
-                </div>
                 </div>
             </div>
             {% if character.description %}
