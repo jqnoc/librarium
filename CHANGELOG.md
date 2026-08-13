@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add book character annotations with Name, Description, Biography, required Importance, multi-select Role fields, inline unlabeled translated colored badges, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, and Reading Session creation/editing from a character selector inside the dialog
 
 ### Changed
+- Organize Book Details into persistent accessible Readings, Assessment, Annotations, and Editions tabs while keeping the summary visible
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
 - Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, and document controlled values including Epic as a canonical Form; require classification requests to follow the guide in Copilot instructions

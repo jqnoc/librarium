@@ -878,6 +878,69 @@ img { max-width: 100%; height: auto; }
     flex: 1;
 }
 
+/* ── Book detail tabs ─────────────────────────────────────────────────── */
+.book-tabs {
+    position: sticky;
+    top: var(--lb-book-tabs-top, 0px);
+    z-index: 90;
+    display: flex;
+    align-items: flex-end;
+    gap: .25rem;
+    overflow-x: auto;
+    margin: 1.5rem 0 1rem;
+    padding: .35rem .25rem 0;
+    background: var(--lb-light-bg);
+    border-bottom: 1px solid var(--lb-border);
+    scrollbar-width: thin;
+}
+
+.book-tab {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+    padding: .6rem 1rem .55rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: var(--lb-radius) var(--lb-radius) 0 0;
+    background: transparent;
+    color: var(--lb-text-light);
+    font: inherit;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.book-tab:hover:not(.is-active) {
+    background: var(--lb-bg-hover);
+    color: var(--lb-text);
+}
+
+.book-tab.is-active {
+    background: var(--lb-card-bg);
+    border-bottom-color: var(--lb-deep-orange);
+    color: var(--lb-deep-orange);
+}
+
+.book-tab:focus-visible {
+    outline: 3px solid var(--lb-accent-glow);
+    outline-offset: -3px;
+}
+
+.book-tab-count {
+    margin-left: .25rem;
+    color: var(--lb-text-light);
+    font-size: .82em;
+    font-weight: 600;
+}
+
+.book-tab-panel {
+    min-width: 0;
+}
+
+.book-tab-panel[hidden] {
+    display: none !important;
+}
+
 /* ── Page headings (SciY style) ────────────────────────────────────────── */
 h1 {
     font-size: 1.8rem;

@@ -33,6 +33,7 @@
 {% block title %}{{ info.get('name', 'Book') }}{% if info.get('subtitle') %} – {{ info.get('subtitle') }}{% endif %} – Librarium{% endblock %}
 
 {% block content %}
+<div class="book-detail-page" data-book-id="{{ book_id }}">
 <div style="margin-bottom: 1rem;">
     <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="book.backToLibrary">← Back to Library</a>
 </div>
@@ -265,6 +266,26 @@
     </div>
 </div>
 
+{% set annotation_count = (characters | length) + (thoughts | length) + (quotes | length) + (words | length) %}
+<nav class="book-tabs" data-book-tabs role="tablist" aria-label="Book detail sections" data-i18n-aria-label="book.sectionsNav">
+    <button type="button" class="book-tab" id="book-tab-readings" role="tab" aria-controls="book-tab-readings-overview book-tab-readings-log" aria-selected="true" tabindex="0" data-book-tab-trigger="readings">
+        <span data-i18n="book.readingsTab">Readings</span>
+        <span class="book-tab-count" aria-hidden="true">({{ readings | length }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-assessment" role="tab" aria-controls="book-tab-assessment-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="assessment">
+        <span data-i18n="book.assessmentTab">Assessment</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-annotations" role="tab" aria-controls="book-tab-annotations-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="annotations">
+        <span data-i18n="book.annotationsTab">Annotations</span>
+        <span class="book-tab-count" aria-hidden="true">({{ annotation_count }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-editions" role="tab" aria-controls="book-tab-editions-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="editions">
+        <span data-i18n="book.editionsTab">Editions</span>
+        <span class="book-tab-count" aria-hidden="true">({{ editions | length }})</span>
+    </button>
+</nav>
+
+<section id="book-tab-assessment-panel" class="book-tab-panel" data-book-tab-panel="assessment" role="tabpanel" aria-labelledby="book-tab-assessment" hidden>
 <!-- ── Ratings ────────────────────────────────────────────────────────── -->
 <h2>Rating{% if avg_rating %} — <span style="color: var(--lb-deep-orange);">{{ "%.2f" | format(avg_rating) }} / 5</span>{% endif %}</h2>
 <form method="POST" action="{{ url_for('save_ratings', book_id=book_id) }}">
@@ -389,6 +410,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% endfor %}
 </div>
 {% endif %}
+</section>
+
+<section id="book-tab-readings-overview" class="book-tab-panel is-active" data-book-tab-panel="readings" role="tabpanel" aria-labelledby="book-tab-readings">
 <!-- ── Readings timeline ─────────────────────────────────────────────── -->
 {% if readings %}
 <h2>Readings</h2>
@@ -2215,6 +2239,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 {% endif %}
 
+</section>
+
+<section id="book-tab-annotations-panel" class="book-tab-panel" data-book-tab-panel="annotations" role="tabpanel" aria-labelledby="book-tab-annotations" hidden>
 <!-- ── Characters ────────────────────────────────────────────────────── -->
 <h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
 
@@ -2582,6 +2609,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
+</section>
+
+<section id="book-tab-readings-log" class="book-tab-panel" data-book-tab-panel="readings" role="tabpanel" aria-labelledby="book-tab-readings">
 <!-- ── Sessions table ────────────────────────────────────────────────── -->
 <h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--lb-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
@@ -2798,6 +2828,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
+</section>
+
+<section id="book-tab-editions-panel" class="book-tab-panel" data-book-tab-panel="editions" role="tabpanel" aria-labelledby="book-tab-editions" hidden>
 <!-- ── Editions ────────────────────────────────────────────────────────── -->
 {% if editions and editions | length > 1 %}
 <h2 data-i18n="book.editions">Editions</h2>
@@ -2856,6 +2889,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <a href="{{ url_for('new_book', work_id=book_id) }}" class="btn btn-secondary btn-sm" data-i18n="book.addNewEdition">📗 Add New Edition</a>
     <button class="btn btn-secondary btn-sm" onclick="document.getElementById('linkEditionModal').classList.add('active')" data-i18n="book.linkExistingEdition">🔗 Link Existing Book as Edition</button>
 </div>
+</section>
 
 <!-- Link edition modal -->
 <div class="modal-overlay" id="linkEditionModal">
@@ -2892,9 +2926,122 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
 </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<script>
+(function () {
+    var tabRoot = document.querySelector('[data-book-tabs]');
+    if (!tabRoot) return;
+
+    var triggers = Array.prototype.slice.call(tabRoot.querySelectorAll('[data-book-tab-trigger]'));
+    var panels = Array.prototype.slice.call(document.querySelectorAll('[data-book-tab-panel]'));
+    var validTabs = triggers.map(function (trigger) { return trigger.dataset.bookTabTrigger; });
+    var bookId = {{ book_id | tojson }};
+    var storageKey = 'librarium.bookDetailTab.' + bookId;
+    var currentTab = 'readings';
+
+    function isValidTab(tab) {
+        return validTabs.indexOf(tab) !== -1;
+    }
+
+    function readStoredTab() {
+        try {
+            return window.localStorage.getItem(storageKey) || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
+    function writeStoredTab(tab) {
+        try {
+            window.localStorage.setItem(storageKey, tab);
+        } catch (error) {
+        }
+    }
+
+    function updateTabUrl(tab, clearHash) {
+        var nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('tab', tab);
+        if (clearHash) nextUrl.hash = '';
+        window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash);
+    }
+
+    function emitTabChange(tab) {
+        document.dispatchEvent(new CustomEvent('librarium:book-detail-tab-change', {
+            detail: { tab: tab }
+        }));
+    }
+
+    function selectTab(tab, options) {
+        if (!isValidTab(tab)) tab = 'readings';
+        options = options || {};
+        currentTab = tab;
+
+        triggers.forEach(function (trigger) {
+            var selected = trigger.dataset.bookTabTrigger === tab;
+            trigger.classList.toggle('is-active', selected);
+            trigger.setAttribute('aria-selected', String(selected));
+            trigger.tabIndex = selected ? 0 : -1;
+        });
+
+        panels.forEach(function (panel) {
+            var visible = panel.dataset.bookTabPanel === tab;
+            panel.hidden = !visible;
+            panel.classList.toggle('is-active', visible);
+        });
+
+        writeStoredTab(tab);
+        if (options.updateUrl !== false) updateTabUrl(tab, options.clearHash === true);
+        if (options.emit !== false) emitTabChange(tab);
+    }
+
+    triggers.forEach(function (trigger, index) {
+        trigger.addEventListener('click', function () {
+            selectTab(trigger.dataset.bookTabTrigger, { clearHash: true });
+        });
+
+        trigger.addEventListener('keydown', function (event) {
+            var nextIndex = index;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % triggers.length;
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + triggers.length) % triggers.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = triggers.length - 1;
+            if (nextIndex === index) return;
+            event.preventDefault();
+            triggers[nextIndex].focus();
+            selectTab(triggers[nextIndex].dataset.bookTabTrigger, { clearHash: true });
+        });
+    });
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!form || !form.closest('.book-detail-page') || !form.action) return;
+        var actionUrl = new URL(form.action, window.location.href);
+        if (actionUrl.origin !== window.location.origin) return;
+        actionUrl.searchParams.set('tab', currentTab);
+        form.action = actionUrl.toString();
+    });
+
+    window.addEventListener('popstate', function () {
+        var tab = new URL(window.location.href).searchParams.get('tab');
+        selectTab(isValidTab(tab) ? tab : 'readings', { updateUrl: false });
+    });
+
+    var requestedTab = new URL(window.location.href).searchParams.get('tab');
+    var initialTab = isValidTab(requestedTab) ? requestedTab : readStoredTab();
+    selectTab(isValidTab(initialTab) ? initialTab : 'readings');
+
+    function updateStickyOffset() {
+        var header = document.querySelector('.site-header');
+        if (header) document.documentElement.style.setProperty('--lb-book-tabs-top', header.getBoundingClientRect().height + 'px');
+    }
+
+    updateStickyOffset();
+    window.addEventListener('resize', updateStickyOffset);
+}());
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -3320,6 +3467,11 @@ const progressChart = new Chart(ctx, {
             }
         }
     }
+});
+
+document.addEventListener('librarium:book-detail-tab-change', function (event) {
+    if (!event.detail || event.detail.tab !== 'readings') return;
+    window.setTimeout(function () { progressChart.resize(); }, 0);
 });
 
 // ── Chart update (mode + hide idle) ───────────────────────────────────
