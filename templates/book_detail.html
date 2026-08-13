@@ -266,18 +266,36 @@
     </div>
 </div>
 
-{% set annotation_count = (characters | length) + (thoughts | length) + (quotes | length) + (words | length) %}
 <nav class="book-tabs" data-book-tabs role="tablist" aria-label="Book detail sections" data-i18n-aria-label="book.sectionsNav">
     <button type="button" class="book-tab" id="book-tab-readings" role="tab" aria-controls="book-tab-readings-overview book-tab-readings-log" aria-selected="true" tabindex="0" data-book-tab-trigger="readings">
         <span data-i18n="book.readingsTab">Readings</span>
         <span class="book-tab-count" aria-hidden="true">({{ readings | length }})</span>
     </button>
-    <button type="button" class="book-tab" id="book-tab-assessment" role="tab" aria-controls="book-tab-assessment-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="assessment">
-        <span data-i18n="book.assessmentTab">Assessment</span>
+    <button type="button" class="book-tab" id="book-tab-rating" role="tab" aria-controls="book-tab-rating-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="rating">
+        <span data-i18n="book.ratingTab">Rating</span>
     </button>
-    <button type="button" class="book-tab" id="book-tab-annotations" role="tab" aria-controls="book-tab-annotations-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="annotations">
-        <span data-i18n="book.annotationsTab">Annotations</span>
-        <span class="book-tab-count" aria-hidden="true">({{ annotation_count }})</span>
+    <button type="button" class="book-tab" id="book-tab-classification" role="tab" aria-controls="book-tab-classification-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="classification">
+        <span data-i18n="book.classificationTab">Classification</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-similar-works" role="tab" aria-controls="book-tab-similar-works-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="similar-works">
+        <span data-i18n="book.similarWorksTab">Similar Works</span>
+        <span class="book-tab-count" aria-hidden="true">({{ similar_works | length }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-characters" role="tab" aria-controls="book-tab-characters-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="characters">
+        <span data-i18n="book.charactersTab">Characters</span>
+        <span class="book-tab-count" aria-hidden="true">({{ characters | length }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-thoughts" role="tab" aria-controls="book-tab-thoughts-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="thoughts">
+        <span data-i18n="book.thoughtsTab">Thoughts</span>
+        <span class="book-tab-count" aria-hidden="true">({{ thoughts | length }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-quotes" role="tab" aria-controls="book-tab-quotes-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="quotes">
+        <span data-i18n="book.quotesTab">Quotes</span>
+        <span class="book-tab-count" aria-hidden="true">({{ quotes | length }})</span>
+    </button>
+    <button type="button" class="book-tab" id="book-tab-words" role="tab" aria-controls="book-tab-words-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="words">
+        <span data-i18n="book.wordsTab">Words</span>
+        <span class="book-tab-count" aria-hidden="true">({{ words | length }})</span>
     </button>
     <button type="button" class="book-tab" id="book-tab-editions" role="tab" aria-controls="book-tab-editions-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="editions">
         <span data-i18n="book.editionsTab">Editions</span>
@@ -285,9 +303,9 @@
     </button>
 </nav>
 
-<section id="book-tab-assessment-panel" class="book-tab-panel" data-book-tab-panel="assessment" role="tabpanel" aria-labelledby="book-tab-assessment" hidden>
+<section id="book-tab-rating-panel" class="book-tab-panel" data-book-tab-panel="rating" role="tabpanel" aria-labelledby="book-tab-rating" hidden>
 <!-- ── Ratings ────────────────────────────────────────────────────────── -->
-<h2>Rating{% if avg_rating %} — <span style="color: var(--lb-deep-orange);">{{ "%.2f" | format(avg_rating) }} / 5</span>{% endif %}</h2>
+<h2><span data-i18n="book.rating">Rating</span>{% if avg_rating %} — <span style="color: var(--lb-deep-orange);">{{ "%.2f" | format(avg_rating) }} / 5</span>{% endif %}</h2>
 <form method="POST" action="{{ url_for('save_ratings', book_id=book_id) }}">
     <div class="ratings-section">
         {% for group in rating_dimensions %}
@@ -338,6 +356,10 @@ function recalcAverage() {
 }
 document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
+
+</section>
+
+<section id="book-tab-classification-panel" class="book-tab-panel" data-book-tab-panel="classification" role="tabpanel" aria-labelledby="book-tab-classification" hidden>
 <!-- ── Classification ─────────────────────────────────────────────────── -->
 {% set has_classification = namespace(value=false) %}
 {% for taxonomy_field in taxonomy_fields %}
@@ -379,7 +401,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </div>
 </div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noClassification">No classification yet.</p>
+</div>
 {% endif %}
+
+</section>
+
+<section id="book-tab-similar-works-panel" class="book-tab-panel" data-book-tab-panel="similar-works" role="tabpanel" aria-labelledby="book-tab-similar-works" hidden>
 <!-- ── Similar Works ──────────────────────────────────────────────────── -->
 {% if similar_works %}
 <h2 data-i18n="book.similarWorks">Similar Works</h2>
@@ -408,6 +438,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </div>
     </a>
     {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="padding: 1rem;">
+    <p data-i18n="book.noSimilarWorks">No similar works found.</p>
 </div>
 {% endif %}
 </section>
@@ -2241,7 +2275,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
 </section>
 
-<section id="book-tab-annotations-panel" class="book-tab-panel" data-book-tab-panel="annotations" role="tabpanel" aria-labelledby="book-tab-annotations" hidden>
+<section id="book-tab-characters-panel" class="book-tab-panel" data-book-tab-panel="characters" role="tabpanel" aria-labelledby="book-tab-characters" hidden>
 <!-- ── Characters ────────────────────────────────────────────────────── -->
 <h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
 
@@ -2431,6 +2465,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
+</section>
+
+<section id="book-tab-thoughts-panel" class="book-tab-panel" data-book-tab-panel="thoughts" role="tabpanel" aria-labelledby="book-tab-thoughts" hidden>
 <!-- ── Thoughts ──────────────────────────────────────────────────────── -->
 <div class="annotation-section-heading">
     <h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
@@ -2482,6 +2519,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
+</section>
+
+<section id="book-tab-quotes-panel" class="book-tab-panel" data-book-tab-panel="quotes" role="tabpanel" aria-labelledby="book-tab-quotes" hidden>
 <!-- ── Quotes ────────────────────────────────────────────────────────── -->
 <h2 id="quotes"><span data-i18n="book.quotes">Quotes</span> <span class="annotation-count">({{ quotes | length }})</span></h2>
 
@@ -2527,6 +2567,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </form>
 </div>
 
+</section>
+
+<section id="book-tab-words-panel" class="book-tab-panel" data-book-tab-panel="words" role="tabpanel" aria-labelledby="book-tab-words" hidden>
 <!-- ── Words ─────────────────────────────────────────────────────────── -->
 <h2 id="words"><span data-i18n="book.words">Words</span> <span class="annotation-count">({{ words | length }})</span></h2>
 
@@ -2946,6 +2989,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         return validTabs.indexOf(tab) !== -1;
     }
 
+    function normalizeTab(tab) {
+        if (tab === 'assessment') return 'rating';
+        if (tab === 'annotations') return 'characters';
+        return tab;
+    }
+
     function readStoredTab() {
         try {
             return window.localStorage.getItem(storageKey) || '';
@@ -2975,6 +3024,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     }
 
     function selectTab(tab, options) {
+        tab = normalizeTab(tab);
         if (!isValidTab(tab)) tab = 'readings';
         options = options || {};
         currentTab = tab;
@@ -3025,12 +3075,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     });
 
     window.addEventListener('popstate', function () {
-        var tab = new URL(window.location.href).searchParams.get('tab');
+        var tab = normalizeTab(new URL(window.location.href).searchParams.get('tab'));
         selectTab(isValidTab(tab) ? tab : 'readings', { updateUrl: false });
     });
 
-    var requestedTab = new URL(window.location.href).searchParams.get('tab');
-    var initialTab = isValidTab(requestedTab) ? requestedTab : readStoredTab();
+    var requestedTab = normalizeTab(new URL(window.location.href).searchParams.get('tab'));
+    var initialTab = isValidTab(requestedTab) ? requestedTab : normalizeTab(readStoredTab());
     selectTab(isValidTab(initialTab) ? initialTab : 'readings');
 
     function updateStickyOffset() {
