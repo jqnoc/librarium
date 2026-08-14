@@ -550,6 +550,61 @@ Describes the intended readership.
 
 Audience should never describe quality or difficulty.
 
+## 9. Characters
+
+### Purpose
+
+Characters record the important people, creatures, figures, or other beings who participate in the work. Character annotations are separate from the book's Subjects and Themes: do not copy a character into Subjects merely because the character is named, and do not use a character's biography as a substitute for a Theme.
+
+### Character fields
+
+#### Name
+
+Use the character's name as it appears in the book. If the character has no conventional name, use the clearest stable identifying label used by the work or its established reference material.
+
+#### Importance
+
+Importance describes how significant the character is to the work as a whole. Use exactly one of these controlled values:
+
+- **Main** — a central character whose goals, perspective, decisions, or arc are essential to the work.
+- **Supporting** — a recurring and materially important character who contributes to the development of the central story or characters.
+- **Minor** — a distinct character with a limited but meaningful contribution.
+- **Background** — an incidental character who is present or briefly relevant but has little effect on the story.
+
+Assess Importance across the whole work, not from a single scene, chapter, or currently read section. Importance is independent of Role: an Antagonist, Narrator, Mentor, or Love interest may be Main, Supporting, Minor, or Background depending on the work.
+
+#### Role
+
+Roles describe what the character does in the narrative. Select every applicable value; roles are not mutually exclusive. At least one Role is required.
+
+- **Protagonist** — a central character whose experience, goals, or choices organize the narrative.
+- **Antagonist** — a character who opposes the protagonist or the protagonist's central aims.
+- **Narrator** — a character who tells, frames, or mediates the story.
+- **Mentor** — a character who guides, teaches, trains, or otherwise helps another character develop.
+- **Rival** — a character who competes with or obstructs another character's aims, without necessarily being the principal Antagonist.
+- **Love interest** — a character who is the focus of another character's romantic or amorous interest.
+- **Foil** — a character whose contrasting traits, choices, or circumstances illuminate another character.
+- **Other** — use only when a meaningful narrative role does not fit the controlled values above.
+
+Do not force a role simply because a character shares a superficial trait with its definition. Use **Other** when necessary, and prefer the established values whenever they genuinely apply.
+
+#### Description
+
+Write one concise line explaining broadly who the character is. Identify the character's basic identity, situation, or narrative function without retelling the plot. The Description is an orientation line, not a summary of the character's complete history.
+
+#### Biography
+
+Write a full-book account of the character's story, describing the character's development, relationships, major decisions, conflicts, and outcome from beginning to end. Include the complete arc rather than isolated plot elements or only the portion of the book in which the character is most visible. Spoilers are appropriate because the Biography is an internal record of the character's whole story.
+
+Use between one and five paragraphs according to the character's Importance:
+
+- **Main** — usually three to five paragraphs, with enough detail to cover the complete arc and its major relationships.
+- **Supporting** — usually two to three paragraphs, covering the character's principal contribution and development.
+- **Minor** — usually one or two paragraphs, covering the character's identifiable function and significant actions.
+- **Background** — usually one short paragraph, limited to the character's relevant presence and contribution.
+
+For an unfinished book, treat Importance, Role, Description, and Biography as provisional and revise them after the character's complete role becomes clear.
+
 ---
 
 ## Relationship between Themes and Subjects
