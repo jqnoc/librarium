@@ -203,10 +203,10 @@ When adding a new status:
 
 ### 2.8 Rating system
 
-51 dimensions across 9 groups defined in `RATING_DIMENSIONS`:
+52 dimensions across 9 groups defined in `RATING_DIMENSIONS`:
 
 1. **Emotional Impact** (6): heartfelt, tear, inspiring, melancholy, nostalgia, cathartic
-2. **Story & Plot** (6): plot_quality, predictability, pacing, plot_twists, worldbuilding, character_arc
+2. **Story & Plot** (7): plot_quality, ending_satisfaction, predictability, pacing, plot_twists, worldbuilding, character_arc
 3. **Writing & Style** (6): writing_quality, vocabulary_gain, dialogue, voice, symbolism, editorial_quality
 4. **Genre-Specific** (6): suspense, thrill, humor, romance, mystery, horror
 5. **Engagement** (4): addiction, afterglow, rereadability, originality

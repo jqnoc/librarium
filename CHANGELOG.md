@@ -19,12 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a persistent dark-mode toggle for the global header and startup-sync loading screen
 - Add a UTF-8 Markdown download for each book's thoughts, sorted by page while preserving Markdown headings inside each thought
 - Add book character annotations with Name, Description, Biography, required Importance, multi-select Role fields, inline unlabeled translated colored badges, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, and Reading Session creation/editing from a character selector inside the dialog
+- Add an Ending Satisfaction rating dimension under Story & Plot to record how satisfying, fitting, earned, and effective a book's conclusion is
 
 ### Changed
 - Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Thoughts, Quotes, Words, and Editions while keeping the hero and summary visible
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width controlled classification editors, and aligned publication, contributor, source, and binding fields
-- Consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, and document controlled values including Epic as a canonical Form; require classification requests to follow the guide in Copilot instructions
+- consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, document controlled values including Epic as a canonical Form, add v2.1 whole-work Subgenre and Theme/Subject principles plus a classification workflow, and require classification requests to follow the guide in Copilot instructions
 - Separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
 - Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
 - Allow Words of the Day to be edited directly from the Dashboard and saved to their books

@@ -1,4 +1,4 @@
-# Librarium Taxonomy Guidelines (v2.0)
+# Librarium Taxonomy Guidelines (v2.1)
 
 ## Purpose
 
@@ -139,6 +139,13 @@ They refine the major Genre and should never be used as substitutes for it. In p
 
 Do not normalize apparently synonymous values mechanically. First verify the book's Genre and the semantic role of the value. For example, `Adventure` may be normalized to **Adventure Fiction** only when it is actually functioning as a Fiction Subgenre; an `Adventure` value on a Non-Fiction work must not be converted into Adventure Fiction. Likewise, `Coming-of-Age` may be a Theme rather than a Subgenre.
 
+### Whole-work classification and naming
+
+- Prefer explicit reusable literary labels such as **Coming-of-Age Fiction** over ambiguous shorter labels such as **Coming-of-Age** when a Subgenre is intended.
+- National literatures are legitimate Subgenres when they identify the work's literary or cultural tradition.
+- Classify Subgenres according to the whole work, not isolated plot elements.
+- Distinguish literary mode from plot mechanism, subject matter, setting, and Theme. A journey, dream, premonition, pirate, or named fictional place does not establish a Subgenre by itself.
+
 ### Controlled naming: High Fantasy
 
 For this taxonomy, treat `Epic Fantasy`, **High Fantasy**, and `Secondary World Fantasy` as equivalent labels for the same broad Fantasy Subgenre family. **High Fantasy** is the only canonical controlled value; `Epic Fantasy` and `Secondary World Fantasy` are legacy or non-canonical synonyms.
@@ -249,7 +256,7 @@ They answer:
 
 > **"What ideas does the book explore?"**
 
-Themes are **never concrete entities, domains, or topics.**
+Themes describe ideas, experiences, emotions, values, conflicts, and philosophical questions. They must not be concrete domains, phenomena, entities, or topics. Do not duplicate a concept in Themes and Subjects unless there is a genuinely necessary semantic reason.
 
 ### Themes should contain
 
@@ -407,17 +414,21 @@ Use the most specific historically meaningful period available.
 
 ---
 
-## 7. Subject
+## 7. Subjects
 
 ### Purpose
 
-Subjects describe the **concrete topics** covered by the book.
+Subjects include **concrete topics, phenomena, domains, disciplines, practices, institutions, technologies, historical events, and other substantive objects of attention**.
 
 They answer:
 
-> **"What is the book about?"**
+> **"What substantive things is the book about?"**
 
 Subjects are **always nouns** representing real entities or recognised concepts.
+
+Subjects should normally be reusable real-world concepts rather than story-specific proper names. A proper name may be a Subject when the named person, place, event, work, institution, or other entity is itself a substantive object of attention. Do not classify incidental fictional names or other story-specific details merely because they occur in the work.
+
+Do not automatically repeat a Setting as a Subject. Add a place as a Subject only when the place itself is a substantive object of attention, rather than merely the location where the story happens.
 
 ### Subjects may include
 
@@ -510,6 +521,16 @@ Never include:
 
 These belong in Themes.
 
+## Classification workflow
+
+Apply the following workflow before assigning, auditing, or normalizing values:
+
+1. Identify the whole-work characteristics first.
+2. Separate literary mode from plot elements and mechanisms.
+3. Separate concrete subject matter from thematic interpretation.
+4. Avoid duplicate values across categories.
+5. Mark uncertain classifications as provisional when reading an unfinished book.
+
 ---
 
 ## 8. Audience
@@ -564,8 +585,10 @@ are clearly **Subjects**, because they are identifiable fields, disciplines, or 
 
 The guiding distinction is:
 
-- **Themes** = ideas and lived experiences
-- **Subjects** = concrete domains and topics
+- **Themes** = ideas, human experiences, emotions, values, conflicts, and philosophical questions
+- **Subjects** = concrete domains, phenomena, entities, topics, and other substantive objects of attention
+
+When a concept could be either a Theme or a Subject, ask whether the work is **exploring the thing itself** or **exploring the human experience or idea associated with it**. Classify the former as a Subject and the latter as a Theme. Review the work's emphasis rather than classifying by the word alone.
 
 ### Themes
 
@@ -720,9 +743,9 @@ Use a controlled value such as Essay, Novel, Diary, Interview, or Letters.
 
 ---
 
-### Is it a concrete person, place, discipline, event, work, religion, species or topic?
+### Is it a concrete person, place, discipline, event, work, religion, species, phenomenon, domain, or topic?
 
-→ Subject
+→ Subjects
 
 ---
 
@@ -743,7 +766,7 @@ Use a controlled value such as Essay, Novel, Diary, Interview, or Letters.
 - Reuse existing values whenever possible instead of creating new ones.
 - Every new value should be applicable to more than one book whenever feasible.
 - Keep presentation modes in Forms and literary, academic, or critical classifications in Subgenres.
-- When in doubt between **Theme** and **Subject**, ask: *Is this an idea, or is it a thing?* If it is an idea, it belongs in **Themes**. If it is a thing, it belongs in **Subjects**.
+- When in doubt between **Theme** and **Subject**, ask whether the work explores the thing itself or the human experience or idea associated with it. The former belongs in **Subjects**; the latter belongs in **Themes**.
 
 ## Naming Convention for Future Consistency
 
@@ -757,7 +780,7 @@ Prefer:
 
 Keeping concepts separate makes the controlled vocabulary easier to maintain, search, and reuse.
 
-## Recommendation for version 2.0
+## Guiding principle for version 2.1
 
 After reviewing the taxonomy we've built together, I would add one overarching principle:
 

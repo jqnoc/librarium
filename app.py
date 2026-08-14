@@ -2938,6 +2938,7 @@ RATING_DIMENSIONS = [
         "group": "Story & Plot",
         "items": [
             {"key": "plot_quality",  "label": "Plot Quality",  "tip": "Narrative strength, coherence"},
+            {"key": "ending_satisfaction", "label": "Ending Satisfaction", "tip": "How satisfying, fitting, earned, and effective the conclusion is"},
             {"key": "predictability","label": "Predictability","tip": "How surprising / unpredictable"},
             {"key": "pacing",        "label": "Pacing",        "tip": "Flow, speed of story progression"},
             {"key": "plot_twists",   "label": "Plot Twists",   "tip": "Unexpected turns and surprises"},
