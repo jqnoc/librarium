@@ -8573,7 +8573,7 @@ def add_character(book_id: str):
     ).fetchone()
     if _annotation_wants_json():
         return jsonify({"ok": True, "character": _character_from_row(row)})
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor=f"character-{cursor.lastrowid}"))
 
 
 @app.route("/book/<book_id>/characters/reorder", methods=["POST"])
@@ -8647,7 +8647,7 @@ def edit_character(book_id: str, cid: int):
     ).fetchone()
     if _annotation_wants_json():
         return jsonify({"ok": True, "character": _character_from_row(row)})
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor=f"character-{cid}"))
 
 
 @app.route("/book/<book_id>/characters/<int:cid>/delete", methods=["POST"])
