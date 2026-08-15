@@ -93,12 +93,14 @@
         editor.dataset.initialized = 'true';
 
         var field = editor.dataset.field;
-        var hidden = byId(field);
+        var stateKey = editor.dataset.stateKey || field;
+        var hidden = byId(editor.dataset.hiddenId || field);
         var input = editor.querySelector('[data-chip-input]');
         var chips = editor.querySelector('[data-chips-container]');
         var suggestionsBox = editor.querySelector('[data-classification-suggestions]');
         if (!hidden || !input || !chips || !suggestionsBox) return;
-        var suggestions = Array.from(document.querySelectorAll('#' + field + '-list option')).map(function (option) {
+        var suggestionsList = byId(editor.dataset.suggestionsListId || field + '-list');
+        var suggestions = Array.from(suggestionsList ? suggestionsList.querySelectorAll('option') : []).map(function (option) {
             return normalize(option.value);
         }).filter(Boolean).sort(compareValues);
         var visibleSuggestions = [];
@@ -159,7 +161,7 @@
                 item.setAttribute('aria-selected', index === activeSuggestion ? 'true' : 'false');
             });
             if (activeSuggestion >= 0 && visibleSuggestions[activeSuggestion]) {
-                input.setAttribute('aria-activedescendant', field + '-suggestion-' + activeSuggestion);
+                input.setAttribute('aria-activedescendant', stateKey + '-suggestion-' + activeSuggestion);
             } else {
                 input.removeAttribute('aria-activedescendant');
             }
@@ -185,7 +187,7 @@
             visibleSuggestions.forEach(function (value, index) {
                 var item = document.createElement('div');
                 item.className = 'classification-suggestion';
-                item.id = field + '-suggestion-' + index;
+                item.id = stateKey + '-suggestion-' + index;
                 item.setAttribute('role', 'option');
                 item.setAttribute('aria-selected', 'false');
                 item.textContent = value;
@@ -246,7 +248,7 @@
             renderSuggestions();
         }
 
-        classificationStates[field] = {
+        classificationStates[stateKey] = {
             removeValue: removeValue,
             renderSuggestions: renderSuggestions,
             sync: sync
@@ -323,6 +325,7 @@
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData(classificationDragType, JSON.stringify({
                 field: field,
+                stateKey: stateKey,
                 value: value
             }));
             event.dataTransfer.setData('text/plain', value);
@@ -366,7 +369,7 @@
                 return;
             }
             if (!payload || !payload.field || !payload.value || payload.field === field) return;
-            var sourceState = classificationStates[payload.field];
+            var sourceState = classificationStates[payload.stateKey || payload.field];
             if (!sourceState) return;
             addValue(payload.value);
             sync();
@@ -410,6 +413,14 @@
             });
         }
     }
+
+    window.syncClassificationForm = function (form) {
+        if (!form) return;
+        form.querySelectorAll('[data-classification-editor]').forEach(function (editor) {
+            var state = classificationStates[editor.dataset.stateKey || editor.dataset.field];
+            if (state) state.sync();
+        });
+    };
 
     initialize();
 }());

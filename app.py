@@ -9040,7 +9040,7 @@ def edit_metadata(book_id: str):
         text_fields = (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", *TAXONOMY_FIELD_NAMES,
+            "publication_date", "isbn", "publisher",
             "summary", "translator", "illustrator", "editor",
             "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
@@ -9575,11 +9575,11 @@ def new_book():
 
         book_id = str(uuid_module.uuid4())
 
-        info: dict = {}
+        info: dict = {field: "" for field in TAXONOMY_FIELD_NAMES}
         for field in (
             "name", "subtitle", "author", "language", "original_title",
             "original_language", "original_publication_date",
-            "publication_date", "isbn", "publisher", *TAXONOMY_FIELD_NAMES,
+            "publication_date", "isbn", "publisher",
             "summary", "translator", "illustrator", "editor",
             "foreword_author", "epilogue_author", "contributing_author", "status",
             "format", "binding", "audio_format",
@@ -9677,13 +9677,17 @@ def new_book():
         if link_work_id:
             is_primary = 0  # new edition is secondary
             # Ensure the parent book has a work_id; if not, assign one (use parent's own id)
-            parent = db.execute("SELECT id, work_id FROM books WHERE id = ?", (link_work_id,)).fetchone()
+            parent = db.execute("SELECT * FROM books WHERE id = ?", (link_work_id,)).fetchone()
             if parent and not parent["work_id"]:
                 db.execute("UPDATE books SET work_id = ?, is_primary_edition = 1 WHERE id = ?",
                            (link_work_id, link_work_id))
             elif parent and parent["work_id"]:
                 # Parent already has a work_id; use that instead
                 link_work_id = parent["work_id"]
+            if parent:
+                inherited_taxonomy = _apply_work_taxonomy(db, parent)
+                for field in TAXONOMY_FIELD_NAMES:
+                    info[field] = _normalize_taxonomy_values(inherited_taxonomy.get(field))
 
         db.execute("""
             INSERT INTO books

@@ -8,12 +8,6 @@
 
 <h1 data-i18n="bookForm.editMetadata">Edit Metadata</h1>
 
-{% if info.get('work_id') %}
-<div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--lb-deep-orange);">
-    <div class="card-body" style="padding: 0.75rem 1rem;" data-i18n="bookForm.sharedClassificationHint">Classification is shared by all editions of this work. Changes here update every linked edition.</div>
-</div>
-{% endif %}
-
 {% set is_new_book = false %}
 {% set form_data = info %}
 {% set form_action = url_for('edit_metadata', book_id=book_id) %}

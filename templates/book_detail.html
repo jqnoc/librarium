@@ -370,7 +370,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% if has_classification.value %}
 <div class="classification-section-header">
     <h2 data-i18n="book.classification">Classification</h2>
-    <button type="button" class="btn btn-danger btn-sm" onclick="openCleanClassificationModal()" data-i18n="book.cleanClassification">Clean Classification</button>
+    <div class="classification-section-actions">
+        <button type="button" class="btn btn-primary btn-sm" onclick="openBookClassificationModal()" data-i18n="book.editClassification">Edit Classification</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="openCleanClassificationModal()" data-i18n="book.cleanClassification">Clean Classification</button>
+    </div>
 </div>
 <div class="book-classification-grid">
     {% for taxonomy_field in taxonomy_fields %}
@@ -402,10 +405,64 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 </div>
 {% else %}
+<div class="classification-section-header">
+    <h2 data-i18n="book.classification">Classification</h2>
+    <button type="button" class="btn btn-primary btn-sm" onclick="openBookClassificationModal()" data-i18n="book.editClassification">Edit Classification</button>
+</div>
 <div class="empty-state" style="padding: 1rem;">
     <p data-i18n="book.noClassification">No classification yet.</p>
 </div>
 {% endif %}
+
+<div class="modal-overlay book-classification-edit-modal-overlay" id="bookClassificationEditModal"
+     role="dialog" aria-modal="true" aria-labelledby="book-classification-edit-title" aria-hidden="true">
+    <div class="modal-box book-classification-edit-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeBookClassificationModal()" aria-label="Close">&times;</button>
+        <h3 id="book-classification-edit-title" class="reading-session-classification-title" data-i18n="book.editClassification">Edit Classification</h3>
+        <form id="bookClassificationForm" method="POST" action="{{ url_for('save_classification', book_id=book_id) }}"
+              onsubmit="return saveBookClassification(event)">
+            <div class="reading-session-classification-grid">
+                {% for taxonomy_field in taxonomy_fields %}
+                <div class="reading-session-classification-field">
+                    <label id="book-classification-{{ taxonomy_field.field }}-label" for="book-classification-{{ taxonomy_field.field }}-input"
+                           data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</label>
+                    <p class="classification-description" data-i18n="{{ taxonomy_field.description_key }}">{{ taxonomy_field.description }}</p>
+                    <div class="classification-editor" data-classification-editor data-field="{{ taxonomy_field.field }}"
+                         data-state-key="book-{{ taxonomy_field.field }}"
+                         data-hidden-id="book-classification-{{ taxonomy_field.field }}-value"
+                         data-suggestions-list-id="book-classification-{{ taxonomy_field.field }}-list">
+                        <div class="classification-chips" data-chips-container aria-live="polite">
+                            {% for value in (info.get(taxonomy_field.field, '') or '').split(';') %}
+                            {% if value.strip() %}
+                            <span class="classification-chip" draggable="true" aria-grabbed="false">
+                                <span class="classification-chip-label">{{ value.strip() }}</span>
+                                <button type="button" class="classification-chip-remove" data-remove-chip aria-label="Remove {{ value.strip() }}">&times;</button>
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <input type="text" id="book-classification-{{ taxonomy_field.field }}-input" class="classification-input" data-chip-input autocomplete="off"
+                               placeholder="{{ taxonomy_field.placeholder }}" data-i18n-placeholder="{{ taxonomy_field.placeholder_key }}">
+                        <div class="classification-suggestions" data-classification-suggestions id="book-classification-{{ taxonomy_field.field }}-suggestions" role="listbox"
+                             aria-labelledby="book-classification-{{ taxonomy_field.field }}-label"></div>
+                    </div>
+                    <input type="hidden" id="book-classification-{{ taxonomy_field.field }}-value" name="{{ taxonomy_field.field }}" value="{{ info.get(taxonomy_field.field, '') }}">
+                    <datalist id="book-classification-{{ taxonomy_field.field }}-list">
+                        {% for value in suggestions.get(taxonomy_field.field, []) %}<option value="{{ value }}">{% endfor %}
+                    </datalist>
+                </div>
+                {% endfor %}
+            </div>
+            <p id="bookClassificationError" class="reading-session-classification-error" role="alert" aria-live="polite"></p>
+            <div class="book-classification-edit-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeBookClassificationModal()" data-i18n="form.cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="bookClassificationSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionClassificationSave">Save Classification</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 </section>
 
@@ -3244,6 +3301,64 @@ function openCleanClassificationModal() {
 function closeCleanClassificationModal() {
     var modal = document.getElementById('cleanClassificationModal');
     if (modal) modal.classList.remove('active');
+}
+
+var bookClassificationSaving = false;
+
+function openBookClassificationModal() {
+    var modal = document.getElementById('bookClassificationEditModal');
+    var error = document.getElementById('bookClassificationError');
+    var saveButton = document.getElementById('bookClassificationSaveButton');
+    if (!modal) return;
+    bookClassificationSaving = false;
+    if (error) error.textContent = '';
+    if (saveButton) saveButton.disabled = false;
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('book-classification-modal-open');
+    var firstInput = modal.querySelector('[data-chip-input]');
+    if (firstInput) firstInput.focus();
+}
+
+function closeBookClassificationModal() {
+    var modal = document.getElementById('bookClassificationEditModal');
+    if (!modal || bookClassificationSaving) return;
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('book-classification-modal-open');
+}
+
+function saveBookClassification(event) {
+    event.preventDefault();
+    var form = document.getElementById('bookClassificationForm');
+    var modal = document.getElementById('bookClassificationEditModal');
+    var saveButton = document.getElementById('bookClassificationSaveButton');
+    var error = document.getElementById('bookClassificationError');
+    if (!form || !modal || bookClassificationSaving) return false;
+    if (window.syncClassificationForm) window.syncClassificationForm(form);
+    bookClassificationSaving = true;
+    if (saveButton) saveButton.disabled = true;
+    if (error) error.textContent = '';
+    fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'Accept': 'application/json' }
+    }).then(function (response) {
+        if (!response.ok) throw new Error('classification save failed');
+        return response.json();
+    }).then(function (payload) {
+        if (!payload || !payload.ok) throw new Error('classification save failed');
+        bookClassificationSaving = false;
+        closeBookClassificationModal();
+        window.location.reload();
+    }).catch(function () {
+        bookClassificationSaving = false;
+        if (saveButton) saveButton.disabled = false;
+        if (error) error.textContent = window.librariumI18n
+            ? window.librariumI18n.t('book.readingSessionClassificationError')
+            : 'Classification could not be saved. Try again.';
+    });
+    return false;
 }
 
 function togglePeriodEdit(idx) {
