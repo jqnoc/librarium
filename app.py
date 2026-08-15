@@ -804,6 +804,19 @@ def render_markdown(text: str) -> str:
         return ""
     # Strikethrough: ~~text~~ → <del>text</del>
     text = re.sub(r'~~(.+?)~~', r'<del>\1</del>', text, flags=re.DOTALL)
+    normalized_lines = []
+    in_fenced_code = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if re.match(r"^(`{3,}|~{3,})(?:\s|$)", stripped):
+            in_fenced_code = not in_fenced_code
+        if stripped == "---" and not in_fenced_code:
+            if normalized_lines and normalized_lines[-1] != "":
+                normalized_lines.append("")
+            normalized_lines.extend((line, ""))
+        else:
+            normalized_lines.append(line)
+    text = "\n".join(normalized_lines)
     md = _markdown_lib.Markdown(extensions=['fenced_code', 'nl2br', 'sane_lists'])
     html = md.convert(text)
     s = _Sanitiser(allowed_tags=_MD_ALLOWED_TAGS)
