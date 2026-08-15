@@ -2366,7 +2366,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <div id="character-detail-modal-{{ character.id }}" class="modal-overlay character-detail-modal-overlay"
      role="dialog" aria-modal="true" aria-labelledby="character-detail-title-{{ character.id }}"
      onclick="if (event.target === this) closeCharacterModal(this.id)">
-    <div class="modal-box character-detail-modal-box">
+    <div class="modal-box character-detail-modal-box{% if character.has_portrait %} has-portrait{% endif %}">
         <button type="button" class="reading-session-modal-close character-detail-modal-close"
                 onclick="closeCharacterModal('character-detail-modal-{{ character.id }}')"
                 aria-label="Close">&times;</button>
