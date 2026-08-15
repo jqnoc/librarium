@@ -2171,11 +2171,12 @@ select.form-control { cursor: pointer; }
 }
 .book-classification-edit-modal-box {
     position: relative;
-    width: min(760px, 94vw);
+    width: min(1040px, calc(100vw - 2rem));
     max-width: none;
     max-height: calc(100vh - 2rem);
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
+    box-sizing: border-box;
     padding: 1.5rem;
     text-align: left;
     background: var(--lb-card-bg);
@@ -2891,8 +2892,8 @@ body.reading-session-modal-open { overflow: hidden; }
 
 .book-classification-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.25rem 1.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
     margin-bottom: 1.5rem;
 }
 .book-classification-group h3 {
