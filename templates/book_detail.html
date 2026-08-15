@@ -770,7 +770,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                         data-i18n="book.readingSessionNewCharacter">+ New Character</button>
             </div>
         </div>
-        <form id="readingSessionCharacterForm" method="POST" action="{{ url_for('add_character', book_id=book_id) }}"
+        <form id="readingSessionCharacterForm" method="POST" enctype="multipart/form-data" action="{{ url_for('add_character', book_id=book_id) }}"
               data-add-action="{{ url_for('add_character', book_id=book_id) }}"
               data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/characters/"
               onsubmit="return saveReadingSessionCharacter(event)">
@@ -794,6 +794,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <label for="readingSessionCharacterBiography" data-i18n="book.characterBiography">Biography</label>
                 <textarea id="readingSessionCharacterBiography" name="biography" rows="7" class="form-control"
                           placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder"></textarea>
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
+                <label for="readingSessionCharacterPortrait" data-i18n="book.characterPortrait">Portrait</label>
+                <input type="file" id="readingSessionCharacterPortrait" name="portrait" class="form-control" accept="image/*">
+                <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
             </div>
             <p id="readingSessionCharacterError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
             <div class="reading-session-annotation-actions">
@@ -1034,6 +1039,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         setCharacterRoleSelection(form, character ? character.roles : ['Other']);
         getElement('readingSessionCharacterDescription').value = character ? (character.description || '') : '';
         getElement('readingSessionCharacterBiography').value = character ? (character.biography || '') : '';
+        var portraitInput = getElement('readingSessionCharacterPortrait');
+        if (portraitInput) portraitInput.value = '';
         var title = getElement('reading-session-character-title');
         if (title) {
             title.dataset.i18n = character ? 'book.readingSessionEditCharacter' : 'book.readingSessionNewCharacter';
@@ -2283,7 +2290,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <div class="annotations-list annotations-characters" data-character-list
     data-reorder-url="{{ url_for('reorder_characters', book_id=book_id) }}">
     {% for character in characters %}
-    <div class="annotation-card annotation-character" id="character-{{ character.id }}"
+    <div class="annotation-card annotation-character{% if character.has_portrait %} has-portrait{% endif %}" id="character-{{ character.id }}"
         data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false" tabindex="0"
         role="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="character-detail-modal-{{ character.id }}">
         <div class="annotation-body">
@@ -2307,6 +2314,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <div class="annotation-character-text">{{ character.description }}</div>
             {% endif %}
         </div>
+        {% if character.has_portrait %}
+        <div class="annotation-character-portrait" aria-hidden="true">
+            <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
+        </div>
+        {% endif %}
         <div class="annotation-actions">
             <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})"
                                         data-i18n-title="form.edit" data-i18n-aria-label="form.edit" aria-label="Edit">&#9998;</button>
@@ -2316,7 +2328,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             </form>
         </div>
         <div class="annotation-edit-row" id="character-edit-{{ character.id }}">
-                        <form method="POST" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form"
+                        <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form"
                                     onsubmit="return window.validateCharacterRoleForm(this)">
                 <label for="edit-character-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
                 <input type="text" id="edit-character-name-{{ character.id }}" name="name" value="{{ character.name }}" required
@@ -2329,6 +2341,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <label for="edit-character-biography-{{ character.id }}" data-i18n="book.characterBiography">Biography</label>
                 <textarea id="edit-character-biography-{{ character.id }}" name="biography" rows="6"
                           placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder">{{ character.biography }}</textarea>
+                <label for="edit-character-portrait-{{ character.id }}" data-i18n="book.characterPortrait">Portrait</label>
+                {% if character.has_portrait %}
+                <div class="character-portrait-form-preview">
+                    <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
+                    <label class="character-portrait-remove" for="remove-character-portrait-{{ character.id }}">
+                        <input type="checkbox" id="remove-character-portrait-{{ character.id }}" name="remove_portrait" value="1">
+                        <span data-i18n="book.characterRemovePortrait">Remove current portrait</span>
+                    </label>
+                </div>
+                {% endif %}
+                <input type="file" id="edit-character-portrait-{{ character.id }}" name="portrait" accept="image/*">
+                <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
                 <div class="annotation-character-form-actions">
                     <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})" data-i18n="form.cancel">Cancel</button>
@@ -2347,6 +2371,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 onclick="closeCharacterModal('character-detail-modal-{{ character.id }}')"
                 aria-label="Close">&times;</button>
         <h3 id="character-detail-title-{{ character.id }}" class="character-detail-modal-title">{{ character.name }}</h3>
+        {% if character.has_portrait %}
+        <div class="character-detail-modal-portrait">
+            <img src="{{ url_for('character_portrait', character_id=character.id, v=character.portrait_hash) }}" alt="{{ character.name }}">
+        </div>
+        {% endif %}
         <div class="annotation-character-badges character-detail-modal-badges">
             {% for importance in character_importance_options %}
             {% if importance.value == character.importance %}
@@ -2540,7 +2569,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </script>
 
 <div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form"
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('add_character', book_id=book_id) }}" class="annotation-add-form annotation-character-form"
           onsubmit="return window.validateCharacterRoleForm(this)">
         <label for="add-character-name" data-i18n="book.characterName">Name</label>
         <input type="text" id="add-character-name" name="name" required placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
@@ -2550,6 +2579,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <textarea id="add-character-description" name="description" rows="2" placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
         <label for="add-character-biography" data-i18n="book.characterBiography">Biography</label>
         <textarea id="add-character-biography" name="biography" rows="4" placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder"></textarea>
+        <label for="add-character-portrait" data-i18n="book.characterPortrait">Portrait</label>
+        <input type="file" id="add-character-portrait" name="portrait" accept="image/*">
+        <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
         <div class="annotation-character-form-actions">
             <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addCharacterBtn">+ Add Character</button>
         </div>

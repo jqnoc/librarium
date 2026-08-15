@@ -2089,6 +2089,21 @@ select.form-control { cursor: pointer; }
 .character-detail-modal-badges {
     margin-bottom: 1.25rem;
 }
+.character-detail-modal-portrait {
+    width: 128px;
+    aspect-ratio: 4 / 5;
+    margin: 0 auto 1.25rem;
+    overflow: hidden;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-gradient);
+}
+.character-detail-modal-portrait img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
 .character-detail-modal-field + .character-detail-modal-field {
     margin-top: 1rem;
 }
@@ -4238,6 +4253,44 @@ body.reading-session-modal-open { overflow: hidden; }
     transition: border-color .15s, box-shadow .15s;
 }
 
+.annotation-character.has-portrait {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    gap: 1rem;
+}
+
+.annotation-character-portrait {
+    grid-column: 2;
+    grid-row: 1;
+    width: 96px;
+    aspect-ratio: 4 / 5;
+    align-self: start;
+    justify-self: end;
+    overflow: hidden;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-gradient);
+}
+
+.annotation-character-portrait img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.annotation-character.has-portrait .annotation-edit-row {
+    grid-column: 1 / -1;
+}
+
+.annotation-character.has-portrait .annotation-actions {
+    position: static;
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    margin-top: .5rem;
+}
+
 .annotation-character:hover {
     border-color: var(--lb-orange);
 }
@@ -4276,6 +4329,42 @@ body.reading-session-modal-open { overflow: hidden; }
     line-height: 1.5;
     white-space: pre-line;
     overflow-wrap: anywhere;
+}
+
+.character-portrait-form-preview {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .65rem;
+}
+
+.character-portrait-form-preview img {
+    width: 64px;
+    aspect-ratio: 4 / 5;
+    display: block;
+    object-fit: cover;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+}
+
+.character-portrait-remove {
+    display: inline-flex !important;
+    align-items: center;
+    gap: .35rem;
+    color: var(--lb-text) !important;
+    font-size: .82rem !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+.character-portrait-remove input {
+    accent-color: var(--lb-orange);
+}
+
+.character-portrait-hint {
+    color: var(--lb-text-light);
+    font-size: .78rem;
 }
 
 .annotation-page {

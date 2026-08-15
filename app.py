@@ -141,10 +141,26 @@ def _character_form_values() -> tuple[str | None, list[str], str | None]:
     return importance, roles, None
 
 
+def _character_portrait_upload_values() -> tuple[bytes | None, bytes | None, str | None, str | None]:
+    portrait_file = request.files.get("portrait")
+    if not portrait_file or not portrait_file.filename:
+        return None, None, None, None
+
+    portrait_blob = portrait_file.read()
+    portrait_thumb = _generate_thumbnail(portrait_blob)
+    if not portrait_thumb:
+        return None, None, None, "Character portrait must be a valid image."
+
+    portrait_hash = hashlib.md5(portrait_blob).hexdigest()[:12]
+    return portrait_blob, portrait_thumb, portrait_hash, None
+
+
 def _character_from_row(row: sqlite3.Row) -> dict:
     character = dict(row)
     character["importance"] = _normalise_character_importance(character.get("importance"))
     character["roles"] = _normalise_character_roles(character.get("roles"))
+    character["has_portrait"] = bool(character.get("has_portrait"))
+    character["portrait_hash"] = character.get("portrait_hash") or ""
     return character
 
 DICTIONARY_SOURCES = (
@@ -617,7 +633,7 @@ def _download_all_from_dropbox() -> None:
     _startup_sync_progress = "Syncing images…"
     for u in users_data["users"]:
         slug = _sanitize_username(u["name"])
-        for subfolder in ("covers", "authors"):
+        for subfolder in ("covers", "authors", "characters"):
             remote_dir = f"/images/{slug}/{subfolder}"
             try:
                 entries = _dbx_list_folder(remote_dir)
@@ -662,7 +678,7 @@ def _upload_all_to_dropbox() -> None:
         img_dir = IMAGES_DIR / slug
         if not img_dir.exists():
             continue
-        for subfolder in ("covers", "authors"):
+        for subfolder in ("covers", "authors", "characters"):
             sub = img_dir / subfolder
             if not sub.exists():
                 continue
@@ -932,13 +948,18 @@ def _author_photo_path(author_name: str, username: str | None = None) -> Path:
     return _user_images_dir(username) / "authors" / f"{slug}.webp"
 
 
+def _character_portrait_path(character_id: int | str, username: str | None = None) -> Path:
+    """Return the filesystem path for a character's full-size portrait."""
+    return _user_images_dir(username) / "characters" / f"{character_id}.webp"
+
+
 def _save_image_file(dest: Path, blob: bytes) -> None:
     """Write an image BLOB to the filesystem and upload to Dropbox."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(blob)
     # Upload to Dropbox
     if _is_authenticated():
-        username = dest.parent.parent.name  # images/<user>/covers|authors
+        username = dest.parent.parent.name  # images/<user>/covers|authors|characters
         remote = f"/images/{username}/{dest.parent.name}/{dest.name}"
         try:
             _dbx_upload(dest, remote)
@@ -1241,7 +1262,10 @@ def init_schema() -> None:
             description TEXT    NOT NULL DEFAULT '',
             biography   TEXT    NOT NULL DEFAULT '',
             importance  TEXT    NOT NULL DEFAULT 'Supporting',
-            roles       TEXT    NOT NULL DEFAULT '["Other"]'
+            roles       TEXT    NOT NULL DEFAULT '["Other"]',
+            has_portrait INTEGER NOT NULL DEFAULT 0,
+            portrait_hash TEXT NOT NULL DEFAULT '',
+            portrait_thumb BLOB DEFAULT NULL
         );
     """)
     # Insert the default "Books" library for fresh databases
@@ -1293,6 +1317,7 @@ def _run_all_migrations() -> None:
     migrate_add_characters()
     migrate_add_character_order()
     migrate_add_character_metadata()
+    migrate_add_character_portrait()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2631,6 +2656,29 @@ def migrate_add_character_metadata() -> None:
     if "roles" not in cols:
         db.execute(
             "ALTER TABLE characters ADD COLUMN roles TEXT NOT NULL DEFAULT '[\"Other\"]'"
+        )
+    db.commit()
+    db.close()
+
+
+def migrate_add_character_portrait() -> None:
+    """Add file-backed character portrait metadata and thumbnails."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [row[1] for row in db.execute("PRAGMA table_info(characters)").fetchall()]
+    if "has_portrait" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN has_portrait INTEGER NOT NULL DEFAULT 0"
+        )
+    if "portrait_hash" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN portrait_hash TEXT NOT NULL DEFAULT ''"
+        )
+    if "portrait_thumb" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN portrait_thumb BLOB DEFAULT NULL"
         )
     db.commit()
     db.close()
@@ -7982,7 +8030,7 @@ def book_detail(book_id: str):
     ).fetchone()
     latest_thought = dict(latest_thought_row) if latest_thought_row else None
     characters = [_character_from_row(row) for row in db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
         "WHERE book_id = ? ORDER BY display_order, name COLLATE NOCASE, id",
         (book_id,),
     ).fetchall()]
@@ -8145,6 +8193,72 @@ def book_cover_thumb(book_id: str):
     resp = make_response(row["cover_thumb"])
     resp.headers["Content-Type"] = "image/jpeg"
     resp.headers["ETag"] = f'"t-{cover_hash}"'
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
+@app.route("/character_portrait/<int:character_id>")
+def character_portrait(character_id: int):
+    """Serve a character's full-size portrait from the filesystem."""
+    db = get_db()
+    row = db.execute(
+        "SELECT portrait_hash, portrait_thumb FROM characters WHERE id = ? AND has_portrait = 1",
+        (character_id,),
+    ).fetchone()
+    if not row:
+        abort(404)
+
+    portrait_hash = row["portrait_hash"] or ""
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and portrait_hash == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"{portrait_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    portrait_path = _character_portrait_path(character_id)
+    if portrait_path.exists():
+        resp = make_response(portrait_path.read_bytes())
+        resp.headers["Content-Type"] = "image/webp"
+        resp.headers["ETag"] = f'"{portrait_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if row["portrait_thumb"]:
+        resp = make_response(row["portrait_thumb"])
+        resp.headers["Content-Type"] = "image/jpeg"
+        resp.headers["ETag"] = f'"{portrait_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    abort(404)
+
+
+@app.route("/character_portrait_thumb/<int:character_id>")
+def character_portrait_thumb(character_id: int):
+    """Serve a thumbnail version of a character's portrait."""
+    db = get_db()
+    row = db.execute(
+        "SELECT portrait_thumb, portrait_hash FROM characters WHERE id = ? AND has_portrait = 1",
+        (character_id,),
+    ).fetchone()
+    if not row:
+        abort(404)
+
+    portrait_hash = row["portrait_hash"] or ""
+    etag_from_client = request.headers.get("If-None-Match", "").strip(' "')
+    if etag_from_client and ("t-" + portrait_hash) == etag_from_client:
+        resp = make_response("", 304)
+        resp.headers["ETag"] = f'"t-{portrait_hash}"'
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+    if not row["portrait_thumb"]:
+        abort(404)
+
+    resp = make_response(row["portrait_thumb"])
+    resp.headers["Content-Type"] = "image/jpeg"
+    resp.headers["ETag"] = f'"t-{portrait_hash}"'
     resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return resp
 
@@ -8554,6 +8668,12 @@ def add_character(book_id: str):
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": validation_error}), 400
         return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    portrait_blob, portrait_thumb, portrait_hash, portrait_error = _character_portrait_upload_values()
+    if portrait_error:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": portrait_error}), 400
+        flash(portrait_error, "error")
+        return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
     next_order = db.execute(
         "SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order "
@@ -8561,13 +8681,18 @@ def add_character(book_id: str):
         (book_id,),
     ).fetchone()["next_order"]
     cursor = db.execute(
-        "INSERT INTO characters (book_id, display_order, name, description, biography, importance, roles) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (book_id, next_order, name, description, biography, importance, json.dumps(roles)),
+        "INSERT INTO characters (book_id, display_order, name, description, biography, importance, roles, "
+        "has_portrait, portrait_hash, portrait_thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            book_id, next_order, name, description, biography, importance, json.dumps(roles),
+            1 if portrait_blob else 0, portrait_hash or "", portrait_thumb,
+        ),
     )
     db.commit()
+    if portrait_blob:
+        _save_image_file(_character_portrait_path(cursor.lastrowid), portrait_blob)
     row = db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cursor.lastrowid, book_id),
     ).fetchone()
@@ -8629,6 +8754,12 @@ def edit_character(book_id: str, cid: int):
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": validation_error}), 400
         return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
+    portrait_blob, portrait_thumb, portrait_hash, portrait_error = _character_portrait_upload_values()
+    if portrait_error:
+        if _annotation_wants_json():
+            return jsonify({"ok": False, "error": portrait_error}), 400
+        flash(portrait_error, "error")
+        return redirect(url_for("book_detail", book_id=book_id, _anchor=f"character-{cid}"))
 
     cursor = db.execute(
         "UPDATE characters SET name = ?, description = ?, biography = ?, importance = ?, roles = ? "
@@ -8640,8 +8771,24 @@ def edit_character(book_id: str, cid: int):
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": "Character not found."}), 404
         abort(404)
+    if portrait_blob:
+        db.execute(
+            "UPDATE characters SET has_portrait = 1, portrait_hash = ?, portrait_thumb = ? "
+            "WHERE id = ? AND book_id = ?",
+            (portrait_hash, portrait_thumb, cid, book_id),
+        )
+        db.commit()
+        _save_image_file(_character_portrait_path(cid), portrait_blob)
+    elif request.form.get("remove_portrait") == "1":
+        db.execute(
+            "UPDATE characters SET has_portrait = 0, portrait_hash = '', portrait_thumb = NULL "
+            "WHERE id = ? AND book_id = ?",
+            (cid, book_id),
+        )
+        db.commit()
+        _delete_image_file(_character_portrait_path(cid))
     row = db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cid, book_id),
     ).fetchone()
@@ -8655,6 +8802,7 @@ def delete_character(book_id: str, cid: int):
     db = get_db()
     db.execute("DELETE FROM characters WHERE id = ? AND book_id = ?", (cid, book_id))
     db.commit()
+    _delete_image_file(_character_portrait_path(cid))
     return redirect(url_for("book_detail", book_id=book_id, _anchor="characters"))
 
 
@@ -10497,6 +10645,10 @@ def delete_book(book_id: str):
     sessions_data = [dict(s) for s in sessions]
     periods = db.execute("SELECT * FROM periods WHERE book_id = ?", (book_id,)).fetchall()
     periods_data = [dict(p) for p in periods]
+    character_ids = [
+        row["id"]
+        for row in db.execute("SELECT id FROM characters WHERE book_id = ?", (book_id,)).fetchall()
+    ]
     ratings = db.execute("SELECT * FROM ratings WHERE book_id = ?", (book_id,)).fetchall()
     ratings_data = [dict(r) for r in ratings]
     
@@ -10541,6 +10693,8 @@ def delete_book(book_id: str):
     db.execute("DELETE FROM readings WHERE book_id = ?", (book_id,))
     db.execute("DELETE FROM books WHERE id = ?", (book_id,))
     db.commit()
+    for character_id in character_ids:
+        _delete_image_file(_character_portrait_path(character_id))
     
     book_name = book_dict.get("name", "Book")
     flash(f"Book '{book_name}' deleted. <a href='#' onclick='undoDelete(event)' class='undo-link'>Undo</a>", "success")

@@ -68,17 +68,18 @@ are no blueprints, no ORM, and no separate model files.
 
 ### 2.3 Database
 
-- **13 app tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
+- **14 app tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
   `authors`, `series`, `book_series`, `sources`, `libraries`, `quotes`,
-  `thoughts`, and `words` (plus SQLite-internal `sqlite_sequence`).
+  `thoughts`, `words`, and `characters` (plus SQLite-internal `sqlite_sequence`).
 - All queries are **raw SQL** via `sqlite3`. There is no ORM.
 - `get_db()` returns a per-request `sqlite3.Connection` stored in
   Flask's `g` object. Row factory is `sqlite3.Row`.
 - Primary keys: `books.id` uses UUID strings; most other tables use
   INTEGER autoincrement.
-- Full-size cover and author-photo files are stored on disk under
+- Full-size cover, author-photo, and character-portrait files are stored on disk under
   `DATA_DIR/images/<user>/...`; legacy `cover` / `photo` BLOB columns are
-  retained for migration fallback and thumbnails remain in SQLite.
+  retained for migration fallback, character portraits use file-backed
+  `characters/<id>.webp` files, and thumbnails remain in SQLite.
 
 ### 2.4 Dropbox Cloud Storage
 
@@ -157,6 +158,7 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 22. `migrate_merge_genres_into_tags` — merge genres into the tags column
 23. `migrate_add_annotations` — quotes, thoughts, and words tables
 24. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
+25. `migrate_add_character_portrait` — add character portrait hashes and thumbnails
 
 When adding a new migration:
 
@@ -321,6 +323,8 @@ The library page (`/library`) supports three view modes: **card**,
 | `/library/<id>/delete` | POST | Delete a library |
 | `/cover/<id>` | GET | Serve book cover image from filesystem (DB fallback) |
 | `/cover_thumb/<id>` | GET | Serve book cover thumbnail from DB |
+| `/character_portrait/<id>` | GET | Serve character portrait from filesystem (thumbnail fallback) |
+| `/character_portrait_thumb/<id>` | GET | Serve character portrait thumbnail from DB |
 | `/backup/create` | POST | Trigger a manual backup |
 | `/users` | GET | User selection / creation screen |
 | `/users/create` | POST | Create a new user |
@@ -348,8 +352,8 @@ The library page (`/library`) supports three view modes: **card**,
 ## 5. Database Schema Quick Reference
 
 Full-size covers and author photos are externalized to `DATA_DIR/images/`
-for new writes, but the legacy `cover` / `photo` BLOB columns still exist
-for migration fallback.
+for new writes, as are character portraits in the `characters/` subfolder;
+the legacy `cover` / `photo` BLOB columns still exist for migration fallback.
 
 ```
 books       (id TEXT PK, name, subtitle, author, slug, language,
@@ -384,6 +388,10 @@ quotes      (id INTEGER PK, book_id FK, text, page)
 thoughts    (id INTEGER PK, book_id FK, text, page)
 
 words       (id INTEGER PK, book_id FK, word, definition)
+
+characters  (id INTEGER PK, book_id FK, display_order, name, description,
+             biography, importance, roles, has_portrait, portrait_hash,
+             portrait_thumb BLOB)
 
 series      (id INTEGER PK, name, library_id FK,
              UNIQUE(name, library_id))
