@@ -7566,6 +7566,18 @@ def book_detail(book_id: str):
 
     # Build an info dict that the template accesses via info.get(...)
     info = _apply_work_taxonomy(db, book)
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    taxonomy_books = _apply_work_taxonomy_to_books(
+        db,
+        db.execute(
+            f"SELECT id, name, work_id, {taxonomy_columns} FROM books "
+            f"WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
+            lp,
+        ).fetchall(),
+    )
+    taxonomy_counts, _ = _build_taxonomy_audit(taxonomy_books)
 
     # ── Load all readings ──
     readings_rows = db.execute(
@@ -8105,6 +8117,7 @@ def book_detail(book_id: str):
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
         taxonomy_fields=TAXONOMY_FIELDS,
+        taxonomy_counts=taxonomy_counts,
         suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
         latest_thought=latest_thought,
         characters=characters,

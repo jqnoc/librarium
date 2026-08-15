@@ -383,7 +383,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <h3 data-i18n="{{ taxonomy_field.label_key }}">{{ taxonomy_field.label }}</h3>
         <div class="tag-bubbles">
             {% for taxonomy_value in taxonomy_values %}
-            <a href="{{ url_for('index') }}?{{ taxonomy_field.filter_param }}={{ taxonomy_value | urlencode }}" class="tag-bubble">{{ taxonomy_value }}</a>
+            {% set taxonomy_count = taxonomy_counts.get(taxonomy_field.field, {}).get(taxonomy_value, 0) %}
+            <a href="{{ url_for('index') }}?{{ taxonomy_field.filter_param }}={{ taxonomy_value | urlencode }}" class="tag-bubble book-classification-bubble">
+                <span>{{ taxonomy_value }}</span><span class="tag-bubble-count">({{ taxonomy_count }})</span>
+            </a>
             {% endfor %}
         </div>
     </div>

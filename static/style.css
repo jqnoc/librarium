@@ -2892,6 +2892,21 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-white);
     transform: translateY(-1px);
 }
+.book-classification-bubble {
+    background: var(--lb-accent-faint);
+    color: var(--lb-deep-orange);
+    border: 1px solid var(--lb-deep-orange);
+}
+.book-classification-bubble:hover {
+    background: var(--lb-white);
+    color: var(--lb-deep-orange);
+    border-color: var(--lb-orange);
+}
+.tag-bubble-count {
+    margin-left: .2rem;
+    color: var(--lb-text-light);
+    font-weight: 600;
+}
 
 .book-classification-grid {
     display: grid;
