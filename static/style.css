@@ -2946,13 +2946,40 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-text-light);
     font-weight: 600;
 }
-.session-pace-faster {
-    color: var(--lb-success);
-    font-weight: 600;
+.session-pace-cell {
+    min-width: 10rem;
 }
-.session-pace-slower {
-    color: var(--lb-error);
-    font-weight: 600;
+.session-pace-bar {
+    position: relative;
+    height: .4rem;
+    margin-bottom: .35rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--lb-bg-hover);
+    border: 1px solid var(--lb-border);
+}
+.session-pace-bar-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 2px;
+    border-radius: inherit;
+    background: var(--lb-deep-orange);
+}
+.session-pace-bar-fill.session-pace-faster {
+    background: var(--lb-success);
+}
+.session-pace-bar-fill.session-pace-slower {
+    background: var(--lb-error);
+}
+.session-pace-average-marker {
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: 2px;
+    background: var(--lb-text-light);
+    transform: translateX(-1px);
+}
+.session-pace-value {
+    white-space: nowrap;
 }
 
 .book-classification-grid {

@@ -2918,7 +2918,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th data-i18n="book.colDate">Date</th>
                 <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
                 <th data-i18n="book.colDuration">Duration</th>
-                <th data-i18n="book.colPace">Pace (Pages/h)</th>
+                <th data-i18n="book.colPace">Pace</th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
         </thead>
@@ -2929,8 +2929,20 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td>{{ s.date | display_date }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
-                <td class="{% if not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 %}{% if s.pace_pages_per_hour > avg_pages_per_hour %}session-pace-faster{% elif s.pace_pages_per_hour < avg_pages_per_hour %}session-pace-slower{% endif %}{% endif %}">
-                    {% if not is_pct_format and s.pace_pages_per_hour > 0 %}{{ "%.1f" | format(s.pace_pages_per_hour) }}{% else %}—{% endif %}
+                {% set pace_faster = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour > avg_pages_per_hour %}
+                {% set pace_slower = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour < avg_pages_per_hour %}
+                <td>
+                    {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
+                    <div class="session-pace-cell">
+                        <div class="session-pace-bar" aria-hidden="true">
+                            <span class="session-pace-bar-fill{% if pace_faster %} session-pace-faster{% elif pace_slower %} session-pace-slower{% endif %}" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%;"></span>
+                            <span class="session-pace-average-marker"></span>
+                        </div>
+                        <div class="session-pace-value">
+                            {{ "%.1f" | format(s.pace_pages_per_hour) }} <span data-i18n="book.readingSessionPagesPerHour">pages/hour</span> ({{ "%+.0f" | format(s.pace_difference_pct) }}%)
+                        </div>
+                    </div>
+                    {% else %}—{% endif %}
                 </td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">✏️</button>
