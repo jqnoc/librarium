@@ -2149,6 +2149,45 @@ select.form-control { cursor: pointer; }
     }
 }
 
+.character-edit-modal-overlay {
+    z-index: 100003;
+    padding: 1rem 20px;
+    background: rgba(17, 31, 38, .52);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+.character-edit-modal-box {
+    position: relative;
+    width: 100%;
+    max-width: 760px;
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 1.5rem 2rem 2rem;
+    text-align: left;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.character-edit-modal-title {
+    margin: 0 2.5rem 1.25rem 0;
+    color: var(--lb-deep-orange);
+    font-size: 1.25rem;
+}
+.character-edit-modal-form {
+    gap: .75rem;
+}
+.character-edit-modal-form .annotation-character-form-actions {
+    margin-top: .5rem;
+}
+
+@media (max-width: 640px) {
+    .character-edit-modal-box {
+        padding: 1.25rem;
+    }
+}
+
 .classification-clean-modal-overlay {
     z-index: 10000;
     background: rgba(15, 33, 42, .48);

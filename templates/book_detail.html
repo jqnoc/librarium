@@ -2384,43 +2384,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% endif %}
         </div>
         <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})"
+            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openCharacterEditModal('character-edit-modal-{{ character.id }}', this)"
+                                        aria-haspopup="dialog" aria-controls="character-edit-modal-{{ character.id }}" aria-expanded="false"
                                         data-i18n-title="form.edit" data-i18n-aria-label="form.edit" aria-label="Edit">&#9998;</button>
             <form method="POST" action="{{ url_for('delete_character', book_id=book_id, cid=character.id) }}" style="display:inline;"
                                     onsubmit="return confirm(window.librariumI18n.t('book.deleteCharacterConfirm'))">
                                 <button type="submit" class="btn btn-danger btn-sm" data-i18n-title="form.delete" data-i18n-aria-label="form.delete" aria-label="Delete">&#128465;</button>
-            </form>
-        </div>
-        <div class="annotation-edit-row" id="character-edit-{{ character.id }}">
-                        <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}" class="annotation-edit-form annotation-character-form"
-                                    onsubmit="return window.validateCharacterRoleForm(this)">
-                <label for="edit-character-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
-                <input type="text" id="edit-character-name-{{ character.id }}" name="name" value="{{ character.name }}" required
-                       placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
-                                {{ character_importance_field('edit-character-importance-' ~ character.id, character.importance) }}
-                                {{ character_roles_field('edit-character-roles-' ~ character.id, character.roles) }}
-                <label for="edit-character-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
-                <textarea id="edit-character-description-{{ character.id }}" name="description" rows="3"
-                          placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
-                <label for="edit-character-biography-{{ character.id }}" data-i18n="book.characterBiography">Biography</label>
-                <textarea id="edit-character-biography-{{ character.id }}" name="biography" rows="6"
-                          placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder">{{ character.biography }}</textarea>
-                <label for="edit-character-portrait-{{ character.id }}" data-i18n="book.characterPortrait">Portrait</label>
-                {% if character.has_portrait %}
-                <div class="character-portrait-form-preview">
-                    <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
-                    <label class="character-portrait-remove" for="remove-character-portrait-{{ character.id }}">
-                        <input type="checkbox" id="remove-character-portrait-{{ character.id }}" name="remove_portrait" value="1">
-                        <span data-i18n="book.characterRemovePortrait">Remove current portrait</span>
-                    </label>
-                </div>
-                {% endif %}
-                <input type="file" id="edit-character-portrait-{{ character.id }}" name="portrait" accept="image/*">
-                <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
-                <div class="annotation-character-form-actions">
-                    <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})" data-i18n="form.cancel">Cancel</button>
-                </div>
             </form>
         </div>
     </div>
@@ -2466,6 +2435,48 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         {% endif %}
     </div>
 </div>
+<div id="character-edit-modal-{{ character.id }}" class="modal-overlay character-edit-modal-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="character-edit-title-{{ character.id }}" aria-hidden="true">
+    <div class="modal-box character-edit-modal-box">
+        <button type="button" class="reading-session-modal-close character-edit-modal-close"
+                onclick="closeCharacterEditModal('character-edit-modal-{{ character.id }}')"
+                aria-label="Close">&times;</button>
+        <h3 id="character-edit-title-{{ character.id }}" class="character-edit-modal-title"
+            data-i18n="book.readingSessionEditCharacter">Edit Character</h3>
+        <form method="POST" enctype="multipart/form-data"
+              action="{{ url_for('edit_character', book_id=book_id, cid=character.id) }}"
+              class="annotation-character-form character-edit-modal-form"
+              onsubmit="return window.validateCharacterRoleForm(this)">
+            <label for="character-edit-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
+            <input type="text" id="character-edit-name-{{ character.id }}" name="name" value="{{ character.name }}" required
+                   placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
+            {{ character_importance_field('character-edit-importance-' ~ character.id, character.importance) }}
+            {{ character_roles_field('character-edit-roles-' ~ character.id, character.roles) }}
+            <label for="character-edit-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
+            <textarea id="character-edit-description-{{ character.id }}" name="description" rows="3"
+                      placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
+            <label for="character-edit-biography-{{ character.id }}" data-i18n="book.characterBiography">Biography</label>
+            <textarea id="character-edit-biography-{{ character.id }}" name="biography" rows="6"
+                      placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder">{{ character.biography }}</textarea>
+            <label for="character-edit-portrait-{{ character.id }}" data-i18n="book.characterPortrait">Portrait</label>
+            {% if character.has_portrait %}
+            <div class="character-portrait-form-preview">
+                <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
+                <label class="character-portrait-remove" for="remove-character-portrait-{{ character.id }}">
+                    <input type="checkbox" id="remove-character-portrait-{{ character.id }}" name="remove_portrait" value="1">
+                    <span data-i18n="book.characterRemovePortrait">Remove current portrait</span>
+                </label>
+            </div>
+            {% endif %}
+            <input type="file" id="character-edit-portrait-{{ character.id }}" name="portrait" accept="image/*">
+            <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
+            <div class="annotation-character-form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeCharacterEditModal('character-edit-modal-{{ character.id }}')" data-i18n="form.cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" data-i18n="form.save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endfor %}
 {% else %}
 <div class="empty-state" style="padding: 1rem;">
@@ -2483,6 +2494,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     var dropCompleted = false;
     var activeCharacterModal = null;
     var activeCharacterTrigger = null;
+    var activeCharacterEditModal = null;
+    var activeCharacterEditTrigger = null;
 
     function cards() {
         return Array.from(list.querySelectorAll('[data-character-id]'));
@@ -2498,21 +2511,30 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     function isActionTarget(target) {
         return Boolean(target && target.closest && target.closest(
-            '.annotation-actions, .annotation-edit-row, button, form, input, textarea, select, a'
+            '.annotation-actions, .character-edit-modal, button, form, input, textarea, select, a'
         ));
     }
 
     window.openCharacterModal = function (modalId, trigger) {
         var modal = document.getElementById(modalId);
         if (!modal) return;
+        if (activeCharacterEditModal) {
+            activeCharacterEditModal.classList.remove('active');
+            activeCharacterEditModal.setAttribute('aria-hidden', 'true');
+            if (activeCharacterEditTrigger) activeCharacterEditTrigger.setAttribute('aria-expanded', 'false');
+            activeCharacterEditModal = null;
+            activeCharacterEditTrigger = null;
+        }
         if (activeCharacterModal && activeCharacterModal !== modal) {
             activeCharacterModal.classList.remove('active');
+            activeCharacterModal.setAttribute('aria-hidden', 'true');
             if (activeCharacterTrigger) activeCharacterTrigger.setAttribute('aria-expanded', 'false');
         }
         activeCharacterModal = modal;
         activeCharacterTrigger = trigger || document.querySelector('[aria-controls="' + modalId + '"]');
         if (activeCharacterTrigger) activeCharacterTrigger.setAttribute('aria-expanded', 'true');
         modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('character-detail-modal-open');
         var closeButton = modal.querySelector('.character-detail-modal-close');
         if (closeButton) closeButton.focus();
@@ -2522,6 +2544,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var modal = document.getElementById(modalId);
         if (!modal) return;
         modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
         if (activeCharacterModal === modal) {
             if (activeCharacterTrigger) {
                 activeCharacterTrigger.setAttribute('aria-expanded', 'false');
@@ -2529,7 +2552,48 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             }
             activeCharacterModal = null;
             activeCharacterTrigger = null;
-            document.body.classList.remove('character-detail-modal-open');
+            if (!activeCharacterEditModal) document.body.classList.remove('character-detail-modal-open');
+        }
+    };
+
+    window.openCharacterEditModal = function (modalId, trigger) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        if (activeCharacterModal) {
+            activeCharacterModal.classList.remove('active');
+            activeCharacterModal.setAttribute('aria-hidden', 'true');
+            if (activeCharacterTrigger) activeCharacterTrigger.setAttribute('aria-expanded', 'false');
+            activeCharacterModal = null;
+            activeCharacterTrigger = null;
+        }
+        if (activeCharacterEditModal && activeCharacterEditModal !== modal) {
+            activeCharacterEditModal.classList.remove('active');
+            activeCharacterEditModal.setAttribute('aria-hidden', 'true');
+            if (activeCharacterEditTrigger) activeCharacterEditTrigger.setAttribute('aria-expanded', 'false');
+        }
+        activeCharacterEditModal = modal;
+        activeCharacterEditTrigger = trigger || document.querySelector('[aria-controls="' + modalId + '"]');
+        if (activeCharacterEditTrigger) activeCharacterEditTrigger.setAttribute('aria-expanded', 'true');
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('character-detail-modal-open');
+        var closeButton = modal.querySelector('.character-edit-modal-close');
+        if (closeButton) closeButton.focus();
+    };
+
+    window.closeCharacterEditModal = function (modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
+        if (activeCharacterEditModal === modal) {
+            if (activeCharacterEditTrigger) {
+                activeCharacterEditTrigger.setAttribute('aria-expanded', 'false');
+                activeCharacterEditTrigger.focus();
+            }
+            activeCharacterEditModal = null;
+            activeCharacterEditTrigger = null;
+            if (!activeCharacterModal) document.body.classList.remove('character-detail-modal-open');
         }
     };
 
@@ -2626,7 +2690,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     });
 
     document.addEventListener('keydown', function (event) {
-        if (event.key !== 'Escape' || !activeCharacterModal) return;
+        if (event.key !== 'Escape' || activeCharacterEditModal || !activeCharacterModal) return;
         window.closeCharacterModal(activeCharacterModal.id);
     });
 }());
