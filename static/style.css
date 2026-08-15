@@ -2893,7 +2893,7 @@ body.reading-session-modal-open { overflow: hidden; }
     transform: translateY(-1px);
 }
 .book-classification-bubble {
-    background: var(--lb-accent-faint);
+    background: var(--lb-light-bg);
     color: var(--lb-deep-orange);
     border: 1px solid var(--lb-deep-orange);
 }
