@@ -2309,16 +2309,20 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                     {% endfor %}
                 </div>
             </div>
-            {% if character.description %}
-            <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
-            <div class="annotation-character-text">{{ character.description }}</div>
+            {% if character.description or character.has_portrait %}
+            <div class="annotation-character-description">
+                {% if character.has_portrait %}
+                <div class="annotation-character-portrait" aria-hidden="true">
+                    <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
+                </div>
+                {% endif %}
+                {% if character.description %}
+                <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
+                <div class="annotation-character-text">{{ character.description }}</div>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
-        {% if character.has_portrait %}
-        <div class="annotation-character-portrait" aria-hidden="true">
-            <img src="{{ url_for('character_portrait_thumb', character_id=character.id, v=character.portrait_hash) }}" alt="">
-        </div>
-        {% endif %}
         <div class="annotation-actions">
             <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('character', {{ character.id }})"
                                         data-i18n-title="form.edit" data-i18n-aria-label="form.edit" aria-label="Edit">&#9998;</button>

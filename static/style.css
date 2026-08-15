@@ -4206,11 +4206,12 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 .annotation-character-heading {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: .4rem .5rem;
+    display: block;
     padding-right: 5rem;
+}
+
+.annotation-character-heading .annotation-character-badges {
+    margin-top: .4rem;
 }
 
 .annotation-character-badges {
@@ -4301,18 +4302,14 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 .annotation-character.has-portrait {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 96px;
-    gap: 1rem;
+    display: block;
 }
 
 .annotation-character-portrait {
-    grid-column: 2;
-    grid-row: 1;
     width: 96px;
     aspect-ratio: 4 / 5;
-    align-self: start;
-    justify-self: end;
+    float: right;
+    margin: 0 0 .75rem 1rem;
     overflow: hidden;
     border: 1px solid var(--lb-border);
     border-radius: var(--lb-radius);
@@ -4326,16 +4323,8 @@ body.reading-session-modal-open { overflow: hidden; }
     object-fit: cover;
 }
 
-.annotation-character.has-portrait .annotation-edit-row {
-    grid-column: 1 / -1;
-}
-
-.annotation-character.has-portrait .annotation-actions {
-    position: static;
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-    margin-top: .5rem;
+.annotation-character-description {
+    display: flow-root;
 }
 
 .annotation-character:hover {
