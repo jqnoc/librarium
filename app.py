@@ -7634,6 +7634,13 @@ def book_detail(book_id: str):
 
     book_fmt = info.get("format", "paper") or "paper"
     is_pct_format = book_fmt in ("audiobook", "ebook")
+    for session in all_sessions_data:
+        duration_seconds = session["duration_seconds"] or 0
+        session_pages = session["pages"] or 0
+        session["pace_pages_per_hour"] = (
+            session_pages / (duration_seconds / 3600)
+            if duration_seconds > 0 and not is_pct_format else 0.0
+        )
 
     reading_session_totals: dict[int, dict[str, int]] = {}
     book_session_totals = {"pages": 0, "seconds": 0}

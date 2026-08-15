@@ -2918,6 +2918,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th data-i18n="book.colDate">Date</th>
                 <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
                 <th data-i18n="book.colDuration">Duration</th>
+                <th data-i18n="book.colPace">Pace (Pages/h)</th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
         </thead>
@@ -2928,6 +2929,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td>{{ s.date | display_date }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
+                <td class="{% if not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 %}{% if s.pace_pages_per_hour > avg_pages_per_hour %}session-pace-faster{% elif s.pace_pages_per_hour < avg_pages_per_hour %}session-pace-slower{% endif %}{% endif %}">
+                    {% if not is_pct_format and s.pace_pages_per_hour > 0 %}{{ "%.1f" | format(s.pace_pages_per_hour) }}{% else %}—{% endif %}
+                </td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">✏️</button>
                     <form method="POST" action="{{ url_for('delete_session', book_id=book_id, idx=s.id) }}" style="display:inline;"
@@ -2937,7 +2941,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </td>
             </tr>
             <tr class="session-edit-row" id="session-edit-{{ s.id }}">
-                <td colspan="5">
+                <td colspan="6">
                     <form method="POST" action="{{ url_for('edit_session', book_id=book_id, idx=s.id) }}" class="inline-form">
                         <label>Date</label>
                         <input type="text" name="date" value="{{ s.date }}" class="date-input" required>

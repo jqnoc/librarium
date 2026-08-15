@@ -383,6 +383,7 @@
         'book.colTime':         { en: 'Time',                es: 'Tiempo' },
         'book.colProgress':     { en: 'Progress',            es: 'Progreso' },
         'book.colDuration':     { en: 'Duration',            es: 'Duración' },
+        'book.colPace':         { en: 'Pace (Pages/h)',       es: 'Ritmo (Páginas/h)' },
         'book.colActions':      { en: 'Actions',             es: 'Acciones' },
         'book.addSession':      { en: 'Add New Session',     es: 'Añadir Nueva Sesión' },
         'book.noSessions':      { en: 'No reading sessions yet.', es: 'Aún no hay sesiones de lectura.' },

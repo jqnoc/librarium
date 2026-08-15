@@ -2946,6 +2946,14 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-text-light);
     font-weight: 600;
 }
+.session-pace-faster {
+    color: var(--lb-success);
+    font-weight: 600;
+}
+.session-pace-slower {
+    color: var(--lb-error);
+    font-weight: 600;
+}
 
 .book-classification-grid {
     display: grid;
