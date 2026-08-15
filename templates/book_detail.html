@@ -2284,7 +2284,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     data-reorder-url="{{ url_for('reorder_characters', book_id=book_id) }}">
     {% for character in characters %}
     <div class="annotation-card annotation-character" id="character-{{ character.id }}"
-        data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false">
+        data-character-id="{{ character.id }}" draggable="true" aria-grabbed="false" tabindex="0"
+        role="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="character-detail-modal-{{ character.id }}">
         <div class="annotation-body">
             <div class="annotation-character-heading">
                 <div class="annotation-character-name">{{ character.name }}</div>
@@ -2304,10 +2305,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             {% if character.description %}
             <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
             <div class="annotation-character-text">{{ character.description }}</div>
-            {% endif %}
-            {% if character.biography %}
-            <div class="annotation-character-field-label" data-i18n="book.characterBiography">Biography</div>
-            <div class="annotation-character-text">{{ character.biography }}</div>
             {% endif %}
         </div>
         <div class="annotation-actions">
@@ -2341,6 +2338,42 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
     {% endfor %}
 </div>
+{% for character in characters %}
+<div id="character-detail-modal-{{ character.id }}" class="modal-overlay character-detail-modal-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="character-detail-title-{{ character.id }}"
+     onclick="if (event.target === this) closeCharacterModal(this.id)">
+    <div class="modal-box character-detail-modal-box">
+        <button type="button" class="reading-session-modal-close character-detail-modal-close"
+                onclick="closeCharacterModal('character-detail-modal-{{ character.id }}')"
+                aria-label="Close">&times;</button>
+        <h3 id="character-detail-title-{{ character.id }}" class="character-detail-modal-title">{{ character.name }}</h3>
+        <div class="annotation-character-badges character-detail-modal-badges">
+            {% for importance in character_importance_options %}
+            {% if importance.value == character.importance %}
+            <span class="badge character-badge character-importance-{{ importance.value | lower }}" data-i18n="{{ importance.label_key }}">{{ importance.value }}</span>
+            {% endif %}
+            {% endfor %}
+            {% for role in character_role_options %}
+            {% if role.value in character.roles %}
+            <span class="badge character-badge character-role-{{ role.value | lower | replace(' ', '-') }}" data-i18n="{{ role.label_key }}">{{ role.value }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% if character.description %}
+        <div class="character-detail-modal-field">
+            <div class="annotation-character-field-label" data-i18n="book.characterDescription">Description</div>
+            <div class="annotation-character-text">{{ character.description }}</div>
+        </div>
+        {% endif %}
+        {% if character.biography %}
+        <div class="character-detail-modal-field">
+            <div class="annotation-character-field-label" data-i18n="book.characterBiography">Biography</div>
+            <div class="annotation-character-text">{{ character.biography }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
 {% else %}
 <div class="empty-state" style="padding: 1rem;">
     <p data-i18n="book.noCharacters">No characters yet.</p>
@@ -2355,6 +2388,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     var draggedCard = null;
     var originalOrder = [];
     var dropCompleted = false;
+    var activeCharacterModal = null;
+    var activeCharacterTrigger = null;
 
     function cards() {
         return Array.from(list.querySelectorAll('[data-character-id]'));
@@ -2372,6 +2407,43 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         return Boolean(target && target.closest && target.closest(
             '.annotation-actions, .annotation-edit-row, button, form, input, textarea, select, a'
         ));
+    }
+
+    window.openCharacterModal = function (modalId, trigger) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        if (activeCharacterModal && activeCharacterModal !== modal) {
+            activeCharacterModal.classList.remove('active');
+            if (activeCharacterTrigger) activeCharacterTrigger.setAttribute('aria-expanded', 'false');
+        }
+        activeCharacterModal = modal;
+        activeCharacterTrigger = trigger || document.querySelector('[aria-controls="' + modalId + '"]');
+        if (activeCharacterTrigger) activeCharacterTrigger.setAttribute('aria-expanded', 'true');
+        modal.classList.add('active');
+        document.body.classList.add('character-detail-modal-open');
+        var closeButton = modal.querySelector('.character-detail-modal-close');
+        if (closeButton) closeButton.focus();
+    };
+
+    window.closeCharacterModal = function (modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.classList.remove('active');
+        if (activeCharacterModal === modal) {
+            if (activeCharacterTrigger) {
+                activeCharacterTrigger.setAttribute('aria-expanded', 'false');
+                activeCharacterTrigger.focus();
+            }
+            activeCharacterModal = null;
+            activeCharacterTrigger = null;
+            document.body.classList.remove('character-detail-modal-open');
+        }
+    };
+
+    function cardFromTarget(target) {
+        if (isActionTarget(target)) return null;
+        var card = target && target.closest ? target.closest('[data-character-id]') : null;
+        return card && list.contains(card) ? card : null;
     }
 
     function persistOrder(previousOrder) {
@@ -2444,6 +2516,25 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         draggedCard = null;
         originalOrder = [];
         dropCompleted = false;
+    });
+
+    list.addEventListener('click', function (event) {
+        var card = cardFromTarget(event.target);
+        if (!card) return;
+        window.openCharacterModal(card.getAttribute('aria-controls'), card);
+    });
+
+    list.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        var card = cardFromTarget(event.target);
+        if (!card) return;
+        event.preventDefault();
+        window.openCharacterModal(card.getAttribute('aria-controls'), card);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || !activeCharacterModal) return;
+        window.closeCharacterModal(activeCharacterModal.id);
     });
 }());
 </script>

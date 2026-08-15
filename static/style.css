@@ -2059,6 +2059,43 @@ select.form-control { cursor: pointer; }
 }
 .modal-box p { margin-bottom: 1.5rem; }
 
+.character-detail-modal-open { overflow: hidden; }
+.character-detail-modal-overlay {
+    z-index: 100001;
+    padding: 1rem;
+    background: rgba(17, 31, 38, .48);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+.character-detail-modal-box {
+    position: relative;
+    width: min(680px, calc(100vw - 2rem));
+    max-width: none;
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 1.75rem 2rem 2rem;
+    text-align: left;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.character-detail-modal-title {
+    margin: 0 2.5rem .45rem 0;
+    color: var(--lb-deep-orange);
+    font-size: 1.35rem;
+}
+.character-detail-modal-badges {
+    margin-bottom: 1.25rem;
+}
+.character-detail-modal-field + .character-detail-modal-field {
+    margin-top: 1rem;
+}
+.character-detail-modal-field .annotation-character-field-label {
+    margin-top: 0;
+}
+
 .classification-clean-modal-overlay {
     z-index: 10000;
     background: rgba(15, 33, 42, .48);
@@ -4197,7 +4234,18 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 .annotation-character {
-    cursor: grab;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.annotation-character:hover {
+    border-color: var(--lb-orange);
+}
+
+.annotation-character:focus-visible {
+    outline: 3px solid var(--lb-accent-glow);
+    outline-offset: 2px;
+    border-color: var(--lb-orange);
 }
 
 .annotation-character:active,
