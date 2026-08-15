@@ -4202,12 +4202,12 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-deep-orange);
     font-size: 1.08rem;
     font-weight: 700;
+    padding-right: 5rem;
     overflow-wrap: anywhere;
 }
 
 .annotation-character-heading {
     display: block;
-    padding-right: 5rem;
 }
 
 .annotation-character-heading .annotation-character-badges {
