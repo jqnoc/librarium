@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add an Ending Satisfaction rating dimension under Story & Plot to record how satisfying, fitting, earned, and effective a book's conclusion is
 
 ### Changed
-- Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Thoughts, Quotes, Words, and Editions while keeping the hero and summary visible
+- Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Annotations, Quotes, Words, and Editions while keeping the hero and summary visible
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width row-based classification editing on the Book Details tab, modal character editing, a wider single-column classification editor dialog with shared-book counts and whitish bubble backgrounds, and aligned publication, contributor, source, and binding fields
 - consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, document controlled values including Epic as a canonical Form, add v2.1 whole-work Subgenre and Theme/Subject principles plus a classification workflow, and require classification requests to follow the guide in Copilot instructions

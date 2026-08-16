@@ -286,7 +286,7 @@
         <span class="book-tab-count" aria-hidden="true">({{ characters | length }})</span>
     </button>
     <button type="button" class="book-tab" id="book-tab-thoughts" role="tab" aria-controls="book-tab-thoughts-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="thoughts">
-        <span data-i18n="book.thoughtsTab">Thoughts</span>
+        <span data-i18n="book.thoughtsTab">Annotations</span>
         <span class="book-tab-count" aria-hidden="true">({{ thoughts | length }})</span>
     </button>
     <button type="button" class="book-tab" id="book-tab-quotes" role="tab" aria-controls="book-tab-quotes-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="quotes">
@@ -2795,9 +2795,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </section>
 
 <section id="book-tab-thoughts-panel" class="book-tab-panel" data-book-tab-panel="thoughts" role="tabpanel" aria-labelledby="book-tab-thoughts" hidden>
-<!-- ── Thoughts ──────────────────────────────────────────────────────── -->
+<!-- ── Annotations ───────────────────────────────────────────────────── -->
 <div class="annotation-section-heading">
-    <h2 id="thoughts"><span data-i18n="book.thoughts">Thoughts</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
+    <h2 id="thoughts"><span data-i18n="book.thoughts">Annotations</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
     <a href="{{ url_for('export_thoughts_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
        title="Download thoughts as Markdown" data-i18n-title="book.exportThoughtsMarkdownTitle">
         <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportThoughtsMarkdown">Download Markdown</span>

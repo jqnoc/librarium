@@ -178,7 +178,7 @@
         'book.classificationTab': { en: 'Classification',       es: 'Clasificación' },
         'book.similarWorksTab': { en: 'Similar Works',          es: 'Obras Similares' },
         'book.charactersTab':   { en: 'Characters',             es: 'Personajes' },
-        'book.thoughtsTab':     { en: 'Thoughts',               es: 'Reflexiones' },
+        'book.thoughtsTab':     { en: 'Annotations',            es: 'Anotaciones' },
         'book.quotesTab':       { en: 'Quotes',                 es: 'Citas' },
         'book.wordsTab':        { en: 'Words',                  es: 'Palabras' },
         'book.editionsTab':     { en: 'Editions',               es: 'Ediciones' },
@@ -974,7 +974,7 @@
 
         // ── Annotations (Quotes, Thoughts, Words, Characters) ─────────
         'book.quotes':              { en: 'Quotes',                es: 'Citas' },
-        'book.thoughts':            { en: 'Thoughts',              es: 'Reflexiones' },
+        'book.thoughts':            { en: 'Annotations',           es: 'Anotaciones' },
         'book.exportThoughtsMarkdown': { en: 'Download Markdown',   es: 'Descargar Markdown' },
         'book.exportThoughtsMarkdownTitle': { en: 'Download thoughts as Markdown', es: 'Descargar reflexiones como Markdown' },
         'book.exportClassificationMarkdown': { en: 'Download Markdown', es: 'Descargar Markdown' },
