@@ -8578,6 +8578,81 @@ def delete_quote(book_id: str, qid: int):
 def _annotation_wants_json() -> bool:
     return "application/json" in request.headers.get("Accept", "").lower()
 
+def _markdown_single_line(value: object, fallback: str = "") -> str:
+    text = re.sub(r"[\r\n]+", " ", str(value or "")).strip()
+    return text or fallback
+
+
+def _book_markdown_filename(book_title: str, suffix: str) -> str:
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", book_title or "book")
+    filename = re.sub(r"\s+", " ", filename).strip(" .")[:120]
+    return f"{filename or 'book'} - {suffix}.md"
+
+
+def _markdown_download_response(content: str, filename: str, fallback_filename: str):
+    response = make_response(content)
+    encoded_filename = urllib.parse.quote(filename, safe="")
+    response.headers["Content-Type"] = "text/markdown; charset=utf-8"
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{fallback_filename}"; filename*=UTF-8\'\'{encoded_filename}'
+    )
+    return response
+
+
+def _classification_markdown(book_title: str, info: dict) -> str:
+    title = _markdown_single_line(book_title, "Untitled")
+    lines = [f"# {title}", "", "## Classification", ""]
+    has_values = False
+    for taxonomy_field in TAXONOMY_FIELDS:
+        values = sorted(
+            [
+                _markdown_single_line(value)
+                for value in (info.get(taxonomy_field["field"], "") or "").split(";")
+                if value.strip()
+            ],
+            key=str.casefold,
+        )
+        if not values:
+            continue
+        has_values = True
+        lines.append(f"### {taxonomy_field['label']}")
+        lines.extend(f"- {value}" for value in values)
+        lines.append("")
+    if not has_values:
+        lines.append("No classification yet.")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _characters_markdown(book_title: str, characters: list[dict]) -> str:
+    title = _markdown_single_line(book_title, "Untitled")
+    lines = [f"# {title}", "", "## Characters", ""]
+    if not characters:
+        lines.extend(["No characters yet.", ""])
+    for index, character in enumerate(characters):
+        name = _markdown_single_line(character.get("name"), "Unnamed character")
+        lines.extend([f"### {name}", ""])
+        importance = _markdown_single_line(character.get("importance"))
+        roles = ", ".join(
+            _markdown_single_line(role)
+            for role in (character.get("roles") or [])
+            if _markdown_single_line(role)
+        )
+        if importance:
+            lines.append(f"**Importance:** {importance}")
+        if roles:
+            lines.append(f"**Roles:** {roles}")
+        description = str(character.get("description") or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if description:
+            lines.extend(["", "**Description**", "", description])
+        biography = str(character.get("biography") or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if biography:
+            lines.extend(["", "**Biography**", "", biography])
+        if index < len(characters) - 1:
+            lines.extend(["", ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _thoughts_markdown(book_title: str, thoughts) -> str:
     title = re.sub(r"[\r\n]+", " ", (book_title or "Untitled")).strip() or "Untitled"
     lines = [f"# {title}", "", "## Thoughts", ""]
@@ -8589,9 +8664,45 @@ def _thoughts_markdown(book_title: str, thoughts) -> str:
 
 
 def _thoughts_markdown_filename(book_title: str) -> str:
-    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", book_title or "book")
-    filename = re.sub(r"\s+", " ", filename).strip(" .")[:120]
-    return f"{filename or 'book'} - thoughts.md"
+    return _book_markdown_filename(book_title, "thoughts")
+
+
+@app.route("/book/<book_id>/classification/export")
+def export_classification_markdown(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+    info = _apply_work_taxonomy(db, book)
+    filename = _book_markdown_filename(info.get("name"), "classification")
+    return _markdown_download_response(
+        _classification_markdown(info.get("name"), info),
+        filename,
+        "classification.md",
+    )
+
+
+@app.route("/book/<book_id>/characters/export")
+def export_characters_markdown(book_id: str):
+    db = get_db()
+    book = db.execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()
+    if not book:
+        abort(404)
+    characters = [
+        _character_from_row(row)
+        for row in db.execute(
+            "SELECT id, display_order, name, description, biography, importance, roles "
+            "FROM characters WHERE book_id = ? "
+            "ORDER BY display_order, name COLLATE NOCASE, id",
+            (book_id,),
+        ).fetchall()
+    ]
+    filename = _book_markdown_filename(book["name"], "characters")
+    return _markdown_download_response(
+        _characters_markdown(book["name"], characters),
+        filename,
+        "characters.md",
+    )
 
 
 @app.route("/book/<book_id>/thoughts/export")
@@ -8605,13 +8716,11 @@ def export_thoughts_markdown(book_id: str):
         "ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page, id",
         (book_id,),
     ).fetchall()
-    response = make_response(_thoughts_markdown(book["name"], thoughts))
-    filename = urllib.parse.quote(_thoughts_markdown_filename(book["name"]), safe="")
-    response.headers["Content-Type"] = "text/markdown; charset=utf-8"
-    response.headers["Content-Disposition"] = (
-        f'attachment; filename="thoughts.md"; filename*=UTF-8\'\'{filename}'
+    return _markdown_download_response(
+        _thoughts_markdown(book["name"], thoughts),
+        _thoughts_markdown_filename(book["name"]),
+        "thoughts.md",
     )
-    return response
 
 
 @app.route("/book/<book_id>/thoughts/add", methods=["POST"])

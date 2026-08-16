@@ -286,6 +286,8 @@ The library page (`/library`) supports three view modes: **card**,
 | `/book/<id>/periods/<idx>/edit` | POST | Edit a period |
 | `/book/<id>/periods/<idx>/delete` | POST | Delete a period |
 | `/book/<id>/ratings` | POST | Save ratings |
+| `/book/<id>/classification/export` | GET | Download book classification as Markdown |
+| `/book/<id>/characters/export` | GET | Download book characters as Markdown without portraits |
 | `/book/<id>/quotes/add` | POST | Add a quote annotation |
 | `/book/<id>/quotes/<qid>/edit` | POST | Edit a quote annotation |
 | `/book/<id>/quotes/<qid>/delete` | POST | Delete a quote annotation |

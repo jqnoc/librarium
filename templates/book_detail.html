@@ -373,6 +373,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="classification-section-actions">
         <button type="button" class="btn btn-primary btn-sm" onclick="openBookClassificationModal()" data-i18n="book.editClassification">Edit Classification</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="openCleanClassificationModal()" data-i18n="book.cleanClassification">Clean Classification</button>
+        <a href="{{ url_for('export_classification_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+           title="Download classification as Markdown" data-i18n-title="book.exportClassificationMarkdownTitle">
+            <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportClassificationMarkdown">Download Markdown</span>
+        </a>
     </div>
 </div>
 <div class="book-classification-grid">
@@ -410,7 +414,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 {% else %}
 <div class="classification-section-header">
     <h2 data-i18n="book.classification">Classification</h2>
-    <button type="button" class="btn btn-primary btn-sm" onclick="openBookClassificationModal()" data-i18n="book.editClassification">Edit Classification</button>
+    <div class="classification-section-actions">
+        <button type="button" class="btn btn-primary btn-sm" onclick="openBookClassificationModal()" data-i18n="book.editClassification">Edit Classification</button>
+        <a href="{{ url_for('export_classification_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+           title="Download classification as Markdown" data-i18n-title="book.exportClassificationMarkdownTitle">
+            <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportClassificationMarkdown">Download Markdown</span>
+        </a>
+    </div>
 </div>
 <div class="empty-state" style="padding: 1rem;">
     <p data-i18n="book.noClassification">No classification yet.</p>
@@ -2404,7 +2414,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
 <section id="book-tab-characters-panel" class="book-tab-panel" data-book-tab-panel="characters" role="tabpanel" aria-labelledby="book-tab-characters" hidden>
 <!-- ── Characters ────────────────────────────────────────────────────── -->
-<h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
+<div class="annotation-section-heading">
+    <h2 id="characters"><span data-i18n="book.characters">Characters</span> <span class="annotation-count">({{ characters | length }})</span></h2>
+    <a href="{{ url_for('export_characters_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+       title="Download characters as Markdown" data-i18n-title="book.exportCharactersMarkdownTitle">
+        <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportCharactersMarkdown">Download Markdown</span>
+    </a>
+</div>
 
 {% if characters %}
 <div class="annotations-list annotations-characters" data-character-list
