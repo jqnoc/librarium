@@ -10184,6 +10184,15 @@ def shutdown_backup():
     """Create a backup and sync to Dropbox before the Electron shell quits."""
     errors: list[str] = []
 
+    # Create the local backup before any network work so a slow Dropbox
+    # request cannot prevent a fresh machine-local recovery point.
+    try:
+        name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
+    except Exception as e:
+        print(f"[backup] Local shutdown backup failed: {e}")
+        errors.append(f"Local backup failed: {e}")
+        name = None
+
     # Sync all user DBs to Dropbox first (single upload per user)
     if _is_authenticated():
         try:
@@ -10212,13 +10221,6 @@ def shutdown_backup():
         except Exception as e:
             print(f"[dropbox] Shutdown sync failed: {e}")
             errors.append(f"Dropbox sync failed: {e}")
-    # Create local backup (skip Dropbox — already handled above)
-    try:
-        name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
-    except Exception as e:
-        print(f"[backup] Local shutdown backup failed: {e}")
-        errors.append(f"Local backup failed: {e}")
-        name = None
 
     if errors:
         return jsonify({"ok": False, "backup": name, "error": "; ".join(errors)}), 500

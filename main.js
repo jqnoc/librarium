@@ -33,6 +33,7 @@ const backendPath = isPackaged
 
 // ── Port discovery ──────────────────────────────────────────────────────
 const PREFERRED_PORT = 48720;
+const SHUTDOWN_SYNC_TIMEOUT_MS = 120000;
 
 /**
  * Try to bind to PREFERRED_PORT first (keeps localStorage across restarts).
@@ -325,18 +326,17 @@ async function requestQuit() {
 
 /**
  * Call the Flask shutdown-backup endpoint to create a backup and sync
- * all data to Dropbox before the app quits.  Times out after 30 seconds.
+ * all data to Dropbox before the app quits.  Times out after two minutes.
  */
 async function shutdownAndSync() {
   if (!flaskPort) return { ok: true };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SHUTDOWN_SYNC_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
     const response = await fetch(`http://127.0.0.1:${flaskPort}/api/shutdown-backup`, {
       method: "POST",
       signal: controller.signal,
     });
-    clearTimeout(timeout);
     let payload = null;
     try {
       payload = await response.json();
@@ -355,6 +355,16 @@ async function shutdownAndSync() {
 
     return { ok: true };
   } catch (e) {
+    if (e.name === "AbortError") {
+      return {
+        ok: false,
+        error:
+          `Shutdown sync exceeded ${SHUTDOWN_SYNC_TIMEOUT_MS / 1000} seconds. ` +
+          "Dropbox may still be processing the upload; check your connection and try again.",
+      };
+    }
     return { ok: false, error: `Shutdown sync request failed: ${e.message}` };
+  } finally {
+    clearTimeout(timeout);
   }
 }
