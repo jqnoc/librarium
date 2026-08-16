@@ -159,6 +159,7 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 23. `migrate_add_annotations` — quotes, thoughts, and words tables
 24. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
 25. `migrate_add_character_portrait` — add character portrait hashes and thumbnails
+26. `migrate_add_session_page_range` — add saved start and end pages to reading sessions
 
 When adding a new migration:
 
@@ -371,7 +372,7 @@ books       (id TEXT PK, name, subtitle, author, slug, language,
 readings    (id INTEGER PK, book_id FK, reading_number, status, notes)
 
 sessions    (id INTEGER PK, book_id FK, date, pages, duration_seconds,
-             reading_id FK, progress_pct)
+             reading_id FK, progress_pct, start_page, end_page)
 
 periods     (id INTEGER PK, book_id FK, start_date, end_date, pages,
              note, reading_id FK, progress_pct, duration_seconds)

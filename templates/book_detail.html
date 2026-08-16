@@ -625,14 +625,19 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </button>
             </div>
         </div>
-        <form id="readingSessionForm" class="reading-session-form" method="POST" action="{{ url_for('add_session', book_id=book_id) }}"
+                <form id="readingSessionForm" class="reading-session-form" method="POST" action="{{ url_for('add_session', book_id=book_id) }}"
+                            data-add-action="{{ url_for('add_session', book_id=book_id) }}"
+                            data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/sessions/"
+                            data-default-date="{{ today_iso }}"
               onsubmit="return prepareReadingSession()">
             <input type="hidden" name="reading_id" id="readingSessionReadingId">
-            <input type="hidden" name="date" value="{{ today_iso }}">
+                        <input type="hidden" name="date" id="readingSessionDate" value="{{ today_iso }}">
             <input type="hidden" name="hours" id="readingSessionHours" value="0">
             <input type="hidden" name="minutes" id="readingSessionMinutes" value="0">
             <input type="hidden" name="seconds" id="readingSessionSeconds" value="0">
             <input type="hidden" name="pages" id="readingSessionPages" value="0">
+                        <input type="hidden" name="start_page" id="readingSessionSavedStartPage" value="">
+                        <input type="hidden" name="end_page" id="readingSessionSavedEndPage" value="">
         </form>
     </div>
 </div>
@@ -877,14 +882,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     var state = {
         readingId: null,
         readingNumber: null,
+        sessionId: null,
         elapsedSeconds: 0,
         startedAt: null,
         timerId: null,
         running: false,
         hasStarted: false,
+        resumeMode: false,
         pageInputsEditable: false,
         startPage: 1,
         pace: 0,
+        estimateBaseElapsed: null,
+        estimateBaseEndPage: null,
         classificationWasRunning: false,
         classificationSaving: false,
         quickModalWasRunning: false,
@@ -1178,18 +1187,25 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         }
     }
 
-    function estimatedPages() {
+    function estimatedPages(elapsedSeconds) {
         if (state.pace <= 0) return 0;
-        return Math.max(0, Math.round(state.elapsedSeconds / 3600 * state.pace));
+        var elapsed = elapsedSeconds === undefined ? state.elapsedSeconds : elapsedSeconds;
+        return Math.max(0, Math.round(elapsed / 3600 * state.pace));
     }
 
     function updatePageEstimate() {
         var pages = estimatedPages();
         var endPage = state.startPage + pages;
+        if (state.resumeMode && state.estimateBaseElapsed !== null) {
+            endPage = state.estimateBaseEndPage + estimatedPages(Math.max(0, state.elapsedSeconds - state.estimateBaseElapsed));
+            pages = Math.max(0, endPage - state.startPage);
+        }
         if (state.pageInputsEditable) return;
         getElement('readingSessionStartPage').value = state.startPage;
         getElement('readingSessionEndPage').value = endPage;
         getElement('readingSessionPages').value = pages;
+        getElement('readingSessionSavedStartPage').value = state.startPage;
+        getElement('readingSessionSavedEndPage').value = endPage;
     }
 
     function syncEditedPageRange() {
@@ -1199,11 +1215,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var endPage = parseInt(endInput.value, 10);
         if (!Number.isFinite(startPage) || startPage < 1) return;
         state.startPage = startPage;
+        getElement('readingSessionSavedStartPage').value = startPage;
         if (!Number.isFinite(endPage)) {
             getElement('readingSessionPages').value = 0;
+            getElement('readingSessionSavedEndPage').value = '';
             return;
         }
         getElement('readingSessionPages').value = Math.max(0, endPage - startPage);
+        getElement('readingSessionSavedEndPage').value = endPage;
     }
 
     function updatePaceLabel() {
@@ -1216,29 +1235,60 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         }
     }
 
-    window.openReadingSessionModal = function (readingId, readingNumber, startPage, pace) {
+    window.openReadingSessionModal = function (readingId, readingNumber, startPage, pace, savedSession) {
         state.readingId = readingId;
         state.readingNumber = readingNumber;
-        state.elapsedSeconds = 0;
+        state.sessionId = savedSession ? Number(savedSession.id) : null;
+        state.elapsedSeconds = savedSession ? Math.max(0, Number(savedSession.elapsedSeconds) || 0) : 0;
         state.startedAt = null;
         state.running = false;
-        state.hasStarted = false;
-        state.pageInputsEditable = false;
+        state.hasStarted = Boolean(savedSession);
+        state.resumeMode = Boolean(savedSession);
+        state.pageInputsEditable = Boolean(savedSession);
         state.classificationWasRunning = false;
         state.classificationSaving = false;
         state.startPage = Math.max(1, Number(startPage) || 1);
         state.pace = Math.max(0, Number(pace) || 0);
+        state.estimateBaseElapsed = null;
+        state.estimateBaseEndPage = null;
         clearTimer();
-        setPageInputsEditable(false);
+        var form = getElement('readingSessionForm');
+        form.action = savedSession
+            ? form.dataset.editActionPrefix + savedSession.id + '/edit'
+            : form.dataset.addAction;
+        getElement('readingSessionDate').value = savedSession && savedSession.date
+            ? savedSession.date
+            : form.dataset.defaultDate;
         getElement('readingSessionReading').textContent = translate('book.readingSessionFor', 'Reading') + ' #' + readingNumber;
         getElement('readingSessionReadingId').value = readingId;
-        getElement('readingSessionStopwatch').textContent = formatElapsed(0);
-        updatePageEstimate();
+        if (savedSession) {
+            var savedStartPage = Math.max(1, Number(savedSession.startPage) || state.startPage);
+            var savedEndPage = Math.max(savedStartPage, Number(savedSession.endPage) || savedStartPage);
+            state.startPage = savedStartPage;
+            getElement('readingSessionStartPage').value = savedStartPage;
+            getElement('readingSessionEndPage').value = savedEndPage;
+            getElement('readingSessionPages').value = savedEndPage - savedStartPage;
+            getElement('readingSessionSavedStartPage').value = savedStartPage;
+            getElement('readingSessionSavedEndPage').value = savedEndPage;
+        }
+        setPageInputsEditable(Boolean(savedSession));
+        getElement('readingSessionStopwatch').textContent = formatElapsed(state.elapsedSeconds);
+        if (!savedSession) updatePageEstimate();
         updatePaceLabel();
         updateControls();
         getElement('readingSessionModal').classList.add('active');
         document.body.classList.add('reading-session-modal-open');
         getElement('readingSessionPlayButton').focus();
+    };
+
+    window.resumeReadingSession = function (readingId, readingNumber, sessionId, startPage, endPage, elapsedSeconds, pace, date) {
+        window.openReadingSessionModal(readingId, readingNumber, startPage, pace, {
+            id: sessionId,
+            startPage: startPage,
+            endPage: endPage,
+            elapsedSeconds: elapsedSeconds,
+            date: date
+        });
     };
 
     window.openReadingSessionCharacterModal = function (characterId) {
@@ -1571,9 +1621,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         state.startedAt = null;
         state.elapsedSeconds = 0;
         state.hasStarted = false;
+        state.sessionId = null;
+        state.resumeMode = false;
+        state.estimateBaseElapsed = null;
+        state.estimateBaseEndPage = null;
         state.classificationWasRunning = false;
         state.classificationSaving = false;
         setPageInputsEditable(false);
+        getElement('readingSessionForm').action = getElement('readingSessionForm').dataset.addAction;
         getElement('readingSessionModal').classList.remove('active');
         document.body.classList.remove('reading-session-modal-open');
         updateControls();
@@ -1581,8 +1636,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     window.playReadingSession = function () {
         if (state.running) return;
-        state.startedAt = Date.now() - (state.elapsedSeconds * 1000);
         syncEditedPageRange();
+        if (state.resumeMode) {
+            var currentEndPage = parseInt(getElement('readingSessionEndPage').value, 10);
+            state.estimateBaseElapsed = state.elapsedSeconds;
+            state.estimateBaseEndPage = Number.isFinite(currentEndPage) ? currentEndPage : state.startPage;
+        }
+        state.startedAt = Date.now() - (state.elapsedSeconds * 1000);
         state.running = true;
         state.hasStarted = true;
         setPageInputsEditable(false);
@@ -2950,6 +3010,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                           onsubmit="return confirm('Delete this session?');">
                         <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
                     </form>
+                    {% if loop.last and not is_pct_format %}
+                    <button type="button" class="btn btn-primary btn-sm" onclick='resumeReadingSession({{ current_reading_id }}, {{ current_reading_number }}, {{ s.id }}, {{ s.start_page|int }}, {{ s.end_page|int }}, {{ s.duration_seconds|int }}, {{ '%.6f'|format(avg_pages_per_hour|float) }}, {{ s.date|tojson }})'>
+                        <span aria-hidden="true">&#9654;</span> <span data-i18n="book.readingSessionResume">Resume</span>
+                    </button>
+                    {% endif %}
                 </td>
             </tr>
             <tr class="session-edit-row" id="session-edit-{{ s.id }}">

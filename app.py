@@ -1214,7 +1214,9 @@ def init_schema() -> None:
             pages            INTEGER NOT NULL DEFAULT 0,
             duration_seconds INTEGER NOT NULL DEFAULT 0,
             reading_id       INTEGER REFERENCES readings(id) ON DELETE SET NULL,
-            progress_pct     REAL    DEFAULT NULL
+            progress_pct     REAL    DEFAULT NULL,
+            start_page       INTEGER DEFAULT NULL,
+            end_page         INTEGER DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS periods (
@@ -1331,6 +1333,7 @@ def _run_all_migrations() -> None:
     migrate_add_character_order()
     migrate_add_character_metadata()
     migrate_add_character_portrait()
+    migrate_add_session_page_range()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -1748,6 +1751,26 @@ def migrate_add_total_time() -> None:
     db.commit()
     db.close()
     print("✅ Migration complete – total_time_seconds / progress_pct added.")
+
+
+def migrate_add_session_page_range() -> None:
+    """Add saved start and end pages to timed reading sessions."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+    session_cols = [r[1] for r in db.execute("PRAGMA table_info(sessions)").fetchall()]
+    if "start_page" in session_cols and "end_page" in session_cols:
+        db.close()
+        return
+    print("⏳ Migrating: adding session page range …")
+    if "start_page" not in session_cols:
+        db.execute("ALTER TABLE sessions ADD COLUMN start_page INTEGER DEFAULT NULL")
+    if "end_page" not in session_cols:
+        db.execute("ALTER TABLE sessions ADD COLUMN end_page INTEGER DEFAULT NULL")
+    db.commit()
+    db.close()
+    print("✅ Migration complete – session page range added.")
 
 
 def migrate_add_period_duration() -> None:
@@ -3927,6 +3950,17 @@ def _normalize_input_date(value: str) -> str:
         except ValueError:
             pass
     return value
+
+
+def _parse_optional_page(value: str) -> int | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        page = int(value)
+    except (TypeError, ValueError):
+        return None
+    return max(1, page)
 
 
 def _collect_languages() -> list[str]:
@@ -7621,12 +7655,24 @@ def book_detail(book_id: str):
 
     # ── Load ALL sessions (with reading_id) ──
     sessions_rows = db.execute(
-        "SELECT id, date, pages, duration_seconds, reading_id, progress_pct "
+        "SELECT id, date, pages, duration_seconds, reading_id, progress_pct, start_page, end_page "
         "FROM sessions WHERE book_id = ? ORDER BY id",
         (book_id,),
     ).fetchall()
+    book_fmt = info.get("format", "paper") or "paper"
+    is_pct_format = book_fmt in ("audiobook", "ebook")
+    starting_page = info.get("starting_page", 0) or 0
     all_sessions_data = []
+    fallback_pages_by_reading: dict[int | None, int] = {}
     for sr in sessions_rows:
+        reading_pages = fallback_pages_by_reading.get(sr["reading_id"], 0)
+        fallback_start_page = max(1, starting_page + reading_pages)
+        session_start_page = sr["start_page"]
+        session_end_page = sr["end_page"]
+        if not is_pct_format:
+            session_start_page = session_start_page or fallback_start_page
+            session_end_page = session_end_page or session_start_page + (sr["pages"] or 0)
+            fallback_pages_by_reading[sr["reading_id"]] = reading_pages + (sr["pages"] or 0)
         all_sessions_data.append({
             "id": sr["id"],
             "date": sr["date"],
@@ -7635,6 +7681,8 @@ def book_detail(book_id: str):
             "duration_display": _format_duration(sr["duration_seconds"]),
             "reading_id": sr["reading_id"],
             "progress_pct": sr["progress_pct"],
+            "start_page": session_start_page,
+            "end_page": session_end_page,
         })
 
     # ── Load ALL periods (with reading_id) ──
@@ -7645,8 +7693,6 @@ def book_detail(book_id: str):
     ).fetchall()
     all_periods_data = [dict(pr) for pr in periods_rows]
 
-    book_fmt = info.get("format", "paper") or "paper"
-    is_pct_format = book_fmt in ("audiobook", "ebook")
     for session in all_sessions_data:
         duration_seconds = session["duration_seconds"] or 0
         session_pages = session["pages"] or 0
@@ -7748,7 +7794,6 @@ def book_detail(book_id: str):
         total_pages = tracked_pages + period_pages
         total_seconds = tracked_seconds + period_seconds
 
-    starting_page = info.get("starting_page", 0) or 0
     total_book_pages = info.get("pages", 0) or 0
     effective_pages = total_book_pages - starting_page if starting_page > 0 else total_book_pages
 
@@ -9367,9 +9412,11 @@ def add_session(book_id: str):
             pages_val = int(request.form.get("pages", "0").strip() or 0)
         except ValueError:
             pages_val = 0
+        start_page_val = _parse_optional_page(request.form.get("start_page", ""))
+        end_page_val = _parse_optional_page(request.form.get("end_page", ""))
         db.execute(
-            "INSERT INTO sessions (book_id, date, pages, duration_seconds, reading_id) VALUES (?,?,?,?,?)",
-            (book_id, date, pages_val, dur_seconds, reading_id),
+            "INSERT INTO sessions (book_id, date, pages, duration_seconds, reading_id, start_page, end_page) VALUES (?,?,?,?,?,?,?)",
+            (book_id, date, pages_val, dur_seconds, reading_id, start_page_val, end_page_val),
         )
     db.commit()
     flash("Reading session added.", "success")
@@ -9411,10 +9458,20 @@ def edit_session(book_id: str, idx: int):
             pages_val = int(request.form.get("pages", "0").strip() or 0)
         except ValueError:
             pages_val = 0
-        db.execute(
-            "UPDATE sessions SET date=?, pages=?, duration_seconds=? WHERE id=?",
-            (date, pages_val, dur_seconds, idx),
-        )
+        start_page_raw = request.form.get("start_page", "").strip()
+        end_page_raw = request.form.get("end_page", "").strip()
+        if start_page_raw or end_page_raw:
+            start_page_val = _parse_optional_page(start_page_raw)
+            end_page_val = _parse_optional_page(end_page_raw)
+            db.execute(
+                "UPDATE sessions SET date=?, pages=?, duration_seconds=?, start_page=?, end_page=? WHERE id=?",
+                (date, pages_val, dur_seconds, start_page_val, end_page_val, idx),
+            )
+        else:
+            db.execute(
+                "UPDATE sessions SET date=?, pages=?, duration_seconds=? WHERE id=?",
+                (date, pages_val, dur_seconds, idx),
+            )
     db.commit()
     flash("Reading session updated.", "success")
     return redirect(url_for("book_detail", book_id=book_id, _anchor="add-session"))
