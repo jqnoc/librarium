@@ -327,6 +327,7 @@ The library page (`/library`) supports three view modes: **card**,
 | `/cover/<id>` | GET | Serve book cover image from filesystem (DB fallback) |
 | `/cover_thumb/<id>` | GET | Serve book cover thumbnail from DB |
 | `/character_portrait/<id>` | GET | Serve character portrait from filesystem (thumbnail fallback) |
+| `/character_portrait/<id>/download` | GET | Download character portrait (original file, thumbnail fallback) |
 | `/character_portrait_thumb/<id>` | GET | Serve character portrait thumbnail from DB |
 | `/backup/create` | POST | Trigger a manual backup |
 | `/users` | GET | User selection / creation screen |

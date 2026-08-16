@@ -2475,14 +2475,17 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <div id="character-detail-modal-{{ character.id }}" class="modal-overlay character-detail-modal-overlay"
      role="dialog" aria-modal="true" aria-labelledby="character-detail-title-{{ character.id }}"
      onclick="if (event.target === this) closeCharacterModal(this.id)">
-    <div class="modal-box character-detail-modal-box{% if character.has_portrait %} has-portrait{% endif %}">
-        <button type="button" class="reading-session-modal-close character-detail-modal-close"
-                onclick="closeCharacterModal('character-detail-modal-{{ character.id }}')"
-                aria-label="Close">&times;</button>
+    <div class="modal-box character-detail-modal-box{% if character.has_portrait %} has-portrait{% endif %}" tabindex="-1">
         <h3 id="character-detail-title-{{ character.id }}" class="character-detail-modal-title">{{ character.name }}</h3>
         {% if character.has_portrait %}
         <div class="character-detail-modal-portrait">
             <img src="{{ url_for('character_portrait', character_id=character.id, v=character.portrait_hash) }}" alt="{{ character.name }}">
+            <a href="{{ url_for('download_character_portrait', character_id=character.id) }}"
+               class="character-portrait-download" download
+               title="Download portrait" data-i18n-title="book.characterPortraitDownload"
+               aria-label="Download portrait" data-i18n-aria-label="book.characterPortraitDownload">
+                <span aria-hidden="true">&#8681;</span>
+            </a>
         </div>
         {% endif %}
         <div class="annotation-character-badges character-detail-modal-badges">
@@ -2612,8 +2615,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         modal.classList.add('active');
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('character-detail-modal-open');
-        var closeButton = modal.querySelector('.character-detail-modal-close');
-        if (closeButton) closeButton.focus();
+        var modalContent = modal.querySelector('.character-detail-modal-box');
+        if (modalContent) modalContent.focus();
     };
 
     window.closeCharacterModal = function (modalId) {

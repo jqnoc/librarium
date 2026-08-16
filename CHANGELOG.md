@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add a hover-visible download icon to full character portraits for exporting the original image
 - Add a Resume action to the last page-based reading-session row that reopens the saved timed session with its page range, date, and elapsed time
 - Add Markdown downloads for each book's classification and character data without portraits
 - Add a read-only `Wind and Truth` classification analysis comparing the target taxonomy with existing classified books and recommending normalization and cross-book review
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add an Ending Satisfaction rating dimension under Story & Plot to record how satisfying, fitting, earned, and effective a book's conclusion is
 
 ### Changed
+- Remove the redundant close icon from Character detail modals while retaining backdrop and Escape dismissal
 - Allow a longer bounded shutdown-sync window, clarify timeout errors, and create the local shutdown backup before Dropbox work
 - Match Character edit dialog controls to the shared form styling and tighten its field spacing
 - Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Annotations, Quotes, Words, and Editions while keeping the hero and summary visible

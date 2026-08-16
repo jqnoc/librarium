@@ -999,6 +999,7 @@
         'book.characterBiography':  { en: 'Biography',              es: 'Biografía' },
         'book.characterBiographyPlaceholder': { en: 'Biography',    es: 'Biografía' },
         'book.characterPortrait':  { en: 'Portrait',                es: 'Retrato' },
+        'book.characterPortraitDownload': { en: 'Download portrait', es: 'Descargar retrato' },
         'book.characterPortraitHint': { en: 'Use a 4:5 image.',      es: 'Usa una imagen 4:5.' },
         'book.characterRemovePortrait': { en: 'Remove current portrait', es: 'Eliminar retrato actual' },
         'book.quoteTextPlaceholder':  { en: 'Quote text...',       es: 'Texto de la cita...' },

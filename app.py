@@ -8320,6 +8320,55 @@ def character_portrait(character_id: int):
     abort(404)
 
 
+@app.route("/character_portrait/<int:character_id>/download")
+def download_character_portrait(character_id: int):
+    """Download a character's original portrait, or its stored thumbnail."""
+    db = get_db()
+    row = db.execute(
+        "SELECT name, portrait_thumb FROM characters WHERE id = ? AND has_portrait = 1",
+        (character_id,),
+    ).fetchone()
+    if not row:
+        abort(404)
+
+    portrait_path = _character_portrait_path(character_id)
+    portrait_blob = portrait_path.read_bytes() if portrait_path.exists() else row["portrait_thumb"]
+    if not portrait_blob:
+        abort(404)
+
+    image_format = ""
+    try:
+        with Image.open(io.BytesIO(portrait_blob)) as image:
+            image_format = (image.format or "").upper()
+    except Exception:
+        pass
+
+    format_details = {
+        "JPEG": ("image/jpeg", "jpg"),
+        "PNG": ("image/png", "png"),
+        "WEBP": ("image/webp", "webp"),
+        "GIF": ("image/gif", "gif"),
+        "BMP": ("image/bmp", "bmp"),
+        "TIFF": ("image/tiff", "tiff"),
+        "AVIF": ("image/avif", "avif"),
+        "HEIF": ("image/heif", "heif"),
+    }
+    content_type, extension = format_details.get(image_format, ("image/webp", "webp"))
+    filename_base = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", row["name"] or "character")
+    filename_base = re.sub(r"\s+", " ", filename_base).strip(" .")[:120] or "character"
+    fallback_base = re.sub(r"[^A-Za-z0-9._ -]+", "-", filename_base).strip(" .")[:120] or "character"
+    filename = f"{filename_base}.{extension}"
+    fallback_filename = f"{fallback_base}.{extension}"
+
+    response = make_response(portrait_blob)
+    response.headers["Content-Type"] = content_type
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{fallback_filename}"; '
+        f"filename*=UTF-8''{urllib.parse.quote(filename, safe='')}"
+    )
+    return response
+
+
 @app.route("/character_portrait_thumb/<int:character_id>")
 def character_portrait_thumb(character_id: int):
     """Serve a thumbnail version of a character's portrait."""

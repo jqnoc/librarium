@@ -2109,6 +2109,7 @@ select.form-control { cursor: pointer; }
     margin-bottom: 1.25rem;
 }
 .character-detail-modal-portrait {
+    position: relative;
     width: 128px;
     aspect-ratio: 4 / 5;
     margin: 0 auto 1.25rem;
@@ -2129,6 +2130,42 @@ select.form-control { cursor: pointer; }
     height: 100%;
     display: block;
     object-fit: cover;
+}
+.character-portrait-download {
+    position: absolute;
+    top: .55rem;
+    right: .55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid rgba(255, 255, 255, .8);
+    border-radius: 50%;
+    background: rgba(17, 31, 38, .78);
+    color: var(--lb-white);
+    font-size: 1rem;
+    line-height: 1;
+    text-decoration: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-.2rem);
+    pointer-events: none;
+    transition: opacity .15s, visibility .15s, transform .15s, background .15s;
+}
+.character-detail-modal-portrait:hover .character-portrait-download,
+.character-detail-modal-portrait:focus-within .character-portrait-download {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.character-portrait-download:hover,
+.character-portrait-download:focus-visible {
+    background: var(--lb-deep-orange);
+    color: var(--lb-white);
+    outline: 2px solid var(--lb-white);
+    outline-offset: 2px;
 }
 .character-detail-modal-field + .character-detail-modal-field {
     margin-top: 1rem;
