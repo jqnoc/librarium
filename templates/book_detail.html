@@ -2524,15 +2524,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
               class="annotation-character-form character-edit-modal-form"
               onsubmit="return window.validateCharacterRoleForm(this)">
             <label for="character-edit-name-{{ character.id }}" data-i18n="book.characterName">Name</label>
-            <input type="text" id="character-edit-name-{{ character.id }}" name="name" value="{{ character.name }}" required
+            <input type="text" id="character-edit-name-{{ character.id }}" name="name" class="form-control" value="{{ character.name }}" required
                    placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
             {{ character_importance_field('character-edit-importance-' ~ character.id, character.importance) }}
             {{ character_roles_field('character-edit-roles-' ~ character.id, character.roles) }}
             <label for="character-edit-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
-            <textarea id="character-edit-description-{{ character.id }}" name="description" rows="3"
+            <textarea id="character-edit-description-{{ character.id }}" name="description" class="form-control" rows="3"
                       placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
             <label for="character-edit-biography-{{ character.id }}" data-i18n="book.characterBiography">Biography</label>
-            <textarea id="character-edit-biography-{{ character.id }}" name="biography" rows="6"
+            <textarea id="character-edit-biography-{{ character.id }}" name="biography" class="form-control" rows="6"
                       placeholder="Biography" data-i18n-placeholder="book.characterBiographyPlaceholder">{{ character.biography }}</textarea>
             <label for="character-edit-portrait-{{ character.id }}" data-i18n="book.characterPortrait">Portrait</label>
             {% if character.has_portrait %}
@@ -2544,7 +2544,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </label>
             </div>
             {% endif %}
-            <input type="file" id="character-edit-portrait-{{ character.id }}" name="portrait" accept="image/*">
+            <input type="file" id="character-edit-portrait-{{ character.id }}" name="portrait" class="form-control" accept="image/*">
             <span class="character-portrait-hint" data-i18n="book.characterPortraitHint">Use a 4:5 image.</span>
             <div class="annotation-character-form-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeCharacterEditModal('character-edit-modal-{{ character.id }}')" data-i18n="form.cancel">Cancel</button>

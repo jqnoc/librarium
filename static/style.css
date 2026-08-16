@@ -2176,7 +2176,13 @@ select.form-control { cursor: pointer; }
     font-size: 1.25rem;
 }
 .character-edit-modal-form {
-    gap: .75rem;
+    gap: .55rem;
+}
+.character-edit-modal-form > input[type="text"] {
+    width: 100%;
+}
+.character-edit-modal-form .character-role-error:empty {
+    min-height: 0;
 }
 .character-edit-modal-form .annotation-character-form-actions {
     margin-top: .5rem;
