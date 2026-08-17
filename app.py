@@ -788,7 +788,7 @@ def _dictionary_plain_text(raw: str) -> str:
     return parser.get_text()
 
 
-# ── Markdown renderer (for thoughts) ───────────────────────────────────
+# ── Markdown renderer (for annotations) ────────────────────────────────
 _MD_ALLOWED_TAGS = frozenset({
     'p', 'br', 'hr',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -1252,7 +1252,7 @@ def init_schema() -> None:
             page    INTEGER DEFAULT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS thoughts (
+        CREATE TABLE IF NOT EXISTS annotations (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             text    TEXT    NOT NULL DEFAULT '',
@@ -1318,6 +1318,7 @@ def _run_all_migrations() -> None:
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
+    migrate_rename_legacy_annotation_table()
     migrate_add_word_translations()
     migrate_add_word_synonyms()
     migrate_externalize_images()
@@ -2274,19 +2275,19 @@ def migrate_merge_genres_into_tags() -> None:
     print(f">> Migration complete - genres merged into tags for {len(rows)} books.")
 
 
-# ── Migration: Add annotations tables (quotes, thoughts, words) ─────────
+# ── Migration: Add annotation tables (quotes, annotations, words) ──────
 def migrate_add_annotations() -> None:
-    """Create quotes, thoughts, and words tables."""
+    """Create quotes, annotations, and words tables."""
     if not DB_PATH.exists():
         return
     db = sqlite3.connect(str(DB_PATH))
     existing = {r[0] for r in db.execute(
         "SELECT name FROM sqlite_master WHERE type='table'"
     ).fetchall()}
-    if "quotes" in existing and "thoughts" in existing and "words" in existing:
+    if "quotes" in existing and "annotations" in existing and "words" in existing:
         db.close()
         return
-    print(">> Migrating: adding annotations tables (quotes, thoughts, words) ...")
+    print(">> Migrating: adding annotation tables (quotes, annotations, words) ...")
     db.executescript("""
         CREATE TABLE IF NOT EXISTS quotes (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2294,7 +2295,7 @@ def migrate_add_annotations() -> None:
             text    TEXT    NOT NULL DEFAULT '',
             page    INTEGER DEFAULT NULL
         );
-        CREATE TABLE IF NOT EXISTS thoughts (
+        CREATE TABLE IF NOT EXISTS annotations (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             text    TEXT    NOT NULL DEFAULT '',
@@ -2313,6 +2314,31 @@ def migrate_add_annotations() -> None:
     db.commit()
     db.close()
     print(">> Migration complete — annotations tables created.")
+
+
+def migrate_rename_legacy_annotation_table() -> None:
+    """Rename the legacy annotation table and preserve its rows."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    existing = {r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if "thoughts" not in existing:
+        db.close()
+        return
+    print(">> Migrating: renaming legacy annotation table ...")
+    if "annotations" not in existing:
+        db.execute("ALTER TABLE thoughts RENAME TO annotations")
+    else:
+        db.execute(
+            "INSERT INTO annotations (book_id, text, page) "
+            "SELECT book_id, text, page FROM thoughts"
+        )
+        db.execute("DROP TABLE thoughts")
+    db.commit()
+    db.close()
+    print(">> Migration complete — legacy annotation table renamed.")
 
 
 def migrate_add_word_translations() -> None:
@@ -8109,11 +8135,11 @@ def book_detail(book_id: str):
         f"SELECT id, name, language FROM books WHERE library_id = ? AND id NOT IN ({ph}) ORDER BY name COLLATE NOCASE",
         [info["library_id"]] + exclude_ids,
     ).fetchall()
-    latest_thought_row = db.execute(
-        "SELECT id, text, page FROM thoughts WHERE book_id = ? ORDER BY id DESC LIMIT 1",
+    latest_annotation_row = db.execute(
+        "SELECT id, text, page FROM annotations WHERE book_id = ? ORDER BY id DESC LIMIT 1",
         (book_id,),
     ).fetchone()
-    latest_thought = dict(latest_thought_row) if latest_thought_row else None
+    latest_annotation = dict(latest_annotation_row) if latest_annotation_row else None
     characters = [_character_from_row(row) for row in db.execute(
         "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
         "WHERE book_id = ? ORDER BY display_order, name COLLATE NOCASE, id",
@@ -8192,7 +8218,7 @@ def book_detail(book_id: str):
         taxonomy_fields=TAXONOMY_FIELDS,
         taxonomy_counts=taxonomy_counts,
         suggestions=_collect_field_values(*TAXONOMY_FIELD_NAMES),
-        latest_thought=latest_thought,
+        latest_annotation=latest_annotation,
         characters=characters,
         character_importance_options=CHARACTER_IMPORTANCE_OPTIONS,
         character_role_options=CHARACTER_ROLE_OPTIONS,
@@ -8203,8 +8229,8 @@ def book_detail(book_id: str):
         quotes=[dict(r) for r in db.execute(
             "SELECT * FROM quotes WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
         ).fetchall()],
-        thoughts=[dict(r) for r in db.execute(
-            "SELECT * FROM thoughts WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
+        annotations=[dict(r) for r in db.execute(
+            "SELECT * FROM annotations WHERE book_id = ? ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page", (book_id,)
         ).fetchall()],
         words=[dict(r) for r in db.execute(
             "SELECT * FROM words WHERE book_id = ? ORDER BY word COLLATE NOCASE", (book_id,)
@@ -8577,7 +8603,7 @@ def dictionary_translate():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Routes – Annotation CRUD (Quotes, Thoughts, Words)
+# Routes – Annotation CRUD (Quotes, Annotations, Words)
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ── Quotes ──
@@ -8622,7 +8648,7 @@ def delete_quote(book_id: str, qid: int):
     return redirect(url_for("book_detail", book_id=book_id, _anchor="quotes"))
 
 
-# ── Thoughts ──
+# ── Annotations ──
 
 def _annotation_wants_json() -> bool:
     return "application/json" in request.headers.get("Accept", "").lower()
@@ -8702,18 +8728,18 @@ def _characters_markdown(book_title: str, characters: list[dict]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _thoughts_markdown(book_title: str, thoughts) -> str:
+def _annotations_markdown(book_title: str, annotations) -> str:
     title = re.sub(r"[\r\n]+", " ", (book_title or "Untitled")).strip() or "Untitled"
-    lines = [f"# {title}", "", "## Thoughts", ""]
-    for index, thought in enumerate(thoughts):
+    lines = [f"# {title}", "", "## Annotations", ""]
+    for index, annotation in enumerate(annotations):
         if index:
             lines.extend(["", ""])
-        lines.append(thought["text"] or "")
+        lines.append(annotation["text"] or "")
     return "\n".join(lines) + "\n"
 
 
-def _thoughts_markdown_filename(book_title: str) -> str:
-    return _book_markdown_filename(book_title, "thoughts")
+def _annotations_markdown_filename(book_title: str) -> str:
+    return _book_markdown_filename(book_title, "annotations")
 
 
 @app.route("/book/<book_id>/classification/export")
@@ -8754,26 +8780,26 @@ def export_characters_markdown(book_id: str):
     )
 
 
-@app.route("/book/<book_id>/thoughts/export")
-def export_thoughts_markdown(book_id: str):
+@app.route("/book/<book_id>/annotations/export")
+def export_annotations_markdown(book_id: str):
     db = get_db()
     book = db.execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()
     if not book:
         abort(404)
-    thoughts = db.execute(
-        "SELECT text, page FROM thoughts WHERE book_id = ? "
+    annotations = db.execute(
+        "SELECT text, page FROM annotations WHERE book_id = ? "
         "ORDER BY CASE WHEN page IS NULL THEN 1 ELSE 0 END, page, id",
         (book_id,),
     ).fetchall()
     return _markdown_download_response(
-        _thoughts_markdown(book["name"], thoughts),
-        _thoughts_markdown_filename(book["name"]),
-        "thoughts.md",
+        _annotations_markdown(book["name"], annotations),
+        _annotations_markdown_filename(book["name"]),
+        "annotations.md",
     )
 
 
-@app.route("/book/<book_id>/thoughts/add", methods=["POST"])
-def add_thought(book_id: str):
+@app.route("/book/<book_id>/annotations/add", methods=["POST"])
+def add_annotation(book_id: str):
     db = get_db()
     if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
         abort(404)
@@ -8782,44 +8808,44 @@ def add_thought(book_id: str):
     page = int(page_str) if page_str.isdigit() else None
     if text:
         cursor = db.execute(
-            "INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
+            "INSERT INTO annotations (book_id, text, page) VALUES (?, ?, ?)",
             (book_id, text, page),
         )
         db.commit()
         if _annotation_wants_json():
             return jsonify({"ok": True, "id": cursor.lastrowid})
     elif _annotation_wants_json():
-        return jsonify({"ok": False, "error": "Thought text is required."}), 400
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+        return jsonify({"ok": False, "error": "Annotation text is required."}), 400
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="annotations"))
 
 
-@app.route("/book/<book_id>/thoughts/<int:tid>/edit", methods=["POST"])
-def edit_thought(book_id: str, tid: int):
+@app.route("/book/<book_id>/annotations/<int:aid>/edit", methods=["POST"])
+def edit_annotation(book_id: str, aid: int):
     db = get_db()
     text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str.isdigit() else None
     if text:
         cursor = db.execute(
-            "UPDATE thoughts SET text = ?, page = ? WHERE id = ? AND book_id = ?",
-            (text, page, tid, book_id),
+            "UPDATE annotations SET text = ?, page = ? WHERE id = ? AND book_id = ?",
+            (text, page, aid, book_id),
         )
         db.commit()
         if _annotation_wants_json():
             if cursor.rowcount == 0:
-                return jsonify({"ok": False, "error": "Thought not found."}), 404
-            return jsonify({"ok": True, "id": tid})
+                return jsonify({"ok": False, "error": "Annotation not found."}), 404
+            return jsonify({"ok": True, "id": aid})
     elif _annotation_wants_json():
-        return jsonify({"ok": False, "error": "Thought text is required."}), 400
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+        return jsonify({"ok": False, "error": "Annotation text is required."}), 400
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="annotations"))
 
 
-@app.route("/book/<book_id>/thoughts/<int:tid>/delete", methods=["POST"])
-def delete_thought(book_id: str, tid: int):
+@app.route("/book/<book_id>/annotations/<int:aid>/delete", methods=["POST"])
+def delete_annotation(book_id: str, aid: int):
     db = get_db()
-    db.execute("DELETE FROM thoughts WHERE id = ? AND book_id = ?", (tid, book_id))
+    db.execute("DELETE FROM annotations WHERE id = ? AND book_id = ?", (aid, book_id))
     db.commit()
-    return redirect(url_for("book_detail", book_id=book_id, _anchor="thoughts"))
+    return redirect(url_for("book_detail", book_id=book_id, _anchor="annotations"))
 
 
 # ── Words ──
@@ -9053,9 +9079,9 @@ def delete_character(book_id: str, cid: int):
 # ── Bookly PDF Import ──
 
 def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
-    """Parse a Bookly summary PDF and extract quotes, thoughts, and words."""
+    """Parse a Bookly summary PDF and extract quotes, annotations, and words."""
     import pdfplumber
-    result: dict = {"quotes": [], "thoughts": [], "words": []}
+    result: dict = {"quotes": [], "annotations": [], "words": []}
 
     pdf = pdfplumber.open(io.BytesIO(pdf_bytes))
     full_text = ""
@@ -9079,14 +9105,14 @@ def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
 
     # Find sections by headers
     import re
-    thoughts_header = re.search(r"My\s+thoughts\s+about\s+this\s+book", text_block, re.IGNORECASE)
+    annotations_header = re.search(r"My\s+(?:thoughts|annotations)\s+about\s+this\s+book", text_block, re.IGNORECASE)
     quotes_header = re.search(r"Quotes\s+I\s+liked\s+the\s+most", text_block, re.IGNORECASE)
     words_header = re.search(r"New\s+words\s+I\s+learned", text_block, re.IGNORECASE)
 
     # Determine section boundaries
     headers = []
-    if thoughts_header:
-        headers.append(("thoughts", thoughts_header.start()))
+    if annotations_header:
+        headers.append(("annotations", annotations_header.start()))
     if quotes_header:
         headers.append(("quotes", quotes_header.start()))
     if words_header:
@@ -9104,12 +9130,12 @@ def _parse_bookly_pdf(pdf_bytes: bytes) -> dict:
             end = len(text_block)
         sections[name] = text_block[header_end:end].strip()
 
-    # Parse thoughts and quotes (same format: p.NUMBER • text)
+    # Parse annotations and quotes (same format: p.NUMBER • text)
     page_entry_re = re.compile(r"p\.(\d+)\s*[•·]\s*")
     # Quotation marks to strip from beginning/end of extracted quotes
     _quote_marks = '\'\"«»""''‹›„‟‚‛「」『』'
 
-    for section_name in ("thoughts", "quotes"):
+    for section_name in ("annotations", "quotes"):
         if section_name not in sections:
             continue
         section_text = sections[section_name]
@@ -9207,21 +9233,21 @@ def import_bookly(book_id: str):
 
     if clear_existing:
         db.execute("DELETE FROM quotes WHERE book_id = ?", (book_id,))
-        db.execute("DELETE FROM thoughts WHERE book_id = ?", (book_id,))
+        db.execute("DELETE FROM annotations WHERE book_id = ?", (book_id,))
         db.execute("DELETE FROM words WHERE book_id = ?", (book_id,))
 
     for q in parsed["quotes"]:
         db.execute("INSERT INTO quotes (book_id, text, page) VALUES (?, ?, ?)",
                    (book_id, q["text"], q.get("page")))
-    for t in parsed["thoughts"]:
-        db.execute("INSERT INTO thoughts (book_id, text, page) VALUES (?, ?, ?)",
-                   (book_id, t["text"], t.get("page")))
+    for annotation in parsed["annotations"]:
+        db.execute("INSERT INTO annotations (book_id, text, page) VALUES (?, ?, ?)",
+                   (book_id, annotation["text"], annotation.get("page")))
     for w in parsed["words"]:
         db.execute("INSERT INTO words (book_id, word, definition) VALUES (?, ?, ?)",
                    (book_id, w["word"], w["definition"]))
     db.commit()
 
-    counts = f"{len(parsed['quotes'])} quotes, {len(parsed['thoughts'])} thoughts, {len(parsed['words'])} words"
+    counts = f"{len(parsed['quotes'])} quotes, {len(parsed['annotations'])} annotations, {len(parsed['words'])} words"
     flash(f"Bookly import complete: {counts}.", "success")
     return redirect(url_for("book_detail", book_id=book_id))
 

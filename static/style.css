@@ -2776,7 +2776,7 @@ body.reading-session-modal-open { overflow: hidden; }
     gap: .6rem;
     margin-top: .4rem;
 }
-.reading-session-thought-mode-row {
+.reading-session-annotation-mode-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2785,12 +2785,12 @@ body.reading-session-modal-open { overflow: hidden; }
     padding-bottom: .75rem;
     border-bottom: 1px solid var(--lb-border);
 }
-.reading-session-annotation-modal-box .reading-session-thought-mode-label {
+.reading-session-annotation-modal-box .reading-session-annotation-mode-label {
     margin: 0;
     color: var(--lb-text-light);
     font-size: .8rem;
 }
-.reading-session-thought-page-row {
+.reading-session-annotation-page-row {
     max-width: 150px;
     margin-top: .9rem;
 }
@@ -2838,8 +2838,8 @@ body.reading-session-modal-open { overflow: hidden; }
     .reading-session-word-translation { grid-template-columns: 1fr; }
     .reading-session-dictionary-button,
     .reading-session-translate-button { width: 100%; }
-    .reading-session-thought-mode-row { align-items: flex-start; flex-direction: column; }
-    .reading-session-thought-page-row { max-width: none; }
+    .reading-session-annotation-mode-row { align-items: flex-start; flex-direction: column; }
+    .reading-session-annotation-page-row { max-width: none; }
     .reading-session-character-selector-row { grid-template-columns: 1fr; }
     .reading-session-character-selector-row .btn { width: 100%; }
 }
@@ -4241,7 +4241,7 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Annotations (Quotes, Thoughts, Words)
+    Annotation cards and rich text
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .annotation-count {
@@ -4314,26 +4314,26 @@ body.reading-session-modal-open { overflow: hidden; }
     padding-left: 0.85rem;
 }
 
-.annotation-thought .annotation-text {
+.annotation-note .annotation-text {
     color: var(--lb-text);
     line-height: 1.6;
 }
-.annotation-thought .annotation-text p { margin: 0 0 0.5em; }
-.annotation-thought .annotation-text p:last-child { margin-bottom: 0; }
-.annotation-thought .annotation-text h1,
-.annotation-thought .annotation-text h2,
-.annotation-thought .annotation-text h3,
-.annotation-thought .annotation-text h4 { margin: 0.6em 0 0.3em; font-weight: 600; }
-.annotation-thought .annotation-text h2 { font-size: 1.2rem; }
-.annotation-thought .annotation-text h3 { font-size: 1.08rem; }
-.annotation-thought .annotation-text h4 { font-size: 1rem; }
-.annotation-thought .annotation-text blockquote {
+.annotation-note .annotation-text p { margin: 0 0 0.5em; }
+.annotation-note .annotation-text p:last-child { margin-bottom: 0; }
+.annotation-note .annotation-text h1,
+.annotation-note .annotation-text h2,
+.annotation-note .annotation-text h3,
+.annotation-note .annotation-text h4 { margin: 0.6em 0 0.3em; font-weight: 600; }
+.annotation-note .annotation-text h2 { font-size: 1.2rem; }
+.annotation-note .annotation-text h3 { font-size: 1.08rem; }
+.annotation-note .annotation-text h4 { font-size: 1rem; }
+.annotation-note .annotation-text blockquote {
     margin: 0.5em 0;
     padding: 0.25em 0.75em;
     border-left: 3px solid var(--lb-border);
     color: var(--lb-text-light);
 }
-.annotation-thought .annotation-text pre {
+.annotation-note .annotation-text pre {
     margin: 0.5em 0;
     padding: 0.6em 0.8em;
     background: var(--lb-light-bg);
@@ -4342,28 +4342,28 @@ body.reading-session-modal-open { overflow: hidden; }
     overflow-x: auto;
     font-size: 0.88rem;
 }
-.annotation-thought .annotation-text code {
+.annotation-note .annotation-text code {
     padding: 0.15em 0.35em;
     background: var(--lb-light-bg);
     border-radius: 3px;
     font-size: 0.88rem;
 }
-.annotation-thought .annotation-text pre code {
+.annotation-note .annotation-text pre code {
     padding: 0;
     background: none;
     border-radius: 0;
 }
-.annotation-thought .annotation-text ul,
-.annotation-thought .annotation-text ol {
+.annotation-note .annotation-text ul,
+.annotation-note .annotation-text ol {
     margin: 0.4em 0;
     padding-left: 1.5em;
 }
-.annotation-thought .annotation-text hr {
+.annotation-note .annotation-text hr {
     margin: 0.75em 0;
     border: none;
     border-top: 1px solid var(--lb-border);
 }
-.annotation-thought .annotation-text del {
+.annotation-note .annotation-text del {
     text-decoration: line-through;
     opacity: 0.7;
 }

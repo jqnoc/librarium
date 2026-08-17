@@ -285,9 +285,9 @@
         <span data-i18n="book.charactersTab">Characters</span>
         <span class="book-tab-count" aria-hidden="true">({{ characters | length }})</span>
     </button>
-    <button type="button" class="book-tab" id="book-tab-thoughts" role="tab" aria-controls="book-tab-thoughts-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="thoughts">
-        <span data-i18n="book.thoughtsTab">Annotations</span>
-        <span class="book-tab-count" aria-hidden="true">({{ thoughts | length }})</span>
+    <button type="button" class="book-tab" id="book-tab-annotations" role="tab" aria-controls="book-tab-annotations-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="annotations">
+        <span data-i18n="book.annotationsTab">Annotations</span>
+        <span class="book-tab-count" aria-hidden="true">({{ annotations | length }})</span>
     </button>
     <button type="button" class="book-tab" id="book-tab-quotes" role="tab" aria-controls="book-tab-quotes-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="quotes">
         <span data-i18n="book.quotesTab">Quotes</span>
@@ -604,9 +604,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                         data-i18n-title="book.readingSessionAddQuote">
                     <span aria-hidden="true">&#10077;</span> <span data-i18n="book.readingSessionQuote">Quote</span>
                 </button>
-                <button type="button" class="btn btn-secondary" id="readingSessionAddThoughtButton" onclick="openReadingSessionThoughtModal()"
-                        data-i18n-title="book.readingSessionAddThought">
-                    <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionThought">Thought</span>
+                <button type="button" class="btn btn-secondary" id="readingSessionAddAnnotationButton" onclick="openReadingSessionAnnotationModal()"
+                        data-i18n-title="book.readingSessionAddAnnotation">
+                    <span aria-hidden="true">&#128172;</span> <span data-i18n="book.readingSessionAnnotation">Annotation</span>
                 </button>
                 <button type="button" class="btn btn-secondary" id="readingSessionAddWordButton" onclick="openReadingSessionWordModal()"
                         data-i18n-title="book.readingSessionAddWord">
@@ -796,35 +796,35 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </form>
     </div>
 </div>
-<div id="readingSessionThoughtModal" class="modal-overlay reading-session-annotation-modal-overlay"
-    role="dialog" aria-modal="true" aria-labelledby="reading-session-thought-title">
-    <div class="modal-box reading-session-annotation-modal-box reading-session-thought-modal-box">
-        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionThoughtModal()" aria-label="Close">&times;</button>
-        <h3 id="reading-session-thought-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddThought">Add Thought</h3>
-        <div class="reading-session-thought-mode-row">
-            <p id="readingSessionThoughtModeLabel" class="reading-session-thought-mode-label" data-i18n="book.readingSessionEditingLastThought">Editing the last saved thought</p>
-            <button type="button" class="btn btn-secondary btn-sm" id="readingSessionThoughtModeButton" onclick="toggleReadingSessionThoughtMode()" data-i18n="book.readingSessionNewThought">New Thought</button>
+<div id="readingSessionAnnotationModal" class="modal-overlay reading-session-annotation-modal-overlay"
+    role="dialog" aria-modal="true" aria-labelledby="reading-session-annotation-title">
+    <div class="modal-box reading-session-annotation-modal-box">
+        <button type="button" class="reading-session-modal-close" onclick="closeReadingSessionAnnotationModal()" aria-label="Close">&times;</button>
+        <h3 id="reading-session-annotation-title" class="reading-session-annotation-title" data-i18n="book.readingSessionAddAnnotation">Add Annotation</h3>
+        <div class="reading-session-annotation-mode-row">
+            <p id="readingSessionAnnotationModeLabel" class="reading-session-annotation-mode-label" data-i18n="book.readingSessionEditingLastAnnotation">Editing the last saved annotation</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="readingSessionAnnotationModeButton" onclick="toggleReadingSessionAnnotationMode()" data-i18n="book.readingSessionNewAnnotation">New Annotation</button>
         </div>
-        <form id="readingSessionThoughtForm" method="POST" action="{{ url_for('add_thought', book_id=book_id) }}"
-              data-add-action="{{ url_for('add_thought', book_id=book_id) }}"
-              data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/thoughts/"
-              onsubmit="return saveReadingSessionThought(event)">
+        <form id="readingSessionAnnotationForm" method="POST" action="{{ url_for('add_annotation', book_id=book_id) }}"
+              data-add-action="{{ url_for('add_annotation', book_id=book_id) }}"
+              data-edit-action-prefix="{{ url_for('book_detail', book_id=book_id) }}/annotations/"
+              onsubmit="return saveReadingSessionAnnotation(event)">
             <div class="reading-session-annotation-field">
-                <label for="readingSessionThoughtText" data-i18n="book.thoughtTextPlaceholder">Your thought</label>
-                <textarea id="readingSessionThoughtText" name="text" rows="7" class="form-control" required
-                          placeholder="Your thought..." data-i18n-placeholder="book.thoughtTextPlaceholder">{% if latest_thought %}{{ latest_thought.get('text', '') }}{% endif %}</textarea>
+                <label for="readingSessionAnnotationText" data-i18n="book.annotationTextPlaceholder">Your annotation</label>
+                <textarea id="readingSessionAnnotationText" name="text" rows="7" class="form-control" required
+                          placeholder="Your annotation..." data-i18n-placeholder="book.annotationTextPlaceholder">{% if latest_annotation %}{{ latest_annotation.get('text', '') }}{% endif %}</textarea>
             </div>
-            <div class="reading-session-thought-page-row">
+            <div class="reading-session-annotation-page-row">
                 <div class="reading-session-annotation-field">
-                    <label for="readingSessionThoughtPage" data-i18n="book.pagePlaceholder">Page</label>
-                    <input type="number" id="readingSessionThoughtPage" name="page" class="form-control" min="1"{% if latest_thought and latest_thought.get('page') %} value="{{ latest_thought.get('page') }}"{% endif %}
+                    <label for="readingSessionAnnotationPage" data-i18n="book.pagePlaceholder">Page</label>
+                    <input type="number" id="readingSessionAnnotationPage" name="page" class="form-control" min="1"{% if latest_annotation and latest_annotation.get('page') %} value="{{ latest_annotation.get('page') }}"{% endif %}
                            placeholder="Page" data-i18n-placeholder="book.pagePlaceholder">
                 </div>
             </div>
-            <p id="readingSessionThoughtError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
+            <p id="readingSessionAnnotationError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
             <div class="reading-session-annotation-actions">
-                <button type="submit" class="btn btn-primary" id="readingSessionThoughtSaveButton">
-                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveThought">Save Thought</span>
+                <button type="submit" class="btn btn-primary" id="readingSessionAnnotationSaveButton">
+                    <span aria-hidden="true">&#10003;</span> <span data-i18n="book.readingSessionSaveAnnotation">Save Annotation</span>
                 </button>
             </div>
         </form>
@@ -887,7 +887,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <script>
 (function () {
     var readingSessionBookId = {{ book_id | tojson }};
-    var initialLatestThought = {{ latest_thought | tojson }};
+    var initialLatestAnnotation = {{ latest_annotation | tojson }};
     var initialCharacters = {{ characters | tojson }};
     var state = {
         readingId: null,
@@ -908,8 +908,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         classificationSaving: false,
         quickModalWasRunning: false,
         quickModalSaving: false,
-        latestThought: initialLatestThought,
-        thoughtMode: initialLatestThought ? 'edit' : 'new',
+        latestAnnotation: initialLatestAnnotation,
+        annotationMode: initialLatestAnnotation ? 'edit' : 'new',
         characters: Array.isArray(initialCharacters) ? initialCharacters : [],
         characterMode: 'new',
     };
@@ -1132,34 +1132,34 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         getElement('readingSessionCharacterSaveButton').disabled = false;
     }
 
-    function setThoughtMode(mode) {
-        if (mode === 'edit' && !state.latestThought) mode = 'new';
-        state.thoughtMode = mode;
-        var form = getElement('readingSessionThoughtForm');
-        var text = getElement('readingSessionThoughtText');
-        var page = getElement('readingSessionThoughtPage');
-        var label = getElement('readingSessionThoughtModeLabel');
-        var modeButton = getElement('readingSessionThoughtModeButton');
+    function setAnnotationMode(mode) {
+        if (mode === 'edit' && !state.latestAnnotation) mode = 'new';
+        state.annotationMode = mode;
+        var form = getElement('readingSessionAnnotationForm');
+        var text = getElement('readingSessionAnnotationText');
+        var page = getElement('readingSessionAnnotationPage');
+        var label = getElement('readingSessionAnnotationModeLabel');
+        var modeButton = getElement('readingSessionAnnotationModeButton');
         if (!form || !text || !page || !label || !modeButton) return;
 
         if (mode === 'edit') {
-            form.action = form.dataset.editActionPrefix + state.latestThought.id + '/edit';
-            text.value = state.latestThought.text || '';
-            page.value = state.latestThought.page || '';
-            label.dataset.i18n = 'book.readingSessionEditingLastThought';
-            label.textContent = translate('book.readingSessionEditingLastThought', 'Editing the last saved thought');
-            modeButton.dataset.i18n = 'book.readingSessionNewThought';
-            modeButton.textContent = translate('book.readingSessionNewThought', 'New Thought');
+            form.action = form.dataset.editActionPrefix + state.latestAnnotation.id + '/edit';
+            text.value = state.latestAnnotation.text || '';
+            page.value = state.latestAnnotation.page || '';
+            label.dataset.i18n = 'book.readingSessionEditingLastAnnotation';
+            label.textContent = translate('book.readingSessionEditingLastAnnotation', 'Editing the last saved annotation');
+            modeButton.dataset.i18n = 'book.readingSessionNewAnnotation';
+            modeButton.textContent = translate('book.readingSessionNewAnnotation', 'New Annotation');
         } else {
             form.action = form.dataset.addAction;
             text.value = '### ';
             page.value = '';
-            label.dataset.i18n = 'book.readingSessionWritingNewThought';
-            label.textContent = translate('book.readingSessionWritingNewThought', 'Writing a new thought');
-            modeButton.dataset.i18n = 'book.readingSessionEditLastThought';
-            modeButton.textContent = translate('book.readingSessionEditLastThought', 'Edit Last Thought');
+            label.dataset.i18n = 'book.readingSessionWritingNewAnnotation';
+            label.textContent = translate('book.readingSessionWritingNewAnnotation', 'Writing a new annotation');
+            modeButton.dataset.i18n = 'book.readingSessionEditLastAnnotation';
+            modeButton.textContent = translate('book.readingSessionEditLastAnnotation', 'Edit Last Annotation');
         }
-        modeButton.style.display = state.latestThought ? '' : 'none';
+        modeButton.style.display = state.latestAnnotation ? '' : 'none';
     }
 
     function updateElapsed() {
@@ -1575,52 +1575,52 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         return false;
     };
 
-    window.openReadingSessionThoughtModal = function () {
-        if (!beginQuickModal('readingSessionThoughtModal', 'readingSessionThoughtError')) return;
-        setThoughtMode(state.latestThought ? 'edit' : 'new');
-        getElement('readingSessionThoughtSaveButton').disabled = false;
-        getElement('readingSessionThoughtText').focus();
+    window.openReadingSessionAnnotationModal = function () {
+        if (!beginQuickModal('readingSessionAnnotationModal', 'readingSessionAnnotationError')) return;
+        setAnnotationMode(state.latestAnnotation ? 'edit' : 'new');
+        getElement('readingSessionAnnotationSaveButton').disabled = false;
+        getElement('readingSessionAnnotationText').focus();
     };
 
-    window.closeReadingSessionThoughtModal = function () {
+    window.closeReadingSessionAnnotationModal = function () {
         if (state.quickModalSaving) return;
-        var modal = getElement('readingSessionThoughtModal');
+        var modal = getElement('readingSessionAnnotationModal');
         if (modal) modal.classList.remove('active');
         state.quickModalWasRunning = false;
     };
 
-    window.toggleReadingSessionThoughtMode = function () {
-        setThoughtMode(state.thoughtMode === 'edit' ? 'new' : 'edit');
-        getElement('readingSessionThoughtText').focus();
+    window.toggleReadingSessionAnnotationMode = function () {
+        setAnnotationMode(state.annotationMode === 'edit' ? 'new' : 'edit');
+        getElement('readingSessionAnnotationText').focus();
     };
 
-    window.saveReadingSessionThought = function (event) {
+    window.saveReadingSessionAnnotation = function (event) {
         event.preventDefault();
-        var form = getElement('readingSessionThoughtForm');
-        var text = getElement('readingSessionThoughtText');
-        var page = getElement('readingSessionThoughtPage');
+        var form = getElement('readingSessionAnnotationForm');
+        var text = getElement('readingSessionAnnotationText');
+        var page = getElement('readingSessionAnnotationPage');
         var shouldResume = state.quickModalWasRunning;
         if (!text.value.trim()) {
-            setModalError('readingSessionThoughtError', translate('book.thoughtRequired', 'Thought text is required.'));
+            setModalError('readingSessionAnnotationError', translate('book.annotationRequired', 'Annotation text is required.'));
             text.focus();
             return false;
         }
         state.quickModalSaving = true;
-        getElement('readingSessionThoughtSaveButton').disabled = true;
-        setModalError('readingSessionThoughtError', '');
+        getElement('readingSessionAnnotationSaveButton').disabled = true;
+        setModalError('readingSessionAnnotationError', '');
         var savedText = text.value;
         var savedPage = page.value ? Number(page.value) : null;
         fetchAnnotationJson(form.action, form).then(function (payload) {
-            state.latestThought = {
+            state.latestAnnotation = {
                 id: payload.id,
                 text: savedText,
                 page: savedPage,
             };
-            finishQuickModal('readingSessionThoughtModal', shouldResume);
+            finishQuickModal('readingSessionAnnotationModal', shouldResume);
         }).catch(function (error) {
             state.quickModalSaving = false;
-            getElement('readingSessionThoughtSaveButton').disabled = false;
-            setModalError('readingSessionThoughtError', error.message || translate('book.readingSessionSaveError', 'The thought could not be saved.'));
+            getElement('readingSessionAnnotationSaveButton').disabled = false;
+            setModalError('readingSessionAnnotationError', error.message || translate('book.readingSessionSaveError', 'The annotation could not be saved.'));
         });
         return false;
     };
@@ -1684,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     getElement('readingSessionStartPage').addEventListener('input', syncEditedPageRange);
     getElement('readingSessionEndPage').addEventListener('input', syncEditedPageRange);
-    getElement('readingSessionThoughtText').addEventListener('keydown', function (event) {
+    getElement('readingSessionAnnotationText').addEventListener('keydown', function (event) {
         if (!event.ctrlKey) return;
         var prefix = '';
         if (event.key === 'Enter') {
@@ -1710,13 +1710,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var classificationModal = getElement('readingSessionClassificationModal');
         var quoteModal = getElement('readingSessionQuoteModal');
         var wordModal = getElement('readingSessionWordModal');
-        var thoughtModal = getElement('readingSessionThoughtModal');
+        var annotationModal = getElement('readingSessionAnnotationModal');
         var characterModal = getElement('readingSessionCharacterModal');
         if (!modal.classList.contains('active')
             || (classificationModal && classificationModal.classList.contains('active'))
             || (quoteModal && quoteModal.classList.contains('active'))
             || (wordModal && wordModal.classList.contains('active'))
-            || (thoughtModal && thoughtModal.classList.contains('active'))
+            || (annotationModal && annotationModal.classList.contains('active'))
             || (characterModal && characterModal.classList.contains('active'))
             || event.repeat || event.code !== 'Space') return;
         event.preventDefault();
@@ -2797,37 +2797,37 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
 </section>
 
-<section id="book-tab-thoughts-panel" class="book-tab-panel" data-book-tab-panel="thoughts" role="tabpanel" aria-labelledby="book-tab-thoughts" hidden>
+<section id="book-tab-annotations-panel" class="book-tab-panel" data-book-tab-panel="annotations" role="tabpanel" aria-labelledby="book-tab-annotations" hidden>
 <!-- ── Annotations ───────────────────────────────────────────────────── -->
 <div class="annotation-section-heading">
-    <h2 id="thoughts"><span data-i18n="book.thoughts">Annotations</span> <span class="annotation-count">({{ thoughts | length }})</span></h2>
-    <a href="{{ url_for('export_thoughts_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
-       title="Download thoughts as Markdown" data-i18n-title="book.exportThoughtsMarkdownTitle">
-        <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportThoughtsMarkdown">Download Markdown</span>
+    <h2 id="annotations"><span data-i18n="book.annotations">Annotations</span> <span class="annotation-count">({{ annotations | length }})</span></h2>
+    <a href="{{ url_for('export_annotations_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+       title="Download annotations as Markdown" data-i18n-title="book.exportAnnotationsMarkdownTitle">
+        <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportAnnotationsMarkdown">Download Markdown</span>
     </a>
 </div>
 
-{% if thoughts %}
+{% if annotations %}
 <div class="annotations-list">
-    {% for th in thoughts %}
-    <div class="annotation-card annotation-thought" id="thought-{{ th.id }}">
+    {% for annotation in annotations %}
+    <div class="annotation-card annotation-note" id="annotation-{{ annotation.id }}">
         <div class="annotation-body">
-            <div class="annotation-text">{{ th.text | md_to_html }}</div>
-            {% if th.page %}<div class="annotation-page">p. {{ th.page }}</div>{% endif %}
+            <div class="annotation-text">{{ annotation.text | md_to_html }}</div>
+            {% if annotation.page %}<div class="annotation-page">p. {{ annotation.page }}</div>{% endif %}
         </div>
         <div class="annotation-actions">
-            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})">✏️</button>
-            <form method="POST" action="{{ url_for('delete_thought', book_id=book_id, tid=th.id) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete this thought?');">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('annotation', {{ annotation.id }})">✏️</button>
+            <form method="POST" action="{{ url_for('delete_annotation', book_id=book_id, aid=annotation.id) }}" style="display:inline;"
+                onsubmit="return confirm('Delete this annotation?');">
                 <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
             </form>
         </div>
-        <div class="annotation-edit-row" id="thought-edit-{{ th.id }}">
-            <form method="POST" action="{{ url_for('edit_thought', book_id=book_id, tid=th.id) }}" class="annotation-edit-form">
-                <textarea id="edit-thought-{{ th.id }}" name="text" rows="3" required>{{ th.text }}</textarea>
-                <input type="number" name="page" value="{{ th.page or '' }}" placeholder="Page" min="1" style="width:80px;">
+        <div class="annotation-edit-row" id="annotation-edit-{{ annotation.id }}">
+            <form method="POST" action="{{ url_for('edit_annotation', book_id=book_id, aid=annotation.id) }}" class="annotation-edit-form">
+                <textarea id="edit-annotation-{{ annotation.id }}" name="text" rows="3" required>{{ annotation.text }}</textarea>
+                <input type="number" name="page" value="{{ annotation.page or '' }}" placeholder="Page" min="1" style="width:80px;">
                 <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('thought', {{ th.id }})" data-i18n="form.cancel">Cancel</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('annotation', {{ annotation.id }})" data-i18n="form.cancel">Cancel</button>
             </form>
         </div>
     </div>
@@ -2835,16 +2835,16 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 </div>
 {% else %}
 <div class="empty-state" style="padding: 1rem;">
-    <p data-i18n="book.noThoughts">No thoughts yet.</p>
+    <p data-i18n="book.noAnnotations">No annotations yet.</p>
 </div>
 {% endif %}
 
 <div class="add-annotation-panel">
-    <form method="POST" action="{{ url_for('add_thought', book_id=book_id) }}" class="annotation-add-form">
-        <textarea id="add-thought-text" name="text" rows="2" required placeholder="Your thought..." data-i18n-placeholder="book.thoughtTextPlaceholder"></textarea>
+    <form method="POST" action="{{ url_for('add_annotation', book_id=book_id) }}" class="annotation-add-form">
+        <textarea id="add-annotation-text" name="text" rows="2" required placeholder="Your annotation..." data-i18n-placeholder="book.annotationTextPlaceholder"></textarea>
         <div class="annotation-add-row">
             <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
-            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addThoughtBtn">+ Add Thought</button>
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addAnnotationBtn">+ Add Annotation</button>
         </div>
     </form>
 </div>
@@ -3342,7 +3342,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 
     function normalizeTab(tab) {
         if (tab === 'assessment') return 'rating';
-        if (tab === 'annotations') return 'characters';
+        if (tab === 'thoughts') return 'annotations';
         return tab;
     }
 
@@ -3575,13 +3575,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add-form textareas
     irt('add-quote-text');
     irt('readingSessionQuoteText');
-    imt('add-thought-text');
+    imt('add-annotation-text');
     irt('add-word-def');
-    imt('readingSessionThoughtText');
+    imt('readingSessionAnnotationText');
     irt('readingSessionWordDefinition');
     // Edit-form textareas
     document.querySelectorAll('textarea[id^="edit-quote-"]').forEach(function(ta) { irt(ta.id); });
-    document.querySelectorAll('textarea[id^="edit-thought-"]').forEach(function(ta) { imt(ta.id); });
+    document.querySelectorAll('textarea[id^="edit-annotation-"]').forEach(function(ta) { imt(ta.id); });
     document.querySelectorAll('textarea[id^="edit-word-"]').forEach(function(ta) { irt(ta.id); });
     initWordTranslationLanguageControls();
 });

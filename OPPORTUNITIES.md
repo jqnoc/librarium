@@ -14,7 +14,7 @@ Librarium already does several things unusually well for a personal reading trac
 - multi-edition linking
 - multi-library support
 - authors, series, and acquisition sources
-- quotes, thoughts, and words annotations
+- quotes, annotations, and words
 - yearly and global statistics
 - dashboard, calendar, and activity views
 - multi-user local setup
@@ -91,17 +91,17 @@ Annotations are already one of the strongest and most distinctive parts of Libra
 
 Possible additions:
 
-- a global notebook view for all quotes, thoughts, and words
+- a global notebook view for all quotes, annotations, and words
 - filters by author, tag, language, source, year, and rating
 - full-text search across annotations
 - pinned or favorite annotations
 - export of selected notes as Markdown, text, or PDF
-- a "commonplace book" reading journal built from saved highlights and thoughts
+- a "commonplace book" reading journal built from saved highlights and annotations
 
 Why it matters:
 
 - turns annotations from attached metadata into a real long-term knowledge system
-- increases the value of the existing quotes/thoughts/words model
+- increases the value of the existing quotes/annotations/words model
 - differentiates Librarium from more generic reading trackers
 
 Expected product impact:

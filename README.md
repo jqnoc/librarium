@@ -92,10 +92,10 @@ Node.js, or pip installed to run it.
 
 ### Annotations
 
-- Quotes, thoughts, and words per book edition
+- Quotes, annotations, and words per book edition
 - Inline add/edit/delete workflows on the book detail page
-- Bookly PDF import for quotes, thoughts, and words
-- Thoughts now use Markdown editing with a dedicated toolbar
+- Bookly PDF import for quotes, annotations, and words
+- Annotations now use Markdown editing with a dedicated toolbar
 
 ### Multi-Edition System
 

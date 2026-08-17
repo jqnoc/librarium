@@ -70,7 +70,7 @@ are no blueprints, no ORM, and no separate model files.
 
 - **14 app tables**: `books`, `readings`, `sessions`, `periods`, `ratings`,
   `authors`, `series`, `book_series`, `sources`, `libraries`, `quotes`,
-  `thoughts`, `words`, and `characters` (plus SQLite-internal `sqlite_sequence`).
+  `annotations`, `words`, and `characters` (plus SQLite-internal `sqlite_sequence`).
 - All queries are **raw SQL** via `sqlite3`. There is no ORM.
 - `get_db()` returns a per-request `sqlite3.Connection` stored in
   Flask's `g` object. Row factory is `sqlite3.Row`.
@@ -156,10 +156,11 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 20. `migrate_add_tags` — tags column on books
 21. `migrate_normalize_genres` — normalise genre strings
 22. `migrate_merge_genres_into_tags` — merge genres into the tags column
-23. `migrate_add_annotations` — quotes, thoughts, and words tables
-24. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
-25. `migrate_add_character_portrait` — add character portrait hashes and thumbnails
-26. `migrate_add_session_page_range` — add saved start and end pages to reading sessions
+23. `migrate_add_annotations` — quotes, annotations, and words tables
+24. `migrate_rename_legacy_annotation_table` — rename the legacy annotation table and preserve its rows
+25. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
+26. `migrate_add_character_portrait` — add character portrait hashes and thumbnails
+27. `migrate_add_session_page_range` — add saved start and end pages to reading sessions
 
 When adding a new migration:
 
@@ -288,12 +289,13 @@ The library page (`/library`) supports three view modes: **card**,
 | `/book/<id>/ratings` | POST | Save ratings |
 | `/book/<id>/classification/export` | GET | Download book classification as Markdown |
 | `/book/<id>/characters/export` | GET | Download book characters as Markdown without portraits |
+| `/book/<id>/annotations/export` | GET | Download book annotations as Markdown |
 | `/book/<id>/quotes/add` | POST | Add a quote annotation |
 | `/book/<id>/quotes/<qid>/edit` | POST | Edit a quote annotation |
 | `/book/<id>/quotes/<qid>/delete` | POST | Delete a quote annotation |
-| `/book/<id>/thoughts/add` | POST | Add a thought annotation |
-| `/book/<id>/thoughts/<tid>/edit` | POST | Edit a thought annotation |
-| `/book/<id>/thoughts/<tid>/delete` | POST | Delete a thought annotation |
+| `/book/<id>/annotations/add` | POST | Add an annotation |
+| `/book/<id>/annotations/<aid>/edit` | POST | Edit an annotation |
+| `/book/<id>/annotations/<aid>/delete` | POST | Delete an annotation |
 | `/book/<id>/words/add` | POST | Add a word annotation |
 | `/book/<id>/words/<wid>/edit` | POST | Edit a word annotation |
 | `/book/<id>/words/<wid>/delete` | POST | Delete a word annotation |
@@ -389,7 +391,7 @@ authors     (name TEXT PK, photo BLOB, has_photo, birth_date,
 
 quotes      (id INTEGER PK, book_id FK, text, page)
 
-thoughts    (id INTEGER PK, book_id FK, text, page)
+annotations (id INTEGER PK, book_id FK, text, page)
 
 words       (id INTEGER PK, book_id FK, word, definition)
 
