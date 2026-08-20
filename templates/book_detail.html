@@ -3021,8 +3021,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 data-session-progress="{{ s.progress_pct or 0 }}" data-session-duration="{{ s.duration_seconds or 0 }}">
                 <td>{{ loop.index }}</td>
                 <td class="session-date-cell">{{ s.date | display_date }}</td>
-                <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
-                <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
+                <td class="session-pages-cell">{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
+                <td class="session-duration-cell">{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
                 {% set pace_faster = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour > avg_pages_per_hour %}
                 {% set pace_slower = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour < avg_pages_per_hour %}
                 <td>
@@ -3600,8 +3600,8 @@ function toggleEdit(idx) {
         var progressOrPages = isPctFormat
             ? group.maxProgress.toFixed(1) + '%'
             : String(Math.round(group.totalPages));
-        appendTextCell(summaryRow, progressOrPages);
-        appendTextCell(summaryRow, formatDuration(group.totalDuration));
+        appendTextCell(summaryRow, progressOrPages, 'session-pages-cell');
+        appendTextCell(summaryRow, formatDuration(group.totalDuration), 'session-duration-cell');
 
         var pace = group.totalDuration > 0 && !isPctFormat
             ? group.totalPages / (group.totalDuration / 3600)

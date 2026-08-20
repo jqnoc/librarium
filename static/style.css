@@ -1270,7 +1270,11 @@ h3 {
     visibility: hidden;
 }
 .reading-sessions-table.is-summarized-by-day .session-actions-heading {
-    visibility: hidden;
+    color: transparent;
+}
+.reading-sessions-table .session-pages-cell,
+.reading-sessions-table .session-duration-cell {
+    font-weight: 600;
 }
 .reading-sessions-table th:not(:last-child),
 .reading-sessions-table td:not(:last-child) {
