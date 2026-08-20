@@ -295,6 +295,7 @@
         'book.finishPlanFollowingDays': { en: 'Each following day', es: 'Cada día siguiente' },
         'book.finishPlanDays':  { en: 'days',                   es: 'días' },
         'book.startReadingSession': { en: 'Start Reading Session', es: 'Iniciar Sesión de Lectura' },
+        'book.resumeLastReadingSession': { en: 'Resume Last Reading Session', es: 'Reanudar última sesión de lectura' },
         'book.readingSessionFor':   { en: 'Reading',               es: 'Lectura' },
         'book.readingSessionPlay':  { en: 'Play',                  es: 'Iniciar' },
         'book.readingSessionResume': { en: 'Resume',               es: 'Reanudar' },

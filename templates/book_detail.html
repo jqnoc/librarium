@@ -543,11 +543,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 {% if is_pct_format %}{{ "%.1f" | format(rd.total_pages) }}% · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% else %}{{ rd.total_pages }} pages · {{ rd.total_time }} · {{ rd.session_count }} session{{ 's' if rd.session_count != 1 else '' }}{% endif %}
             </div>
             {% if rd.status == 'reading' and not is_pct_format %}
-            <div style="margin-top: 0.75rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
                 <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
                     onclick="event.preventDefault(); event.stopPropagation(); openReadingSessionModal({{ rd.id }}, {{ rd.reading_number }}, {{ info.get('starting_page', 0)|int + rd.total_pages|int }}, {{ '%.6f'|format(rd.avg_pages_per_hour|float) }})">
                     <span aria-hidden="true">&#9654;</span> <span data-i18n="book.startReadingSession">Start Reading Session</span>
                 </button>
+                {% if rd.id == current_reading_id and sessions %}
+                {% set last_session = sessions[-1] %}
+                <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
+                    onclick='event.preventDefault(); event.stopPropagation(); resumeReadingSession({{ current_reading_id }}, {{ current_reading_number }}, {{ last_session.id }}, {{ last_session.start_page|int }}, {{ last_session.end_page|int }}, {{ last_session.duration_seconds|int }}, {{ '%.6f'|format(avg_pages_per_hour|float) }}, {{ last_session.date|tojson }})'>
+                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.resumeLastReadingSession">Resume Last Reading Session</span>
+                </button>
+                {% endif %}
             </div>
             {% endif %}
             {% if readings | length > 1 %}
@@ -3046,11 +3053,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                           onsubmit="return confirm('Delete this session?');">
                         <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
                     </form>
-                    {% if loop.last and not is_pct_format %}
-                    <button type="button" class="btn btn-primary btn-sm" onclick='resumeReadingSession({{ current_reading_id }}, {{ current_reading_number }}, {{ s.id }}, {{ s.start_page|int }}, {{ s.end_page|int }}, {{ s.duration_seconds|int }}, {{ '%.6f'|format(avg_pages_per_hour|float) }}, {{ s.date|tojson }})'>
-                        <span aria-hidden="true">&#9654;</span> <span data-i18n="book.readingSessionResume">Resume</span>
-                    </button>
-                    {% endif %}
                 </td>
             </tr>
             <tr class="session-edit-row" id="session-edit-{{ s.id }}">
