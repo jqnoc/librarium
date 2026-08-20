@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add an unchecked-by-default per-book `Group by Day` option to organize reading-session rows under day separators while preserving individual session actions
 - Add a hover-visible download icon to full character portraits for exporting the original image
 - Add a Resume action to the last page-based reading-session row that reopens the saved timed session with its page range, date, and elapsed time
 - Add Markdown downloads for each book's classification and character data without portraits

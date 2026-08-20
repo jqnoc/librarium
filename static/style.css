@@ -1226,6 +1226,48 @@ h3 {
 /* ── Tables (SciY style) ──────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
 
+.session-table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: .75rem;
+}
+.session-table-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    color: var(--lb-text-light);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.session-table-checkbox input {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--lb-deep-orange);
+}
+.session-day-group-row {
+    display: none;
+}
+.reading-sessions-table.is-grouped-by-day .session-day-group-row {
+    display: table-row;
+}
+.session-day-group-row td {
+    background: var(--lb-bg-hover);
+    color: var(--lb-deep-orange);
+    font-weight: 600;
+    padding-top: .45rem;
+    padding-bottom: .45rem;
+    border-top: 2px solid var(--lb-border);
+}
+.session-day-group-label {
+    display: inline-block;
+}
+.reading-sessions-table.is-grouped-by-day .session-date-cell {
+    visibility: hidden;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

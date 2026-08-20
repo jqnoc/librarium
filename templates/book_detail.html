@@ -2989,8 +2989,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <h2><span data-i18n="book.sessions">Reading Sessions</span>{% if has_multiple_readings %} <span style="font-size: 0.75em; color: var(--lb-text-light);">(Reading #{{ current_reading_number }})</span>{% endif %}</h2>
 
 {% if sessions %}
+<div class="session-table-toolbar">
+    <label class="session-table-checkbox" for="groupReadingSessionsByDay">
+        <input type="checkbox" id="groupReadingSessionsByDay" aria-controls="readingSessionsBody">
+        <span data-i18n="book.groupByDay">Group by Day</span>
+    </label>
+</div>
 <div class="table-wrap">
-    <table>
+    <table class="reading-sessions-table" data-reading-sessions-table>
         <thead>
             <tr>
                 <th>#</th>
@@ -3002,11 +3008,11 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="readingSessionsBody">
             {% for s in sessions %}
-            <tr id="session-row-{{ s.id }}">
+            <tr class="session-data-row" id="session-row-{{ s.id }}" data-session-date="{{ s.date or '' }}">
                 <td>{{ loop.index }}</td>
-                <td>{{ s.date | display_date }}</td>
+                <td class="session-date-cell">{{ s.date | display_date }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td>{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
                 {% set pace_faster = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour > avg_pages_per_hour %}
@@ -3462,6 +3468,103 @@ function toggleEdit(idx) {
     const row = document.getElementById('session-edit-' + idx);
     row.classList.toggle('active');
 }
+
+(function () {
+    var table = document.querySelector('[data-reading-sessions-table]');
+    var checkbox = document.getElementById('groupReadingSessionsByDay');
+    var body = document.getElementById('readingSessionsBody');
+    if (!table || !checkbox || !body) return;
+
+    var bookId = {{ book_id | tojson }};
+    var storageKey = 'librarium.bookDetailGroupSessionsByDay.' + bookId;
+    var sessionRows = Array.prototype.slice.call(body.querySelectorAll('.session-data-row'));
+    var originalNodes = Array.prototype.slice.call(body.children);
+    var groups = [];
+    var groupsByDate = Object.create(null);
+
+    sessionRows.forEach(function (row) {
+        var key = row.dataset.sessionDate || '';
+        var group = groupsByDate[key];
+        if (!group) {
+            group = { key: key, rows: [] };
+            groupsByDate[key] = group;
+            groups.push(group);
+        }
+        group.rows.push(row);
+    });
+
+    function readStoredGrouping() {
+        try {
+            return window.localStorage.getItem(storageKey) === 'true';
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function writeStoredGrouping(grouped) {
+        try {
+            window.localStorage.setItem(storageKey, grouped ? 'true' : 'false');
+        } catch (error) {
+        }
+    }
+
+    function createGroupRow(group) {
+        var groupRow = document.createElement('tr');
+        groupRow.className = 'session-day-group-row';
+        groupRow.dataset.sessionDay = group.key;
+
+        var cell = document.createElement('td');
+        cell.colSpan = 7;
+        var label = document.createElement('span');
+        label.className = 'session-day-group-label';
+        var dateElement = group.rows[0].querySelector('.session-date-cell [data-date]');
+        var dateCell = group.rows[0].querySelector('.session-date-cell');
+        if (dateElement) {
+            label.appendChild(dateElement.cloneNode(true));
+        } else {
+            label.textContent = dateCell ? dateCell.textContent.trim() || '\u2014' : '\u2014';
+        }
+        cell.appendChild(label);
+        groupRow.appendChild(cell);
+        return groupRow;
+    }
+
+    function removeGroupRows() {
+        Array.prototype.slice.call(body.querySelectorAll('.session-day-group-row')).forEach(function (row) {
+            row.remove();
+        });
+    }
+
+    function restoreOriginalOrder() {
+        originalNodes.forEach(function (node) {
+            body.appendChild(node);
+        });
+    }
+
+    function applyGrouping(grouped) {
+        removeGroupRows();
+        restoreOriginalOrder();
+        table.classList.toggle('is-grouped-by-day', grouped);
+        if (!grouped) return;
+
+        groups.forEach(function (group) {
+            body.appendChild(createGroupRow(group));
+            group.rows.forEach(function (row) {
+                body.appendChild(row);
+                var sessionId = row.id.replace('session-row-', '');
+                var editRow = document.getElementById('session-edit-' + sessionId);
+                if (editRow) body.appendChild(editRow);
+            });
+        });
+    }
+
+    checkbox.checked = readStoredGrouping();
+    applyGrouping(checkbox.checked);
+    checkbox.addEventListener('change', function () {
+        writeStoredGrouping(checkbox.checked);
+        applyGrouping(checkbox.checked);
+    });
+}());
 
 function openCleanClassificationModal() {
     var modal = document.getElementById('cleanClassificationModal');
