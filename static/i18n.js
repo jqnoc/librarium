@@ -11,6 +11,7 @@
         // ── Navigation & global ─────────────────────────────────────────
         'nav.dashboard':    { en: 'Dashboard',    es: 'Panel' },
         'nav.library':      { en: 'Library',      es: 'Biblioteca' },
+        'nav.index':        { en: 'Index',        es: 'Índice' },
         'nav.authors':      { en: 'Authors',      es: 'Autores' },
         'nav.series':       { en: 'Series',       es: 'Series' },
         'nav.stats':        { en: 'Stats',        es: 'Estadísticas' },
@@ -24,6 +25,19 @@
         'nav.close':        { en: 'Close Librarium', es: 'Cerrar Librarium' },
         'theme.toggle':     { en: 'Toggle dark mode', es: 'Alternar modo oscuro' },
         'footer.copy':      { en: 'Librarium',     es: 'Librarium' },
+
+        'index.title':       { en: 'Index',                    es: 'Índice' },
+        'index.downloadTaxonomyAudit': { en: 'Download taxonomy audit', es: 'Descargar auditoría taxonómica' },
+        'index.downloadTaxonomyAuditTitle': { en: 'Download every taxonomy value as CSV', es: 'Descargar todos los valores taxonómicos como CSV' },
+        'index.noTaxonomyValues': { en: 'No values yet.',         es: 'Aún no hay valores.' },
+        'index.genreCloud':  { en: 'Genre Cloud',               es: 'Nube de Géneros' },
+        'index.subgenreCloud': { en: 'Subgenre Cloud',           es: 'Nube de Subgéneros' },
+        'index.formCloud':   { en: 'Form Cloud',                es: 'Nube de Formas' },
+        'index.themeCloud':  { en: 'Theme Cloud',               es: 'Nube de Temas' },
+        'index.settingCloud': { en: 'Setting Cloud',             es: 'Nube de Ambientaciones' },
+        'index.historicalPeriodCloud': { en: 'Historical Period Cloud', es: 'Nube de Períodos Históricos' },
+        'index.subjectCloud': { en: 'Subject Cloud',              es: 'Nube de Materias' },
+        'index.audienceCloud': { en: 'Audience Cloud',             es: 'Nube de Públicos' },
 
         // ── Library selector / management ───────────────────────────────
         'library.select':        { en: 'Select libraries',      es: 'Seleccionar bibliotecas' },

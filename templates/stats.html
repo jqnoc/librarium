@@ -171,26 +171,6 @@
 </div>
 {% endif %}
 
-<!-- Genres word cloud -->
-{% if genre_counts %}
-<div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
-    <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.genreCloud">Genre Cloud</h3>
-        <div id="genreCloud" class="word-cloud"></div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Themes word cloud -->
-{% if theme_counts %}
-<div class="card" style="margin-top: 2rem; margin-bottom: 2rem;">
-    <div class="card-body">
-        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);" data-i18n="stats.themeCloud">Theme Cloud</h3>
-        <div id="themeCloud" class="word-cloud"></div>
-    </div>
-</div>
-{% endif %}
-
 {% else %}
 <div class="empty-state">
     <div class="icon">📊</div>
@@ -728,44 +708,6 @@ function makeHBar(canvasId, dataMap, colorMap, sorted, aspectRatio) {
 // Status bar (use per-status colours)
 const statusData = {{ status_chart | tojson }};
 makeHBar('statusBar', statusData, STATUS_COLORS, true, 2);
-
-// Word cloud renderer
-function renderWordCloud(containerId, countsObj, filterKey) {
-    const container = document.getElementById(containerId);
-    if (!container || !countsObj) return;
-    const entries = Object.entries(countsObj).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) {
-        container.innerHTML = '<p style="color:var(--lb-muted);text-align:center;">No data.</p>';
-        return;
-    }
-    const maxCount = entries[0][1];
-    const minCount = entries[entries.length - 1][1];
-    const minFontSize = 0.75;
-    const maxFontSize = 1.6;
-    container.innerHTML = '';
-    entries.forEach(([word, count]) => {
-        const a = document.createElement('a');
-        a.textContent = word;
-        a.href = '/library?' + filterKey + '=' + encodeURIComponent(word);
-        a.className = 'tag-cloud-pill';
-        const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
-        const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
-        a.style.fontSize = fontSize + 'rem';
-        if (ratio > 0.6) a.classList.add('tag-cloud-pill--hot');
-        a.title = `${word}: ${count}`;
-        container.appendChild(a);
-    });
-}
-
-{% if genre_counts %}
-const FULL_GENRE_COUNTS = {{ genre_counts | tojson }};
-renderWordCloud('genreCloud', FULL_GENRE_COUNTS, 'genre');
-{% endif %}
-
-{% if theme_counts %}
-const FULL_THEME_COUNTS = {{ theme_counts | tojson }};
-renderWordCloud('themeCloud', FULL_THEME_COUNTS, 'theme');
-{% endif %}
 
 // Language bar
 const langData = {{ language_counts | tojson }};

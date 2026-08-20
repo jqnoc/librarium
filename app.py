@@ -190,7 +190,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addGenre",
         "description": "The broadest literary or factual category: what kind of book it is. Use only a few broad, reusable values.",
         "description_key": "bookForm.genreDescription",
-        "cloud_key": "dash.genreCloud",
+        "cloud_key": "index.genreCloud",
         "csv_label": "Genre",
         "missing_key": "dash.noGenres",
         "missing_label": "books without genres",
@@ -204,7 +204,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addSubgenre",
         "description": "A more specific literary, academic, or stylistic classification, including movements, disciplines, or national literatures.",
         "description_key": "bookForm.subgenreDescription",
-        "cloud_key": "dash.subgenreCloud",
+        "cloud_key": "index.subgenreCloud",
         "csv_label": "Subgenre",
         "missing_key": "dash.noSubgenres",
         "missing_label": "books without subgenres",
@@ -218,7 +218,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addForm",
         "description": "The way a work is written or presented, such as a novel, essay, diary, memoir, or letters.",
         "description_key": "bookForm.formDescription",
-        "cloud_key": "dash.formCloud",
+        "cloud_key": "index.formCloud",
         "csv_label": "Form",
         "missing_key": "dash.noForms",
         "missing_label": "books without forms",
@@ -232,7 +232,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addTheme",
         "description": "Abstract ideas, emotions, values, conflicts, and philosophical questions explored by the work, never concrete people, places, events, or objects.",
         "description_key": "bookForm.themesDescription",
-        "cloud_key": "dash.themeCloud",
+        "cloud_key": "index.themeCloud",
         "csv_label": "Theme",
         "missing_key": "dash.noThemes",
         "missing_label": "books without themes",
@@ -246,7 +246,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addSetting",
         "description": "Geographical places or environments where the story happens or where the book's subject is situated. Do not use historical periods.",
         "description_key": "bookForm.settingDescription",
-        "cloud_key": "dash.settingCloud",
+        "cloud_key": "index.settingCloud",
         "csv_label": "Setting",
         "missing_key": "dash.noSettings",
         "missing_label": "books without settings",
@@ -260,7 +260,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addHistoricalPeriod",
         "description": "The most specific meaningful era or chronological period when the story or subject takes place.",
         "description_key": "bookForm.historicalPeriodDescription",
-        "cloud_key": "dash.historicalPeriodCloud",
+        "cloud_key": "index.historicalPeriodCloud",
         "csv_label": "Historical Period",
         "missing_key": "dash.noHistoricalPeriods",
         "missing_label": "books without historical periods",
@@ -274,7 +274,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addSubject",
         "description": "Concrete people, places, events, disciplines, works, institutions, species, or topics the book is about. Keep abstract ideas in Themes.",
         "description_key": "bookForm.subjectDescription",
-        "cloud_key": "dash.subjectCloud",
+        "cloud_key": "index.subjectCloud",
         "csv_label": "Subject",
         "missing_key": "dash.noSubjects",
         "missing_label": "books without subjects",
@@ -288,7 +288,7 @@ TAXONOMY_FIELDS = (
         "placeholder_key": "bookForm.addAudience",
         "description": "The intended readership, such as children, young adults, adults, or academic readers; never the book's quality or difficulty.",
         "description_key": "bookForm.audienceDescription",
-        "cloud_key": "dash.audienceCloud",
+        "cloud_key": "index.audienceCloud",
         "csv_label": "Audience",
         "missing_key": "dash.noAudiences",
         "missing_label": "books without audiences",
@@ -4113,6 +4113,26 @@ def _build_taxonomy_audit(books: list[dict]) -> tuple[dict[str, dict[str, int]],
     return counts, titles
 
 
+def _build_taxonomy_index_data(books: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Prepare cloud values and CSV audit rows for the taxonomy index."""
+    taxonomy_counts, taxonomy_books = _build_taxonomy_audit(books)
+    taxonomy_clouds = []
+    taxonomy_audit = []
+    for taxonomy_field in TAXONOMY_FIELDS:
+        field = taxonomy_field["field"]
+        counts = taxonomy_counts[field]
+        taxonomy_clouds.append({
+            **taxonomy_field,
+            "all_counts": dict(sorted(counts.items(), key=lambda item: item[0].casefold())),
+        })
+        taxonomy_audit.append({
+            "type": taxonomy_field["csv_label"],
+            "counts": counts,
+            "books": taxonomy_books[field],
+        })
+    return taxonomy_clouds, taxonomy_audit
+
+
 def _build_similar_works(
     db: sqlite3.Connection,
     book_id: str,
@@ -5023,20 +5043,6 @@ def dashboard():
             most_reread = {"name": rbk["name"], "id": rbk["id"], "count": reread_row["cnt"],
                            "has_cover": bool(rbk["has_cover"]), "cover_hash": rbk["cover_hash"] or ""}
 
-    taxonomy_counts, taxonomy_books = _build_taxonomy_audit(primary_books)
-    taxonomy_clouds = []
-    taxonomy_audit = []
-    for taxonomy_field in TAXONOMY_FIELDS:
-        field = taxonomy_field["field"]
-        counts = taxonomy_counts[field]
-        all_counts = dict(sorted(counts.items(), key=lambda item: item[0].casefold()))
-        taxonomy_clouds.append({**taxonomy_field, "all_counts": all_counts})
-        taxonomy_audit.append({
-            "type": taxonomy_field["csv_label"],
-            "counts": counts,
-            "books": taxonomy_books[field],
-        })
-
     # ── Series progress ──────────────────────────────────────────────────
     series_progress = []
     series_query = (
@@ -5227,10 +5233,8 @@ def dashboard():
         # Format & source
         format_counts=dict(format_counts),
         source_counts=dict(source_counts),
-        # Taxonomy audit
+        # Taxonomy health
         taxonomy_fields=TAXONOMY_FIELDS,
-        taxonomy_clouds=taxonomy_clouds,
-        taxonomy_audit=taxonomy_audit,
         # Series
         series_progress=series_progress,
         # TBR
@@ -5259,6 +5263,29 @@ def dashboard():
         # Spotlights
         word_of_the_day=word_of_the_day,
         quote_of_the_day=quote_of_the_day,
+    )
+
+
+@app.route("/index")
+def taxonomy_index():
+    """Index of the current library's classification values."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf, lp = _lib_filter(lib_ids)
+    taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
+    primary_books = _apply_work_taxonomy_to_books(
+        db,
+        db.execute(
+            "SELECT id, name, work_id, "
+            f"{taxonomy_columns} FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
+            lp,
+        ).fetchall(),
+    )
+    taxonomy_clouds, taxonomy_audit = _build_taxonomy_index_data(primary_books)
+    return render_template(
+        "taxonomy_index.html",
+        taxonomy_clouds=taxonomy_clouds,
+        taxonomy_audit=taxonomy_audit,
     )
 
 
@@ -5771,19 +5798,14 @@ def global_stats():
     authors_read_data = [authors_read_by_year.get(y, 0) for y in all_years]
 
     # ── Library Stats data ──────────────────────────────────────────────
-    all_lib_books = _apply_work_taxonomy_to_books(
-        db,
-        db.execute(
-            "SELECT id, name, status, work_id, genres, themes, language, original_language, pages, publisher, has_cover, cover_hash, author "
-            f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
-            lp,
-        ).fetchall(),
-    )
+    all_lib_books = db.execute(
+        "SELECT id, name, status, language, original_language, pages, publisher, has_cover, cover_hash, author "
+        f"FROM books WHERE {lf} AND (work_id IS NULL OR is_primary_edition = 1)",
+        lp,
+    ).fetchall()
     avg_ratings = _load_avg_ratings_for_books(db, [book["id"] for book in all_lib_books])
 
     status_counts: dict[str, int] = Counter()
-    theme_counts: dict[str, int] = Counter()
-    genre_counts: dict[str, int] = Counter()
     language_counts: dict[str, int] = Counter()
     orig_lang_counts: dict[str, int] = Counter()
     publisher_counts: dict[str, int] = Counter()
@@ -5794,10 +5816,6 @@ def global_stats():
 
     for bk in all_lib_books:
         status_counts[bk["status"] or "unknown"] += 1
-        for theme in _split_taxonomy_values(bk["themes"]):
-            theme_counts[theme] += 1
-        for genre in _split_taxonomy_values(bk["genres"]):
-            genre_counts[genre] += 1
         if bk["language"]:
             language_counts[bk["language"]] += 1
         else:
@@ -5842,9 +5860,6 @@ def global_stats():
     author_counts_clean = _remove_unknown(dict(author_counts))
     status_chart_clean = {k: v for k, v in status_chart.items() if str(k).strip().lower() != 'unknown'}
 
-    genre_counts_clean = _remove_unknown(dict(genre_counts))
-    theme_counts_clean = _remove_unknown(dict(theme_counts))
-
     # Prepare publisher chart data: show top N publishers and aggregate the rest as "Other" (computed from cleaned counts)
     TOP_PUBLISHERS_FOR_CHART = 20
     from collections import Counter as _Counter
@@ -5877,8 +5892,6 @@ def global_stats():
         bought_years=bought_years,
         bought_data=bought_data,
         status_chart=status_chart_clean,
-        genre_counts=genre_counts_clean,
-        theme_counts=theme_counts_clean,
         language_counts=language_counts_clean,
         orig_lang_counts=orig_lang_counts_clean,
         publisher_counts=publisher_counts_clean,

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Index - Librarium{% endblock %}
+
+{% block content %}
+<div class="taxonomy-index-heading">
+    <h1 data-i18n="index.title">Index</h1>
+    <button type="button" class="btn btn-secondary btn-sm"
+            onclick="downloadTaxonomyAudit(taxonomyAudit)"
+            data-i18n-title="index.downloadTaxonomyAuditTitle">
+        <span aria-hidden="true">&#x2193;</span> <span data-i18n="index.downloadTaxonomyAudit">Download taxonomy audit</span>
+    </button>
+</div>
+
+<div class="taxonomy-index-cloud-grid">
+    {% for taxonomy_cloud in taxonomy_clouds %}
+    <div class="card">
+        <div class="card-body">
+            <h2 class="taxonomy-index-cloud-title" data-i18n="{{ taxonomy_cloud.cloud_key }}">{{ taxonomy_cloud.csv_label }} Cloud</h2>
+            <div id="index-{{ taxonomy_cloud.field }}-cloud" class="word-cloud"></div>
+            {% if not taxonomy_cloud.all_counts %}
+            <p class="taxonomy-index-empty" data-i18n="index.noTaxonomyValues">No values yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var taxonomyAudit = {{ taxonomy_audit | tojson }};
+var libraryUrl = {{ url_for('index') | tojson }};
+
+(function () {
+    function renderIndexCloud(containerId, counts, filterKey) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        var entries = Object.entries(counts).sort(function (left, right) {
+            return left[0].localeCompare(right[0], undefined, { sensitivity: 'base' });
+        });
+        if (entries.length === 0) return;
+
+        var countValues = entries.map(function (entry) { return entry[1]; });
+        var maxCount = Math.max.apply(null, countValues);
+        var minCount = Math.min.apply(null, countValues);
+        entries.forEach(function (entry) {
+            var word = entry[0];
+            var count = entry[1];
+            var link = document.createElement('a');
+            var ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
+            link.textContent = word;
+            link.href = libraryUrl + '?' + filterKey + '=' + encodeURIComponent(word);
+            link.className = 'tag-cloud-pill';
+            link.style.fontSize = (0.75 + ratio * 0.85) + 'rem';
+            if (ratio > 0.6) link.classList.add('tag-cloud-pill--hot');
+            link.title = word + ': ' + count;
+            container.appendChild(link);
+        });
+    }
+
+    {% for taxonomy_cloud in taxonomy_clouds %}
+    {% if taxonomy_cloud.all_counts %}
+    renderIndexCloud(
+        'index-{{ taxonomy_cloud.field }}-cloud',
+        {{ taxonomy_cloud.all_counts | tojson }},
+        {{ taxonomy_cloud.filter_param | tojson }}
+    );
+    {% endif %}
+    {% endfor %}
+}());
+</script>
+{% endblock %}

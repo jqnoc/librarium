@@ -655,33 +655,6 @@ function toggleDashboardWordEdit(wordId) {
 </div>
 {% endif %}
 
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Classification                                                         -->
-<!-- ═══════════════════════════════════════════════════════════════════════ -->
-<div class="dash-section">
-    <div class="dash-taxonomy-heading">
-        <h2 class="dash-heading" data-i18n="dash.classification">Classification</h2>
-        <button type="button" class="btn btn-secondary btn-sm"
-                onclick="downloadTaxonomyAudit(taxonomyAudit)"
-                data-i18n-title="dash.downloadTaxonomyAuditTitle">
-            <span aria-hidden="true">&#x2193;</span> <span data-i18n="dash.downloadTaxonomyAudit">Download taxonomy audit</span>
-        </button>
-    </div>
-    <div class="dash-taxonomy-cloud-grid">
-        {% for taxonomy_cloud in taxonomy_clouds %}
-        <div class="card">
-            <div class="card-body">
-                <h3 class="dash-taxonomy-cloud-title" data-i18n="{{ taxonomy_cloud.cloud_key }}">{{ taxonomy_cloud.csv_label }} Cloud</h3>
-                <div id="dash-{{ taxonomy_cloud.field }}-cloud" class="word-cloud"></div>
-                {% if not taxonomy_cloud.all_counts %}
-                <p class="dash-taxonomy-empty" data-i18n="dash.noTaxonomyValues">No values yet.</p>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -695,7 +668,6 @@ const readingBooks  = {{ reading_books | tojson }};
 const formatCounts  = {{ format_counts | tojson }};
 const sourceCounts  = {{ source_counts | tojson }};
 {% if language_counts %}const languageCounts = {{ language_counts | tojson }};{% endif %}
-const taxonomyAudit = {{ taxonomy_audit | tojson }};
 
 function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
@@ -1085,32 +1057,6 @@ function makeDonut(canvasId, dataMap) {
 makeDonut('formatDonut', formatCounts);
 makeDonut('sourceDonut', sourceCounts);
 {% if language_counts %}makeDonut('langDonut', languageCounts);{% endif %}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Classification clouds
-// ═══════════════════════════════════════════════════════════════════════════
-function renderDashboardCloud(containerId, counts, filterKey) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    const entries = Object.entries(counts).sort((left, right) => left[0].localeCompare(right[0], undefined, { sensitivity: 'base' }));
-    if (entries.length === 0) return;
-    const countValues = entries.map(entry => entry[1]);
-    const maxCount = Math.max(...countValues), minCount = Math.min(...countValues);
-    entries.forEach(([word, count]) => {
-        const a = document.createElement('a');
-        a.textContent = word;
-        a.href = '/library?' + filterKey + '=' + encodeURIComponent(word);
-        a.className = 'tag-cloud-pill';
-        const ratio = maxCount === minCount ? 0.5 : (count - minCount) / (maxCount - minCount);
-        a.style.fontSize = (0.75 + ratio * 0.85) + 'rem';
-        if (ratio > 0.6) a.classList.add('tag-cloud-pill--hot');
-        a.title = word + ': ' + count;
-        container.appendChild(a);
-    });
-}
-{% for taxonomy_cloud in taxonomy_clouds %}
-{% if taxonomy_cloud.all_counts %}renderDashboardCloud('dash-{{ taxonomy_cloud.field }}-cloud', {{ taxonomy_cloud.all_counts | tojson }}, '{{ taxonomy_cloud.filter_param }}');{% endif %}
-{% endfor %}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Dashboard cover strips dynamic sizing
