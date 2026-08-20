@@ -1266,10 +1266,6 @@ h3 {
 .session-day-group-label {
     display: inline-block;
 }
-.session-summary-row td {
-    background: var(--lb-bg-hover);
-    font-weight: 600;
-}
 .reading-sessions-table.is-grouped-by-day .session-date-cell {
     visibility: hidden;
 }

@@ -3584,12 +3584,18 @@ function toggleEdit(idx) {
 
         var sessionRange = String(group.firstIndex);
         if (group.lastIndex !== group.firstIndex) sessionRange += '-' + group.lastIndex;
-        appendTextCell(summaryRow, sessionRange);
-
-        var dateCell = document.createElement('td');
-        dateCell.className = 'session-date-cell';
-        appendDateContent(dateCell, group);
-        summaryRow.appendChild(dateCell);
+        if (groupCheckbox.checked) {
+            var rangeCell = document.createElement('td');
+            rangeCell.colSpan = 2;
+            rangeCell.textContent = sessionRange;
+            summaryRow.appendChild(rangeCell);
+        } else {
+            appendTextCell(summaryRow, sessionRange);
+            var dateCell = document.createElement('td');
+            dateCell.className = 'session-date-cell';
+            appendDateContent(dateCell, group);
+            summaryRow.appendChild(dateCell);
+        }
 
         var progressOrPages = isPctFormat
             ? group.maxProgress.toFixed(1) + '%'
