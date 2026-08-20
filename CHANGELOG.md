@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
+- Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding the redundant Date heading and cells in grouped mode, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
 - Add a hover-visible download icon to full character portraits for exporting the original image
 - Add a Start Session action beside the active Reading card and show Resume Last Session there when the last session is from today, reusing its saved page range, date, and elapsed time and removing the redundant session-row action
 - Add Markdown downloads for each book's classification and character data without portraits
