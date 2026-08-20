@@ -1269,6 +1269,9 @@ h3 {
 .reading-sessions-table.is-grouped-by-day .session-date-cell {
     visibility: hidden;
 }
+.reading-sessions-table.is-summarized-by-day .session-actions-heading {
+    visibility: hidden;
+}
 .reading-sessions-table th:not(:last-child),
 .reading-sessions-table td:not(:last-child) {
     width: 1%;
