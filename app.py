@@ -159,6 +159,7 @@ def _character_from_row(row: sqlite3.Row) -> dict:
     character = dict(row)
     character["importance"] = _normalise_character_importance(character.get("importance"))
     character["roles"] = _normalise_character_roles(character.get("roles"))
+    character["deceased"] = bool(character.get("deceased"))
     character["has_portrait"] = bool(character.get("has_portrait"))
     character["portrait_hash"] = character.get("portrait_hash") or ""
     return character
@@ -1278,6 +1279,7 @@ def init_schema() -> None:
             biography   TEXT    NOT NULL DEFAULT '',
             importance  TEXT    NOT NULL DEFAULT 'Supporting',
             roles       TEXT    NOT NULL DEFAULT '["Other"]',
+            deceased    INTEGER NOT NULL DEFAULT 0,
             has_portrait INTEGER NOT NULL DEFAULT 0,
             portrait_hash TEXT NOT NULL DEFAULT '',
             portrait_thumb BLOB DEFAULT NULL
@@ -1334,6 +1336,7 @@ def _run_all_migrations() -> None:
     migrate_add_character_order()
     migrate_add_character_metadata()
     migrate_add_character_portrait()
+    migrate_add_character_deceased()
     migrate_add_session_page_range()
 
 
@@ -2743,6 +2746,21 @@ def migrate_add_character_portrait() -> None:
             "ALTER TABLE characters ADD COLUMN portrait_thumb BLOB DEFAULT NULL"
         )
     db.commit()
+    db.close()
+
+
+def migrate_add_character_deceased() -> None:
+    """Add the deceased marker to character annotations."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [row[1] for row in db.execute("PRAGMA table_info(characters)").fetchall()]
+    if "deceased" not in cols:
+        db.execute(
+            "ALTER TABLE characters ADD COLUMN deceased INTEGER NOT NULL DEFAULT 0"
+        )
+        db.commit()
     db.close()
 
 
@@ -8154,7 +8172,7 @@ def book_detail(book_id: str):
     ).fetchone()
     latest_annotation = dict(latest_annotation_row) if latest_annotation_row else None
     characters = [_character_from_row(row) for row in db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, deceased, has_portrait, portrait_hash FROM characters "
         "WHERE book_id = ? ORDER BY display_order, name COLLATE NOCASE, id",
         (book_id,),
     ).fetchall()]
@@ -8779,7 +8797,7 @@ def export_characters_markdown(book_id: str):
     characters = [
         _character_from_row(row)
         for row in db.execute(
-            "SELECT id, display_order, name, description, biography, importance, roles "
+            "SELECT id, display_order, name, description, biography, importance, roles, deceased "
             "FROM characters WHERE book_id = ? "
             "ORDER BY display_order, name COLLATE NOCASE, id",
             (book_id,),
@@ -8942,6 +8960,7 @@ def add_character(book_id: str):
     name = request.form.get("name", "").strip()
     description = request.form.get("description", "").strip()
     biography = request.form.get("biography", "").strip()
+    deceased = 1 if request.form.get("deceased") == "1" else 0
     if not name:
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": "Character name is required."}), 400
@@ -8964,10 +8983,10 @@ def add_character(book_id: str):
         (book_id,),
     ).fetchone()["next_order"]
     cursor = db.execute(
-        "INSERT INTO characters (book_id, display_order, name, description, biography, importance, roles, "
-        "has_portrait, portrait_hash, portrait_thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO characters (book_id, display_order, name, description, biography, importance, roles, deceased, "
+        "has_portrait, portrait_hash, portrait_thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            book_id, next_order, name, description, biography, importance, json.dumps(roles),
+            book_id, next_order, name, description, biography, importance, json.dumps(roles), deceased,
             1 if portrait_blob else 0, portrait_hash or "", portrait_thumb,
         ),
     )
@@ -8975,7 +8994,7 @@ def add_character(book_id: str):
     if portrait_blob:
         _save_image_file(_character_portrait_path(cursor.lastrowid), portrait_blob)
     row = db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, deceased, has_portrait, portrait_hash FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cursor.lastrowid, book_id),
     ).fetchone()
@@ -9028,6 +9047,7 @@ def edit_character(book_id: str, cid: int):
     name = request.form.get("name", "").strip()
     description = request.form.get("description", "").strip()
     biography = request.form.get("biography", "").strip()
+    deceased = 1 if request.form.get("deceased") == "1" else 0
     if not name:
         if _annotation_wants_json():
             return jsonify({"ok": False, "error": "Character name is required."}), 400
@@ -9045,9 +9065,9 @@ def edit_character(book_id: str, cid: int):
         return redirect(url_for("book_detail", book_id=book_id, _anchor=f"character-{cid}"))
 
     cursor = db.execute(
-        "UPDATE characters SET name = ?, description = ?, biography = ?, importance = ?, roles = ? "
+        "UPDATE characters SET name = ?, description = ?, biography = ?, importance = ?, roles = ?, deceased = ? "
         "WHERE id = ? AND book_id = ?",
-        (name, description, biography, importance, json.dumps(roles), cid, book_id),
+        (name, description, biography, importance, json.dumps(roles), deceased, cid, book_id),
     )
     db.commit()
     if cursor.rowcount == 0:
@@ -9071,7 +9091,7 @@ def edit_character(book_id: str, cid: int):
         db.commit()
         _delete_image_file(_character_portrait_path(cid))
     row = db.execute(
-        "SELECT id, display_order, name, description, biography, importance, roles, has_portrait, portrait_hash FROM characters "
+        "SELECT id, display_order, name, description, biography, importance, roles, deceased, has_portrait, portrait_hash FROM characters "
         "WHERE id = ? AND book_id = ?",
         (cid, book_id),
     ).fetchone()

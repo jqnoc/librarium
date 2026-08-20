@@ -870,6 +870,12 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 {{ character_roles_field('readingSessionCharacterRoles', ['Other']) }}
             </div>
             <div class="reading-session-annotation-field reading-session-character-field">
+                <label class="character-deceased-toggle" for="readingSessionCharacterDeceased">
+                    <input type="checkbox" id="readingSessionCharacterDeceased" name="deceased" value="1">
+                    <span data-i18n="book.characterDeceased">Deceased</span>
+                </label>
+            </div>
+            <div class="reading-session-annotation-field reading-session-character-field">
                 <label for="readingSessionCharacterDescription" data-i18n="book.characterDescription">Description</label>
                 <textarea id="readingSessionCharacterDescription" name="description" rows="3" class="form-control"
                           placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
@@ -1124,6 +1130,8 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             : form.dataset.addAction;
         getElement('readingSessionCharacterName').value = character ? (character.name || '') : '';
         getElement('readingSessionCharacterImportance').value = character ? character.importance : 'Supporting';
+        var deceasedInput = getElement('readingSessionCharacterDeceased');
+        if (deceasedInput) deceasedInput.checked = Boolean(character && character.deceased);
         setCharacterRoleSelection(form, character ? character.roles : ['Other']);
         getElement('readingSessionCharacterDescription').value = character ? (character.description || '') : '';
         getElement('readingSessionCharacterBiography').value = character ? (character.biography || '') : '';
@@ -2440,7 +2448,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         role="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="character-detail-modal-{{ character.id }}">
         <div class="annotation-body">
             <div class="annotation-character-heading">
-                <div class="annotation-character-name">{{ character.name }}</div>
+                <div class="annotation-character-name">{{ character.name }}{% if character.deceased %} <span class="character-deceased-marker" role="img" title="Deceased" data-i18n-title="book.characterDeceased" aria-label="Deceased" data-i18n-aria-label="book.characterDeceased">&#128128;</span>{% endif %}</div>
                 <div class="annotation-character-badges">
                     {% for importance in character_importance_options %}
                     {% if importance.value == character.importance %}
@@ -2540,6 +2548,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                    placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
             {{ character_importance_field('character-edit-importance-' ~ character.id, character.importance) }}
             {{ character_roles_field('character-edit-roles-' ~ character.id, character.roles) }}
+            <label class="character-deceased-toggle" for="character-edit-deceased-{{ character.id }}">
+                <input type="checkbox" id="character-edit-deceased-{{ character.id }}" name="deceased" value="1"{% if character.deceased %} checked{% endif %}>
+                <span data-i18n="book.characterDeceased">Deceased</span>
+            </label>
             <label for="character-edit-description-{{ character.id }}" data-i18n="book.characterDescription">Description</label>
             <textarea id="character-edit-description-{{ character.id }}" name="description" class="form-control" rows="3"
                       placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder">{{ character.description }}</textarea>
@@ -2791,6 +2803,10 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <input type="text" id="add-character-name" name="name" required placeholder="Character name" data-i18n-placeholder="book.characterNamePlaceholder">
         {{ character_importance_field('add-character-importance', 'Supporting') }}
         {{ character_roles_field('add-character-roles', ['Other']) }}
+        <label class="character-deceased-toggle" for="add-character-deceased">
+            <input type="checkbox" id="add-character-deceased" name="deceased" value="1">
+            <span data-i18n="book.characterDeceased">Deceased</span>
+        </label>
         <label for="add-character-description" data-i18n="book.characterDescription">Description</label>
         <textarea id="add-character-description" name="description" rows="2" placeholder="Short description" data-i18n-placeholder="book.characterDescriptionPlaceholder"></textarea>
         <label for="add-character-biography" data-i18n="book.characterBiography">Biography</label>

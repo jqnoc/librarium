@@ -334,6 +334,7 @@
         'book.readingSessionSaveWord': { en: 'Save Word',             es: 'Guardar palabra' },
         'book.readingSessionSaveAnnotation': { en: 'Save Annotation',       es: 'Guardar anotación' },
         'book.characterRequired': { en: 'Character name is required.', es: 'El nombre del personaje es obligatorio.' },
+        'book.characterDeceased': { en: 'Deceased', es: 'Fallecido' },
         'book.characterImportance': { en: 'Importance', es: 'Importancia' },
         'book.characterImportanceMain': { en: 'Main', es: 'Principal' },
         'book.characterImportanceSupporting': { en: 'Supporting', es: 'Secundario' },

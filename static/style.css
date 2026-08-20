@@ -4460,6 +4460,13 @@ body.reading-session-modal-open { overflow: hidden; }
     white-space: nowrap;
 }
 
+.character-deceased-marker {
+    display: inline-block;
+    margin-left: .25rem;
+    font-size: .92em;
+    vertical-align: .02em;
+}
+
 .character-importance-main {
     background: #ECFDF5;
     color: #047857;
@@ -4631,6 +4638,22 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 
 .character-portrait-remove input {
+    accent-color: var(--lb-orange);
+}
+
+.character-deceased-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    gap: .45rem;
+    color: var(--lb-text) !important;
+    font-size: .82rem !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    cursor: pointer;
+}
+
+.character-deceased-toggle input {
     accent-color: var(--lb-orange);
 }
 
