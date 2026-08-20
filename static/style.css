@@ -2989,7 +2989,7 @@ body.reading-session-modal-open { overflow: hidden; }
     color: var(--lb-text-light);
     font-weight: 600;
 }
-.session-pace-cell {
+.session-pace-bar-cell {
     min-width: 10rem;
 }
 .session-pace-bar {

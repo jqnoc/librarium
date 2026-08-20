@@ -2998,6 +2998,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <th>{% if is_pct_format %}<span data-i18n="book.colProgress">Progress</span>{% else %}<span data-i18n="book.colPages">Pages</span>{% endif %}</th>
                 <th data-i18n="book.colDuration">Duration</th>
                 <th data-i18n="book.colPace">Pace</th>
+                <th class="session-pace-bar-heading" scope="col"></th>
                 <th data-i18n="book.colActions">Actions</th>
             </tr>
         </thead>
@@ -3012,16 +3013,18 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 {% set pace_slower = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour < avg_pages_per_hour %}
                 <td>
                     {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
-                    <div class="session-pace-cell">
-                        <div class="session-pace-bar" aria-hidden="true">
-                            <span class="session-pace-bar-fill{% if pace_faster %} session-pace-faster{% elif pace_slower %} session-pace-slower{% endif %}" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%;"></span>
-                            <span class="session-pace-average-marker"></span>
-                        </div>
-                        <div class="session-pace-value">
-                            {{ "%.1f" | format(s.pace_pages_per_hour) }} <span data-i18n="book.readingSessionPagesPerHour">pages/hour</span> ({{ "%+.0f" | format(s.pace_difference_pct) }}%)
-                        </div>
+                    <div class="session-pace-value">
+                        {{ "%.1f" | format(s.pace_pages_per_hour) }} <span data-i18n="book.readingSessionPagesPerHour">pages/hour</span> ({{ "%+.0f" | format(s.pace_difference_pct) }}%)
                     </div>
                     {% else %}—{% endif %}
+                </td>
+                <td class="session-pace-bar-cell">
+                    {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
+                    <div class="session-pace-bar" aria-hidden="true">
+                        <span class="session-pace-bar-fill{% if pace_faster %} session-pace-faster{% elif pace_slower %} session-pace-slower{% endif %}" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%;"></span>
+                        <span class="session-pace-average-marker"></span>
+                    </div>
+                    {% endif %}
                 </td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="toggleEdit({{ s.id }})">✏️</button>
@@ -3037,7 +3040,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 </td>
             </tr>
             <tr class="session-edit-row" id="session-edit-{{ s.id }}">
-                <td colspan="6">
+                <td colspan="7">
                     <form method="POST" action="{{ url_for('edit_session', book_id=book_id, idx=s.id) }}" class="inline-form">
                         <label>Date</label>
                         <input type="text" name="date" value="{{ s.date }}" class="date-input" required>

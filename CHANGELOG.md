@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
 - Improve Author cards with grammatical reading metrics and sorting by books read or time read
 - Make Reading Session annotation controls use five equal-width columns, keep session controls in three equal-width columns, and stabilize the responsive dialog width for long book titles
-- Show per-session pace as `pages/hour` with signed average differences and centered comparison bars beside Duration
+- Show per-session pace as `pages/hour` with signed average differences and centered comparison bars in a separate titleless column between Pace and Actions
 - Match the spacing between annotation section headings and their first cards
 - Swap the Quotes and Annotations sections on the Book Details page
 
