@@ -546,14 +546,16 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
                 <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
                     onclick="event.preventDefault(); event.stopPropagation(); openReadingSessionModal({{ rd.id }}, {{ rd.reading_number }}, {{ info.get('starting_page', 0)|int + rd.total_pages|int }}, {{ '%.6f'|format(rd.avg_pages_per_hour|float) }})">
-                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.startReadingSession">Start Reading Session</span>
+                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.startReadingSession">Start Session</span>
                 </button>
                 {% if rd.id == current_reading_id and sessions %}
                 {% set last_session = sessions[-1] %}
+                {% if last_session.date == today_iso %}
                 <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
                     onclick='event.preventDefault(); event.stopPropagation(); resumeReadingSession({{ current_reading_id }}, {{ current_reading_number }}, {{ last_session.id }}, {{ last_session.start_page|int }}, {{ last_session.end_page|int }}, {{ last_session.duration_seconds|int }}, {{ '%.6f'|format(avg_pages_per_hour|float) }}, {{ last_session.date|tojson }})'>
-                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.resumeLastReadingSession">Resume Last Reading Session</span>
+                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.resumeLastReadingSession">Resume Last Session</span>
                 </button>
+                {% endif %}
                 {% endif %}
             </div>
             {% endif %}
