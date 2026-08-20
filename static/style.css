@@ -1269,6 +1269,17 @@ h3 {
 .reading-sessions-table.is-grouped-by-day .session-date-cell {
     visibility: hidden;
 }
+.reading-sessions-table th:not(:last-child),
+.reading-sessions-table td:not(:last-child) {
+    width: 1%;
+    white-space: nowrap;
+}
+.reading-sessions-table th:last-child,
+.reading-sessions-table td:last-child {
+    width: 100%;
+    text-align: right;
+    white-space: nowrap;
+}
 
 table {
     width: 100%;
