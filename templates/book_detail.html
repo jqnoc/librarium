@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 {% if last_session.date == today_iso %}
                 <button type="button" class="btn btn-primary btn-sm reading-session-trigger"
                     onclick='event.preventDefault(); event.stopPropagation(); resumeReadingSession({{ current_reading_id }}, {{ current_reading_number }}, {{ last_session.id }}, {{ last_session.start_page|int }}, {{ last_session.end_page|int }}, {{ last_session.duration_seconds|int }}, {{ '%.6f'|format(avg_pages_per_hour|float) }}, {{ last_session.date|tojson }})'>
-                    <span aria-hidden="true">&#9654;</span> <span data-i18n="book.resumeLastReadingSession">Resume Last Session</span>
+                    <span aria-hidden="true">&#8635;</span> <span data-i18n="book.resumeLastReadingSession">Resume Last Session</span>
                 </button>
                 {% endif %}
                 {% endif %}
