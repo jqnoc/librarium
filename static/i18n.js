@@ -376,6 +376,7 @@
         'book.readingTimeline': { en: 'Reading Timeline',    es: 'Línea Temporal de Lectura' },
         'book.sessions':        { en: 'Reading Sessions',    es: 'Sesiones de Lectura' },
         'book.groupByDay':      { en: 'Group by Day',         es: 'Agrupar por día' },
+        'book.summarizeByDay':  { en: 'Summarize by Day',     es: 'Resumir por día' },
         'book.allReadings':     { en: '(all readings)',      es: '(todas las lecturas)' },
         'book.colNum':          { en: '#',                   es: '#' },
         'book.colReading':      { en: 'Reading',             es: 'Lectura' },

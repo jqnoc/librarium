@@ -1230,6 +1230,8 @@ h3 {
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
     margin-bottom: .75rem;
 }
 .session-table-checkbox {
@@ -1263,6 +1265,10 @@ h3 {
 }
 .session-day-group-label {
     display: inline-block;
+}
+.session-summary-row td {
+    background: var(--lb-bg-hover);
+    font-weight: 600;
 }
 .reading-sessions-table.is-grouped-by-day .session-date-cell {
     visibility: hidden;

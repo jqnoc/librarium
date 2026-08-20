@@ -2994,9 +2994,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <input type="checkbox" id="groupReadingSessionsByDay" aria-controls="readingSessionsBody">
         <span data-i18n="book.groupByDay">Group by Day</span>
     </label>
+    <label class="session-table-checkbox" for="summarizeReadingSessionsByDay">
+        <input type="checkbox" id="summarizeReadingSessionsByDay" aria-controls="readingSessionsBody">
+        <span data-i18n="book.summarizeByDay">Summarize by Day</span>
+    </label>
 </div>
 <div class="table-wrap">
-    <table class="reading-sessions-table" data-reading-sessions-table>
+    <table class="reading-sessions-table" data-reading-sessions-table
+           data-average-pace="{{ '%.6f'|format(avg_pages_per_hour|float) }}"
+           data-is-pct-format="{{ 'true' if is_pct_format else 'false' }}">
         <thead>
             <tr>
                 <th>#</th>
@@ -3010,7 +3016,9 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         </thead>
         <tbody id="readingSessionsBody">
             {% for s in sessions %}
-            <tr class="session-data-row" id="session-row-{{ s.id }}" data-session-date="{{ s.date or '' }}">
+            <tr class="session-data-row" id="session-row-{{ s.id }}" data-session-date="{{ s.date or '' }}"
+                data-session-index="{{ loop.index }}" data-session-pages="{{ s.pages or 0 }}"
+                data-session-progress="{{ s.progress_pct or 0 }}" data-session-duration="{{ s.duration_seconds or 0 }}">
                 <td>{{ loop.index }}</td>
                 <td class="session-date-cell">{{ s.date | display_date }}</td>
                 <td>{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
@@ -3471,12 +3479,16 @@ function toggleEdit(idx) {
 
 (function () {
     var table = document.querySelector('[data-reading-sessions-table]');
-    var checkbox = document.getElementById('groupReadingSessionsByDay');
+    var groupCheckbox = document.getElementById('groupReadingSessionsByDay');
+    var summaryCheckbox = document.getElementById('summarizeReadingSessionsByDay');
     var body = document.getElementById('readingSessionsBody');
-    if (!table || !checkbox || !body) return;
+    if (!table || !groupCheckbox || !summaryCheckbox || !body) return;
 
     var bookId = {{ book_id | tojson }};
-    var storageKey = 'librarium.bookDetailGroupSessionsByDay.' + bookId;
+    var groupStorageKey = 'librarium.bookDetailGroupSessionsByDay.' + bookId;
+    var summaryStorageKey = 'librarium.bookDetailSummarizeSessionsByDay.' + bookId;
+    var averagePace = Number(table.dataset.averagePace) || 0;
+    var isPctFormat = table.dataset.isPctFormat === 'true';
     var sessionRows = Array.prototype.slice.call(body.querySelectorAll('.session-data-row'));
     var originalNodes = Array.prototype.slice.call(body.children);
     var groups = [];
@@ -3485,15 +3497,29 @@ function toggleEdit(idx) {
     sessionRows.forEach(function (row) {
         var key = row.dataset.sessionDate || '';
         var group = groupsByDate[key];
+        var sessionIndex = Number(row.dataset.sessionIndex) || 0;
         if (!group) {
-            group = { key: key, rows: [] };
+            group = {
+                key: key,
+                rows: [],
+                firstIndex: sessionIndex,
+                lastIndex: sessionIndex,
+                totalPages: 0,
+                maxProgress: 0,
+                totalDuration: 0
+            };
             groupsByDate[key] = group;
             groups.push(group);
         }
         group.rows.push(row);
+        group.firstIndex = Math.min(group.firstIndex, sessionIndex);
+        group.lastIndex = Math.max(group.lastIndex, sessionIndex);
+        group.totalPages += Number(row.dataset.sessionPages) || 0;
+        group.maxProgress = Math.max(group.maxProgress, Number(row.dataset.sessionProgress) || 0);
+        group.totalDuration += Number(row.dataset.sessionDuration) || 0;
     });
 
-    function readStoredGrouping() {
+    function readStoredState(storageKey) {
         try {
             return window.localStorage.getItem(storageKey) === 'true';
         } catch (error) {
@@ -3501,10 +3527,28 @@ function toggleEdit(idx) {
         }
     }
 
-    function writeStoredGrouping(grouped) {
+    function writeStoredState(storageKey, enabled) {
         try {
-            window.localStorage.setItem(storageKey, grouped ? 'true' : 'false');
+            window.localStorage.setItem(storageKey, enabled ? 'true' : 'false');
         } catch (error) {
+        }
+    }
+
+    function appendTextCell(row, text, className) {
+        var cell = document.createElement('td');
+        if (className) cell.className = className;
+        cell.textContent = text;
+        row.appendChild(cell);
+        return cell;
+    }
+
+    function appendDateContent(target, group) {
+        var dateElement = group.rows[0].querySelector('.session-date-cell [data-date]');
+        var dateCell = group.rows[0].querySelector('.session-date-cell');
+        if (dateElement) {
+            target.appendChild(dateElement.cloneNode(true));
+        } else {
+            target.textContent = dateCell ? dateCell.textContent.trim() || '\u2014' : '\u2014';
         }
     }
 
@@ -3517,20 +3561,88 @@ function toggleEdit(idx) {
         cell.colSpan = 7;
         var label = document.createElement('span');
         label.className = 'session-day-group-label';
-        var dateElement = group.rows[0].querySelector('.session-date-cell [data-date]');
-        var dateCell = group.rows[0].querySelector('.session-date-cell');
-        if (dateElement) {
-            label.appendChild(dateElement.cloneNode(true));
-        } else {
-            label.textContent = dateCell ? dateCell.textContent.trim() || '\u2014' : '\u2014';
-        }
+        appendDateContent(label, group);
         cell.appendChild(label);
         groupRow.appendChild(cell);
         return groupRow;
     }
 
+    function formatDuration(seconds) {
+        seconds = Math.max(0, Math.round(seconds));
+        var hours = Math.floor(seconds / 3600);
+        var minutes = Math.floor((seconds % 3600) / 60);
+        var remainingSeconds = seconds % 60;
+        if (hours > 0) return hours + 'h ' + minutes + 'm ' + remainingSeconds + 's';
+        if (minutes > 0) return minutes + 'm ' + remainingSeconds + 's';
+        return remainingSeconds + 's';
+    }
+
+    function createSummaryRow(group) {
+        var summaryRow = document.createElement('tr');
+        summaryRow.className = 'session-summary-row';
+        summaryRow.dataset.sessionDay = group.key;
+
+        var sessionRange = String(group.firstIndex);
+        if (group.lastIndex !== group.firstIndex) sessionRange += '-' + group.lastIndex;
+        appendTextCell(summaryRow, sessionRange);
+
+        var dateCell = document.createElement('td');
+        dateCell.className = 'session-date-cell';
+        appendDateContent(dateCell, group);
+        summaryRow.appendChild(dateCell);
+
+        var progressOrPages = isPctFormat
+            ? group.maxProgress.toFixed(1) + '%'
+            : String(Math.round(group.totalPages));
+        appendTextCell(summaryRow, progressOrPages);
+        appendTextCell(summaryRow, formatDuration(group.totalDuration));
+
+        var pace = group.totalDuration > 0 && !isPctFormat
+            ? group.totalPages / (group.totalDuration / 3600)
+            : 0;
+        var paceCell = document.createElement('td');
+        if (pace > 0) {
+            var paceValue = document.createElement('div');
+            paceValue.className = 'session-pace-value';
+            paceValue.appendChild(document.createTextNode(pace.toFixed(1) + ' '));
+            var paceUnit = group.rows[0].querySelector('[data-i18n="book.readingSessionPagesPerHour"]');
+            paceValue.appendChild(paceUnit ? paceUnit.cloneNode(true) : document.createTextNode('pages/hour'));
+            if (averagePace > 0) {
+                var difference = (pace - averagePace) / averagePace * 100;
+                var roundedDifference = Math.round(difference);
+                var differenceLabel = roundedDifference > 0 ? '+' + roundedDifference : String(roundedDifference);
+                paceValue.appendChild(document.createTextNode(' (' + differenceLabel + '%)'));
+            }
+            paceCell.appendChild(paceValue);
+        } else {
+            paceCell.textContent = '\u2014';
+        }
+        summaryRow.appendChild(paceCell);
+
+        var barCell = document.createElement('td');
+        barCell.className = 'session-pace-bar-cell';
+        if (pace > 0 && averagePace > 0) {
+            var bar = document.createElement('div');
+            bar.className = 'session-pace-bar';
+            bar.setAttribute('aria-hidden', 'true');
+            var fill = document.createElement('span');
+            fill.className = 'session-pace-bar-fill';
+            if (pace > averagePace) fill.classList.add('session-pace-faster');
+            if (pace < averagePace) fill.classList.add('session-pace-slower');
+            fill.style.width = Math.min(pace / (averagePace * 2) * 100, 100).toFixed(1) + '%';
+            var marker = document.createElement('span');
+            marker.className = 'session-pace-average-marker';
+            bar.appendChild(fill);
+            bar.appendChild(marker);
+            barCell.appendChild(bar);
+        }
+        summaryRow.appendChild(barCell);
+        appendTextCell(summaryRow, '\u2014');
+        return summaryRow;
+    }
+
     function removeGroupRows() {
-        Array.prototype.slice.call(body.querySelectorAll('.session-day-group-row')).forEach(function (row) {
+        Array.prototype.slice.call(body.querySelectorAll('.session-day-group-row, .session-summary-row')).forEach(function (row) {
             row.remove();
         });
     }
@@ -3541,28 +3653,47 @@ function toggleEdit(idx) {
         });
     }
 
-    function applyGrouping(grouped) {
-        removeGroupRows();
-        restoreOriginalOrder();
-        table.classList.toggle('is-grouped-by-day', grouped);
-        if (!grouped) return;
-
-        groups.forEach(function (group) {
-            body.appendChild(createGroupRow(group));
-            group.rows.forEach(function (row) {
-                body.appendChild(row);
-                var sessionId = row.id.replace('session-row-', '');
-                var editRow = document.getElementById('session-edit-' + sessionId);
-                if (editRow) body.appendChild(editRow);
-            });
+    function setIndividualRowsVisible(visible) {
+        originalNodes.forEach(function (node) {
+            node.hidden = !visible;
         });
     }
 
-    checkbox.checked = readStoredGrouping();
-    applyGrouping(checkbox.checked);
-    checkbox.addEventListener('change', function () {
-        writeStoredGrouping(checkbox.checked);
-        applyGrouping(checkbox.checked);
+    function applyDisplay() {
+        var grouped = groupCheckbox.checked;
+        var summarized = summaryCheckbox.checked;
+        removeGroupRows();
+        restoreOriginalOrder();
+        setIndividualRowsVisible(!summarized);
+        table.classList.toggle('is-grouped-by-day', grouped);
+        table.classList.toggle('is-summarized-by-day', summarized);
+        if (!grouped && !summarized) return;
+
+        groups.forEach(function (group) {
+            if (grouped) body.appendChild(createGroupRow(group));
+            if (summarized) {
+                body.appendChild(createSummaryRow(group));
+            } else {
+                group.rows.forEach(function (row) {
+                    body.appendChild(row);
+                    var sessionId = row.id.replace('session-row-', '');
+                    var editRow = document.getElementById('session-edit-' + sessionId);
+                    if (editRow) body.appendChild(editRow);
+                });
+            }
+        });
+    }
+
+    groupCheckbox.checked = readStoredState(groupStorageKey);
+    summaryCheckbox.checked = readStoredState(summaryStorageKey);
+    applyDisplay();
+    groupCheckbox.addEventListener('change', function () {
+        writeStoredState(groupStorageKey, groupCheckbox.checked);
+        applyDisplay();
+    });
+    summaryCheckbox.addEventListener('change', function () {
+        writeStoredState(summaryStorageKey, summaryCheckbox.checked);
+        applyDisplay();
     });
 }());
 
