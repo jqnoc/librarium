@@ -1275,7 +1275,7 @@ h3 {
     white-space: nowrap;
 }
 .reading-sessions-table th:last-child,
-.reading-sessions-table td:last-child {
+.reading-sessions-table td:last-child:not([colspan]) {
     width: 100%;
     text-align: right;
     white-space: nowrap;
