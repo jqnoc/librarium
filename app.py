@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -335,6 +335,7 @@ _sync_thread_lock = threading.Lock()
 _last_download_hash: dict[str, str] = {}   # remote path → content_hash at download time
 _startup_sync_done = threading.Event()      # set when initial download + migrations finish
 _startup_sync_progress: str = ""            # human-readable status for the loading page
+_SYNC_METADATA_TABLE = "sync_metadata"
 
 
 def _load_auth() -> dict | None:
@@ -397,11 +398,90 @@ def _reset_dropbox_client() -> None:
 _UPLOAD_CHUNK = 140 * 1024 * 1024  # 140 MB — use chunked upload above this
 
 
+def _quote_sql_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _parse_sync_timestamp(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, (int, float)):
+        try:
+            parsed = datetime.fromtimestamp(value, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
+    elif isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _current_sync_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _read_db_sync_timestamp(db_path: Path) -> datetime | None:
+    """Read the last committed application update from a database."""
+    if not db_path.exists():
+        return None
+
+    db = None
+    try:
+        db = sqlite3.connect(str(db_path))
+        row = db.execute(
+            f"SELECT last_updated_at FROM {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
+            "WHERE id = 1"
+        ).fetchone()
+        if row:
+            timestamp = _parse_sync_timestamp(row[0])
+            if timestamp:
+                return timestamp
+    except sqlite3.OperationalError as error:
+        if "no such table" not in str(error).lower():
+            return None
+    except sqlite3.DatabaseError:
+        return None
+    except OSError:
+        pass
+    finally:
+        if db is not None:
+            db.close()
+
+    mtimes = []
+    for candidate in (
+        db_path,
+        Path(f"{db_path}-wal"),
+        Path(f"{db_path}-shm"),
+    ):
+        try:
+            if candidate.exists():
+                mtimes.append(candidate.stat().st_mtime)
+        except OSError:
+            pass
+    if not mtimes:
+        return None
+    return datetime.fromtimestamp(max(mtimes), tz=timezone.utc)
+
+
 def _dbx_download(remote_path: str, local_path: Path) -> str | None:
     """Download a file from Dropbox app folder to a local path.
 
     Skips the download when the local file already matches the remote
-    content hash, to avoid re-downloading large unchanged databases.
+    content hash, or when a local database has a newer committed update
+    timestamp than the Dropbox file.
     Returns the content_hash on success, or None if the file does not
     exist on Dropbox.
     """
@@ -409,6 +489,22 @@ def _dbx_download(remote_path: str, local_path: Path) -> str | None:
     try:
         meta = dbx.files_get_metadata(remote_path)
         remote_hash = meta.content_hash
+        remote_updated_at = _parse_sync_timestamp(getattr(meta, "server_modified", None))
+
+        if local_path.suffix.lower() == ".db" and local_path.exists():
+            local_updated_at = _read_db_sync_timestamp(local_path)
+            if (
+                local_updated_at is not None
+                and remote_updated_at is not None
+                and local_updated_at > remote_updated_at
+            ):
+                if remote_hash:
+                    _last_download_hash[remote_path] = remote_hash
+                print(
+                    f"[dropbox] Keeping newer local database {local_path.name} "
+                    f"({local_updated_at.isoformat()} > {remote_updated_at.isoformat()})"
+                )
+                return remote_hash
 
         # Skip download if the local file already matches
         if local_path.exists() and remote_hash:
@@ -1338,6 +1434,7 @@ def _run_all_migrations() -> None:
     migrate_add_character_portrait()
     migrate_add_character_deceased()
     migrate_add_session_page_range()
+    migrate_add_sync_metadata()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2761,6 +2858,49 @@ def migrate_add_character_deceased() -> None:
             "ALTER TABLE characters ADD COLUMN deceased INTEGER NOT NULL DEFAULT 0"
         )
         db.commit()
+    db.close()
+
+
+def _ensure_sync_update_triggers(db: sqlite3.Connection) -> None:
+    tables = db.execute(
+        "SELECT name FROM sqlite_master "
+        "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != ?",
+        (_SYNC_METADATA_TABLE,),
+    ).fetchall()
+    for row in tables:
+        table_name = row[0]
+        table_hash = hashlib.sha256(table_name.encode("utf-8")).hexdigest()[:16]
+        quoted_table = _quote_sql_identifier(table_name)
+        for operation in ("INSERT", "UPDATE", "DELETE"):
+            trigger_name = f"librarium_sync_{table_hash}_{operation.lower()}"
+            db.execute(
+                f"CREATE TRIGGER IF NOT EXISTS {_quote_sql_identifier(trigger_name)} "
+                f"AFTER {operation} ON {quoted_table} BEGIN "
+                f"UPDATE {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
+                "SET last_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                "WHERE id = 1; END"
+            )
+
+
+def migrate_add_sync_metadata() -> None:
+    """Store the last committed database update and track all table writes."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    db.execute(
+        f"CREATE TABLE IF NOT EXISTS {_quote_sql_identifier(_SYNC_METADATA_TABLE)} ("
+        "id INTEGER PRIMARY KEY CHECK (id = 1), "
+        "last_updated_at TEXT NOT NULL"
+        ")"
+    )
+    db.execute(
+        f"INSERT OR IGNORE INTO {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
+        "(id, last_updated_at) VALUES (1, ?)",
+        (_current_sync_timestamp(),),
+    )
+    _ensure_sync_update_triggers(db)
+    db.commit()
     db.close()
 
 
