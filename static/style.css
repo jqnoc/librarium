@@ -2155,20 +2155,11 @@ select.form-control { cursor: pointer; }
 }
 .character-detail-modal-box.has-portrait {
     width: min(760px, calc(100vw - 2rem));
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
-    column-gap: 2rem;
-    align-items: start;
 }
 .character-detail-modal-title {
     margin: 0 2.5rem .45rem 0;
     color: var(--lb-deep-orange);
     font-size: 1.35rem;
-}
-.character-detail-modal-box.has-portrait .character-detail-modal-title,
-.character-detail-modal-box.has-portrait .character-detail-modal-badges,
-.character-detail-modal-box.has-portrait .character-detail-modal-field {
-    grid-column: 1;
 }
 .character-detail-modal-badges {
     margin-bottom: 1.25rem;
@@ -2184,11 +2175,10 @@ select.form-control { cursor: pointer; }
     background: var(--lb-gradient);
 }
 .character-detail-modal-box.has-portrait .character-detail-modal-portrait {
-    grid-column: 2;
-    grid-row: 1 / span 4;
+    float: right;
     width: 220px;
-    max-width: 100%;
-    margin: 0 0 1.25rem auto;
+    max-width: 42%;
+    margin: 0 0 1.25rem 2rem;
 }
 .character-detail-modal-portrait img {
     width: 100%;
@@ -2246,8 +2236,9 @@ select.form-control { cursor: pointer; }
     }
 
     .character-detail-modal-box.has-portrait .character-detail-modal-portrait {
+        float: none;
         width: min(180px, 100%);
-        margin: 0 0 1.25rem auto;
+        margin: 0 auto 1.25rem;
     }
 }
 
