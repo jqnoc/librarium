@@ -1353,7 +1353,8 @@ def init_schema() -> None:
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             text    TEXT    NOT NULL DEFAULT '',
-            page    INTEGER DEFAULT NULL
+            page    INTEGER DEFAULT NULL,
+            date    TEXT DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS words (
@@ -1416,6 +1417,7 @@ def _run_all_migrations() -> None:
     migrate_normalize_genres()
     migrate_merge_genres_into_tags()
     migrate_add_annotations()
+    migrate_add_annotation_date()
     migrate_rename_legacy_annotation_table()
     migrate_add_word_translations()
     migrate_add_word_synonyms()
@@ -2399,7 +2401,8 @@ def migrate_add_annotations() -> None:
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             book_id TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             text    TEXT    NOT NULL DEFAULT '',
-            page    INTEGER DEFAULT NULL
+            page    INTEGER DEFAULT NULL,
+            date    TEXT DEFAULT NULL
         );
         CREATE TABLE IF NOT EXISTS words (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2414,6 +2417,19 @@ def migrate_add_annotations() -> None:
     db.commit()
     db.close()
     print(">> Migration complete — annotations tables created.")
+
+
+def migrate_add_annotation_date() -> None:
+    """Add an optional date to annotations."""
+    if not DB_PATH.exists():
+        return
+    db = sqlite3.connect(str(DB_PATH))
+    existing = {r[1] for r in db.execute("PRAGMA table_info(annotations)").fetchall()}
+    if "date" not in existing:
+        print(">> Migrating: adding date column to annotations ...")
+        db.execute("ALTER TABLE annotations ADD COLUMN date TEXT DEFAULT NULL")
+        db.commit()
+    db.close()
 
 
 def migrate_rename_legacy_annotation_table() -> None:
@@ -8307,7 +8323,7 @@ def book_detail(book_id: str):
         [info["library_id"]] + exclude_ids,
     ).fetchall()
     latest_annotation_row = db.execute(
-        "SELECT id, text, page FROM annotations WHERE book_id = ? ORDER BY id DESC LIMIT 1",
+        "SELECT id, text, page, date FROM annotations WHERE book_id = ? ORDER BY id DESC LIMIT 1",
         (book_id,),
     ).fetchone()
     latest_annotation = dict(latest_annotation_row) if latest_annotation_row else None
@@ -8977,10 +8993,11 @@ def add_annotation(book_id: str):
     text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str.isdigit() else None
+    annotation_date = request.form.get("date", "").strip() or None
     if text:
         cursor = db.execute(
-            "INSERT INTO annotations (book_id, text, page) VALUES (?, ?, ?)",
-            (book_id, text, page),
+            "INSERT INTO annotations (book_id, text, page, date) VALUES (?, ?, ?, ?)",
+            (book_id, text, page, annotation_date),
         )
         db.commit()
         if _annotation_wants_json():
@@ -8996,10 +9013,11 @@ def edit_annotation(book_id: str, aid: int):
     text = request.form.get("text", "").strip()
     page_str = request.form.get("page", "").strip()
     page = int(page_str) if page_str.isdigit() else None
+    annotation_date = request.form.get("date", "").strip() or None
     if text:
         cursor = db.execute(
-            "UPDATE annotations SET text = ?, page = ? WHERE id = ? AND book_id = ?",
-            (text, page, aid, book_id),
+            "UPDATE annotations SET text = ?, page = ?, date = ? WHERE id = ? AND book_id = ?",
+            (text, page, annotation_date, aid, book_id),
         )
         db.commit()
         if _annotation_wants_json():

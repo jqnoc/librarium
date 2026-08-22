@@ -161,6 +161,7 @@ in the `if __name__ == "__main__"` block. Each migration is idempotent
 25. `migrate_externalize_images` — extract full-size cover/photo BLOBs to filesystem files
 26. `migrate_add_character_portrait` — add character portrait hashes and thumbnails
 27. `migrate_add_session_page_range` — add saved start and end pages to reading sessions
+28. `migrate_add_annotation_date` — add optional dates to annotations
 
 When adding a new migration:
 
@@ -391,7 +392,7 @@ authors     (name TEXT PK, photo BLOB, has_photo, birth_date,
 
 quotes      (id INTEGER PK, book_id FK, text, page)
 
-annotations (id INTEGER PK, book_id FK, text, page)
+annotations (id INTEGER PK, book_id FK, text, page, date)
 
 words       (id INTEGER PK, book_id FK, word, definition)
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add optional dates to annotations with persisted date/page sorting across books
 - Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding the redundant Date heading text and cells in grouped mode while retaining the header background, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
 - Add a hover-visible download icon to full character portraits for exporting the original image
 - Add a persisted deceased status for characters with a skull marker after the name on character cards

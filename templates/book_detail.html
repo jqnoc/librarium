@@ -823,11 +823,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <textarea id="readingSessionAnnotationText" name="text" rows="7" class="form-control" required
                           placeholder="Your annotation..." data-i18n-placeholder="book.annotationTextPlaceholder">{% if latest_annotation %}{{ latest_annotation.get('text', '') }}{% endif %}</textarea>
             </div>
-            <div class="reading-session-annotation-page-row">
+            <div class="reading-session-annotation-meta-row">
                 <div class="reading-session-annotation-field">
                     <label for="readingSessionAnnotationPage" data-i18n="book.pagePlaceholder">Page</label>
                     <input type="number" id="readingSessionAnnotationPage" name="page" class="form-control" min="1"{% if latest_annotation and latest_annotation.get('page') %} value="{{ latest_annotation.get('page') }}"{% endif %}
                            placeholder="Page" data-i18n-placeholder="book.pagePlaceholder">
+                </div>
+                <div class="reading-session-annotation-field">
+                    <label for="readingSessionAnnotationDate" data-i18n="book.annotationDate">Date</label>
+                    <input type="date" id="readingSessionAnnotationDate" name="date" class="form-control">
                 </div>
             </div>
             <p id="readingSessionAnnotationError" class="reading-session-annotation-error" role="alert" aria-live="polite"></p>
@@ -1155,14 +1159,16 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var form = getElement('readingSessionAnnotationForm');
         var text = getElement('readingSessionAnnotationText');
         var page = getElement('readingSessionAnnotationPage');
+        var annotationDate = getElement('readingSessionAnnotationDate');
         var label = getElement('readingSessionAnnotationModeLabel');
         var modeButton = getElement('readingSessionAnnotationModeButton');
-        if (!form || !text || !page || !label || !modeButton) return;
+        if (!form || !text || !page || !annotationDate || !label || !modeButton) return;
 
         if (mode === 'edit') {
             form.action = form.dataset.editActionPrefix + state.latestAnnotation.id + '/edit';
             text.value = state.latestAnnotation.text || '';
             page.value = state.latestAnnotation.page || '';
+            annotationDate.value = state.latestAnnotation.date || '';
             label.dataset.i18n = 'book.readingSessionEditingLastAnnotation';
             label.textContent = translate('book.readingSessionEditingLastAnnotation', 'Editing the last saved annotation');
             modeButton.dataset.i18n = 'book.readingSessionNewAnnotation';
@@ -1171,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
             form.action = form.dataset.addAction;
             text.value = '### ';
             page.value = '';
+            annotationDate.value = '';
             label.dataset.i18n = 'book.readingSessionWritingNewAnnotation';
             label.textContent = translate('book.readingSessionWritingNewAnnotation', 'Writing a new annotation');
             modeButton.dataset.i18n = 'book.readingSessionEditLastAnnotation';
@@ -1616,6 +1623,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         var form = getElement('readingSessionAnnotationForm');
         var text = getElement('readingSessionAnnotationText');
         var page = getElement('readingSessionAnnotationPage');
+        var annotationDate = getElement('readingSessionAnnotationDate');
         var shouldResume = state.quickModalWasRunning;
         if (!text.value.trim()) {
             setModalError('readingSessionAnnotationError', translate('book.annotationRequired', 'Annotation text is required.'));
@@ -1627,11 +1635,13 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         setModalError('readingSessionAnnotationError', '');
         var savedText = text.value;
         var savedPage = page.value ? Number(page.value) : null;
+        var savedDate = annotationDate.value || null;
         fetchAnnotationJson(form.action, form).then(function (payload) {
             state.latestAnnotation = {
                 id: payload.id,
                 text: savedText,
                 page: savedPage,
+                date: savedDate,
             };
             finishQuickModal('readingSessionAnnotationModal', shouldResume);
         }).catch(function (error) {
@@ -2826,19 +2836,42 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
 <!-- ── Annotations ───────────────────────────────────────────────────── -->
 <div class="annotation-section-heading">
     <h2 id="annotations"><span data-i18n="book.annotations">Annotations</span> <span class="annotation-count">({{ annotations | length }})</span></h2>
-    <a href="{{ url_for('export_annotations_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
-       title="Download annotations as Markdown" data-i18n-title="book.exportAnnotationsMarkdownTitle">
-        <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportAnnotationsMarkdown">Download Markdown</span>
-    </a>
+    <div class="annotation-section-actions">
+        <div class="annotation-sort-controls" data-annotation-sort-controls>
+            <label for="annotationSortField" data-i18n="book.sortAnnotationsBy">Sort by</label>
+            <select id="annotationSortField" data-annotation-sort-field>
+                <option value="page" data-i18n="book.sortAnnotationsPage">Page</option>
+                <option value="date" data-i18n="book.sortAnnotationsDate">Date</option>
+            </select>
+            <label for="annotationSortOrder" class="annotation-sort-order-label" data-i18n="book.sortAnnotationsOrder">Order</label>
+            <select id="annotationSortOrder" data-annotation-sort-order>
+                <option value="asc" data-i18n="book.sortAnnotationsAscending">Ascending</option>
+                <option value="desc" data-i18n="book.sortAnnotationsDescending">Descending</option>
+            </select>
+        </div>
+        <a href="{{ url_for('export_annotations_markdown', book_id=book_id) }}" class="btn btn-secondary btn-sm"
+           title="Download annotations as Markdown" data-i18n-title="book.exportAnnotationsMarkdownTitle">
+            <span aria-hidden="true">&#8681;</span> <span data-i18n="book.exportAnnotationsMarkdown">Download Markdown</span>
+        </a>
+    </div>
 </div>
 
 {% if annotations %}
-<div class="annotations-list">
+<div class="annotations-list" data-annotation-sort-list>
     {% for annotation in annotations %}
-    <div class="annotation-card annotation-note" id="annotation-{{ annotation.id }}">
+    <div class="annotation-card annotation-note" id="annotation-{{ annotation.id }}"
+         data-annotation-sort-item
+         data-annotation-id="{{ annotation.id }}"
+         data-annotation-page="{{ annotation.page if annotation.page is not none else '' }}"
+         data-annotation-date="{{ annotation.get('date') or '' }}">
         <div class="annotation-body">
             <div class="annotation-text">{{ annotation.text | md_to_html }}</div>
-            {% if annotation.page %}<div class="annotation-page">p. {{ annotation.page }}</div>{% endif %}
+            {% if annotation.page is not none or annotation.get('date') %}
+            <div class="annotation-meta">
+                {% if annotation.get('date') %}<span class="annotation-date"><span data-i18n="book.annotationDate">Date</span>: {{ annotation.get('date') | display_date }}</span>{% endif %}
+                {% if annotation.page is not none %}<span class="annotation-page"><span data-i18n="book.pagePlaceholder">Page</span>: {{ annotation.page }}</span>{% endif %}
+            </div>
+            {% endif %}
         </div>
         <div class="annotation-actions">
             <button class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('annotation', {{ annotation.id }})">✏️</button>
@@ -2850,7 +2883,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
         <div class="annotation-edit-row" id="annotation-edit-{{ annotation.id }}">
             <form method="POST" action="{{ url_for('edit_annotation', book_id=book_id, aid=annotation.id) }}" class="annotation-edit-form">
                 <textarea id="edit-annotation-{{ annotation.id }}" name="text" rows="3" required>{{ annotation.text }}</textarea>
-                <input type="number" name="page" value="{{ annotation.page or '' }}" placeholder="Page" min="1" style="width:80px;">
+                <label class="annotation-edit-field" for="edit-annotation-date-{{ annotation.id }}">
+                    <span data-i18n="book.annotationDate">Date</span>
+                    <input type="date" id="edit-annotation-date-{{ annotation.id }}" name="date" value="{{ annotation.get('date') or '' }}">
+                </label>
+                <label class="annotation-edit-field" for="edit-annotation-page-{{ annotation.id }}">
+                    <span data-i18n="book.pagePlaceholder">Page</span>
+                    <input type="number" id="edit-annotation-page-{{ annotation.id }}" name="page" value="{{ annotation.page or '' }}" placeholder="Page" min="1">
+                </label>
                 <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAnnotationEdit('annotation', {{ annotation.id }})" data-i18n="form.cancel">Cancel</button>
             </form>
@@ -2868,7 +2908,14 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <form method="POST" action="{{ url_for('add_annotation', book_id=book_id) }}" class="annotation-add-form">
         <textarea id="add-annotation-text" name="text" rows="2" required placeholder="Your annotation..." data-i18n-placeholder="book.annotationTextPlaceholder"></textarea>
         <div class="annotation-add-row">
-            <input type="number" name="page" placeholder="Page" min="1" style="width:80px;" data-i18n-placeholder="book.pagePlaceholder">
+            <label class="annotation-add-field" for="add-annotation-date">
+                <span data-i18n="book.annotationDate">Date</span>
+                <input type="date" id="add-annotation-date" name="date">
+            </label>
+            <label class="annotation-add-field" for="add-annotation-page">
+                <span data-i18n="book.pagePlaceholder">Page</span>
+                <input type="number" id="add-annotation-page" name="page" placeholder="Page" min="1" data-i18n-placeholder="book.pagePlaceholder">
+            </label>
             <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addAnnotationBtn">+ Add Annotation</button>
         </div>
     </form>
@@ -3800,6 +3847,79 @@ function toggleAnnotationEdit(type, id) {
     const row = document.getElementById(type + '-edit-' + id);
     row.classList.toggle('active');
 }
+
+(function () {
+    var controls = document.querySelector('[data-annotation-sort-controls]');
+    if (!controls) return;
+
+    var fieldSelect = controls.querySelector('[data-annotation-sort-field]');
+    var orderSelect = controls.querySelector('[data-annotation-sort-order]');
+    var list = document.querySelector('[data-annotation-sort-list]');
+    var storageKey = 'librarium.annotationSortPreferences';
+
+    function readPreferences() {
+        try {
+            return JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function writePreferences() {
+        try {
+            window.localStorage.setItem(storageKey, JSON.stringify({
+                field: fieldSelect.value,
+                order: orderSelect.value
+            }));
+        } catch (error) {
+        }
+    }
+
+    function restorePreferences() {
+        var preferences = readPreferences();
+        var fieldValues = Array.prototype.map.call(fieldSelect.options, function (option) { return option.value; });
+        var orderValues = Array.prototype.map.call(orderSelect.options, function (option) { return option.value; });
+        if (fieldValues.indexOf(preferences.field) !== -1) fieldSelect.value = preferences.field;
+        if (orderValues.indexOf(preferences.order) !== -1) orderSelect.value = preferences.order;
+    }
+
+    function compareItems(left, right) {
+        var attribute = fieldSelect.value === 'date' ? 'data-annotation-date' : 'data-annotation-page';
+        var leftValue = left.getAttribute(attribute) || '';
+        var rightValue = right.getAttribute(attribute) || '';
+        var leftMissing = !leftValue;
+        var rightMissing = !rightValue;
+
+        if (leftMissing || rightMissing) {
+            if (leftMissing && rightMissing) return Number(left.dataset.annotationId) - Number(right.dataset.annotationId);
+            return leftMissing ? 1 : -1;
+        }
+
+        var comparison = fieldSelect.value === 'date'
+            ? leftValue.localeCompare(rightValue)
+            : Number(leftValue) - Number(rightValue);
+        if (comparison === 0) comparison = Number(left.dataset.annotationId) - Number(right.dataset.annotationId);
+        return orderSelect.value === 'desc' ? -comparison : comparison;
+    }
+
+    function applySort() {
+        if (!list) return;
+        var items = Array.prototype.slice.call(list.querySelectorAll('[data-annotation-sort-item]'));
+        items.sort(compareItems);
+        items.forEach(function (item) { list.appendChild(item); });
+    }
+
+    restorePreferences();
+    fieldSelect.addEventListener('change', function () {
+        writePreferences();
+        applySort();
+    });
+    orderSelect.addEventListener('change', function () {
+        writePreferences();
+        applySort();
+    });
+    applySort();
+}());
 
 function initWordTranslationLanguageControls() {
     const storageKey = 'librarium.wordTranslationLanguage';

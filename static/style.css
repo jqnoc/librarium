@@ -2850,6 +2850,16 @@ body.reading-session-modal-open { overflow: hidden; }
     max-width: 150px;
     margin-top: .9rem;
 }
+.reading-session-annotation-meta-row {
+    display: flex;
+    gap: .75rem;
+    max-width: 320px;
+    margin-top: .9rem;
+}
+.reading-session-annotation-meta-row .reading-session-annotation-field {
+    flex: 1;
+    min-width: 0;
+}
 .reading-session-quote-page-row {
     max-width: 150px;
     margin-top: .9rem;
@@ -2896,6 +2906,7 @@ body.reading-session-modal-open { overflow: hidden; }
     .reading-session-translate-button { width: 100%; }
     .reading-session-annotation-mode-row { align-items: flex-start; flex-direction: column; }
     .reading-session-annotation-page-row { max-width: none; }
+    .reading-session-annotation-meta-row { max-width: none; }
     .reading-session-character-selector-row { grid-template-columns: 1fr; }
     .reading-session-character-selector-row .btn { width: 100%; }
 }
@@ -4319,6 +4330,37 @@ body.reading-session-modal-open { overflow: hidden; }
     margin-bottom: 0;
 }
 
+.annotation-section-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.annotation-sort-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    color: var(--lb-text-light);
+    font-size: 0.8rem;
+}
+
+.annotation-sort-controls select {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+}
+
+.annotation-sort-order-label {
+    margin-left: 0.25rem;
+}
+
 .annotations-list {
     display: flex;
     flex-direction: column;
@@ -4656,7 +4698,20 @@ body.reading-session-modal-open { overflow: hidden; }
 .annotation-page {
     font-size: 0.82rem;
     color: var(--lb-text-light);
+}
+
+.annotation-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
     margin-top: 0.25rem;
+    font-size: 0.82rem;
+    color: var(--lb-text-light);
+}
+
+.annotation-date {
+    white-space: nowrap;
 }
 
 .annotation-actions {
@@ -4701,6 +4756,7 @@ body.reading-session-modal-open { overflow: hidden; }
 
 .annotation-edit-form input[type="text"],
 .annotation-edit-form input[type="number"],
+.annotation-edit-form input[type="date"],
 .annotation-edit-form select {
     font-family: inherit;
     font-size: 0.92rem;
@@ -4709,6 +4765,18 @@ body.reading-session-modal-open { overflow: hidden; }
     border-radius: var(--lb-radius);
     background: var(--lb-white);
     color: var(--lb-text);
+}
+
+.annotation-edit-field,
+.annotation-add-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    color: var(--lb-text-light);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
 }
 
 .annotation-character-form {
@@ -4983,11 +5051,12 @@ body.reading-session-modal-open { overflow: hidden; }
 .annotation-add-row {
     display: flex;
     gap: 0.5rem;
-    align-items: center;
+    align-items: flex-end;
 }
 
 .annotation-add-row input[type="text"],
 .annotation-add-row input[type="number"],
+.annotation-add-row input[type="date"],
 .annotation-add-row select {
     font-family: inherit;
     font-size: 0.92rem;
