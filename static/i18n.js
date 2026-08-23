@@ -19,6 +19,7 @@
         'nav.calendar':     { en: 'Calendar',     es: 'Calendario' },
         'nav.sources':      { en: 'Sources',      es: 'Fuentes' },
         'nav.addBook':      { en: '+ Add Book',   es: '+ Añadir Libro' },
+        'nav.backTo':       { en: '← Back to',    es: '← Volver a' },
         'nav.minimize':     { en: 'Minimize Librarium', es: 'Minimizar Librarium' },
         'nav.maximize':     { en: 'Maximize Librarium', es: 'Maximizar Librarium' },
         'nav.restore':      { en: 'Restore Librarium',  es: 'Restaurar Librarium' },

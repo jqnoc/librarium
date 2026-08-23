@@ -2,10 +2,6 @@
 {% block title %}Edit – {{ author_name }} – Librarium{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('author_detail', author_name=author_name) }}" class="btn btn-secondary btn-sm" data-i18n="editAuthor.backToAuthor">← Back to Author</a>
-</div>
-
 <h1 data-i18n="editAuthor.title">Edit Author Details</h1>
 <p style="color: var(--lb-text-light); margin-bottom: 1.5rem;">{{ author_name }}</p>
 

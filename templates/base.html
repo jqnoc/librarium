@@ -410,6 +410,19 @@
         {% endif %}
         {% endwith %}
 
+        {% if navigation_back %}
+        <div style="margin-bottom: 1rem;">
+            <a href="{{ navigation_back.href }}" class="btn btn-secondary btn-sm">
+                <span data-i18n="nav.backTo">← Back to</span>
+                {% if navigation_back.label_key %}
+                <span data-i18n="{{ navigation_back.label_key }}">{{ navigation_back.label }}</span>
+                {% else %}
+                <span>{{ navigation_back.label }}</span>
+                {% endif %}
+            </a>
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
     </div>
 

@@ -2,10 +2,6 @@
 {% block title %}Edit – {{ info.get('name', 'Book') }} – Librarium{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('book_detail', book_id=book_id) }}" class="btn btn-secondary btn-sm" data-i18n="bookForm.backToBook">← Back to Book</a>
-</div>
-
 <h1 data-i18n="bookForm.editMetadata">Edit Metadata</h1>
 
 {% set is_new_book = false %}

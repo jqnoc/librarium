@@ -2,10 +2,6 @@
 {% block title %}Add New Book – Librarium{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="bookForm.backToLibrary">← Back to Library</a>
-</div>
-
 <h1 data-i18n="bookForm.addNewBook">Add New Book</h1>
 
 {% if parent_work_id %}

@@ -2,10 +2,6 @@
 {% block title %}{{ author }} – Librarium{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('authors_list') }}" class="btn btn-secondary btn-sm" data-i18n="authorDetail.backToAuthors">← Back to Authors</a>
-</div>
-
 <h1>{{ author }}</h1>
 
 <!-- ── Hero: photo + metadata ────────────────────────────────────────── -->
@@ -127,7 +123,6 @@
 <div class="empty-state">
     <div class="icon">📚</div>
     <p data-i18n="authorDetail.empty">No books found for this author.</p>
-    <a href="{{ url_for('authors_list') }}" class="btn btn-secondary" data-i18n="authorDetail.backToAuthors">← Back to Authors</a>
 </div>
 {% endif %}
 

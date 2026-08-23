@@ -34,10 +34,6 @@
 
 {% block content %}
 <div class="book-detail-page" data-book-id="{{ book_id }}">
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm" data-i18n="book.backToLibrary">← Back to Library</a>
-</div>
-
 <h1{% if info.get('subtitle') %} style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;"{% endif %}>{{ info.get('name', 'Untitled') }}</h1>
 {% if info.get('subtitle') %}
 <div style="font-size: 1.1rem; color: var(--lb-deep-orange); border-bottom: 3px solid var(--lb-deep-orange); padding-bottom: .3em; margin-bottom: 1.5rem;">{{ info.get('subtitle') }}</div>

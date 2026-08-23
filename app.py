@@ -315,6 +315,8 @@ CONTROLLED_FORM_VALUES = (
 
 app = Flask(__name__)
 app.secret_key = "librarium-local-dev-key"
+NAVIGATION_HISTORY_KEY = "_navigation_history"
+NAVIGATION_HISTORY_LIMIT = 20
 
 # ── Dropbox integration ──────────────────────────────────────────────────
 DROPBOX_APP_KEY = "tlt9ax4wz2mw2i0"
@@ -3203,6 +3205,20 @@ def inject_library_context():
             "dropbox_connected": _is_authenticated(),
             "author_page_name": author_page_name,
         }
+
+
+@app.context_processor
+def inject_navigation_context():
+    """Make the current session's previous page available to the shared layout."""
+    navigation_back = getattr(g, "_navigation_back", None)
+    if navigation_back:
+        navigation_back = dict(navigation_back)
+        navigation_back["href"] = url_for("navigation_back")
+    else:
+        navigation_back = _navigation_fallback()
+        if navigation_back:
+            navigation_back["href"] = navigation_back["url"]
+    return {"navigation_back": navigation_back}
 
 
 # ── Rating dimensions ────────────────────────────────────────────────────
@@ -10958,6 +10974,168 @@ def user_update_backup_dir():
     return redirect(request.referrer or url_for("index"))
 
 
+def _navigation_request_url() -> str:
+    query_string = request.query_string.decode("utf-8", errors="replace")
+    return request.path + (f"?{query_string}" if query_string else "")
+
+
+def _is_internal_navigation_url(target_url: str) -> bool:
+    parsed_url = urllib.parse.urlsplit(target_url)
+    return (
+        target_url.startswith("/")
+        and not target_url.startswith("//")
+        and not parsed_url.scheme
+        and not parsed_url.netloc
+    )
+
+
+def _navigation_history_from_session() -> list[dict[str, str]]:
+    raw_history = session.get(NAVIGATION_HISTORY_KEY, [])
+    if not isinstance(raw_history, list):
+        return []
+
+    history = []
+    for item in raw_history:
+        if not isinstance(item, dict):
+            continue
+        target_url = item.get("url")
+        label = item.get("label")
+        if (
+            not isinstance(target_url, str)
+            or not _is_internal_navigation_url(target_url)
+            or not isinstance(label, str)
+            or not label.strip()
+        ):
+            continue
+        entry = {"url": target_url, "label": label[:200]}
+        label_key = item.get("label_key")
+        if isinstance(label_key, str) and len(label_key) <= 80:
+            entry["label_key"] = label_key
+        history.append(entry)
+    return history[-NAVIGATION_HISTORY_LIMIT:]
+
+
+def _navigation_book_name(book_id: str | None) -> str:
+    if not book_id:
+        return "Book"
+    try:
+        row = get_db().execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()
+    except sqlite3.Error:
+        row = None
+    return (row["name"] or "Book") if row else "Book"
+
+
+def _navigation_page_label() -> dict[str, str]:
+    endpoint = request.endpoint or ""
+    static_labels = {
+        "dashboard": {"label": "Dashboard", "label_key": "nav.dashboard"},
+        "index": {"label": "Library", "label_key": "nav.library"},
+        "taxonomy_index": {"label": "Index", "label_key": "nav.index"},
+        "global_stats": {"label": "Stats", "label_key": "nav.stats"},
+        "calendar_view": {"label": "Calendar", "label_key": "nav.calendar"},
+        "activity": {"label": "Activity", "label_key": "nav.activity"},
+        "authors_list": {"label": "Authors", "label_key": "nav.authors"},
+        "series_list": {"label": "Series", "label_key": "nav.series"},
+        "sources_list": {"label": "Sources", "label_key": "nav.sources"},
+        "new_book": {"label": "Add Book", "label_key": "addBook.title"},
+        "edit_metadata": {"label": "Edit Metadata", "label_key": "bookForm.editMetadata"},
+        "edit_author": {"label": "Edit Author Details", "label_key": "editAuthor.title"},
+    }
+    if endpoint in static_labels:
+        return dict(static_labels[endpoint])
+
+    view_args = request.view_args or {}
+    if endpoint == "book_detail":
+        return {"label": _navigation_book_name(view_args.get("book_id"))}
+    if endpoint == "author_detail":
+        return {"label": view_args.get("author_name") or "Author"}
+    if endpoint == "series_detail":
+        try:
+            row = get_db().execute(
+                "SELECT name FROM series WHERE id = ?", (view_args.get("series_id"),)
+            ).fetchone()
+        except sqlite3.Error:
+            row = None
+        return {"label": (row["name"] or "Series") if row else "Series"}
+
+    year_labels = {
+        "stats_year": "Reading Statistics for",
+        "stats_year_time": "Time Read in",
+        "stats_year_authors": "Authors Read in",
+        "stats_year_books": "Books Finished in",
+        "stats_year_bought": "Books Bought in",
+    }
+    if endpoint in year_labels:
+        year = str(view_args.get("year") or "").strip()
+        return {"label": f"{year_labels[endpoint]} {year}".strip()}
+
+    fallback_label = endpoint.replace("_", " ").strip().title() or "Librarium"
+    return {"label": fallback_label}
+
+
+def _navigation_fallback() -> dict[str, str] | None:
+    endpoint = request.endpoint or ""
+    view_args = request.view_args or {}
+    if endpoint == "book_detail":
+        return {"url": url_for("index"), "label": "Library", "label_key": "nav.library"}
+    if endpoint == "author_detail":
+        return {"url": url_for("authors_list"), "label": "Authors", "label_key": "nav.authors"}
+    if endpoint == "edit_author":
+        author_name = view_args.get("author_name") or "Author"
+        return {
+            "url": url_for("author_detail", author_name=author_name),
+            "label": author_name,
+        }
+    if endpoint == "series_detail":
+        return {"url": url_for("series_list"), "label": "Series", "label_key": "nav.series"}
+    if endpoint == "edit_metadata":
+        book_id = view_args.get("book_id")
+        return {
+            "url": url_for("book_detail", book_id=book_id),
+            "label": _navigation_book_name(book_id),
+        }
+    if endpoint == "new_book":
+        return {"url": url_for("index"), "label": "Library", "label_key": "nav.library"}
+    if endpoint in {
+        "stats_year",
+        "stats_year_time",
+        "stats_year_authors",
+        "stats_year_books",
+        "stats_year_bought",
+    }:
+        return {"url": url_for("global_stats"), "label": "Stats", "label_key": "nav.stats"}
+    return None
+
+
+def _should_track_navigation() -> bool:
+    if request.method != "GET" or not request.endpoint:
+        return False
+    if request.path == "/navigation/back":
+        return False
+    excluded_prefixes = (
+        "/api/",
+        "/static/",
+        "/cover/",
+        "/author_photo",
+        "/character_portrait",
+        "/auth/",
+        "/users",
+    )
+    return not request.path.startswith(excluded_prefixes)
+
+
+@app.route("/navigation/back")
+def navigation_back():
+    """Return to the previous page in the current session's page history."""
+    history = _navigation_history_from_session()
+    if len(history) < 2:
+        return redirect(url_for("dashboard"))
+
+    target = history[-2]
+    session[NAVIGATION_HISTORY_KEY] = history[:-2]
+    return redirect(target["url"])
+
+
 @app.before_request
 def check_user_selected():
     """Redirect to Dropbox auth if not authenticated, then to user selection if no user is set."""
@@ -10994,6 +11172,42 @@ def set_pending_user_cookie(response):
     if pending:
         response.set_cookie("librarium_user", pending, max_age=60 * 60 * 24 * 365 * 5,
                              samesite="Lax")
+    return response
+
+
+@app.before_request
+def prepare_navigation_history():
+    """Prepare the previous page for the shared back button."""
+    if not _should_track_navigation():
+        return
+
+    current_url = _navigation_request_url()
+    history = _navigation_history_from_session()
+    if history and history[-1]["url"] == current_url:
+        history.pop()
+
+    g._navigation_track = True
+    g._navigation_current_url = current_url
+    g._navigation_history = history
+    g._navigation_back = history[-1] if history else None
+
+
+@app.after_request
+def record_navigation_history(response):
+    """Record successful HTML pages while keeping the session history bounded."""
+    if (
+        not getattr(g, "_navigation_track", False)
+        or response.status_code != 200
+        or response.mimetype != "text/html"
+    ):
+        return response
+
+    history = list(getattr(g, "_navigation_history", []))
+    current_url = g._navigation_current_url
+    if history and history[-1]["url"] == current_url:
+        history.pop()
+    history.append({"url": current_url, **_navigation_page_label()})
+    session[NAVIGATION_HISTORY_KEY] = history[-NAVIGATION_HISTORY_LIMIT:]
     return response
 
 

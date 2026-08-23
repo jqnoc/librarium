@@ -2,10 +2,6 @@
 {% block title %}{{ series.name }} – Series – Librarium{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('series_list') }}" class="btn btn-secondary btn-sm" data-i18n="series.backToSeries">← Back to Series</a>
-</div>
-
 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
         <h1 style="margin: 0 0 0.25rem 0; color: var(--lb-text-dark);">{{ series.name }}</h1>
