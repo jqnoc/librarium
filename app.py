@@ -84,6 +84,15 @@ DB_PATH = DATA_DIR / "librarium.db"
 
 APP_VERSION = "2.2.0-beta"
 
+FINISH_PLAN_MODE_DAILY = "daily"
+FINISH_PLAN_MODE_WEEKLY = "weekly"
+FINISH_PLAN_MODES = (FINISH_PLAN_MODE_DAILY, FINISH_PLAN_MODE_WEEKLY)
+
+
+def _normalize_finish_plan_mode(value: object) -> str:
+    mode = str(value or "").strip().lower()
+    return mode if mode in FINISH_PLAN_MODES else FINISH_PLAN_MODE_DAILY
+
 CHARACTER_IMPORTANCE_OPTIONS = (
     {"value": "Main", "label_key": "book.characterImportanceMain"},
     {"value": "Supporting", "label_key": "book.characterImportanceSupporting"},
@@ -1268,7 +1277,8 @@ def init_schema() -> None:
             historical_periods        TEXT    NOT NULL DEFAULT '',
             subjects                  TEXT    NOT NULL DEFAULT '',
             audiences                 TEXT    NOT NULL DEFAULT '',
-            expected_finish_date      TEXT    NOT NULL DEFAULT ''
+            expected_finish_date      TEXT    NOT NULL DEFAULT '',
+            finish_plan_mode          TEXT    NOT NULL DEFAULT 'daily'
         );
 
         CREATE TABLE IF NOT EXISTS work_taxonomy (
@@ -1439,6 +1449,7 @@ def _run_all_migrations() -> None:
     migrate_add_character_deceased()
     migrate_add_session_page_range()
     migrate_add_sync_metadata()
+    migrate_add_finish_plan_mode()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2768,6 +2779,32 @@ def migrate_add_expected_finish_date() -> None:
         db.execute("ALTER TABLE books ADD COLUMN expected_finish_date TEXT NOT NULL DEFAULT ''")
         db.commit()
         print(">> Migration complete — books now support expected finish dates.")
+    db.close()
+
+
+def migrate_add_finish_plan_mode() -> None:
+    """Add and normalize the per-book finish plan cadence."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    changed = False
+    if "finish_plan_mode" not in cols:
+        db.execute("ALTER TABLE books ADD COLUMN finish_plan_mode TEXT NOT NULL DEFAULT 'daily'")
+        changed = True
+
+    result = db.execute(
+        "UPDATE books SET finish_plan_mode = ? "
+        "WHERE finish_plan_mode IS NULL OR finish_plan_mode NOT IN (?, ?)",
+        (FINISH_PLAN_MODE_DAILY,) + FINISH_PLAN_MODES,
+    )
+    if result.rowcount:
+        changed = True
+
+    if changed:
+        db.commit()
+        print(">> Migration complete — books now support Daily and Weekly finish plans.")
     db.close()
 
 
@@ -8120,6 +8157,7 @@ def book_detail(book_id: str):
         planning_avg_pages_per_hour = book_session_totals["pages"] / (book_session_totals["seconds"] / 3600)
 
     expected_finish_date = info.get("expected_finish_date", "") or ""
+    finish_plan_mode = _normalize_finish_plan_mode(info.get("finish_plan_mode"))
     finish_plan = None
     if not is_pct_format and expected_finish_date:
         try:
@@ -8129,18 +8167,86 @@ def book_detail(book_id: str):
 
         if target_date and target_date >= today:
             total_plan_days = (target_date - today).days + 1
+
+            def _plan_time(pages: float) -> str:
+                if pages <= 0 or planning_avg_pages_per_hour <= 0:
+                    return ""
+                seconds = math.ceil(pages / planning_avg_pages_per_hour * 3600)
+                return _format_duration(seconds)
+
             if pages_remaining <= 0:
                 finish_plan = {
                     "complete": True,
+                    "mode": finish_plan_mode,
                     "total_days": total_plan_days,
                     "remaining_days": total_plan_days - 1,
+                    "total_periods": total_plan_days,
+                    "remaining_periods": total_plan_days - 1,
                     "pages_remaining": 0,
                     "today_pages_read": today_pages_read,
                     "today_time_read": today_time_read,
+                    "period_pages_read": today_pages_read,
+                    "period_time_read": today_time_read,
                     "pages_today": 0,
                     "pages_per_remaining_day": 0,
                     "time_today": "",
                     "time_per_remaining_day": "",
+                    "pages_current_period": 0,
+                    "pages_per_remaining_period": 0,
+                    "time_current_period": "",
+                    "time_per_remaining_period": "",
+                    "avg_pages_per_hour": planning_avg_pages_per_hour,
+                }
+            elif finish_plan_mode == FINISH_PLAN_MODE_WEEKLY:
+                current_week_start = today - timedelta(days=today.weekday())
+                target_week_start = target_date - timedelta(days=target_date.weekday())
+                total_plan_weeks = ((target_week_start - current_week_start).days // 7) + 1
+                current_week_pages_read = 0
+                current_week_seconds_read = 0
+                for day_str, activity in daily_activity.items():
+                    try:
+                        activity_date = date.fromisoformat(day_str)
+                    except (TypeError, ValueError):
+                        continue
+                    if current_week_start <= activity_date <= today:
+                        current_week_pages_read += activity.get("pages", 0)
+                        current_week_seconds_read += activity.get("seconds", 0)
+
+                current_week_time_read = (
+                    _format_duration(current_week_seconds_read)
+                    if current_week_seconds_read > 0 else ""
+                )
+                pages_at_start_of_week = pages_remaining + current_week_pages_read
+                planned_pages_this_week = pages_at_start_of_week / total_plan_weeks
+                pages_this_week = max(planned_pages_this_week - current_week_pages_read, 0)
+                week_goal_reached = current_week_pages_read >= planned_pages_this_week
+                remaining_weeks = total_plan_weeks - 1
+                pages_after_this_week = max(pages_remaining - pages_this_week, 0)
+                pages_per_remaining_week = (
+                    pages_after_this_week / remaining_weeks if remaining_weeks > 0 else 0
+                )
+
+                finish_plan = {
+                    "complete": False,
+                    "mode": finish_plan_mode,
+                    "total_days": total_plan_days,
+                    "remaining_days": total_plan_days - 1,
+                    "total_periods": total_plan_weeks,
+                    "remaining_periods": remaining_weeks,
+                    "pages_remaining": pages_remaining,
+                    "today_pages_read": today_pages_read,
+                    "today_time_read": today_time_read,
+                    "period_pages_read": current_week_pages_read,
+                    "period_time_read": current_week_time_read,
+                    "period_goal_reached": week_goal_reached,
+                    "pages_today": 0,
+                    "pages_per_remaining_day": 0,
+                    "time_today": "",
+                    "time_per_remaining_day": "",
+                    "pages_current_period": pages_this_week,
+                    "pages_per_remaining_period": pages_per_remaining_week,
+                    "time_current_period": _plan_time(pages_this_week),
+                    "time_per_remaining_period": _plan_time(pages_per_remaining_week),
                     "avg_pages_per_hour": planning_avg_pages_per_hour,
                 }
             else:
@@ -8154,24 +8260,28 @@ def book_detail(book_id: str):
                     pages_after_today / remaining_days if remaining_days > 0 else 0
                 )
 
-                def _plan_time(pages: float) -> str:
-                    if pages <= 0 or planning_avg_pages_per_hour <= 0:
-                        return ""
-                    seconds = math.ceil(pages / planning_avg_pages_per_hour * 3600)
-                    return _format_duration(seconds)
-
                 finish_plan = {
                     "complete": False,
+                    "mode": finish_plan_mode,
                     "total_days": total_plan_days,
                     "remaining_days": remaining_days,
+                    "total_periods": total_plan_days,
+                    "remaining_periods": remaining_days,
                     "pages_remaining": pages_remaining,
                     "today_pages_read": today_pages_read,
                     "today_time_read": today_time_read,
+                    "period_pages_read": today_pages_read,
+                    "period_time_read": today_time_read,
+                    "period_goal_reached": today_goal_reached,
                     "today_goal_reached": today_goal_reached,
                     "pages_today": pages_today,
                     "pages_per_remaining_day": pages_per_remaining_day,
                     "time_today": _plan_time(pages_today),
                     "time_per_remaining_day": _plan_time(pages_per_remaining_day),
+                    "pages_current_period": pages_today,
+                    "pages_per_remaining_period": pages_per_remaining_day,
+                    "time_current_period": _plan_time(pages_today),
+                    "time_per_remaining_period": _plan_time(pages_per_remaining_day),
                     "avg_pages_per_hour": planning_avg_pages_per_hour,
                 }
 
@@ -8388,6 +8498,7 @@ def book_detail(book_id: str):
         last_date=last_date,
         today_iso=today_iso,
         expected_finish_date=expected_finish_date,
+        finish_plan_mode=finish_plan_mode,
         finish_plan=finish_plan,
         current_reading_status=current_reading["status"] or "",
         reading_days=reading_days,
@@ -9721,10 +9832,15 @@ def edit_metadata(book_id: str):
 @app.route("/book/<book_id>/finish-plan", methods=["POST"])
 def save_finish_plan(book_id: str):
     db = get_db()
-    book = db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone()
+    book = db.execute(
+        "SELECT id, finish_plan_mode FROM books WHERE id = ?", (book_id,)
+    ).fetchone()
     if not book:
         abort(404)
 
+    finish_plan_mode = _normalize_finish_plan_mode(
+        request.form.get("finish_plan_mode", book["finish_plan_mode"])
+    )
     expected_finish_date = ""
     if not request.form.get("clear"):
         expected_finish_date = _normalize_input_date(request.form.get("expected_finish_date", ""))
@@ -9739,8 +9855,8 @@ def save_finish_plan(book_id: str):
             return redirect(url_for("book_detail", book_id=book_id, _anchor="finish-plan"))
 
     db.execute(
-        "UPDATE books SET expected_finish_date = ? WHERE id = ?",
-        (expected_finish_date, book_id),
+        "UPDATE books SET expected_finish_date = ?, finish_plan_mode = ? WHERE id = ?",
+        (expected_finish_date, finish_plan_mode, book_id),
     )
     db.commit()
     flash("Expected finish date updated." if expected_finish_date else "Expected finish date cleared.", "success")

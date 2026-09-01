@@ -2287,15 +2287,22 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     <div class="finish-plan-header">
         <div>
             <h3 data-i18n="book.finishPlan">Finish Plan</h3>
-            <p class="finish-plan-description" data-i18n="book.finishPlanDescription">Set an expected finish date to plan the remaining pages and reading time.</p>
+            <p class="finish-plan-description" data-i18n="book.finishPlanDescription">Set an expected finish date and choose daily or weekly targets.</p>
         </div>
         <form method="POST" action="{{ url_for('save_finish_plan', book_id=book_id) }}" class="finish-plan-form">
+            <div class="form-group">
+                <label for="finish-plan-mode" data-i18n="book.finishPlanMode">Plan Cadence</label>
+                <select id="finish-plan-mode" name="finish_plan_mode" class="form-control">
+                    <option value="daily" {{ 'selected' if finish_plan_mode == 'daily' else '' }} data-i18n="book.finishPlanDaily">Daily</option>
+                    <option value="weekly" {{ 'selected' if finish_plan_mode == 'weekly' else '' }} data-i18n="book.finishPlanWeekly">Weekly</option>
+                </select>
+            </div>
             <div class="form-group">
                 <label for="expected-finish-date" data-i18n="book.expectedFinishDate">Expected Finish Date</label>
                 <input id="expected-finish-date" type="date" name="expected_finish_date" value="{{ expected_finish_date }}" min="{{ today_iso }}" class="form-control">
             </div>
             <div class="finish-plan-actions">
-                <button type="submit" class="btn btn-primary" data-i18n="book.saveFinishDate">Save Date</button>
+                <button type="submit" class="btn btn-primary" data-i18n="book.saveFinishPlan">Save Plan</button>
                 {% if expected_finish_date %}
                 <button type="submit" name="clear" value="1" class="btn btn-secondary" data-i18n="book.clearFinishDate">Clear</button>
                 {% endif %}
@@ -2304,14 +2311,15 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     </div>
 
     {% if finish_plan %}
+    {% set is_weekly_finish_plan = finish_plan.mode == 'weekly' %}
     <div class="finish-plan-overview">
         <div class="finish-plan-stat">
             <span class="meta-label" data-i18n="book.expectedFinish">Expected Finish</span>
             <strong>{{ expected_finish_date | display_date }}</strong>
         </div>
         <div class="finish-plan-stat">
-            <span class="meta-label" data-i18n="book.finishPlanReadingDays">Reading Days</span>
-            <strong>{{ finish_plan.total_days }}</strong>
+            <span class="meta-label" data-i18n="{{ 'book.finishPlanReadingWeeks' if is_weekly_finish_plan else 'book.finishPlanReadingDays' }}">{{ 'Reading Weeks' if is_weekly_finish_plan else 'Reading Days' }}</span>
+            <strong>{{ finish_plan.total_periods }}</strong>
         </div>
         <div class="finish-plan-stat">
             <span class="meta-label" data-i18n="book.finishPlanPagesRemaining">Pages Remaining</span>
@@ -2330,25 +2338,25 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
     {% else %}
     <div class="finish-plan-days">
         <div class="finish-plan-day finish-plan-day-today">
-            <div class="finish-plan-day-label" data-i18n="book.finishPlanToday">Today</div>
-            {% if finish_plan.today_goal_reached %}
-            <div class="finish-plan-primary finish-plan-goal-reached"><strong data-i18n="book.finishPlanTodayGoalReached">Today's reading goal reached! ✅</strong></div>
+            <div class="finish-plan-day-label" data-i18n="{{ 'book.finishPlanThisWeek' if is_weekly_finish_plan else 'book.finishPlanToday' }}">{{ 'This Week' if is_weekly_finish_plan else 'Today' }}</div>
+            {% if finish_plan.period_goal_reached %}
+            <div class="finish-plan-primary finish-plan-goal-reached"><strong data-i18n="{{ 'book.finishPlanWeekGoalReached' if is_weekly_finish_plan else 'book.finishPlanTodayGoalReached' }}">{{ "This week's reading goal reached! ✅" if is_weekly_finish_plan else "Today's reading goal reached! ✅" }}</strong></div>
             {% else %}
-            <div class="finish-plan-primary"><strong>{{ "%.1f" | format(finish_plan.pages_today) }}</strong> <span data-i18n="book.finishPlanPages">pages</span></div>
+            <div class="finish-plan-primary"><strong>{{ "%.1f" | format(finish_plan.pages_current_period) }}</strong> <span data-i18n="book.finishPlanPages">pages</span></div>
             {% endif %}
-            <div class="finish-plan-time">{% if finish_plan.time_today %}<span data-i18n="book.finishPlanPlannedTime">Planned time</span>: {{ finish_plan.time_today }}{% elif finish_plan.today_time_read %}<span data-i18n="book.finishPlanTimeReadToday">Time read today</span>: {{ finish_plan.today_time_read }}{% else %}<span data-i18n="book.finishPlanNoPace">No timed sessions</span>{% endif %}</div>
-            {% if finish_plan.today_pages_read > 0 %}
-            <div class="finish-plan-already-read"><span data-i18n="book.finishPlanAlreadyRead">Already read today</span>: {{ finish_plan.today_pages_read }}</div>
+            <div class="finish-plan-time">{% if finish_plan.time_current_period %}<span data-i18n="book.finishPlanPlannedTime">Planned time</span>: {{ finish_plan.time_current_period }}{% elif finish_plan.period_time_read %}<span data-i18n="{{ 'book.finishPlanTimeReadThisWeek' if is_weekly_finish_plan else 'book.finishPlanTimeReadToday' }}">{{ 'Time read this week' if is_weekly_finish_plan else 'Time read today' }}</span>: {{ finish_plan.period_time_read }}{% else %}<span data-i18n="book.finishPlanNoPace">No timed sessions</span>{% endif %}</div>
+            {% if finish_plan.period_pages_read > 0 %}
+            <div class="finish-plan-already-read"><span data-i18n="{{ 'book.finishPlanAlreadyReadThisWeek' if is_weekly_finish_plan else 'book.finishPlanAlreadyRead' }}">{{ 'Already read this week' if is_weekly_finish_plan else 'Already read today' }}</span>: {{ finish_plan.period_pages_read }}</div>
             {% endif %}
-            {% if finish_plan.time_today and finish_plan.today_time_read %}
-            <div class="finish-plan-already-read"><span data-i18n="book.finishPlanTimeReadToday">Time read today</span>: {{ finish_plan.today_time_read }}</div>
+            {% if finish_plan.time_current_period and finish_plan.period_time_read %}
+            <div class="finish-plan-already-read"><span data-i18n="{{ 'book.finishPlanTimeReadThisWeek' if is_weekly_finish_plan else 'book.finishPlanTimeReadToday' }}">{{ 'Time read this week' if is_weekly_finish_plan else 'Time read today' }}</span>: {{ finish_plan.period_time_read }}</div>
             {% endif %}
         </div>
-        {% if finish_plan.remaining_days > 0 %}
+        {% if finish_plan.remaining_periods > 0 %}
         <div class="finish-plan-day">
-            <div class="finish-plan-day-label"><span data-i18n="book.finishPlanFollowingDays">Each following day</span> <span class="finish-plan-day-count">({{ finish_plan.remaining_days }} <span data-i18n="book.finishPlanDays">days</span>)</span></div>
-            <div class="finish-plan-primary"><strong>{{ "%.1f" | format(finish_plan.pages_per_remaining_day) }}</strong> <span data-i18n="book.finishPlanPages">pages</span></div>
-            <div class="finish-plan-time"><span data-i18n="book.finishPlanPlannedTime">Planned time</span>: {% if finish_plan.time_per_remaining_day %}{{ finish_plan.time_per_remaining_day }}{% else %}<span data-i18n="book.finishPlanNoPace">No timed sessions</span>{% endif %}</div>
+            <div class="finish-plan-day-label"><span data-i18n="{{ 'book.finishPlanFollowingWeeks' if is_weekly_finish_plan else 'book.finishPlanFollowingDays' }}">{{ 'Each following week' if is_weekly_finish_plan else 'Each following day' }}</span> <span class="finish-plan-day-count">({{ finish_plan.remaining_periods }} <span data-i18n="{{ 'book.finishPlanWeeks' if is_weekly_finish_plan else 'book.finishPlanDays' }}">{{ 'weeks' if is_weekly_finish_plan else 'days' }}</span>)</span></div>
+            <div class="finish-plan-primary"><strong>{{ "%.1f" | format(finish_plan.pages_per_remaining_period) }}</strong> <span data-i18n="book.finishPlanPages">pages</span></div>
+            <div class="finish-plan-time"><span data-i18n="book.finishPlanPlannedTime">Planned time</span>: {% if finish_plan.time_per_remaining_period %}{{ finish_plan.time_per_remaining_period }}{% else %}<span data-i18n="book.finishPlanNoPace">No timed sessions</span>{% endif %}</div>
         </div>
         {% endif %}
     </div>
