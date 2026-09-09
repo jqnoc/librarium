@@ -3099,8 +3099,6 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td class="session-date-cell">{{ s.date | display_date }}</td>
                 <td class="session-pages-cell">{% if is_pct_format %}{{ "%.1f" | format(s.progress_pct or 0) }}%{% else %}{{ s.pages }}{% endif %}</td>
                 <td class="session-duration-cell">{{ s.duration_display or (s.duration_seconds ~ ' sec') }}</td>
-                {% set pace_faster = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour > avg_pages_per_hour %}
-                {% set pace_slower = not is_pct_format and s.pace_pages_per_hour > 0 and avg_pages_per_hour > 0 and s.pace_pages_per_hour < avg_pages_per_hour %}
                 <td>
                     {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
                     <div class="session-pace-value">
@@ -3111,7 +3109,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td class="session-pace-bar-cell">
                     {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
                     <div class="session-pace-bar" aria-hidden="true">
-                        <span class="session-pace-bar-fill{% if pace_faster %} session-pace-faster{% elif pace_slower %} session-pace-slower{% endif %}" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%;"></span>
+                        <span class="session-pace-bar-fill" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%; --session-pace-color-score: {{ "%.1f" | format(s.pace_color_percent) }}%;"></span>
                         <span class="session-pace-average-marker"></span>
                     </div>
                     {% endif %}
@@ -3648,6 +3646,28 @@ function toggleEdit(idx) {
         return remainingSeconds + 's';
     }
 
+    function getGroupPace(group) {
+        return group.totalDuration > 0 && !isPctFormat
+            ? group.totalPages / (group.totalDuration / 3600)
+            : 0;
+    }
+
+    function getPaceBounds(values) {
+        var validValues = values.filter(function (value) { return value > 0; });
+        if (!validValues.length) return { min: 0, max: 0 };
+        return {
+            min: Math.min.apply(Math, validValues),
+            max: Math.max.apply(Math, validValues)
+        };
+    }
+
+    function getPaceColorScore(pace, bounds) {
+        if (!(pace > 0) || bounds.max <= bounds.min) return 50;
+        return Math.max(0, Math.min(100, (pace - bounds.min) / (bounds.max - bounds.min) * 100));
+    }
+
+    var summaryPaceBounds = getPaceBounds(groups.map(getGroupPace));
+
     function createSummaryRow(group) {
         var summaryRow = document.createElement('tr');
         summaryRow.className = 'session-summary-row';
@@ -3674,9 +3694,7 @@ function toggleEdit(idx) {
         appendTextCell(summaryRow, progressOrPages, 'session-pages-cell');
         appendTextCell(summaryRow, formatDuration(group.totalDuration), 'session-duration-cell');
 
-        var pace = group.totalDuration > 0 && !isPctFormat
-            ? group.totalPages / (group.totalDuration / 3600)
-            : 0;
+        var pace = getGroupPace(group);
         var paceCell = document.createElement('td');
         if (pace > 0) {
             var paceValue = document.createElement('div');
@@ -3704,9 +3722,8 @@ function toggleEdit(idx) {
             bar.setAttribute('aria-hidden', 'true');
             var fill = document.createElement('span');
             fill.className = 'session-pace-bar-fill';
-            if (pace > averagePace) fill.classList.add('session-pace-faster');
-            if (pace < averagePace) fill.classList.add('session-pace-slower');
             fill.style.width = Math.min(pace / (averagePace * 2) * 100, 100).toFixed(1) + '%';
+            fill.style.setProperty('--session-pace-color-score', getPaceColorScore(pace, summaryPaceBounds).toFixed(1) + '%');
             var marker = document.createElement('span');
             marker.className = 'session-pace-average-marker';
             bar.appendChild(fill);

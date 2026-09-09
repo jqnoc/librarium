@@ -8117,14 +8117,28 @@ def book_detail(book_id: str):
     avg_pages_per_hour = 0.0
     if total_seconds > 0 and not is_pct_format:
         avg_pages_per_hour = total_pages / (total_seconds / 3600)
+    paced_session_values = [
+        session["pace_pages_per_hour"]
+        for session in cur_sessions
+        if session["pace_pages_per_hour"] > 0
+    ]
+    min_session_pace = min(paced_session_values) if paced_session_values else 0.0
+    max_session_pace = max(paced_session_values) if paced_session_values else 0.0
+    session_pace_range = max_session_pace - min_session_pace
     for session in cur_sessions:
         session_pace = session["pace_pages_per_hour"]
         if session_pace > 0 and avg_pages_per_hour > 0:
             session["pace_difference_pct"] = (session_pace - avg_pages_per_hour) / avg_pages_per_hour * 100
             session["pace_bar_percent"] = min(session_pace / (avg_pages_per_hour * 2) * 100, 100)
+            session["pace_color_percent"] = (
+                50.0
+                if session_pace_range <= 0
+                else (session_pace - min_session_pace) / session_pace_range * 100
+            )
         else:
             session["pace_difference_pct"] = None
             session["pace_bar_percent"] = 0
+            session["pace_color_percent"] = 50.0
 
     status = info.get("status", "")
     progress_pct = 0.0
