@@ -11105,6 +11105,8 @@ def user_update_backup_dir():
 
 
 def _navigation_request_url() -> str:
+    if request.endpoint == "series_list":
+        return request.path
     query_string = request.query_string.decode("utf-8", errors="replace")
     return request.path + (f"?{query_string}" if query_string else "")
 
@@ -11259,6 +11261,7 @@ def navigation_back():
     """Return to the previous page in the current session's page history."""
     history = _navigation_history_from_session()
     if len(history) < 2:
+        session.pop(NAVIGATION_HISTORY_KEY, None)
         return redirect(url_for("dashboard"))
 
     target = history[-2]
