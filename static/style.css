@@ -3074,10 +3074,10 @@ body.reading-session-modal-open { overflow: hidden; }
     min-width: 2px;
     border-radius: inherit;
     background: var(--lb-deep-orange);
-    background: color-mix(
-        in srgb,
-        var(--lb-error) calc(100% - var(--session-pace-color-score, 50%)),
-        var(--lb-success) var(--session-pace-color-score, 50%)
+    background: oklch(
+        0.68
+        0.17
+        calc(25deg + var(--session-pace-color-score, 50) * 1.3deg)
     );
 }
 .session-pace-average-marker {

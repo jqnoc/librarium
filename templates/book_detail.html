@@ -3109,7 +3109,7 @@ document.addEventListener('DOMContentLoaded', recalcAverage);
                 <td class="session-pace-bar-cell">
                     {% if not is_pct_format and s.pace_pages_per_hour > 0 %}
                     <div class="session-pace-bar" aria-hidden="true">
-                        <span class="session-pace-bar-fill" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%; --session-pace-color-score: {{ "%.1f" | format(s.pace_color_percent) }}%;"></span>
+                        <span class="session-pace-bar-fill" style="width: {{ "%.1f" | format(s.pace_bar_percent) }}%; --session-pace-color-score: {{ "%.1f" | format(s.pace_color_percent) }};"></span>
                         <span class="session-pace-average-marker"></span>
                     </div>
                     {% endif %}
@@ -3723,7 +3723,7 @@ function toggleEdit(idx) {
             var fill = document.createElement('span');
             fill.className = 'session-pace-bar-fill';
             fill.style.width = Math.min(pace / (averagePace * 2) * 100, 100).toFixed(1) + '%';
-            fill.style.setProperty('--session-pace-color-score', getPaceColorScore(pace, summaryPaceBounds).toFixed(1) + '%');
+            fill.style.setProperty('--session-pace-color-score', getPaceColorScore(pace, summaryPaceBounds).toFixed(1));
             var marker = document.createElement('span');
             marker.className = 'session-pace-average-marker';
             bar.appendChild(fill);
