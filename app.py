@@ -347,92 +347,31 @@ _last_download_hash: dict[str, str] = {}   # remote path → content_hash at dow
 _startup_sync_done = threading.Event()      # set when initial download + migrations finish
 _startup_sync_progress: str = ""            # human-readable status for the loading page
 _SYNC_METADATA_TABLE = "sync_metadata"
-SYNC_MODE_DROPBOX = "dropbox"
-SYNC_MODE_LOCAL = "local"
-SYNC_MODES = (SYNC_MODE_DROPBOX, SYNC_MODE_LOCAL)
-SYNC_SETTINGS_FILE = DATA_DIR / "settings.json"
 SYNC_STATE_FILE = DATA_DIR / "sync_status.json"
-SYNC_HISTORY_LIMIT = 40
-SYNC_ERROR_LIMIT = 30
-SYNC_CONFLICT_LIMIT = 20
 _sync_state_lock = threading.RLock()
 _sync_operation_lock = threading.Lock()
-_sync_operation_stats: dict | None = None
-
-
-def _default_sync_settings() -> dict:
-    return {"sync_mode": SYNC_MODE_DROPBOX}
-
-
-def _load_sync_settings() -> dict:
-    """Load local storage preferences without requiring a user database."""
-    if not SYNC_SETTINGS_FILE.exists():
-        return _default_sync_settings()
-    try:
-        data = json.loads(SYNC_SETTINGS_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            mode = data.get("sync_mode")
-            if mode in SYNC_MODES:
-                return {"sync_mode": mode}
-    except (json.JSONDecodeError, OSError):
-        pass
-    return _default_sync_settings()
-
-
-def _get_sync_mode() -> str:
-    return _load_sync_settings()["sync_mode"]
-
-
-def _save_sync_settings(settings: dict) -> None:
-    SYNC_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SYNC_SETTINGS_FILE.write_text(
-        json.dumps(settings, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
-
-def _set_sync_mode(mode: str) -> str:
-    normalized = mode if mode in SYNC_MODES else SYNC_MODE_DROPBOX
-    _save_sync_settings({"sync_mode": normalized})
-    return normalized
 
 
 def _dropbox_sync_enabled() -> bool:
-    """Return whether Dropbox transfers are enabled and authenticated."""
-    return _get_sync_mode() == SYNC_MODE_DROPBOX and _is_authenticated()
+    """Return whether Dropbox transfers are available."""
+    return _is_authenticated()
 
 
 def _default_sync_state() -> dict:
-    return {
-        "active": False,
-        "phase": "",
-        "status": "idle",
-        "last_attempt_at": "",
-        "last_success_at": "",
-        "pending_uploads": [],
-        "pending_downloads": [],
-        "errors": [],
-        "conflicts": [],
-        "history": [],
-        "files": {},
-    }
+    return {"last_success_at": ""}
 
 
 def _load_sync_state() -> dict:
-    state = _default_sync_state()
     if SYNC_STATE_FILE.exists():
         try:
             stored = json.loads(SYNC_STATE_FILE.read_text(encoding="utf-8"))
             if isinstance(stored, dict):
-                state.update(stored)
+                last_success_at = stored.get("last_success_at", "")
+                if isinstance(last_success_at, str):
+                    return {"last_success_at": last_success_at}
         except (json.JSONDecodeError, OSError):
             pass
-    for key in ("pending_uploads", "pending_downloads", "errors", "conflicts", "history"):
-        if not isinstance(state.get(key), list):
-            state[key] = []
-    if not isinstance(state.get("files"), dict):
-        state["files"] = {}
-    return state
+    return _default_sync_state()
 
 
 def _save_sync_state(state: dict) -> None:
@@ -453,178 +392,21 @@ def _update_sync_state(update) -> dict:
         return state
 
 
-def _sync_refresh_pending(state: dict) -> None:
-    pending_uploads = []
-    pending_downloads = []
-    for remote_path, file_state in state.get("files", {}).items():
-        status = file_state.get("status")
-        if status == "pending-upload":
-            pending_uploads.append(remote_path)
-        elif status == "pending-download":
-            pending_downloads.append(remote_path)
-    state["pending_uploads"] = sorted(pending_uploads)
-    state["pending_downloads"] = sorted(pending_downloads)
-
-
-def _sync_add_activity(
-    state: dict,
-    kind: str,
-    message: str,
-    remote_path: str | None = None,
-) -> None:
-    entry = {
-        "at": _current_sync_timestamp(),
-        "kind": kind,
-        "message": message,
-    }
-    if remote_path:
-        entry["path"] = remote_path
-    state.setdefault("history", []).insert(0, entry)
-    state["history"] = state["history"][:SYNC_HISTORY_LIMIT]
-
-
-def _sync_set_file_state(
-    remote_path: str,
-    status: str,
-    *,
-    local_hash: str = "",
-    remote_hash: str = "",
-    activity: tuple[str, str] | None = None,
-) -> dict:
-    def update(state: dict) -> None:
-        previous = state.setdefault("files", {}).get(remote_path, {})
-        state["files"][remote_path] = {
-            **previous,
-            "status": status,
-            "local_hash": local_hash or previous.get("local_hash", ""),
-            "remote_hash": remote_hash or previous.get("remote_hash", ""),
-            "synced_hash": (
-                remote_hash
-                if status == "synced" and remote_hash
-                else previous.get("synced_hash", "")
-            ),
-            "updated_at": _current_sync_timestamp(),
-        }
-        if activity:
-            _sync_add_activity(state, activity[0], activity[1], remote_path)
-        _sync_refresh_pending(state)
-
-    return _update_sync_state(update)
-
-
-def _sync_record_error(message: str, remote_path: str | None = None) -> None:
-    def update(state: dict) -> None:
-        error = {"at": _current_sync_timestamp(), "message": message}
-        if remote_path:
-            error["path"] = remote_path
-            file_state = state.setdefault("files", {}).setdefault(remote_path, {})
-            if file_state.get("status") not in {"pending-upload", "pending-download"}:
-                file_state["status"] = "error"
-            file_state["updated_at"] = error["at"]
-        state.setdefault("errors", []).insert(0, error)
-        state["errors"] = state["errors"][:SYNC_ERROR_LIMIT]
-        _sync_add_activity(state, "error", message, remote_path)
-        _sync_refresh_pending(state)
-
-    _update_sync_state(update)
-
-
-def _sync_record_conflict(
-    remote_path: str,
-    local_hash: str,
-    remote_hash: str,
-    *,
-    detail: str = "Local and Dropbox copies differ",
-) -> None:
-    def update(state: dict) -> None:
-        file_state = state.setdefault("files", {}).setdefault(remote_path, {})
-        file_state.update({
-            "status": "conflict",
-            "local_hash": local_hash,
-            "remote_hash": remote_hash,
-            "updated_at": _current_sync_timestamp(),
-        })
-        conflicts = [
-            conflict
-            for conflict in state.setdefault("conflicts", [])
-            if conflict.get("path") != remote_path
-        ]
-        conflicts.insert(0, {
-            "path": remote_path,
-            "local_hash": local_hash,
-            "remote_hash": remote_hash,
-            "detected_at": _current_sync_timestamp(),
-            "detail": detail,
-        })
-        state["conflicts"] = conflicts[:SYNC_CONFLICT_LIMIT]
-        _sync_add_activity(state, "conflict", detail, remote_path)
-        _sync_refresh_pending(state)
-
-    _update_sync_state(update)
-
-
-def _sync_clear_conflict(remote_path: str) -> None:
-    def update(state: dict) -> None:
-        state["conflicts"] = [
-            conflict
-            for conflict in state.get("conflicts", [])
-            if conflict.get("path") != remote_path
-        ]
-
-    _update_sync_state(update)
-
-
-def _sync_begin(phase: str, reason: str) -> None:
-    def update(state: dict) -> None:
-        state.update({
-            "active": True,
-            "phase": phase,
-            "status": "syncing",
-            "last_attempt_at": _current_sync_timestamp(),
-            "errors": [],
-        })
-        _sync_add_activity(state, "started", f"Sync started ({reason})")
-
-    _update_sync_state(update)
-
-
-def _sync_finish(success: bool, message: str) -> None:
-    def update(state: dict) -> None:
-        _sync_refresh_pending(state)
-        has_conflicts = bool(state.get("conflicts"))
-        has_errors = bool(state.get("errors"))
-        state.update({
-            "active": False,
-            "phase": "",
-            "status": "conflict" if has_conflicts else "error" if has_errors else "synced" if success else "error",
-        })
-        if success and not has_conflicts and not has_errors:
-            state["last_success_at"] = _current_sync_timestamp()
-        _sync_add_activity(state, "completed" if success else "failed", message)
-
-    _update_sync_state(update)
+def _record_sync_success() -> None:
+    """Persist the completion time shown beside the Dropbox icon."""
+    _update_sync_state(
+        lambda state: state.update({"last_success_at": _current_sync_timestamp()})
+    )
 
 
 def _sync_status_payload() -> dict:
     with _sync_state_lock:
         state = _load_sync_state()
-    mode = _get_sync_mode()
     return {
-        "mode": mode,
-        "local_only": mode == SYNC_MODE_LOCAL,
         "authenticated": _is_authenticated(),
-        "active": bool(state.get("active") and _sync_operation_lock.locked()),
-        "phase": state.get("phase", ""),
-        "status": "local" if mode == SYNC_MODE_LOCAL else state.get("status", "idle"),
-        "last_attempt_at": state.get("last_attempt_at", ""),
+        "active": _sync_operation_lock.locked(),
+        "status": "syncing" if _sync_operation_lock.locked() else "idle",
         "last_success_at": state.get("last_success_at", ""),
-        "pending_uploads": state.get("pending_uploads", []),
-        "pending_downloads": state.get("pending_downloads", []),
-        "pending_upload_count": len(state.get("pending_uploads", [])),
-        "pending_download_count": len(state.get("pending_downloads", [])),
-        "errors": state.get("errors", [])[:SYNC_ERROR_LIMIT],
-        "conflicts": state.get("conflicts", [])[:SYNC_CONFLICT_LIMIT],
-        "history": state.get("history", [])[:SYNC_HISTORY_LIMIT],
     }
 
 
@@ -773,8 +555,8 @@ def _dbx_download(remote_path: str, local_path: Path, *, force: bool = False) ->
     """Download a file from Dropbox app folder to a local path.
 
     Skips the download when the local file already matches the remote
-    content hash, and records divergent local and remote copies as
-    conflicts unless a recorded baseline identifies one side as newer.
+    content hash, or when a local database has a newer committed update
+    timestamp than the Dropbox file.
     Returns the content_hash on success, or None if the file does not
     exist on Dropbox.
     """
@@ -782,63 +564,36 @@ def _dbx_download(remote_path: str, local_path: Path, *, force: bool = False) ->
     try:
         meta = dbx.files_get_metadata(remote_path)
         remote_hash = meta.content_hash
-        local_hash = _file_content_hash(local_path) if local_path.exists() else ""
-        with _sync_state_lock:
-            file_state = _load_sync_state().get("files", {}).get(remote_path, {})
-        synced_hash = file_state.get("synced_hash", "")
+        remote_updated_at = _parse_sync_timestamp(getattr(meta, "server_modified", None))
 
-        if not force and local_hash and remote_hash and local_hash == remote_hash:
-            _last_download_hash[remote_path] = remote_hash
-            _sync_set_file_state(remote_path, "synced", local_hash=local_hash, remote_hash=remote_hash)
-            return remote_hash
-
-        if not force and local_hash and remote_hash and local_hash != remote_hash:
-            if synced_hash and local_hash != synced_hash and remote_hash == synced_hash:
-                _sync_set_file_state(
-                    remote_path,
-                    "pending-upload",
-                    local_hash=local_hash,
-                    remote_hash=remote_hash,
+        if local_path.suffix.lower() == ".db" and local_path.exists():
+            local_updated_at = _read_db_sync_timestamp(local_path)
+            if (
+                local_updated_at is not None
+                and remote_updated_at is not None
+                and local_updated_at > remote_updated_at
+            ):
+                if remote_hash:
+                    _last_download_hash[remote_path] = remote_hash
+                print(
+                    f"[dropbox] Keeping newer local database {local_path.name} "
+                    f"({local_updated_at.isoformat()} > {remote_updated_at.isoformat()})"
                 )
                 return remote_hash
-            if synced_hash and local_hash == synced_hash and remote_hash != synced_hash:
-                _sync_set_file_state(
-                    remote_path,
-                    "pending-download",
-                    local_hash=local_hash,
-                    remote_hash=remote_hash,
-                )
-            else:
-                _sync_record_conflict(
-                    remote_path,
-                    local_hash,
-                    remote_hash,
-                    detail=f"Local and Dropbox copies differ for {local_path.name}",
-                )
+
+        if not force and local_path.exists() and remote_hash:
+            local_hash = _file_content_hash(local_path)
+            if local_hash == remote_hash:
+                _last_download_hash[remote_path] = remote_hash
                 return remote_hash
 
         _, resp = dbx.files_download(remote_path)
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_bytes(resp.content)
         _last_download_hash[remote_path] = remote_hash
-        _sync_set_file_state(
-            remote_path,
-            "synced",
-            local_hash=remote_hash,
-            remote_hash=remote_hash,
-            activity=("download", f"Downloaded {local_path.name}"),
-        )
         return remote_hash
     except ApiError as e:
         if e.error.is_path() and e.error.get_path().is_not_found():
-            if local_path.exists():
-                local_hash = _file_content_hash(local_path)
-                _sync_set_file_state(
-                    remote_path,
-                    "pending-upload",
-                    local_hash=local_hash,
-                    activity=("pending", f"Waiting to upload {local_path.name}"),
-                )
             return None
         raise
 
@@ -872,13 +627,6 @@ def _dbx_upload(local_path: Path, remote_path: str) -> str:
                     cursor.offset = f.tell()
 
     _last_download_hash[remote_path] = meta.content_hash
-    _sync_set_file_state(
-        remote_path,
-        "synced",
-        local_hash=meta.content_hash,
-        remote_hash=meta.content_hash,
-        activity=("upload", f"Uploaded {local_path.name}"),
-    )
     return meta.content_hash
 
 
@@ -961,7 +709,11 @@ def _checkpoint_wal(db_path: Path) -> None:
         pass
 
 
-def sync_db_to_dropbox(username: str | None = None) -> bool:
+def sync_db_to_dropbox(
+    username: str | None = None,
+    *,
+    errors: list[str] | None = None,
+) -> bool:
     """Upload the current user's DB to Dropbox if it has changed.
 
     Returns True if an upload was performed.
@@ -981,18 +733,8 @@ def sync_db_to_dropbox(username: str | None = None) -> bool:
 
     # Check if the file actually changed since last download/upload
     local_hash = _file_content_hash(db_path)
-    with _sync_state_lock:
-        file_state = _load_sync_state().get("files", {}).get(remote, {})
-    if file_state.get("status") == "conflict":
+    if _last_download_hash.get(remote) == local_hash:
         return False
-    if (
-        file_state.get("synced_hash") == local_hash
-        or _last_download_hash.get(remote) == local_hash
-    ):
-        _sync_set_file_state(remote, "synced", local_hash=local_hash, remote_hash=local_hash)
-        return False
-
-    _sync_set_file_state(remote, "pending-upload", local_hash=local_hash)
 
     try:
         _dbx_upload(db_path, remote)
@@ -1000,11 +742,13 @@ def sync_db_to_dropbox(username: str | None = None) -> bool:
         return True
     except (ApiError, AuthError) as e:
         print(f"[dropbox] Upload failed for {db_path.name}: {e}")
-        _sync_record_error(f"Upload failed for {db_path.name}: {e}", remote)
+        if errors is not None:
+            errors.append(f"Upload failed for {db_path.name}: {e}")
         return False
     except Exception as e:
         print(f"[dropbox] Upload error: {e}")
-        _sync_record_error(f"Upload error for {db_path.name}: {e}", remote)
+        if errors is not None:
+            errors.append(f"Upload error for {db_path.name}: {e}")
         return False
 
 
@@ -1026,25 +770,46 @@ def _file_content_hash(path: Path) -> str:
     return hashlib.sha256(block_hashes).hexdigest()
 
 
-def sync_users_json_to_dropbox() -> bool:
+def sync_users_json_to_dropbox(*, errors: list[str] | None = None) -> bool:
     """Upload users.json to Dropbox."""
     if not _dropbox_sync_enabled() or not USERS_FILE.exists():
         return False
     try:
-        local_hash = _file_content_hash(USERS_FILE)
-        with _sync_state_lock:
-            file_state = _load_sync_state().get("files", {}).get("/users.json", {})
-        if file_state.get("status") == "conflict":
-            return False
-        if file_state.get("synced_hash") == local_hash:
-            return False
-        _sync_set_file_state("/users.json", "pending-upload", local_hash=local_hash)
         _dbx_upload(USERS_FILE, "/users.json")
         return True
     except Exception as e:
         print(f"[dropbox] Failed to upload users.json: {e}")
-        _sync_record_error(f"Failed to upload users.json: {e}", "/users.json")
+        if errors is not None:
+            errors.append(f"Failed to upload users.json: {e}")
         return False
+
+
+def _perform_upload_sync(reason: str = "manual") -> bool:
+    """Upload changed local data without downloading remote files."""
+    if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
+        return False
+
+    try:
+        errors: list[str] = []
+        users_data = _load_users()
+        for user in users_data["users"]:
+            sync_db_to_dropbox(user["name"], errors=errors)
+        sync_users_json_to_dropbox(errors=errors)
+        if errors:
+            print(f"[dropbox] {reason} sync completed with errors: {'; '.join(errors)}")
+            return False
+        _record_sync_success()
+        return True
+    except AuthError as error:
+        print(f"[dropbox] Authentication failed during {reason} sync: {error}")
+        _clear_auth()
+        _reset_dropbox_client()
+        return False
+    except Exception as error:
+        print(f"[dropbox] Upload sync failed: {error}")
+        return False
+    finally:
+        _sync_operation_lock.release()
 
 
 def _download_images_from_dropbox(users_data: dict | None = None) -> None:
@@ -1060,23 +825,18 @@ def _download_images_from_dropbox(users_data: dict | None = None) -> None:
             try:
                 entries = _dbx_list_folder(remote_dir)
             except Exception as error:
-                _sync_record_error(
-                    f"Could not list {remote_dir}: {error}",
-                    remote_dir,
-                )
+                print(f"[dropbox] Could not list {remote_dir}: {error}")
                 continue
             local_dir = IMAGES_DIR / slug / subfolder
             local_dir.mkdir(parents=True, exist_ok=True)
             for entry in entries:
                 local_file = local_dir / entry.name
+                if local_file.exists():
+                    continue
                 try:
                     _dbx_download(f"{remote_dir}/{entry.name}", local_file)
                 except Exception as error:
                     print(f"[dropbox] Image download failed ({entry.name}): {error}")
-                    _sync_record_error(
-                        f"Image download failed for {entry.name}: {error}",
-                        f"{remote_dir}/{entry.name}",
-                    )
 
 
 def _download_all_from_dropbox(*, include_images: bool = True) -> None:
@@ -1094,7 +854,7 @@ def _download_all_from_dropbox(*, include_images: bool = True) -> None:
     try:
         _dbx_download("/users.json", USERS_FILE)
     except Exception as error:
-        _sync_record_error(f"Could not download users.json: {error}", "/users.json")
+        print(f"[dropbox] Could not download users.json: {error}")
 
     # Download all user DBs
     users_data = _load_users()
@@ -1109,7 +869,7 @@ def _download_all_from_dropbox(*, include_images: bool = True) -> None:
             if h:
                 print(f"[dropbox] Downloaded {slug}.db")
         except Exception as error:
-            _sync_record_error(f"Could not download {slug}.db: {error}", remote)
+            print(f"[dropbox] Could not download {slug}.db: {error}")
 
     # Ensure backups folder exists
     _dbx_ensure_folder("/backups")
@@ -1156,81 +916,6 @@ def _upload_all_to_dropbox() -> None:
             print(f"[dropbox] Uploaded {slug}/{subfolder} images")
 
 
-def _perform_dropbox_sync(reason: str = "manual", *, include_images: bool = True) -> bool:
-    """Run one guarded bidirectional sync and publish its result."""
-    if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
-        return False
-
-    try:
-        _sync_begin("downloading", reason)
-        _download_all_from_dropbox(include_images=include_images)
-        _update_sync_state(lambda state: state.update({"phase": "uploading"}))
-        users_data = _load_users()
-        for user in users_data["users"]:
-            sync_db_to_dropbox(user["name"])
-        sync_users_json_to_dropbox()
-        with _sync_state_lock:
-            state = _load_sync_state()
-        successful = not state.get("errors") and not state.get("conflicts")
-        _sync_finish(successful, "Sync completed" if successful else "Sync completed with attention needed")
-        return successful
-    except AuthError as error:
-        _sync_record_error(f"Dropbox authentication failed: {error}")
-        _clear_auth()
-        _reset_dropbox_client()
-        _sync_finish(False, "Dropbox authentication failed")
-        return False
-    except Exception as error:
-        print(f"[dropbox] Sync failed: {error}")
-        _sync_record_error(f"Sync failed: {error}")
-        _sync_finish(False, "Sync failed")
-        return False
-    finally:
-        _sync_operation_lock.release()
-
-
-def _perform_image_sync(reason: str = "startup-images") -> bool:
-    """Download remote images after startup without blocking the app UI."""
-    if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
-        return False
-
-    try:
-        _sync_begin("downloading", reason)
-        _download_images_from_dropbox()
-        with _sync_state_lock:
-            state = _load_sync_state()
-        successful = not state.get("errors") and not state.get("conflicts")
-        _sync_finish(
-            successful,
-            "Image sync completed" if successful else "Image sync completed with attention needed",
-        )
-        return successful
-    except AuthError as error:
-        _sync_record_error(f"Dropbox authentication failed: {error}")
-        _clear_auth()
-        _reset_dropbox_client()
-        _sync_finish(False, "Dropbox authentication failed")
-        return False
-    except Exception as error:
-        print(f"[dropbox] Image sync failed: {error}")
-        _sync_record_error(f"Image sync failed: {error}")
-        _sync_finish(False, "Image sync failed")
-        return False
-    finally:
-        _sync_operation_lock.release()
-
-
-def _start_background_image_sync() -> None:
-    """Start a daemon image download that does not gate application readiness."""
-    if not _dropbox_sync_enabled():
-        return
-    threading.Thread(
-        target=_perform_image_sync,
-        daemon=True,
-        name="startup-image-sync",
-    ).start()
-
-
 def _start_periodic_sync() -> None:
     """Start a daemon thread that uploads modified DBs every 5 minutes."""
     global _sync_thread
@@ -1243,7 +928,7 @@ def _start_periodic_sync() -> None:
         while True:
             time.sleep(300)  # 5 minutes
             try:
-                _perform_dropbox_sync("periodic")
+                _perform_upload_sync("periodic")
             except Exception as e:
                 print(f"[dropbox] Periodic sync error: {e}")
 
@@ -1510,15 +1195,9 @@ def _save_image_file(dest: Path, blob: bytes) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(blob)
     # Upload to Dropbox
-    if _dropbox_sync_enabled():
+    if _is_authenticated():
         username = dest.parent.parent.name  # images/<user>/covers|authors|characters
         remote = f"/images/{username}/{dest.parent.name}/{dest.name}"
-        with _sync_state_lock:
-            file_state = _load_sync_state().get("files", {}).get(remote, {})
-        if file_state.get("status") == "conflict":
-            _sync_record_error(f"Image upload skipped for {dest.name}; resolve the Dropbox conflict first", remote)
-            return
-        _sync_set_file_state(remote, "pending-upload", local_hash=_file_content_hash(dest))
         try:
             _dbx_upload(dest, remote)
         except Exception as e:
@@ -3662,8 +3341,6 @@ def inject_library_context():
             "backup_dir": backup_dir,
             "db_path": str(DB_PATH),
             "dropbox_connected": _is_authenticated(),
-            "sync_mode": sync_status["mode"],
-            "local_only_mode": sync_status["local_only"],
             "sync_status": sync_status,
             "author_page_name": author_page_name,
         }
@@ -3681,8 +3358,6 @@ def inject_library_context():
             "backup_dir": str(BACKUP_DIR),
             "db_path": str(DB_PATH),
             "dropbox_connected": _is_authenticated(),
-            "sync_mode": _get_sync_mode(),
-            "local_only_mode": _get_sync_mode() == SYNC_MODE_LOCAL,
             "sync_status": _sync_status_payload(),
             "author_page_name": author_page_name,
         }
@@ -11022,103 +10697,23 @@ def update_similar_works_settings():
     return resp
 
 
-def _local_path_for_remote(remote_path: str) -> Path | None:
-    """Resolve a known Dropbox app-file path to its local counterpart."""
-    parts = [part for part in remote_path.strip("/").split("/") if part]
-    if parts == ["users.json"]:
-        return USERS_FILE
-    if len(parts) == 1 and parts[0].endswith(".db"):
-        slug = parts[0][:-3]
-        if slug and _sanitize_username(slug) == slug:
-            return DATA_DIR / parts[0]
-    if len(parts) == 4 and parts[0] == "images" and parts[2] in {"covers", "authors", "characters"}:
-        if not all(part == Path(part).name and part not in {".", ".."} for part in parts[1:]):
-            return None
-        return IMAGES_DIR / parts[1] / parts[2] / parts[3]
-    return None
-
-
 @app.route("/api/sync-status")
 def sync_status():
-    """Return the current local sync ledger for the settings panel."""
+    """Return the timestamp and state for the header sync control."""
     return jsonify(_sync_status_payload())
 
 
 @app.route("/api/sync-now", methods=["POST"])
 def sync_now():
-    """Start a guarded background sync without blocking the renderer."""
-    if _get_sync_mode() == SYNC_MODE_LOCAL:
-        return jsonify({"ok": False, "error": "Sync is disabled in local-only mode.", **_sync_status_payload()}), 400
+    """Run one upload-only sync for the manual sync button."""
     if not _is_authenticated():
         return jsonify({"ok": False, "error": "Dropbox is not connected.", **_sync_status_payload()}), 401
     if _sync_operation_lock.locked():
         return jsonify({"ok": False, "error": "A sync is already in progress.", **_sync_status_payload()}), 409
 
-    threading.Thread(
-        target=_perform_dropbox_sync,
-        args=("manual",),
-        daemon=True,
-        name="manual-sync",
-    ).start()
-    return jsonify({"ok": True, "started": True, **_sync_status_payload()}), 202
-
-
-@app.route("/api/sync-resolve", methods=["POST"])
-def sync_resolve():
-    """Resolve one recorded conflict by keeping the local or remote copy."""
-    if _get_sync_mode() == SYNC_MODE_LOCAL or not _is_authenticated():
-        return jsonify({"ok": False, "error": "Dropbox is not connected."}), 400
-    payload = request.get_json(silent=True) or request.form
-    remote_path = str(payload.get("path", "")).strip()
-    resolution = str(payload.get("resolution", "")).strip().lower()
-    local_path = _local_path_for_remote(remote_path)
-    if resolution not in {"local", "remote"} or local_path is None:
-        return jsonify({"ok": False, "error": "Invalid conflict resolution."}), 400
-    with _sync_state_lock:
-        conflicts = _load_sync_state().get("conflicts", [])
-    if not any(conflict.get("path") == remote_path for conflict in conflicts):
-        return jsonify({"ok": False, "error": "Conflict not found."}), 404
-    if not _sync_operation_lock.acquire(blocking=False):
-        return jsonify({"ok": False, "error": "A sync is already in progress."}), 409
-
-    try:
-        if resolution == "local":
-            if not local_path.exists():
-                return jsonify({"ok": False, "error": "The local file no longer exists."}), 400
-            _dbx_upload(local_path, remote_path)
-            message = f"Kept local copy for {local_path.name}"
-        else:
-            remote_hash = _dbx_download(remote_path, local_path, force=True)
-            if not remote_hash:
-                return jsonify({"ok": False, "error": "The Dropbox copy no longer exists."}), 404
-            message = f"Restored Dropbox copy for {local_path.name}"
-        _sync_clear_conflict(remote_path)
-        _update_sync_state(lambda state: _sync_add_activity(state, "resolved", message, remote_path))
-        return jsonify({"ok": True, **_sync_status_payload()})
-    except Exception as error:
-        _sync_record_error(f"Could not resolve {remote_path}: {error}", remote_path)
-        return jsonify({"ok": False, "error": str(error), **_sync_status_payload()}), 500
-    finally:
-        _sync_operation_lock.release()
-
-
-@app.route("/sync/mode", methods=["POST"])
-def update_sync_mode():
-    """Switch between Dropbox synchronization and local-only storage."""
-    payload = request.get_json(silent=True) or request.form
-    mode = str(payload.get("mode", "")).strip().lower()
-    if mode not in SYNC_MODES:
-        return jsonify({"ok": False, "error": "Unknown sync mode."}), 400
-    _set_sync_mode(mode)
-    if mode == SYNC_MODE_DROPBOX and _is_authenticated():
-        _start_periodic_sync()
-    if request.is_json:
-        return jsonify({"ok": True, **_sync_status_payload()})
-    if mode == SYNC_MODE_LOCAL:
-        flash("Local-only mode enabled. Dropbox transfers are paused.", "success")
-        return redirect(url_for("user_select") if not _is_authenticated() else (request.referrer or url_for("index")))
-    target = url_for("auth_login") if not _is_authenticated() else (request.referrer or url_for("index"))
-    return redirect(target)
+    successful = _perform_upload_sync("manual")
+    status_code = 200 if successful else 500
+    return jsonify({"ok": successful, **_sync_status_payload()}), status_code
 
 
 # ── Manual backup ────────────────────────────────────────────────────────
@@ -11151,8 +10746,8 @@ def shutdown_backup():
     # Sync all user DBs to Dropbox first (single upload per user)
     if _dropbox_sync_enabled():
         try:
-            if not _perform_dropbox_sync("shutdown"):
-                errors.append("Dropbox sync requires attention before closing.")
+            if not _perform_upload_sync("shutdown"):
+                errors.append("Dropbox upload sync failed.")
             else:
                 users_data = _load_users()
                 # Create server-side backup copies on Dropbox (no re-upload)
@@ -11358,7 +10953,6 @@ def _complete_oauth(query_params: dict) -> bool:
         "display_name": display_name,
         "email": email,
     })
-    _set_sync_mode(SYNC_MODE_DROPBOX)
     _reset_dropbox_client()
 
     # Initial sync
@@ -11367,15 +10961,15 @@ def _complete_oauth(query_params: dict) -> bool:
         remote_users = _dbx_file_exists("/users.json")
         local_users = _load_users()
         if remote_users and not local_users["users"]:
-            _download_all_from_dropbox(include_images=False)
+            _download_all_from_dropbox()
         elif not remote_users and local_users["users"]:
             _upload_all_to_dropbox()
         elif remote_users and local_users["users"]:
-            _download_all_from_dropbox(include_images=False)
+            _download_all_from_dropbox()
+        _record_sync_success()
     except Exception as e:
         print(f"[dropbox] Initial sync error: {e}")
 
-    _start_background_image_sync()
     _start_periodic_sync()
     return True
 
@@ -11525,8 +11119,7 @@ def auth_logout():
         pass
     _clear_auth()
     _reset_dropbox_client()
-    _set_sync_mode(SYNC_MODE_LOCAL)
-    return redirect(url_for("user_select"))
+    return redirect(url_for("auth_login"))
 
 
 @app.route("/auth/status")
@@ -11826,13 +11419,11 @@ def check_user_selected():
         "/api/shutdown-backup",
         "/api/sync-status",
         "/api/sync-now",
-        "/api/sync-resolve",
-        "/sync/mode",
     )
     if any(request.path.startswith(p) for p in exempt):
         return
     # Check Dropbox authentication first
-    if _get_sync_mode() == SYNC_MODE_DROPBOX and not _is_authenticated():
+    if not _is_authenticated():
         return redirect(url_for("auth_login"))
     # Block while startup sync is in progress
     if not _startup_sync_done.is_set():
@@ -12197,10 +11788,9 @@ if __name__ == "__main__":
             if _dropbox_sync_enabled():
                 try:
                     print("[dropbox] Downloading data from Dropbox...")
-                    if _perform_dropbox_sync("startup", include_images=False):
-                        print("[dropbox] Sync complete.")
-                    else:
-                        print("[dropbox] Startup sync completed with attention needed.")
+                    _download_all_from_dropbox()
+                    _record_sync_success()
+                    print("[dropbox] Sync complete.")
                 except Exception as e:
                     print(f"[dropbox] Startup sync failed (working offline): {e}")
 
@@ -12226,7 +11816,6 @@ if __name__ == "__main__":
             if _dropbox_sync_enabled():
                 if is_electron or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                     _start_periodic_sync()
-                _start_background_image_sync()
         finally:
             _startup_sync_progress = ""
             _startup_sync_done.set()

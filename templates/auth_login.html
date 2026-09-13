@@ -32,15 +32,6 @@
                 </a>
             </div>
 
-            <div class="auth-local-only">
-                <h3 data-i18n="auth.localOnlyTitle">Use local-only mode</h3>
-                <p data-i18n="auth.localOnlyDescription">Keep your library on this computer and continue without Dropbox synchronization.</p>
-                <form method="POST" action="{{ url_for('update_sync_mode') }}">
-                    <input type="hidden" name="mode" value="local">
-                    <button type="submit" class="btn btn-secondary" data-i18n="auth.localOnlyButton">Continue locally</button>
-                </form>
-            </div>
-
             <p class="auth-note" data-i18n="auth.note">Your data is stored in the Apps/LibrariumApp folder in your Dropbox. Librarium cannot access any other files.</p>
         </div>
     </div>

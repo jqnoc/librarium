@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add transparent Dropbox synchronization with persisted status, pending upload/download indicators, activity history, conflict detection and resolution, manual Sync Now control, optional local-only mode, bounded Dropbox requests, and non-blocking background image sync during startup
+- Restore predictable Dropbox synchronization with one-time startup downloads, upload-only periodic and manual sync, a persisted last-sync label, bounded Dropbox requests, and shutdown backups
 - Add a reusable session-based back button with bounded history across page visits, including POST redirects and refreshes, while clearing stale single-entry history before dashboard fallback redirects and treating Series sort variants as one page
 - Add optional dates to annotations with persisted date/page sorting across books
 - Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding the redundant Date heading text and cells in grouped mode while retaining the header background, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
