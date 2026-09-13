@@ -673,6 +673,9 @@ def get_dropbox_client() -> dropbox.Dropbox:
         _dbx_client = dropbox.Dropbox(
             oauth2_refresh_token=auth["refresh_token"],
             app_key=DROPBOX_APP_KEY,
+            max_retries_on_error=1,
+            max_retries_on_rate_limit=1,
+            timeout=20,
         )
         return _dbx_client
 
@@ -1044,7 +1047,39 @@ def sync_users_json_to_dropbox() -> bool:
         return False
 
 
-def _download_all_from_dropbox() -> None:
+def _download_images_from_dropbox(users_data: dict | None = None) -> None:
+    """Download remote images without blocking application readiness."""
+    global _startup_sync_progress
+    users_data = users_data or _load_users()
+
+    _startup_sync_progress = "Syncing images…"
+    for u in users_data["users"]:
+        slug = _sanitize_username(u["name"])
+        for subfolder in ("covers", "authors", "characters"):
+            remote_dir = f"/images/{slug}/{subfolder}"
+            try:
+                entries = _dbx_list_folder(remote_dir)
+            except Exception as error:
+                _sync_record_error(
+                    f"Could not list {remote_dir}: {error}",
+                    remote_dir,
+                )
+                continue
+            local_dir = IMAGES_DIR / slug / subfolder
+            local_dir.mkdir(parents=True, exist_ok=True)
+            for entry in entries:
+                local_file = local_dir / entry.name
+                try:
+                    _dbx_download(f"{remote_dir}/{entry.name}", local_file)
+                except Exception as error:
+                    print(f"[dropbox] Image download failed ({entry.name}): {error}")
+                    _sync_record_error(
+                        f"Image download failed for {entry.name}: {error}",
+                        f"{remote_dir}/{entry.name}",
+                    )
+
+
+def _download_all_from_dropbox(*, include_images: bool = True) -> None:
     """Download users.json and all user DBs from Dropbox to DATA_DIR.
 
     Called at startup when authenticated.  Updates
@@ -1079,28 +1114,8 @@ def _download_all_from_dropbox() -> None:
     # Ensure backups folder exists
     _dbx_ensure_folder("/backups")
 
-    # Download images — only files not already present locally
-    _startup_sync_progress = "Syncing images…"
-    for u in users_data["users"]:
-        slug = _sanitize_username(u["name"])
-        for subfolder in ("covers", "authors", "characters"):
-            remote_dir = f"/images/{slug}/{subfolder}"
-            try:
-                entries = _dbx_list_folder(remote_dir)
-            except Exception:
-                continue
-            local_dir = IMAGES_DIR / slug / subfolder
-            local_dir.mkdir(parents=True, exist_ok=True)
-            for entry in entries:
-                local_file = local_dir / entry.name
-                try:
-                    _dbx_download(f"{remote_dir}/{entry.name}", local_file)
-                except Exception as e:
-                    print(f"[dropbox] Image download failed ({entry.name}): {e}")
-                    _sync_record_error(
-                        f"Image download failed for {entry.name}: {e}",
-                        f"{remote_dir}/{entry.name}",
-                    )
+    if include_images:
+        _download_images_from_dropbox(users_data)
 
 
 def _upload_all_to_dropbox() -> None:
@@ -1141,14 +1156,14 @@ def _upload_all_to_dropbox() -> None:
             print(f"[dropbox] Uploaded {slug}/{subfolder} images")
 
 
-def _perform_dropbox_sync(reason: str = "manual") -> bool:
+def _perform_dropbox_sync(reason: str = "manual", *, include_images: bool = True) -> bool:
     """Run one guarded bidirectional sync and publish its result."""
     if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
         return False
 
     try:
         _sync_begin("downloading", reason)
-        _download_all_from_dropbox()
+        _download_all_from_dropbox(include_images=include_images)
         _update_sync_state(lambda state: state.update({"phase": "uploading"}))
         users_data = _load_users()
         for user in users_data["users"]:
@@ -1172,6 +1187,48 @@ def _perform_dropbox_sync(reason: str = "manual") -> bool:
         return False
     finally:
         _sync_operation_lock.release()
+
+
+def _perform_image_sync(reason: str = "startup-images") -> bool:
+    """Download remote images after startup without blocking the app UI."""
+    if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
+        return False
+
+    try:
+        _sync_begin("downloading", reason)
+        _download_images_from_dropbox()
+        with _sync_state_lock:
+            state = _load_sync_state()
+        successful = not state.get("errors") and not state.get("conflicts")
+        _sync_finish(
+            successful,
+            "Image sync completed" if successful else "Image sync completed with attention needed",
+        )
+        return successful
+    except AuthError as error:
+        _sync_record_error(f"Dropbox authentication failed: {error}")
+        _clear_auth()
+        _reset_dropbox_client()
+        _sync_finish(False, "Dropbox authentication failed")
+        return False
+    except Exception as error:
+        print(f"[dropbox] Image sync failed: {error}")
+        _sync_record_error(f"Image sync failed: {error}")
+        _sync_finish(False, "Image sync failed")
+        return False
+    finally:
+        _sync_operation_lock.release()
+
+
+def _start_background_image_sync() -> None:
+    """Start a daemon image download that does not gate application readiness."""
+    if not _dropbox_sync_enabled():
+        return
+    threading.Thread(
+        target=_perform_image_sync,
+        daemon=True,
+        name="startup-image-sync",
+    ).start()
 
 
 def _start_periodic_sync() -> None:
@@ -11310,14 +11367,15 @@ def _complete_oauth(query_params: dict) -> bool:
         remote_users = _dbx_file_exists("/users.json")
         local_users = _load_users()
         if remote_users and not local_users["users"]:
-            _download_all_from_dropbox()
+            _download_all_from_dropbox(include_images=False)
         elif not remote_users and local_users["users"]:
             _upload_all_to_dropbox()
         elif remote_users and local_users["users"]:
-            _download_all_from_dropbox()
+            _download_all_from_dropbox(include_images=False)
     except Exception as e:
         print(f"[dropbox] Initial sync error: {e}")
 
+    _start_background_image_sync()
     _start_periodic_sync()
     return True
 
@@ -12139,7 +12197,7 @@ if __name__ == "__main__":
             if _dropbox_sync_enabled():
                 try:
                     print("[dropbox] Downloading data from Dropbox...")
-                    if _perform_dropbox_sync("startup"):
+                    if _perform_dropbox_sync("startup", include_images=False):
                         print("[dropbox] Sync complete.")
                     else:
                         print("[dropbox] Startup sync completed with attention needed.")
@@ -12168,6 +12226,7 @@ if __name__ == "__main__":
             if _dropbox_sync_enabled():
                 if is_electron or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                     _start_periodic_sync()
+                _start_background_image_sync()
         finally:
             _startup_sync_progress = ""
             _startup_sync_done.set()
