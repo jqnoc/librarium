@@ -758,6 +758,7 @@ img { max-width: 100%; height: auto; }
 .dropbox-sync-badge {
     display: inline-flex;
     align-items: center;
+    gap: .28rem;
     margin-left: 0.4rem;
     color: rgba(255,255,255,.7);
 }
@@ -765,6 +766,150 @@ img { max-width: 100%; height: auto; }
     width: 14px;
     height: 14px;
 }
+.sync-badge-label {
+    font-size: .72rem;
+    white-space: nowrap;
+}
+.sync-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.sync-status-synced { color: #8be0b2; }
+.sync-status-syncing { color: #f8cf77; }
+.sync-status-conflict,
+.sync-status-error { color: #ffaaa5; }
+.sync-status-local { color: rgba(255,255,255,.72); }
+
+/* ── Sync transparency panel ─────────────────────────────────────────── */
+.sync-panel {
+    padding: .9rem;
+    background: var(--lb-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+}
+.sync-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+}
+.sync-panel-header h4 { margin: 0; }
+.sync-panel-subtitle {
+    margin: .2rem 0 0;
+    color: var(--lb-text-light);
+    font-size: .78rem;
+}
+.sync-panel-state {
+    padding: .18rem .45rem;
+    border-radius: 999px;
+    background: var(--lb-card-bg);
+    color: var(--lb-text-light);
+    font-size: .72rem;
+    white-space: nowrap;
+}
+.sync-panel-state.sync-status-synced { color: var(--lb-finished); }
+.sync-panel-state.sync-status-syncing { color: var(--lb-warning, #b57900); }
+.sync-panel-state.sync-status-conflict,
+.sync-panel-state.sync-status-error { color: var(--lb-error); }
+.sync-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem;
+    margin-top: .8rem;
+}
+.sync-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    min-width: 0;
+    padding: .5rem;
+    background: var(--lb-card-bg);
+    border: 1px solid var(--lb-border);
+    border-radius: 5px;
+}
+.sync-summary-item span {
+    color: var(--lb-text-light);
+    font-size: .7rem;
+}
+.sync-summary-item strong {
+    overflow: hidden;
+    color: var(--lb-text);
+    font-size: .82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sync-panel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .75rem;
+}
+.sync-panel-actions form { margin: 0; }
+.sync-detail-block {
+    margin-top: .8rem;
+    padding-top: .7rem;
+    border-top: 1px solid var(--lb-border);
+}
+.sync-detail-block h5 {
+    margin: 0 0 .45rem;
+    color: var(--lb-text);
+    font-size: .78rem;
+}
+.sync-conflict-item,
+.sync-error-item,
+.sync-history-item {
+    display: flex;
+    gap: .5rem;
+    align-items: flex-start;
+    padding: .45rem 0;
+    border-top: 1px solid var(--lb-border);
+    font-size: .76rem;
+}
+.sync-conflict-item:first-child,
+.sync-error-item:first-child,
+.sync-history-item:first-child { border-top: 0; }
+.sync-conflict-item > div:first-child {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: .15rem;
+    min-width: 0;
+}
+.sync-conflict-item strong {
+    overflow: hidden;
+    color: var(--lb-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sync-conflict-item span,
+.sync-error-item,
+.sync-history-item { color: var(--lb-text-light); }
+.sync-conflict-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: .3rem;
+}
+.sync-error-item { color: var(--lb-error); }
+.sync-history-details {
+    margin-top: .8rem;
+    border-top: 1px solid var(--lb-border);
+    color: var(--lb-text-light);
+    font-size: .78rem;
+}
+.sync-history-details summary {
+    padding: .65rem 0 .35rem;
+    cursor: pointer;
+    color: var(--lb-text);
+}
+.sync-history-item time {
+    flex: 0 0 7.2rem;
+    color: var(--lb-text-light);
+    font-size: .7rem;
+}
+.sync-empty { color: var(--lb-text-light); font-size: .76rem; }
 
 /* ── Dropbox auth page ─────────────────────────────────────────────────── */
 .auth-description {
@@ -794,6 +939,24 @@ img { max-width: 100%; height: auto; }
     font-size: 0.82rem;
     color: var(--lb-text-light);
     text-align: center;
+    line-height: 1.4;
+}
+.auth-local-only {
+    margin: 1.1rem 0 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--lb-border);
+    text-align: center;
+}
+.auth-local-only h3 {
+    margin: 0 0 .35rem;
+    color: var(--lb-text);
+    font-size: .96rem;
+}
+.auth-local-only p {
+    margin: 0 auto .75rem;
+    max-width: 28rem;
+    color: var(--lb-text-light);
+    font-size: .82rem;
     line-height: 1.4;
 }
 .auth-success-icon {

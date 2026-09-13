@@ -74,15 +74,21 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" class="library-manage-btn" onclick="document.getElementById('libraryModal').style.display='flex'" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
+                <button type="button" class="library-manage-btn" onclick="openLibraryModal()" title="Manage libraries" data-i18n-title="library.manage">⚙</button>
                 {% if current_user %}
                 <span class="current-user-badge" title="{{ current_user }}">
                     <span class="current-user-name">{{ current_user }}</span>
                 </span>
                 {% endif %}
-                {% if dropbox_connected %}
-                <span class="dropbox-sync-badge" id="dropboxSyncBadge" title="Synced with Dropbox">
-                    <svg class="dropbox-icon-xs" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
+                {% if sync_mode == 'local' %}
+                <span class="dropbox-sync-badge sync-status-badge sync-status-local" id="dropboxSyncBadge" title="Local-only mode" data-i18n-title="sync.localOnly">
+                    <span class="sync-status-dot" aria-hidden="true"></span>
+                    <span class="sync-badge-label" data-i18n="sync.localOnlyShort">Local only</span>
+                </span>
+                {% elif dropbox_connected %}
+                <span class="dropbox-sync-badge sync-status-badge sync-status-{{ sync_status.status }}" id="dropboxSyncBadge" title="Synced with Dropbox" data-i18n-title="sync.statusSynced">
+                        <svg class="dropbox-icon-xs" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
+                    <span class="sync-badge-label" id="syncBadgeLabel" data-i18n="sync.statusSynced">Synced</span>
                 </span>
                 {% endif %}
             </div>
@@ -447,11 +453,11 @@
     {% block scripts %}{% endblock %}
 
     <!-- ── Library management modal ──────────────────────────────────── -->
-    <div id="libraryModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div id="libraryModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeLibraryModal()">
         <div class="modal-dialog">
             <div class="modal-header">
                 <h3 data-i18n="library.manageTitle">Manage Libraries</h3>
-                <button type="button" class="modal-close" onclick="document.getElementById('libraryModal').style.display='none'">&times;</button>
+                <button type="button" class="modal-close" onclick="closeLibraryModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <h4 data-i18n="library.createNew">Create New Library</h4>
@@ -477,25 +483,77 @@
                 {% endfor %}
 
                 <hr>
-                {% if dropbox_connected %}
+                {% if dropbox_connected and not local_only_mode %}
                 <h4 data-i18n="library.cloudStorage">Cloud Storage</h4>
                 <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
                     <svg style="width:14px;height:14px;color:var(--lb-accent);flex-shrink:0" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
                     <span style="font-size: 0.82rem; color: var(--lb-text-light);">Apps/LibrariumApp/{{ current_user }}.db</span>
                 </div>
                 {% else %}
-                <h4 data-i18n="library.databasePath">Database Path</h4>
+                <h4 data-i18n="sync.localStorage">Local Storage</h4>
                 <div style="margin-top: 0.3rem;">
                     <span style="font-size: 0.82rem; color: var(--lb-text-light); word-break: break-all;" title="{{ db_path }}">{{ db_path }}</span>
                 </div>
                 {% endif %}
 
                 <hr>
+                <section class="sync-panel" id="syncPanel" aria-live="polite">
+                    <div class="sync-panel-header">
+                        <div>
+                            <h4 data-i18n="sync.title">Sync status</h4>
+                            <p class="sync-panel-subtitle" id="syncModeLabel" data-i18n="sync.localOnly">Local-only mode</p>
+                        </div>
+                        <span class="sync-panel-state" id="syncPanelState" data-i18n="sync.statusIdle">Ready</span>
+                    </div>
+                    <div class="sync-summary-grid">
+                        <div class="sync-summary-item">
+                            <span data-i18n="sync.lastSuccessful">Last successful sync</span>
+                            <strong id="syncLastSuccess" data-i18n="sync.never">Never</strong>
+                        </div>
+                        <div class="sync-summary-item">
+                            <span data-i18n="sync.currentActivity">Current activity</span>
+                            <strong id="syncCurrentActivity" data-i18n="sync.idle">Idle</strong>
+                        </div>
+                        <div class="sync-summary-item">
+                            <span data-i18n="sync.pendingUploads">Pending uploads</span>
+                            <strong id="syncPendingUploads">0</strong>
+                        </div>
+                        <div class="sync-summary-item">
+                            <span data-i18n="sync.pendingDownloads">Pending downloads</span>
+                            <strong id="syncPendingDownloads">0</strong>
+                        </div>
+                    </div>
+                    <div class="sync-panel-actions">
+                        <button type="button" class="btn btn-primary btn-sm" id="syncNowButton" onclick="librariumSyncNow()" data-i18n="sync.now">Sync now</button>
+                        <form method="POST" action="{{ url_for('update_sync_mode') }}" {% if local_only_mode %}style="display:none"{% endif %} id="localOnlyForm">
+                            <input type="hidden" name="mode" value="local">
+                            <button type="submit" class="btn btn-secondary btn-sm" data-i18n="sync.useLocalOnly">Use local-only mode</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('update_sync_mode') }}" {% if not local_only_mode %}style="display:none"{% endif %} id="dropboxModeForm">
+                            <input type="hidden" name="mode" value="dropbox">
+                            <button type="submit" class="btn btn-secondary btn-sm" data-i18n="sync.reconnect">Reconnect Dropbox</button>
+                        </form>
+                    </div>
+                    <div class="sync-detail-block" id="syncConflictsBlock" style="display:none">
+                        <h5 data-i18n="sync.conflicts">Conflicts</h5>
+                        <div id="syncConflictsList"></div>
+                    </div>
+                    <div class="sync-detail-block" id="syncErrorsBlock" style="display:none">
+                        <h5 data-i18n="sync.errors">Recent errors</h5>
+                        <div id="syncErrorsList"></div>
+                    </div>
+                    <details class="sync-history-details">
+                        <summary data-i18n="sync.activity">Sync activity</summary>
+                        <div id="syncHistoryList" class="sync-history-list"></div>
+                    </details>
+                </section>
+
+                <hr>
                 <h4 data-i18n="backup.title">Database Backup</h4>
                 <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
                     <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>
                 </form>
-                {% if dropbox_connected %}
+                {% if dropbox_connected and not local_only_mode %}
                 <div style="margin-top: 0.5rem;">
                     <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dropboxHint">Backups are stored in your Dropbox (Apps/LibrariumApp/backups/).</small>
                 </div>
@@ -537,6 +595,223 @@
             </div>
         </div>
     </div>
+    <script>
+    var librariumSyncPollTimer = null;
+
+    function syncTranslation(key, fallback) {
+        return window.librariumI18n && typeof window.librariumI18n.t === 'function'
+            ? window.librariumI18n.t(key)
+            : fallback;
+    }
+
+    function formatSyncDate(value) {
+        if (!value) return syncTranslation('sync.never', 'Never');
+        var date = new Date(value);
+        if (isNaN(date.getTime())) return value;
+        var lang = window.librariumI18n && window.librariumI18n.getLang
+            ? window.librariumI18n.getLang()
+            : 'en';
+        return date.toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
+    }
+
+    function syncStatusLabel(status) {
+        var keys = {
+            idle: ['sync.statusIdle', 'Ready'],
+            local: ['sync.statusLocal', 'Local only'],
+            synced: ['sync.statusSynced', 'Synced'],
+            syncing: ['sync.statusSyncing', 'Syncing'],
+            conflict: ['sync.statusConflict', 'Needs attention'],
+            error: ['sync.statusError', 'Sync error']
+        };
+        var entry = keys[status] || keys.idle;
+        return syncTranslation(entry[0], entry[1]);
+    }
+
+    function syncPhaseLabel(phase) {
+        var keys = {
+            downloading: ['sync.downloading', 'Downloading...'],
+            uploading: ['sync.uploading', 'Uploading...']
+        };
+        var entry = keys[phase];
+        return entry ? syncTranslation(entry[0], entry[1]) : phase || syncTranslation('sync.syncing', 'Syncing...');
+    }
+
+    function renderSyncList(container, items, emptyText, renderItem) {
+        container.textContent = '';
+        if (!items || !items.length) {
+            var empty = document.createElement('span');
+            empty.className = 'sync-empty';
+            empty.textContent = emptyText;
+            container.appendChild(empty);
+            return;
+        }
+        items.forEach(function(item) { container.appendChild(renderItem(item)); });
+    }
+
+    function updateLibrariumSyncStatus(data) {
+        var badge = document.getElementById('dropboxSyncBadge');
+        var badgeLabel = badge && badge.querySelector('.sync-badge-label');
+        if (badge) {
+            ['local', 'idle', 'synced', 'syncing', 'conflict', 'error'].forEach(function(status) {
+                badge.classList.remove('sync-status-' + status);
+            });
+            var badgeStatus = data.local_only ? 'local' : (data.status || 'idle');
+            badge.classList.add('sync-status-' + badgeStatus);
+            badge.title = data.local_only
+                ? syncTranslation('sync.localOnly', 'Local-only mode')
+                : syncStatusLabel(data.status);
+            if (badgeLabel) {
+                badgeLabel.textContent = data.local_only
+                    ? syncTranslation('sync.localOnlyShort', 'Local only')
+                    : syncStatusLabel(data.status);
+            }
+        }
+
+        var modeLabel = document.getElementById('syncModeLabel');
+        var panelState = document.getElementById('syncPanelState');
+        var lastSuccess = document.getElementById('syncLastSuccess');
+        var currentActivity = document.getElementById('syncCurrentActivity');
+        var pendingUploads = document.getElementById('syncPendingUploads');
+        var pendingDownloads = document.getElementById('syncPendingDownloads');
+        if (!modeLabel) return;
+        modeLabel.textContent = data.local_only
+            ? syncTranslation('sync.localOnly', 'Local-only mode')
+            : syncTranslation('sync.dropboxMode', 'Dropbox synchronization');
+        panelState.textContent = syncStatusLabel(data.local_only ? 'local' : data.status);
+        panelState.className = 'sync-panel-state sync-status-' + (data.status || 'idle');
+        lastSuccess.textContent = formatSyncDate(data.last_success_at);
+        currentActivity.textContent = data.active
+            ? syncPhaseLabel(data.phase)
+            : syncTranslation('sync.idle', 'Idle');
+        pendingUploads.textContent = String(data.pending_upload_count || 0);
+        pendingDownloads.textContent = String(data.pending_download_count || 0);
+
+        var nowButton = document.getElementById('syncNowButton');
+        if (nowButton) {
+            nowButton.disabled = data.local_only || data.active || !data.authenticated;
+            nowButton.textContent = data.active
+                ? syncTranslation('sync.syncing', 'Syncing...')
+                : syncTranslation('sync.now', 'Sync now');
+        }
+        var localForm = document.getElementById('localOnlyForm');
+        var dropboxForm = document.getElementById('dropboxModeForm');
+        if (localForm) localForm.style.display = data.local_only ? 'none' : '';
+        if (dropboxForm) dropboxForm.style.display = data.local_only ? '' : 'none';
+
+        var conflictsBlock = document.getElementById('syncConflictsBlock');
+        var conflictsList = document.getElementById('syncConflictsList');
+        conflictsBlock.style.display = data.conflicts && data.conflicts.length ? '' : 'none';
+        renderSyncList(conflictsList, data.conflicts, syncTranslation('sync.noConflicts', 'No conflicts'), function(conflict) {
+            var row = document.createElement('div');
+            row.className = 'sync-conflict-item';
+            var info = document.createElement('div');
+            var path = document.createElement('strong');
+            path.textContent = conflict.path || '';
+            var detail = document.createElement('span');
+            detail.textContent = conflict.detail || syncTranslation('sync.conflictDetail', 'The local and Dropbox copies differ.');
+            info.appendChild(path);
+            info.appendChild(detail);
+            row.appendChild(info);
+            if (!data.local_only) {
+                var actions = document.createElement('div');
+                actions.className = 'sync-conflict-actions';
+                [['local', 'sync.keepLocal'], ['remote', 'sync.useRemote']].forEach(function(choice) {
+                    var button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn-secondary btn-sm';
+                    button.textContent = syncTranslation(choice[1], choice[0] === 'local' ? 'Keep local' : 'Use Dropbox');
+                    button.onclick = function() { resolveLibrariumConflict(conflict.path, choice[0]); };
+                    actions.appendChild(button);
+                });
+                row.appendChild(actions);
+            }
+            return row;
+        });
+
+        var errorsBlock = document.getElementById('syncErrorsBlock');
+        var errorsList = document.getElementById('syncErrorsList');
+        errorsBlock.style.display = data.errors && data.errors.length ? '' : 'none';
+        renderSyncList(errorsList, data.errors, syncTranslation('sync.noErrors', 'No recent errors'), function(error) {
+            var row = document.createElement('div');
+            row.className = 'sync-error-item';
+            row.textContent = (error.path ? error.path + ': ' : '') + (error.message || '');
+            return row;
+        });
+
+        var historyList = document.getElementById('syncHistoryList');
+        renderSyncList(historyList, data.history, syncTranslation('sync.noActivity', 'No sync activity yet.'), function(entry) {
+            var row = document.createElement('div');
+            row.className = 'sync-history-item';
+            var time = document.createElement('time');
+            time.textContent = formatSyncDate(entry.at);
+            var message = document.createElement('span');
+            message.textContent = entry.message || '';
+            row.appendChild(time);
+            row.appendChild(message);
+            return row;
+        });
+    }
+
+    function scheduleLibrariumSyncPoll(data) {
+        if (librariumSyncPollTimer) window.clearTimeout(librariumSyncPollTimer);
+        var modal = document.getElementById('libraryModal');
+        if ((modal && modal.style.display === 'flex') || (data && data.active)) {
+            librariumSyncPollTimer = window.setTimeout(loadLibrariumSyncStatus, 5000);
+        }
+    }
+
+    function loadLibrariumSyncStatus() {
+        fetch('{{ url_for("sync_status") }}')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                updateLibrariumSyncStatus(data);
+                scheduleLibrariumSyncPoll(data);
+            })
+            .catch(function() { scheduleLibrariumSyncPoll({active: false}); });
+    }
+
+    function openLibraryModal() {
+        var modal = document.getElementById('libraryModal');
+        if (modal) modal.style.display = 'flex';
+        loadLibrariumSyncStatus();
+    }
+
+    function closeLibraryModal() {
+        var modal = document.getElementById('libraryModal');
+        if (modal) modal.style.display = 'none';
+        if (librariumSyncPollTimer) window.clearTimeout(librariumSyncPollTimer);
+        librariumSyncPollTimer = null;
+    }
+
+    function librariumSyncNow() {
+        var button = document.getElementById('syncNowButton');
+        if (button) button.disabled = true;
+        fetch('{{ url_for("sync_now") }}', {method: 'POST'})
+            .then(function(response) { return response.json().then(function(data) { return {ok: response.ok, data: data}; }); })
+            .then(function(result) {
+                updateLibrariumSyncStatus(result.data);
+                scheduleLibrariumSyncPoll(result.data);
+            })
+            .catch(function() { loadLibrariumSyncStatus(); });
+    }
+
+    function resolveLibrariumConflict(path, resolution) {
+        fetch('{{ url_for("sync_resolve") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: path, resolution: resolution})
+        })
+            .then(function(response) { return response.json().then(function(data) { return {ok: response.ok, data: data}; }); })
+            .then(function(result) {
+                if (result.data) updateLibrariumSyncStatus(result.data);
+                if (!result.ok) window.alert(result.data.error || syncTranslation('sync.resolveFailed', 'Could not resolve conflict.'));
+            })
+            .catch(function() { window.alert(syncTranslation('sync.resolveFailed', 'Could not resolve conflict.')); });
+    }
+    </script>
     <!-- ── Add Book modal ────────────────────────────────────────────── -->
     <div id="addBookModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
         <div class="modal-dialog">
