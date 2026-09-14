@@ -80,17 +80,6 @@
                     <span class="current-user-name">{{ current_user }}</span>
                 </span>
                 {% endif %}
-                {% if dropbox_connected %}
-                <span class="dropbox-sync-badge" id="dropboxSyncBadge" title="Dropbox synchronization" data-i18n-title="sync.title">
-                        <svg class="dropbox-icon-xs" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
-                    <span class="sync-last-label" data-i18n="sync.lastSynced">Last synced</span>
-                    <span class="sync-last-value" id="syncLastSuccess" data-sync-date="{{ sync_status.last_success_at }}">{{ sync_status.last_success_at or 'Never' }}</span>
-                    <button type="button" class="sync-now-button" id="syncNowButton" onclick="librariumSyncNow()" title="Sync now" data-i18n-title="sync.now" data-i18n-aria-label="sync.now">
-                        <span aria-hidden="true">↻</span>
-                        <span data-i18n="sync.now">Sync now</span>
-                    </button>
-                </span>
-                {% endif %}
             </div>
             <nav class="header-nav">
                 <a href="{{ url_for('dashboard') }}" data-i18n="nav.dashboard">Dashboard</a>
@@ -488,6 +477,16 @@
                 <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
                     <svg style="width:14px;height:14px;color:var(--lb-accent);flex-shrink:0" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
                     <span style="font-size: 0.82rem; color: var(--lb-text-light);">Apps/LibrariumApp/{{ current_user }}.db</span>
+                </div>
+                <div class="settings-cloud-sync">
+                    <div class="settings-cloud-sync-status">
+                        <span class="sync-last-label" data-i18n="sync.lastSynced">Last synced</span>
+                        <span class="sync-last-value" id="syncLastSuccess" data-sync-date="{{ sync_status.last_success_at }}">{{ sync_status.last_success_at or 'Never' }}</span>
+                    </div>
+                    <button type="button" class="sync-now-button" id="syncNowButton" onclick="librariumSyncNow()" title="Sync now" data-i18n-title="sync.now" data-i18n-aria-label="sync.now">
+                        <span aria-hidden="true">↻</span>
+                        <span data-i18n="sync.now">Sync now</span>
+                    </button>
                 </div>
                 {% else %}
                 <h4 data-i18n="sync.localStorage">Local Storage</h4>
