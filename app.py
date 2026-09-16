@@ -350,6 +350,7 @@ _SYNC_METADATA_TABLE = "sync_metadata"
 SYNC_STATE_FILE = DATA_DIR / "sync_status.json"
 _sync_state_lock = threading.RLock()
 _sync_operation_lock = threading.Lock()
+_SYNC_LOCK_WAIT_SECONDS = 90
 
 
 def _dropbox_sync_enabled() -> bool:
@@ -784,9 +785,18 @@ def sync_users_json_to_dropbox(*, errors: list[str] | None = None) -> bool:
         return False
 
 
-def _perform_upload_sync(reason: str = "manual") -> bool:
+def _perform_upload_sync(
+    reason: str = "manual", *, wait_for_lock: bool = False
+) -> bool:
     """Upload changed local data without downloading remote files."""
-    if not _dropbox_sync_enabled() or not _sync_operation_lock.acquire(blocking=False):
+    if not _dropbox_sync_enabled():
+        return False
+
+    if wait_for_lock:
+        lock_acquired = _sync_operation_lock.acquire(timeout=_SYNC_LOCK_WAIT_SECONDS)
+    else:
+        lock_acquired = _sync_operation_lock.acquire(blocking=False)
+    if not lock_acquired:
         return False
 
     try:
@@ -10746,7 +10756,7 @@ def shutdown_backup():
     # Sync all user DBs to Dropbox first (single upload per user)
     if _dropbox_sync_enabled():
         try:
-            if not _perform_upload_sync("shutdown"):
+            if not _perform_upload_sync("shutdown", wait_for_lock=True):
                 errors.append("Dropbox upload sync failed.")
             else:
                 users_data = _load_users()

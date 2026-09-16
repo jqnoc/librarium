@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move the Dropbox last-synced timestamp and manual sync control from the header into the Settings dialog's Cloud Storage section with consistent dialog styling
 - Let character biographies flow beside desktop portraits and return to full width below them, while stacking portraits cleanly on narrow screens
 - Remove the redundant close icon from Character detail modals while retaining backdrop and Escape dismissal
-- Allow a longer bounded shutdown-sync window, clarify timeout errors, and create the local shutdown backup before Dropbox work
+- Allow a longer bounded shutdown-sync window, wait for an active sync before the final upload, clarify timeout errors, and create the local shutdown backup before Dropbox work
 - Match Character edit dialog controls to the shared form styling and tighten its field spacing
 - Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Annotations, Quotes, Words, and Editions while keeping the hero and summary visible
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
