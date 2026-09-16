@@ -87,7 +87,12 @@ platform application data directory. The active user database is selected
 locally, and the Electron shell calls `/api/shutdown-backup` before quitting.
 
 SQLite's Online Backup API creates consistent local recovery copies, keeping
-the most recent backups in the configured per-user backup directory.
+the most recent backups in the configured per-user backup directory. Each
+snapshot stores `database.db` and `manifest.json` under
+`snapshots/<user>/librarium_<timestamp>/`; full-size image bytes are stored
+once under `objects/sha256/<prefix>/<hash>` and referenced by the manifest.
+Unchanged images are therefore not copied into every backup. Old snapshots
+are pruned per user and unreferenced image objects are garbage-collected.
 
 ### 2.5 Migrations
 
@@ -418,7 +423,7 @@ Key helper patterns in `app.py`:
 | `_cover_path()` / `_author_photo_path()` | Resolve full-size media file paths |
 | `_run_all_migrations()` | Execute all migrations sequentially |
 | `validate_and_restore_db()` | Integrity check + backup restore |
-| `backup_database()` | Daily backup with pruning |
+| `backup_database()` | Database and incremental image snapshot with pruning |
 | `sanitize_html()` | Allowlist-based HTML sanitiser for notes |
 
 ---

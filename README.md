@@ -57,6 +57,7 @@ Node.js, or pip installed to run it.
 - All databases, `users.json`, and full-size images stay under the platform
   app-data directory
 - Daily SQLite backups keep the five most recent local copies
+- Incremental image snapshots store unchanged full-size images only once
 - A validated local backup runs before Electron quits; quitting can be
   cancelled if the backup fails
 
@@ -194,19 +195,27 @@ Librarium/
   users.json
   <user>.db
   backups/
-    librarium_YYYY-MM-DD_HH-MM-SS.db
+    snapshots/
+      <user>/
+        librarium_YYYY-MM-DD_HH-MM-SS-ffffff/
+          database.db
+          manifest.json
+    objects/
+      sha256/<prefix>/<full-hash>
   images/
     <user>/
       covers/
       authors/
+      characters/
 ```
 
 Each user has their own SQLite database named after their username
 (e.g. user `JqnOC` → `jqnoc.db`). Full-size cover images and author
 photos are stored as files under `images/<user>/...`; thumbnails remain
-in the database. On first run after upgrading from an older version, any
-existing `data/` folder next to the app is migrated into the platform
-app-data location.
+in the database. Each backup manifest records the image paths and their
+SHA-256 content objects, so unchanged images are not copied again. On
+first run after upgrading from an older version, any existing `data/`
+folder next to the app is migrated into the platform app-data location.
 
 ## Project Structure
 
@@ -491,6 +500,8 @@ group's average, so groups with fewer ratings are not under-weighted.
   if the database is corrupted
 - **Daily backups** using SQLite's Online Backup API (last 5 kept);
   configurable backup directory
+- Incremental image snapshots deduplicate unchanged full-size images by
+  SHA-256 content while keeping each database snapshot's image manifest
 - Shutdown overlay ensures a backup completes before quitting
 - Database uses WAL mode for safe concurrent reads
 
@@ -507,9 +518,12 @@ data directory:
 
 Each user has their own SQLite database named after their username
 (e.g. user "JqnOC" → `jqnoc.db`). User accounts are tracked in
-`users.json` inside the same directory. Cover images, author photos,
-and thumbnails are stored as BLOBs in the database. No external
-database server required.
+`users.json` inside the same directory. Full-size cover images, author
+photos, and character portraits are stored as files under
+`images/<user>/...`; thumbnails remain in SQLite. Backup snapshots keep
+the database and its image manifest together, with image bytes stored once
+in the backup directory's shared content-addressed object store. No
+external database server is required.
 
 On first run after upgrading from an older version, any existing
 `data/` databases next to the application are automatically copied

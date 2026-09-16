@@ -71,6 +71,12 @@ BACKUP_DIR = DATA_DIR / "backups"
 USERS_FILE = DATA_DIR / "users.json"
 IMAGES_DIR = DATA_DIR / "images"
 MAX_BACKUPS = 5
+BACKUP_SNAPSHOT_DIRNAME = "snapshots"
+BACKUP_OBJECT_DIRNAME = "objects"
+BACKUP_MANIFEST_FILENAME = "manifest.json"
+BACKUP_DATABASE_FILENAME = "database.db"
+BACKUP_MANIFEST_VERSION = 1
+BACKUP_HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 # DB_PATH is set dynamically per-user; default used for migrations at startup
 DB_PATH = DATA_DIR / "librarium.db"
@@ -443,16 +449,35 @@ def validate_and_restore_db() -> None:
     try:
         # Try to open and verify the database
         db = sqlite3.connect(str(DB_PATH))
-        # PRAGMA integrity_check returns 'ok' if healthy, error details otherwise
-        result = db.execute("PRAGMA integrity_check").fetchone()
-        db.close()
+        try:
+            # PRAGMA integrity_check returns 'ok' if healthy, error details otherwise
+            result = db.execute("PRAGMA integrity_check").fetchone()
+        finally:
+            db.close()
         if result[0] == "ok":
             return  # Database is healthy
     except Exception as e:
         print(f"⚠️  Database health check failed: {e}")
 
-    # Database is corrupted; restore from latest backup
+    # Database is corrupted; restore from the latest complete snapshot.
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    username = _get_current_username()
+    snapshot = _find_latest_backup_snapshot(BACKUP_DIR, username)
+    if snapshot:
+        latest_backup = snapshot / BACKUP_DATABASE_FILENAME
+        print(f"⚠️  Database corrupted. Restoring from snapshot: {snapshot.name}")
+
+        corrupted_file = DB_PATH.with_stem(DB_PATH.stem + "_corrupted")
+        DB_PATH.rename(corrupted_file)
+        print(f"    Corrupted database moved to: {corrupted_file.name}")
+
+        shutil.copy2(str(latest_backup), str(DB_PATH))
+        if not _restore_images_from_snapshot(snapshot, username):
+            print("    Database restored, but some image files could not be restored.")
+        print(f"    Restored successfully from {snapshot.name}")
+        return
+
+    # Fall back to backups created before image snapshots were introduced.
     backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
     
     if not backups:
@@ -477,7 +502,7 @@ def validate_and_restore_db() -> None:
 
 # ── Backup ───────────────────────────────────────────────────────────────
 def backup_database(*, skip_if_recent: bool = True) -> str | None:
-    """Create a timestamped backup of the database, keeping the last MAX_BACKUPS.
+    """Create a database and incremental image snapshot.
 
     Uses SQLite's Online Backup API so the copy is always consistent,
     even when the database is in WAL mode.
@@ -485,36 +510,298 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
     When *skip_if_recent* is True (startup call), skips if a backup from
     the current date already exists.  Manual calls pass False to always
     create a new backup.
-    Returns the backup filename on success, or None if skipped.
+    Image bytes are stored once in a shared content-addressed object store;
+    each snapshot manifest records the image version for every relative path.
+    Returns the snapshot database path relative to BACKUP_DIR, or None if
+    skipped.
     """
     if not DB_PATH.exists():
         return None
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    username = _get_current_username()
+    snapshots_dir = _backup_snapshots_dir(BACKUP_DIR, username)
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
 
     if skip_if_recent:
         today_prefix = f"librarium_{date.today().isoformat()}"
-        if any(BACKUP_DIR.glob(f"{today_prefix}*.db")):
+        if any(
+            snapshot.name.startswith(today_prefix)
+            for snapshot in _iter_backup_snapshots(BACKUP_DIR, username)
+        ):
             return None  # already backed up today
 
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    backup_file = BACKUP_DIR / f"librarium_{stamp}.db"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    snapshot_name = f"librarium_{stamp}"
+    snapshot_dir = snapshots_dir / snapshot_name
+    temporary_snapshot = snapshots_dir / f".{snapshot_name}.{uuid_module.uuid4().hex}.tmp"
+    temporary_snapshot.mkdir(parents=True, exist_ok=False)
+    backup_file = temporary_snapshot / BACKUP_DATABASE_FILENAME
 
-    # Use the Online Backup API for a safe, consistent copy
-    src = sqlite3.connect(str(DB_PATH))
-    dst = sqlite3.connect(str(backup_file))
     try:
-        src.backup(dst)
+        # Use the Online Backup API for a safe, consistent database copy.
+        src = sqlite3.connect(str(DB_PATH))
+        dst = sqlite3.connect(str(backup_file))
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+
+        images = _create_image_backup_manifest(BACKUP_DIR, username)
+        manifest = {
+            "version": BACKUP_MANIFEST_VERSION,
+            "user": username,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "images": images,
+        }
+        (temporary_snapshot / BACKUP_MANIFEST_FILENAME).write_text(
+            json.dumps(manifest, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        temporary_snapshot.rename(snapshot_dir)
+    except Exception:
+        shutil.rmtree(temporary_snapshot, ignore_errors=True)
+        raise
+
+    _prune_backup_snapshots(BACKUP_DIR, username)
+
+    return snapshot_dir.relative_to(BACKUP_DIR).as_posix() + f"/{BACKUP_DATABASE_FILENAME}"
+
+
+def _backup_snapshots_dir(backup_dir: Path, username: str) -> Path:
+    """Return the per-user directory containing complete backup snapshots."""
+    return Path(backup_dir) / BACKUP_SNAPSHOT_DIRNAME / _sanitize_username(username)
+
+
+def _backup_objects_dir(backup_dir: Path) -> Path:
+    """Return the shared content-addressed image object directory."""
+    return Path(backup_dir) / BACKUP_OBJECT_DIRNAME / "sha256"
+
+
+def _iter_backup_snapshots(backup_dir: Path, username: str) -> list[Path]:
+    """Return complete snapshots for one user in chronological order."""
+    root = _backup_snapshots_dir(backup_dir, username)
+    if not root.is_dir():
+        return []
+    snapshots = []
+    for candidate in root.iterdir():
+        if not candidate.is_dir() or not candidate.name.startswith("librarium_"):
+            continue
+        if not (candidate / BACKUP_DATABASE_FILENAME).is_file():
+            continue
+        if _read_backup_manifest(candidate) is None:
+            continue
+        snapshots.append(candidate)
+    return sorted(snapshots, key=lambda path: path.name)
+
+
+def _iter_all_backup_snapshots(backup_dir: Path) -> list[Path]:
+    """Return complete snapshots for every user in a backup directory."""
+    root = Path(backup_dir) / BACKUP_SNAPSHOT_DIRNAME
+    if not root.is_dir():
+        return []
+    snapshots = []
+    for user_root in root.iterdir():
+        if user_root.is_dir():
+            snapshots.extend(_iter_backup_snapshots(backup_dir, user_root.name))
+    return snapshots
+
+
+def _find_latest_backup_snapshot(backup_dir: Path, username: str) -> Path | None:
+    """Return the newest complete snapshot for a user, if one exists."""
+    snapshots = _iter_backup_snapshots(backup_dir, username)
+    return snapshots[-1] if snapshots else None
+
+
+def _read_backup_manifest(snapshot_dir: Path) -> dict | None:
+    """Read and minimally validate a snapshot manifest."""
+    manifest_path = snapshot_dir / BACKUP_MANIFEST_FILENAME
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(manifest, dict):
+        return None
+    if manifest.get("version") != BACKUP_MANIFEST_VERSION:
+        return None
+    if not isinstance(manifest.get("images"), dict):
+        return None
+    return manifest
+
+
+def _hash_image_file(path: Path) -> str:
+    """Return the SHA-256 digest of a file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as image_file:
+        for chunk in iter(lambda: image_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _image_object_path(backup_dir: Path, digest: str) -> Path:
+    """Return the object-store path for an image digest."""
+    return _backup_objects_dir(backup_dir) / digest[:2] / digest
+
+
+def _ensure_image_object(source: Path, object_path: Path, digest: str) -> None:
+    """Copy a new image object atomically and verify its digest."""
+    if object_path.is_file():
+        return
+    object_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = object_path.with_name(
+        f".{object_path.name}.{uuid_module.uuid4().hex}.tmp"
+    )
+    try:
+        shutil.copy2(source, temporary)
+        if _hash_image_file(temporary) != digest:
+            raise OSError(f"Image changed while backing up: {source}")
+        temporary.replace(object_path)
     finally:
-        dst.close()
-        src.close()
+        temporary.unlink(missing_ok=True)
 
-    # Prune old backups – keep only the most recent MAX_BACKUPS files
-    backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
-    for old in backups[:-MAX_BACKUPS]:
-        old.unlink()
 
-    return backup_file.name
+def _create_image_backup_manifest(backup_dir: Path, username: str) -> dict[str, str]:
+    """Store new image content and return path-to-digest manifest entries."""
+    image_root = _user_images_dir(username)
+    manifest = {}
+    if not image_root.is_dir():
+        return manifest
+
+    for image_path in sorted(image_root.rglob("*")):
+        if not image_path.is_file():
+            continue
+        relative_path = image_path.relative_to(image_root)
+        if any(part.startswith(".") for part in relative_path.parts):
+            continue
+        try:
+            digest = _hash_image_file(image_path)
+        except FileNotFoundError:
+            continue
+        _ensure_image_object(image_path, _image_object_path(backup_dir, digest), digest)
+        manifest[relative_path.as_posix()] = digest
+    return manifest
+
+
+def _safe_backup_relative_path(value: object) -> Path | None:
+    """Return a safe relative image path from a manifest entry."""
+    if not isinstance(value, str) or not value:
+        return None
+    relative_path = Path(value)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        return None
+    if any(not part or part.startswith(".") for part in relative_path.parts):
+        return None
+    return relative_path
+
+
+def _restore_images_from_snapshot(snapshot_dir: Path, username: str) -> bool:
+    """Restore a snapshot's image tree and remove files absent from its manifest."""
+    manifest = _read_backup_manifest(snapshot_dir)
+    if manifest is None:
+        return False
+    manifest_user = manifest.get("user")
+    if manifest_user and manifest_user != username:
+        return False
+
+    image_root = _user_images_dir(username)
+    expected_paths = set()
+    complete = True
+    for relative_value, digest in sorted(manifest["images"].items()):
+        relative_path = _safe_backup_relative_path(relative_value)
+        if relative_path is None or not isinstance(digest, str) or not BACKUP_HASH_PATTERN.fullmatch(digest):
+            complete = False
+            print(f"    Skipping unsafe image manifest entry: {relative_value}")
+            continue
+
+        object_path = _image_object_path(BACKUP_DIR, digest)
+        if not object_path.is_file():
+            complete = False
+            print(f"    Missing image backup object: {digest}")
+            continue
+        try:
+            if _hash_image_file(object_path) != digest:
+                complete = False
+                print(f"    Corrupt image backup object: {digest}")
+                continue
+            destination = image_root / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            temporary = destination.with_name(
+                f".{destination.name}.{uuid_module.uuid4().hex}.restore"
+            )
+            try:
+                shutil.copy2(object_path, temporary)
+                temporary.replace(destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+            expected_paths.add(relative_path)
+        except OSError as error:
+            complete = False
+            print(f"    Could not restore image {relative_value}: {error}")
+
+    if not complete:
+        return False
+
+    for current_path in image_root.rglob("*"):
+        if not current_path.is_file():
+            continue
+        relative_path = current_path.relative_to(image_root)
+        if any(part.startswith(".") for part in relative_path.parts):
+            continue
+        if relative_path not in expected_paths:
+            current_path.unlink()
+
+    for directory in sorted(
+        (path for path in image_root.rglob("*") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    ):
+        try:
+            directory.rmdir()
+        except OSError:
+            pass
+    return True
+
+
+def _prune_backup_snapshots(backup_dir: Path, username: str) -> None:
+    """Keep recent snapshots and remove unreferenced image objects."""
+    user_root = _backup_snapshots_dir(backup_dir, username)
+    all_user_snapshots = sorted(
+        (
+            path for path in user_root.iterdir()
+            if path.is_dir() and path.name.startswith("librarium_")
+        ),
+        key=lambda path: path.name,
+    ) if user_root.is_dir() else []
+    for old_snapshot in all_user_snapshots[:-MAX_BACKUPS]:
+        shutil.rmtree(old_snapshot, ignore_errors=True)
+
+    referenced_hashes = set()
+    for snapshot in _iter_all_backup_snapshots(backup_dir):
+        manifest = _read_backup_manifest(snapshot)
+        if not manifest:
+            continue
+        referenced_hashes.update(
+            digest for digest in manifest["images"].values()
+            if isinstance(digest, str) and BACKUP_HASH_PATTERN.fullmatch(digest)
+        )
+
+    objects_root = _backup_objects_dir(backup_dir)
+    if not objects_root.is_dir():
+        return
+    for object_path in objects_root.rglob("*"):
+        if object_path.is_file() and BACKUP_HASH_PATTERN.fullmatch(object_path.name):
+            if object_path.name not in referenced_hashes:
+                object_path.unlink(missing_ok=True)
+    for directory in sorted(
+        (path for path in objects_root.rglob("*") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    ):
+        try:
+            directory.rmdir()
+        except OSError:
+            pass
 
 
 # ── User management ──────────────────────────────────────────────────────
@@ -556,7 +843,12 @@ def _character_portrait_path(character_id: int | str, username: str | None = Non
 def _save_image_file(dest: Path, blob: bytes) -> None:
     """Write a full-size image to the local AppData filesystem."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(blob)
+    temporary = dest.with_name(f".{dest.name}.{uuid_module.uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(blob)
+        temporary.replace(dest)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _delete_image_file(path: Path) -> None:
@@ -9983,7 +10275,7 @@ def update_similar_works_settings():
 
 @app.route("/backup/create", methods=["POST"])
 def create_backup():
-    """Manually create a database backup."""
+    """Manually create a database and image snapshot."""
     name = backup_database(skip_if_recent=False)
     if name:
         flash(f"Backup created: {name}", "success")
@@ -10755,6 +11047,7 @@ if __name__ == "__main__":
     if users_data["users"]:
         for _u in users_data["users"]:
             _set_active_user_db(_u["name"])
+            validate_and_restore_db()
             _run_all_migrations()
             backup_database()
         _last = users_data.get("last_user", "")
