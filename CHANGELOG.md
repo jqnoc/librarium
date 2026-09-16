@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Restore predictable Dropbox synchronization with one-time startup downloads, upload-only periodic and manual sync, a persisted last-sync label, bounded Dropbox requests, and shutdown backups
 - Add a reusable session-based back button with bounded history across page visits, including POST redirects and refreshes, while clearing stale single-entry history before dashboard fallback redirects and treating Series sort variants as one page
 - Add optional dates to annotations with persisted date/page sorting across books
 - Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding the redundant Date heading text and cells in grouped mode while retaining the header background, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
@@ -24,17 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add maximized startup with a native maximize/restore control and draggable blue title bar
 - Add Book Details Classification with a confirmation flow to clear every category, plus configurable Similar Works ranked across selected taxonomy categories and grouped by linked work using pooled value-level Dice scoring so broader overlaps are not outranked by sparse exact matches
 - Add an Index taxonomy audit with category clouds, CSV export, alphabetized values, and Library Health links
-- Add a persistent dark-mode toggle for the global header and startup-sync loading screen
+- Add a persistent dark-mode toggle for the global header
 - Add a UTF-8 Markdown download for each book's annotations, sorted by page while preserving Markdown headings inside each annotation and rendering horizontal-rule separators correctly
 - Add book character annotations with Name, Description, Biography, optional 4:5 Portraits, required Importance, multi-select Role fields, inline unlabeled translated colored badges, responsive summary card grids with protected name rows, full-width bubble rows, and description rows, right-aligned portrait thumbnails with flowing description text, and biography detail modals with larger right-aligned portraits and blurred backgrounds, consistent annotation form styling, Book Details CRUD controls, manual drag-and-drop ordering, Reading Session creation/editing from a character selector inside the dialog, and position preservation after inline edits
 - Add taxonomy guidance for character Importance, multi-select Roles, one-line Descriptions, and whole-book Biographies sized to the character's significance
 - Add an Ending Satisfaction rating dimension under Story & Plot to record how satisfying, fitting, earned, and effective a book's conclusion is
 
 ### Changed
-- Move the Dropbox last-synced timestamp and manual sync control from the header into the Settings dialog's Cloud Storage section with consistent dialog styling
+- Make AppData the sole storage location for databases, full-size images, and backups, and remove Dropbox authentication and synchronization
 - Let character biographies flow beside desktop portraits and return to full width below them, while stacking portraits cleanly on narrow screens
 - Remove the redundant close icon from Character detail modals while retaining backdrop and Escape dismissal
-- Allow a longer bounded shutdown-sync window, wait for an active sync before the final upload, clarify timeout errors, and create the local shutdown backup before Dropbox work
 - Match Character edit dialog controls to the shared form styling and tighten its field spacing
 - Organize Book Details into persistent accessible peer tabs ordered Readings, Rating, Classification, Similar Works, Characters, Annotations, Quotes, Words, and Editions while keeping the hero and summary visible
 - Store classification once per linked work, migrate existing edition values into the canonical work record, and keep linked editions synchronized when edited or unlinked
@@ -54,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Gift acquisitions now appear as received gifts from their donor in Dashboard Recent Activity and Calendar instead of as bought purchases
 - Books with Wishlist and Draft statuses are now excluded from the Books by Status Over Time chart
 - Restore the compact global header layout after moving the Reading Session character selector into its dialog
-- Preserve a newer local database during Dropbox startup sync and track committed database updates for conflict detection
 
 ## [2.1.0] — 2026-07-11
 

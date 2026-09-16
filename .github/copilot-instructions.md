@@ -27,10 +27,9 @@ suite** — all verification is manual.
 | Database | SQLite per-user DBs in AppData (WAL mode) |
 | Python | 3.12+ |
 | Node.js | 18+ |
-| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16, pdfplumber ≥ 0.11, markdown ≥ 3.5, dropbox ≥ 12.0 |
+| Python deps | Flask ≥ 3.0, Pillow ≥ 10.0, pillow-heif ≥ 0.16, pdfplumber ≥ 0.11, markdown ≥ 3.5 |
 | Build tooling | PyInstaller + electron-builder |
 | Flask port | Dynamic, prefers `48720` |
-| OAuth callback port | Fixed `48721` |
 | Startup | `npm start`, `run-librarium.bat`, or packaged portable `.exe` |
 
 ---
@@ -54,7 +53,7 @@ Whenever the user asks to classify, extend, audit, normalize, or improve a book'
 3. Polls the port until Flask accepts connections.
 4. Opens a `BrowserWindow` pointing at `http://127.0.0.1:<port>`.
 5. Intercepts app quit, waits for `/api/shutdown-backup`, and only exits
-  immediately once backup/sync succeeds or the user explicitly chooses to
+  immediately once the local backup succeeds or the user explicitly chooses to
   quit anyway.
 
 `preload.js` exposes `window.librarium.isElectron` to the renderer
@@ -81,52 +80,14 @@ are no blueprints, no ORM, and no separate model files.
   retained for migration fallback, character portraits use file-backed
   `characters/<id>.webp` files, and thumbnails remain in SQLite.
 
-### 2.4 Dropbox Cloud Storage
+### 2.4 Local Storage And Backups
 
-Dropbox is **mandatory**. The app requires Dropbox authentication before
-any user interaction. Data is stored in `Apps/LibrariumApp/` (app-folder
-access type).
+Databases, `users.json`, full-size images, and backups are stored only in the
+platform application data directory. The active user database is selected
+locally, and the Electron shell calls `/api/shutdown-backup` before quitting.
 
-#### Auth flow
-- OAuth2 PKCE (no client secret) → system browser → callback to
-  `http://127.0.0.1:48721/auth/callback`.
-- Refresh token + access token persisted in `DATA_DIR/auth.json`.
-- The browser callback shows a close-tab page; the main app continues in
-  Electron via polling on `/auth/status`.
-- `check_user_selected()` middleware redirects to `/auth/login` if not
-  authenticated.
-
-#### Sync strategy
-- **Startup**: download all `.db` files and `users.json` from Dropbox.
-- **Periodic**: every 5 minutes, upload modified DBs (content-hash
-  change detection via `_file_content_hash()`).
-- **Shutdown**: Electron calls `/api/shutdown-backup`, validates the JSON
-  response, and can cancel quitting if backup/sync fails.
-- WAL checkpoint (`PRAGMA wal_checkpoint(TRUNCATE)`) before every upload.
-
-#### Key helpers
-
-| Function | Purpose |
-|----------|---------|
-| `_load_auth()` / `_save_auth()` / `_clear_auth()` | Auth token CRUD in `auth.json` |
-| `get_dropbox_client()` | Thread-safe singleton Dropbox client (auto-refreshes) |
-| `_dbx_download()` / `_dbx_upload()` | File transfer to/from Dropbox |
-| `_dbx_file_exists()` / `_dbx_list_folder()` | Remote listing |
-| `sync_db_to_dropbox()` | Upload one user DB if changed |
-| `sync_users_json_to_dropbox()` | Upload `users.json` |
-| `_download_all_from_dropbox()` | Startup bulk download |
-| `_upload_all_to_dropbox()` | Shutdown bulk upload |
-| `_start_oauth_callback_server()` | One-shot local callback server on `48721` |
-| `_start_periodic_sync()` | Start background sync thread |
-
-#### Dropbox folder layout
-```
-Apps/LibrariumApp/
-  users.json
-  <username>.db
-  backups/
-    <username>_YYYYMMDD_HHMMSS.db
-```
+SQLite's Online Backup API creates consistent local recovery copies, keeping
+the most recent backups in the configured per-user backup directory.
 
 ### 2.5 Migrations
 
@@ -337,11 +298,6 @@ The library page (`/library`) supports three view modes: **card**,
 | `/users/create` | POST | Create a new user |
 | `/users/switch` | POST | Switch to a different user |
 | `/users/update-backup-dir` | POST | Update a user's custom backup directory |
-| `/auth/login` | GET | Dropbox login page |
-| `/auth/start` | GET | Initiate Dropbox OAuth2 PKCE flow |
-| `/auth/callback` | GET | OAuth2 callback (receives auth code) |
-| `/auth/logout` | POST | Disconnect Dropbox and clear auth tokens |
-| `/auth/status` | GET | JSON endpoint returning auth status |
 
 ### API endpoints
 
@@ -352,7 +308,6 @@ The library page (`/library`) supports three view modes: **card**,
 | `/api/status_timeline` | GET | Status-over-time data for stacked area chart |
 | `/api/isbn_lookup` | GET | Look up book metadata by ISBN via Open Library |
 | `/api/shutdown-backup` | POST | Trigger a backup before shutdown |
-| `/api/startup-status` | GET | Startup Dropbox-sync progress for the loading page |
 
 ---
 
@@ -464,7 +419,6 @@ Key helper patterns in `app.py`:
 | `_run_all_migrations()` | Execute all migrations sequentially |
 | `validate_and_restore_db()` | Integrity check + backup restore |
 | `backup_database()` | Daily backup with pruning |
-| `_start_oauth_callback_server()` | Start the one-shot OAuth callback server |
 | `sanitize_html()` | Allowlist-based HTML sanitiser for notes |
 
 ---
@@ -532,10 +486,6 @@ portable executable launches without relying on a system Python install.
 | `templates/series.html` | Series list |
 | `templates/series_detail.html` | Series detail |
 | `templates/users.html` | User selection / creation |
-| `templates/auth_login.html` | Dropbox login / connect page |
-| `templates/auth_waiting.html` | OAuth polling page (shown in Electron while user authorizes in browser) |
-| `templates/auth_success.html` | OAuth callback success page |
-| `templates/startup_sync.html` | Startup Dropbox sync loading page |
 
 ---
 

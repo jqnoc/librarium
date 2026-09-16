@@ -171,7 +171,6 @@
                 var input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'library_ids';
-                input.value = ids;
                 form.appendChild(input);
                 document.body.appendChild(form);
                 form.submit();
@@ -472,39 +471,16 @@
                 {% endfor %}
 
                 <hr>
-                {% if dropbox_connected %}
-                <h4 data-i18n="library.cloudStorage">Cloud Storage</h4>
-                <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
-                    <svg style="width:14px;height:14px;color:var(--lb-accent);flex-shrink:0" viewBox="0 0 43 40" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0L0 8.1l8.6 6.9 12.5-7.8L12.5 0zM0 21.9l12.5 8.1 8.6-7.2-12.5-7.8L0 21.9zM21.1 22.8l8.6 7.2 12.5-8.1-8.6-6.9-12.5 7.8zM42.2 8.1L29.7 0l-8.6 7.2 12.5 7.8 8.6-6.9zM21.2 24.6l-8.6 7.2-3.9-2.5v2.8l12.5 7.5 12.5-7.5v-2.8l-3.9 2.5-8.6-7.2z" fill="currentColor"/></svg>
-                    <span style="font-size: 0.82rem; color: var(--lb-text-light);">Apps/LibrariumApp/{{ current_user }}.db</span>
-                </div>
-                <div class="settings-cloud-sync">
-                    <div class="settings-cloud-sync-status">
-                        <span class="sync-last-label" data-i18n="sync.lastSynced">Last synced</span>
-                        <span class="sync-last-value" id="syncLastSuccess" data-sync-date="{{ sync_status.last_success_at }}">{{ sync_status.last_success_at or 'Never' }}</span>
-                    </div>
-                    <button type="button" class="sync-now-button" id="syncNowButton" onclick="librariumSyncNow()" title="Sync now" data-i18n-title="sync.now" data-i18n-aria-label="sync.now">
-                        <span aria-hidden="true">↻</span>
-                        <span data-i18n="sync.now">Sync now</span>
-                    </button>
-                </div>
-                {% else %}
-                <h4 data-i18n="sync.localStorage">Local Storage</h4>
+                <h4 data-i18n="library.localStorage">Local Storage</h4>
                 <div style="margin-top: 0.3rem;">
                     <span style="font-size: 0.82rem; color: var(--lb-text-light); word-break: break-all;" title="{{ db_path }}">{{ db_path }}</span>
                 </div>
-                {% endif %}
 
                 <hr>
                 <h4 data-i18n="backup.title">Database Backup</h4>
                 <form method="POST" action="{{ url_for('create_backup') }}" class="library-create-form">
                     <button type="submit" class="btn-small" data-i18n="backup.create">Create Backup Now</button>
                 </form>
-                {% if dropbox_connected %}
-                <div style="margin-top: 0.5rem;">
-                    <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dropboxHint">Backups are stored in your Dropbox (Apps/LibrariumApp/backups/).</small>
-                </div>
-                {% else %}
                 <div style="margin-top: 0.75rem;">
                     <label style="font-size: 0.9rem; color: var(--lb-text-light);" data-i18n="backup.directory">Backup Directory</label>
                     <form method="POST" action="{{ url_for('user_update_backup_dir') }}" class="library-create-form" style="margin-top: 0.3rem;">
@@ -513,7 +489,6 @@
                     </form>
                     <small style="color: var(--lb-text-light); font-size: 0.78rem;" data-i18n="backup.dirHint">Leave empty to use the default location.</small>
                 </div>
-                {% endif %}
 
                 <hr>
                 <h4 data-i18n="settings.similarWorksTitle">Similar Works</h4>
@@ -543,25 +518,6 @@
         </div>
     </div>
     <script>
-    function syncTranslation(key, fallback) {
-        return window.librariumI18n && typeof window.librariumI18n.t === 'function'
-            ? window.librariumI18n.t(key)
-            : fallback;
-    }
-
-    function formatSyncDate(value) {
-        if (!value) return syncTranslation('sync.never', 'Never');
-        var date = new Date(value);
-        if (isNaN(date.getTime())) return value;
-        var lang = window.librariumI18n && window.librariumI18n.getLang
-            ? window.librariumI18n.getLang()
-            : 'en';
-        return date.toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-            dateStyle: 'medium',
-            timeStyle: 'short'
-        });
-    }
-
     function openLibraryModal() {
         var modal = document.getElementById('libraryModal');
         if (modal) modal.style.display = 'flex';
@@ -572,58 +528,6 @@
         if (modal) modal.style.display = 'none';
     }
 
-    function updateLibrariumSyncStatus(data) {
-        var lastSuccess = document.getElementById('syncLastSuccess');
-        if (lastSuccess) {
-            lastSuccess.setAttribute('data-sync-date', data.last_success_at || '');
-            lastSuccess.textContent = data.last_success_at
-                ? formatSyncDate(data.last_success_at)
-                : syncTranslation('sync.never', 'Never');
-        }
-
-        var nowButton = document.getElementById('syncNowButton');
-        if (nowButton) {
-            nowButton.disabled = Boolean(data.active) || !data.authenticated;
-            var buttonLabel = nowButton.querySelector('[data-i18n]');
-            if (buttonLabel) buttonLabel.textContent = data.active
-                ? syncTranslation('sync.syncing', 'Syncing...')
-                : syncTranslation('sync.now', 'Sync now');
-        }
-    }
-
-    function librariumSyncNow() {
-        var button = document.getElementById('syncNowButton');
-        var lastSuccess = document.getElementById('syncLastSuccess');
-        if (button) {
-            button.disabled = true;
-            var buttonLabel = button.querySelector('[data-i18n]');
-            if (buttonLabel) buttonLabel.textContent = syncTranslation('sync.syncing', 'Syncing...');
-        }
-        fetch('{{ url_for("sync_now") }}', {method: 'POST'})
-            .then(function(response) { return response.json().then(function(data) { return {ok: response.ok, data: data}; }); })
-            .then(function(result) {
-                updateLibrariumSyncStatus(result.data);
-                if (!result.ok) window.alert(result.data.error || syncTranslation('sync.failed', 'Sync failed.'));
-            })
-            .catch(function() {
-                updateLibrariumSyncStatus({
-                    active: false,
-                    authenticated: true,
-                    last_success_at: lastSuccess ? lastSuccess.getAttribute('data-sync-date') : ''
-                });
-                window.alert(syncTranslation('sync.failed', 'Sync failed.'));
-            });
-    }
-
-    (function() {
-        var lastSuccess = document.getElementById('syncLastSuccess');
-        if (lastSuccess) {
-            var value = lastSuccess.getAttribute('data-sync-date');
-            lastSuccess.textContent = value
-                ? formatSyncDate(value)
-                : syncTranslation('sync.never', 'Never');
-        }
-    })();
     </script>
     <!-- ── Add Book modal ────────────────────────────────────────────── -->
     <div id="addBookModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">

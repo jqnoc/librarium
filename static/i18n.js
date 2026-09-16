@@ -52,8 +52,7 @@
         'library.rename':        { en: 'Rename',                es: 'Renombrar' },
         'library.delete':        { en: 'Delete',                es: 'Eliminar' },
         'library.databasePath':  { en: 'Database Path',          es: 'Ruta de la Base de Datos' },
-        'library.cloudStorage':  { en: 'Cloud Storage',          es: 'Almacenamiento en la Nube' },
-        'library.dropboxPath':   { en: 'Apps/LibrariumApp/',     es: 'Apps/LibrariumApp/' },
+        'library.localStorage':  { en: 'Local Storage',          es: 'Almacenamiento local' },
         'settings.similarWorksTitle': { en: 'Similar Works', es: 'Obras Similares' },
         'settings.similarWorksDescription': { en: 'Choose which classification categories contribute to Similar Works.', es: 'Elige qué categorías de clasificación contribuyen a las obras similares.' },
         'settings.categoriesLabel': { en: 'Classification categories', es: 'Categorías de clasificación' },
@@ -69,7 +68,6 @@
         'backup.dirDefault':     { en: 'Default',                es: 'Por defecto' },
         'backup.saveDir':        { en: 'Save',                   es: 'Guardar' },
         'backup.dirHint':        { en: 'Leave empty to use the default location.', es: 'Dejar vacío para usar la ubicación por defecto.' },
-        'backup.dropboxHint':    { en: 'Backups are stored in your Dropbox (Apps/LibrariumApp/backups/).', es: 'Las copias de seguridad se guardan en tu Dropbox (Apps/LibrariumApp/backups/).' },
 
         // ── User management ─────────────────────────────────────────────
         'users.selectUser':      { en: 'Select User',           es: 'Seleccionar Usuario' },
@@ -81,31 +79,6 @@
         'users.importLegacy':    { en: 'Import existing librarium.db', es: 'Importar librarium.db existente' },
         'users.importFile':      { en: 'Import from file',      es: 'Importar desde archivo' },
         'users.create':          { en: 'Create',                es: 'Crear' },
-
-        // ── Dropbox auth & sync ─────────────────────────────────────────
-        'auth.connectDropbox':   { en: 'Connect to Dropbox',    es: 'Conectar con Dropbox' },
-        'auth.description':      { en: 'Librarium stores your reading data securely in your Dropbox account. Connect your Dropbox to get started.', es: 'Librarium almacena tus datos de lectura de forma segura en tu cuenta de Dropbox. Conecta tu Dropbox para empezar.' },
-        'auth.connectButton':    { en: 'Connect with Dropbox',  es: 'Conectar con Dropbox' },
-        'auth.note':             { en: 'Your data is stored in the Apps/LibrariumApp folder in your Dropbox. Librarium cannot access any other files.', es: 'Tus datos se almacenan en la carpeta Apps/LibrariumApp de tu Dropbox. Librarium no puede acceder a otros archivos.' },
-        'auth.connected':        { en: 'Dropbox Connected',     es: 'Dropbox Conectado' },
-        'auth.successMessage':   { en: 'Your Dropbox account has been connected successfully. Librarium will continue in the desktop app.', es: 'Tu cuenta de Dropbox se ha conectado correctamente. Librarium continuará en la aplicación de escritorio.' },
-        'auth.continue':         { en: 'Continue to Librarium', es: 'Continuar a Librarium' },
-        'auth.closeTab':         { en: 'Close Tab', es: 'Cerrar pestaña' },
-        'auth.closeTabHint':     { en: 'This browser tab can now be closed. Librarium will continue in the desktop app.', es: 'Esta pestaña del navegador ya puede cerrarse. Librarium continuará en la aplicación de escritorio.' },
-        'auth.disconnect':       { en: 'Disconnect',            es: 'Desconectar' },
-        'auth.waitingTitle':     { en: 'Waiting for Dropbox…',   es: 'Esperando a Dropbox…' },
-        'auth.waitingMessage':   { en: 'A browser window has been opened for you to authorize Librarium. Please complete the login in your browser and return here.', es: 'Se ha abierto una ventana del navegador para que autorices Librarium. Completa el inicio de sesión en tu navegador y vuelve aquí.' },
-        'auth.retryLink':        { en: 'Click here to try again', es: 'Haz clic aquí para intentar de nuevo' },
-        'auth.syncingTitle':     { en: 'Syncing with Dropbox…', es: 'Sincronizando con Dropbox…' },
-        'auth.syncingMessage':   { en: 'Downloading your library data. This may take a moment on the first launch.', es: 'Descargando los datos de tu biblioteca. Esto puede tardar un momento en el primer inicio.' },
-        // ── Dropbox auth & sync ─────────────────────────────────────────
-        'sync.title':            { en: 'Dropbox synchronization', es: 'Sincronización con Dropbox' },
-        'sync.lastSynced':       { en: 'Last synced', es: 'Última sincronización' },
-        'sync.never':            { en: 'Never', es: 'Nunca' },
-        'sync.now':              { en: 'Sync now', es: 'Sincronizar ahora' },
-        'sync.syncing':          { en: 'Syncing...', es: 'Sincronizando...' },
-        'sync.failed':           { en: 'Sync failed.', es: 'La sincronización ha fallado.' },
-        'sync.localStorage':     { en: 'Local Storage', es: 'Almacenamiento local' },
 
         // ── Error pages ─────────────────────────────────────────────────
         'error.notFound':        { en: 'Page not found',        es: 'Página no encontrada' },

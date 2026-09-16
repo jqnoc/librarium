@@ -18,7 +18,7 @@ Librarium already does several things unusually well for a personal reading trac
 - yearly and global statistics
 - dashboard, calendar, and activity views
 - multi-user local setup
-- Dropbox-backed sync and backup
+- local backups and recovery
 
 That means the app is already strong as a personal reading archive and retrospective analytics tool.
 
@@ -191,22 +191,23 @@ Expected implementation cost:
 
 - medium
 
-### 7. Sync Model Expansion
+### 7. Portable Backup And Multi-Device Workflows
 
-Dropbox-first sync is coherent for the current product, but it is also a strategic limitation.
+Local-first storage keeps the app dependable and private, while leaving room for
+explicit user-controlled portability later.
 
 Possible additions:
 
-- optional local-only mode without Dropbox requirement
-- alternative sync providers in the future
-- better offline-first behavior
-- clearer sync state, pending work, and conflict visibility
+- export and import bundles for moving a library between machines
+- optional user-managed storage providers in the future
+- clearer backup state and recovery guidance
+- conflict-aware import workflows
 
 Why it matters:
 
 - broadens adoption
-- reduces dependency on one external service
-- improves confidence when using the app across machines
+- preserves local-first reliability
+- improves confidence when moving data across machines
 
 Expected product impact:
 
@@ -356,7 +357,7 @@ Possible improvements:
 - language and formatting defaults
 - export defaults
 - reminder behavior
-- sync and backup preferences
+- backup and recovery preferences
 - future feature flags or personalization settings
 
 Why it matters:
@@ -368,22 +369,22 @@ Priority:
 
 - medium to high
 
-### 8. Sync Transparency And Conflict Handling
+### 8. Backup Transparency And Recovery
 
-Sync is already serious infrastructure, but the product surface can improve.
+Backups are already part of the core safety model, but the product surface can improve.
 
 Possible improvements:
 
-- clearer last sync status
-- pending upload/download indicators
+- clearer last backup status
 - better failure messages
-- conflict awareness when data changes across machines
-- sync activity log
+- backup history and restore affordances
+- recovery checks before destructive operations
+- backup activity log
 
 Why it matters:
 
 - improves trust
-- reduces fear around multi-device usage
+- reduces fear around data loss
 
 Priority:
 
@@ -431,11 +432,11 @@ Why strategic:
 
 - lowers switching cost and increases trust dramatically
 
-### 5. Sync Provider Flexibility
+### 5. Portable Data Workflows
 
 Why strategic:
 
-- expands potential audience and reduces dependence on Dropbox-only operation
+- expands potential audience without making a cloud provider a requirement
 
 ## Suggested Directional Priority
 

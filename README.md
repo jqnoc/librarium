@@ -8,51 +8,38 @@ queries, Jinja2 templates, vanilla JS, and Chart.js for charts. Packaged
 Windows builds bundle that backend into a standalone executable, so the
 portable app runs without a separate Python installation.
 
-Librarium keeps local per-user SQLite databases in the platform app-data
-directory, stores full-size covers and author photos as per-user media
-files, keeps thumbnails in SQLite, and synchronizes everything to Dropbox.
-Dropbox authentication is required before normal app use.
+Librarium keeps per-user SQLite databases and full-size media files in the
+platform app-data directory. Thumbnails remain in SQLite, and local backups
+are created automatically without requiring a cloud account or network
+connection.
 
 ## Getting Started
 
 ### Development Prerequisites
-
+### Local Storage and Backups
 - **Python 3.12+** with pip
-- **Node.js 18+** with npm
+ All databases, `users.json`, and full-size images stay under the platform
+ app-data directory
+ Daily SQLite backups keep the five most recent local copies
+ A validated local backup runs before Electron quits; quitting can be
+ cancelled if the backup fails
 
-### Development Installation
-
-```powershell
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Install Node.js dependencies (Electron)
-npm install
+ User selection / creation screen on first launch
+ Per-user backup-directory overrides
 ```
-
 If you keep the Python environment in `.venv`, `npm start` and `npm run build`
-automatically prefer that interpreter before falling back to the system
-`python` on `PATH`.
-
-### Development Run
 
 ```powershell
-npm start
 ```
 
 Or on Windows, double-click `run-librarium.bat`.
+    librarium_YYYY-MM-DD_HH-MM-SS.db
+    └── users.html
 
-The app opens in its own Electron window. For backend-only development,
-`python app.py` starts Flask on the port set by `LIBRARIUM_PORT` (or
-`5000` by default).
-
-### Portable App
-
-The packaged Windows output (`dist/Librarium <version>.exe`) is a
-standalone portable desktop app. End users do **not** need Python,
+User databases, `users.json`, images, and backups are stored in the platform
+application data directory, not inside the project folder.
 Node.js, or pip installed to run it.
-
-## Features
+| Packaging | PyInstaller + electron-builder |
 
 ### Library Management
 
@@ -65,22 +52,20 @@ Node.js, or pip installed to run it.
 - ISBN lookup via Open Library API to auto-fill metadata and cover data
 - Soft-delete with undo
 
-### Cloud Sync
+### Local Storage and Backups
 
-- Dropbox authentication is mandatory before entering the app
-- OAuth2 PKCE flow opens the system browser, then returns to Electron
-  without turning the browser into a second app surface
-- Startup sync downloads `users.json`, databases, and externalized images
-- Periodic background sync uploads modified databases every 5 minutes
-- Validated shutdown backup/sync runs before quitting; Electron can cancel
-  quitting if the sync fails
+- All databases, `users.json`, and full-size images stay under the platform
+  app-data directory
+- Daily SQLite backups keep the five most recent local copies
+- A validated local backup runs before Electron quits; quitting can be
+  cancelled if the backup fails
 
 ### Multi-User System
 
 - Multiple users, each with their own independent SQLite database
-- User selection / creation screen on first launch after Dropbox auth
+- User selection / creation screen on first launch
 - Per-user migrations run automatically on startup
-- Per-user backup-directory overrides when running without Dropbox
+- Per-user backup-directory overrides
 
 ### Reading Tracking
 
@@ -191,11 +176,7 @@ group's average, so groups with fewer ratings are not under-weighted.
 - **Integrity check** on every startup; automatic restore from backup if a
   database is corrupted
 - **Daily local backups** using SQLite's Online Backup API (last 5 kept)
-- Dropbox backup copies stored in `Apps/LibrariumApp/backups/`
 - WAL mode for safe concurrent reads
-- Content-hash-based upload/download skipping for unchanged files
-
-## Data Storage
 
 All application data is stored in the platform's standard application
 data directory:
@@ -210,11 +191,10 @@ Typical layout:
 
 ```text
 Librarium/
-  auth.json
   users.json
   <user>.db
   backups/
-    <user>_YYYYMMDD.db
+    librarium_YYYY-MM-DD_HH-MM-SS.db
   images/
     <user>/
       covers/
@@ -274,15 +254,11 @@ Librarium/
     ├── sources.html
     ├── series.html
     ├── series_detail.html
-    ├── users.html
-    ├── auth_login.html
-    ├── auth_waiting.html
-    ├── auth_success.html
-    └── startup_sync.html
+    └── users.html
 ```
 
-User databases, `users.json`, `auth.json`, images, and backups are stored
-in the platform application data directory, not inside the project folder.
+User databases, `users.json`, images, and backups are stored in the platform
+application data directory, not inside the project folder.
 
 ## Technologies
 
@@ -297,7 +273,6 @@ in the platform application data directory, not inside the project folder.
 | Images | Pillow 10.x, pillow-heif 0.16+ |
 | Parsing | pdfplumber, Markdown |
 | Packaging | PyInstaller + electron-builder |
-| Cloud sync | Dropbox SDK |
 
 ## Building & Releasing
 
@@ -335,7 +310,7 @@ the backend runtime and does not require Python on the target machine.
 
 4. **Merge to `main` and tag**:
    ```powershell
-   git checkout main
+    librarium_YYYY-MM-DD_HH-MM-SS.db
    git merge dev
    git tag -a vx.y.z -m "Librarium vx.y.z"
    git push origin main --tags

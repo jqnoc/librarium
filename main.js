@@ -33,7 +33,7 @@ const backendPath = isPackaged
 
 // ── Port discovery ──────────────────────────────────────────────────────
 const PREFERRED_PORT = 48720;
-const SHUTDOWN_SYNC_TIMEOUT_MS = 120000;
+const SHUTDOWN_BACKUP_TIMEOUT_MS = 120000;
 
 /**
  * Try to bind to PREFERRED_PORT first (keeps localStorage across restarts).
@@ -287,7 +287,7 @@ async function requestQuit() {
   if (quitRequest) return quitRequest;
 
   quitRequest = (async () => {
-    const result = await shutdownAndSync();
+    const result = await shutdownAndBackup();
     if (result.ok) {
       isQuitting = true;
       killFlask();
@@ -302,9 +302,9 @@ async function requestQuit() {
       cancelId: 0,
       noLink: true,
       title: "Librarium",
-      message: "Backup or Dropbox sync did not finish.",
+      message: "Local backup did not finish.",
       detail:
-        `${result.error}\n\nChoose \"Cancel\" to keep Librarium open and try again, or \"Quit Anyway\" to exit without a confirmed sync.`,
+        `${result.error}\n\nChoose \"Cancel\" to keep Librarium open and try again, or \"Quit Anyway\" to exit without a confirmed backup.`,
     });
 
     if (response.response === 1) {
@@ -325,13 +325,13 @@ async function requestQuit() {
 }
 
 /**
- * Call the Flask shutdown-backup endpoint to create a backup and sync
- * all data to Dropbox before the app quits.  Times out after two minutes.
+ * Call the Flask shutdown-backup endpoint to create a local backup before
+ * the app quits. Times out after two minutes.
  */
-async function shutdownAndSync() {
+async function shutdownAndBackup() {
   if (!flaskPort) return { ok: true };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SHUTDOWN_SYNC_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), SHUTDOWN_BACKUP_TIMEOUT_MS);
   try {
     const response = await fetch(`http://127.0.0.1:${flaskPort}/api/shutdown-backup`, {
       method: "POST",
@@ -349,7 +349,7 @@ async function shutdownAndSync() {
         ok: false,
         error:
           payload?.error ||
-          `Shutdown sync returned an unexpected response (${response.status}).`,
+          `Shutdown backup returned an unexpected response (${response.status}).`,
       };
     }
 
@@ -359,11 +359,11 @@ async function shutdownAndSync() {
       return {
         ok: false,
         error:
-          `Shutdown sync exceeded ${SHUTDOWN_SYNC_TIMEOUT_MS / 1000} seconds. ` +
-          "Dropbox may still be processing the upload; check your connection and try again.",
+          `Shutdown backup exceeded ${SHUTDOWN_BACKUP_TIMEOUT_MS / 1000} seconds. ` +
+          "The local database may still be in use; try closing Librarium again.",
       };
     }
-    return { ok: false, error: `Shutdown sync request failed: ${e.message}` };
+    return { ok: false, error: `Shutdown backup request failed: ${e.message}` };
   } finally {
     clearTimeout(timeout);
   }

@@ -1,8 +1,7 @@
 """Librarium – a local Flask app for tracking reading statistics.
 
-User databases live in the platform application data directory and sync to
-Dropbox. Full-size covers and author photos are externalized to per-user
-image folders, while thumbnails remain in SQLite.
+User databases and full-size images live in the platform application data
+directory, while thumbnails remain in SQLite.
 """
 
 import hashlib
@@ -11,17 +10,15 @@ import json
 import math
 import os
 import re
-import secrets
 import sys
 import shutil
 import sqlite3
-import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid as uuid_module
 from collections import Counter
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -30,10 +27,6 @@ from PIL import Image
 from pillow_heif import register_heif_opener
 
 register_heif_opener()          # adds AVIF / HEIF support to Pillow
-
-import dropbox
-from dropbox.files import WriteMode
-from dropbox.exceptions import ApiError, AuthError
 
 from flask import (
     Flask,
@@ -327,628 +320,6 @@ app.secret_key = "librarium-local-dev-key"
 NAVIGATION_HISTORY_KEY = "_navigation_history"
 NAVIGATION_HISTORY_LIMIT = 20
 
-# ── Dropbox integration ──────────────────────────────────────────────────
-DROPBOX_APP_KEY = "tlt9ax4wz2mw2i0"
-DROPBOX_REDIRECT_URI = "http://127.0.0.1:48721/auth/callback"
-DROPBOX_SCOPES = [
-    "account_info.read",
-    "files.metadata.read",
-    "files.metadata.write",
-    "files.content.read",
-    "files.content.write",
-]
-AUTH_FILE = DATA_DIR / "auth.json"
-CACHE_DIR = DATA_DIR / "cache"
-_dbx_client: dropbox.Dropbox | None = None
-_dbx_lock = threading.Lock()
-_sync_thread: threading.Thread | None = None
-_sync_thread_lock = threading.Lock()
-_last_download_hash: dict[str, str] = {}   # remote path → content_hash at download time
-_startup_sync_done = threading.Event()      # set when initial download + migrations finish
-_startup_sync_progress: str = ""            # human-readable status for the loading page
-_SYNC_METADATA_TABLE = "sync_metadata"
-SYNC_STATE_FILE = DATA_DIR / "sync_status.json"
-_sync_state_lock = threading.RLock()
-_sync_operation_lock = threading.Lock()
-_SYNC_LOCK_WAIT_SECONDS = 90
-
-
-def _dropbox_sync_enabled() -> bool:
-    """Return whether Dropbox transfers are available."""
-    return _is_authenticated()
-
-
-def _default_sync_state() -> dict:
-    return {"last_success_at": ""}
-
-
-def _load_sync_state() -> dict:
-    if SYNC_STATE_FILE.exists():
-        try:
-            stored = json.loads(SYNC_STATE_FILE.read_text(encoding="utf-8"))
-            if isinstance(stored, dict):
-                last_success_at = stored.get("last_success_at", "")
-                if isinstance(last_success_at, str):
-                    return {"last_success_at": last_success_at}
-        except (json.JSONDecodeError, OSError):
-            pass
-    return _default_sync_state()
-
-
-def _save_sync_state(state: dict) -> None:
-    SYNC_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temporary_file = SYNC_STATE_FILE.with_suffix(".tmp")
-    temporary_file.write_text(
-        json.dumps(state, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    temporary_file.replace(SYNC_STATE_FILE)
-
-
-def _update_sync_state(update) -> dict:
-    with _sync_state_lock:
-        state = _load_sync_state()
-        update(state)
-        _save_sync_state(state)
-        return state
-
-
-def _record_sync_success() -> None:
-    """Persist the completion time shown beside the Dropbox icon."""
-    _update_sync_state(
-        lambda state: state.update({"last_success_at": _current_sync_timestamp()})
-    )
-
-
-def _sync_status_payload() -> dict:
-    with _sync_state_lock:
-        state = _load_sync_state()
-    return {
-        "authenticated": _is_authenticated(),
-        "active": _sync_operation_lock.locked(),
-        "status": "syncing" if _sync_operation_lock.locked() else "idle",
-        "last_success_at": state.get("last_success_at", ""),
-    }
-
-
-def _load_auth() -> dict | None:
-    """Load Dropbox auth data from auth.json, or None if missing / invalid."""
-    if not AUTH_FILE.exists():
-        return None
-    try:
-        data = json.loads(AUTH_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict) and data.get("refresh_token"):
-            return data
-    except (json.JSONDecodeError, OSError):
-        pass
-    return None
-
-
-def _save_auth(data: dict) -> None:
-    """Persist Dropbox auth data to auth.json."""
-    AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
-    AUTH_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def _clear_auth() -> None:
-    """Remove auth.json (logout)."""
-    if AUTH_FILE.exists():
-        AUTH_FILE.unlink()
-
-
-def _is_authenticated() -> bool:
-    """Return True if a valid Dropbox refresh token exists."""
-    return _load_auth() is not None
-
-
-def get_dropbox_client() -> dropbox.Dropbox:
-    """Return a Dropbox client that auto-refreshes its access token.
-
-    Caches the client in a module-level variable.  Thread-safe.
-    """
-    global _dbx_client
-    with _dbx_lock:
-        if _dbx_client is not None:
-            return _dbx_client
-        auth = _load_auth()
-        if not auth:
-            raise RuntimeError("Not authenticated with Dropbox")
-        _dbx_client = dropbox.Dropbox(
-            oauth2_refresh_token=auth["refresh_token"],
-            app_key=DROPBOX_APP_KEY,
-            max_retries_on_error=1,
-            max_retries_on_rate_limit=1,
-            timeout=20,
-        )
-        return _dbx_client
-
-
-def _reset_dropbox_client() -> None:
-    """Discard the cached Dropbox client (e.g. after logout)."""
-    global _dbx_client
-    with _dbx_lock:
-        _dbx_client = None
-
-
-# ── Dropbox file operations ─────────────────────────────────────────────
-_UPLOAD_CHUNK = 140 * 1024 * 1024  # 140 MB — use chunked upload above this
-
-
-def _quote_sql_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
-
-
-def _parse_sync_timestamp(value) -> datetime | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        parsed = value
-    elif isinstance(value, (int, float)):
-        try:
-            parsed = datetime.fromtimestamp(value, tz=timezone.utc)
-        except (OverflowError, OSError, ValueError):
-            return None
-    elif isinstance(value, str):
-        value = value.strip()
-        if not value:
-            return None
-        if value.endswith("Z"):
-            value = value[:-1] + "+00:00"
-        try:
-            parsed = datetime.fromisoformat(value)
-        except ValueError:
-            return None
-    else:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _current_sync_timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
-
-
-def _read_db_sync_timestamp(db_path: Path) -> datetime | None:
-    """Read the last committed application update from a database."""
-    if not db_path.exists():
-        return None
-
-    db = None
-    try:
-        db = sqlite3.connect(str(db_path))
-        row = db.execute(
-            f"SELECT last_updated_at FROM {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
-            "WHERE id = 1"
-        ).fetchone()
-        if row:
-            timestamp = _parse_sync_timestamp(row[0])
-            if timestamp:
-                return timestamp
-    except sqlite3.OperationalError as error:
-        if "no such table" not in str(error).lower():
-            return None
-    except sqlite3.DatabaseError:
-        return None
-    except OSError:
-        pass
-    finally:
-        if db is not None:
-            db.close()
-
-    mtimes = []
-    for candidate in (
-        db_path,
-        Path(f"{db_path}-wal"),
-        Path(f"{db_path}-shm"),
-    ):
-        try:
-            if candidate.exists():
-                mtimes.append(candidate.stat().st_mtime)
-        except OSError:
-            pass
-    if not mtimes:
-        return None
-    return datetime.fromtimestamp(max(mtimes), tz=timezone.utc)
-
-
-def _dbx_download(remote_path: str, local_path: Path, *, force: bool = False) -> str | None:
-    """Download a file from Dropbox app folder to a local path.
-
-    Skips the download when the local file already matches the remote
-    content hash, or when a local database has a newer committed update
-    timestamp than the Dropbox file.
-    Returns the content_hash on success, or None if the file does not
-    exist on Dropbox.
-    """
-    dbx = get_dropbox_client()
-    try:
-        meta = dbx.files_get_metadata(remote_path)
-        remote_hash = meta.content_hash
-        remote_updated_at = _parse_sync_timestamp(getattr(meta, "server_modified", None))
-
-        if local_path.suffix.lower() == ".db" and local_path.exists():
-            local_updated_at = _read_db_sync_timestamp(local_path)
-            if (
-                local_updated_at is not None
-                and remote_updated_at is not None
-                and local_updated_at > remote_updated_at
-            ):
-                if remote_hash:
-                    _last_download_hash[remote_path] = remote_hash
-                print(
-                    f"[dropbox] Keeping newer local database {local_path.name} "
-                    f"({local_updated_at.isoformat()} > {remote_updated_at.isoformat()})"
-                )
-                return remote_hash
-
-        if not force and local_path.exists() and remote_hash:
-            local_hash = _file_content_hash(local_path)
-            if local_hash == remote_hash:
-                _last_download_hash[remote_path] = remote_hash
-                return remote_hash
-
-        _, resp = dbx.files_download(remote_path)
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        local_path.write_bytes(resp.content)
-        _last_download_hash[remote_path] = remote_hash
-        return remote_hash
-    except ApiError as e:
-        if e.error.is_path() and e.error.get_path().is_not_found():
-            return None
-        raise
-
-
-def _dbx_upload(local_path: Path, remote_path: str) -> str:
-    """Upload a local file to Dropbox app folder (overwrite mode).
-
-    Uses chunked upload for files > 140 MB.  Returns the content_hash.
-    """
-    dbx = get_dropbox_client()
-    size = local_path.stat().st_size
-
-    if size <= _UPLOAD_CHUNK:
-        with open(local_path, "rb") as f:
-            meta = dbx.files_upload(f.read(), remote_path, mode=WriteMode.overwrite)
-    else:
-        with open(local_path, "rb") as f:
-            session_start = dbx.files_upload_session_start(f.read(_UPLOAD_CHUNK))
-            cursor = dropbox.files.UploadSessionCursor(
-                session_id=session_start.session_id, offset=f.tell()
-            )
-            commit = dropbox.files.CommitInfo(path=remote_path, mode=WriteMode.overwrite)
-            while f.tell() < size:
-                remaining = size - f.tell()
-                if remaining <= _UPLOAD_CHUNK:
-                    meta = dbx.files_upload_session_finish(
-                        f.read(remaining), cursor, commit
-                    )
-                else:
-                    dbx.files_upload_session_append_v2(f.read(_UPLOAD_CHUNK), cursor)
-                    cursor.offset = f.tell()
-
-    _last_download_hash[remote_path] = meta.content_hash
-    return meta.content_hash
-
-
-def _dbx_file_exists(remote_path: str) -> bool:
-    """Check whether a file exists on Dropbox."""
-    dbx = get_dropbox_client()
-    try:
-        dbx.files_get_metadata(remote_path)
-        return True
-    except ApiError as e:
-        if e.error.is_path() and e.error.get_path().is_not_found():
-            return False
-        raise
-
-
-def _dbx_delete(remote_path: str) -> None:
-    """Delete a file on Dropbox (silent if not found)."""
-    dbx = get_dropbox_client()
-    try:
-        dbx.files_delete_v2(remote_path)
-    except ApiError:
-        pass
-
-
-def _dbx_copy(src_path: str, dst_path: str) -> bool:
-    """Server-side copy on Dropbox. Returns True on success."""
-    dbx = get_dropbox_client()
-    try:
-        dbx.files_copy_v2(src_path, dst_path)
-        return True
-    except ApiError as e:
-        print(f"[dropbox] Copy {src_path} → {dst_path} failed: {e}")
-        return False
-
-
-def _dbx_list_folder(remote_path: str) -> list:
-    """List all entries in a Dropbox folder (handles pagination)."""
-    dbx = get_dropbox_client()
-    # App-folder root must be listed as "" not "/"
-    if remote_path == "/":
-        remote_path = ""
-    try:
-        result = dbx.files_list_folder(remote_path)
-    except ApiError as e:
-        if e.error.is_path() and e.error.get_path().is_not_found():
-            return []
-        raise
-    entries = list(result.entries)
-    while result.has_more:
-        result = dbx.files_list_folder_continue(result.cursor)
-        entries.extend(result.entries)
-    return entries
-
-
-def _dbx_ensure_folder(remote_path: str) -> None:
-    """Create a folder on Dropbox if it doesn't exist."""
-    dbx = get_dropbox_client()
-    try:
-        dbx.files_create_folder_v2(remote_path)
-    except ApiError as e:
-        # Folder already exists — that's fine
-        if hasattr(e.error, "is_path") and e.error.is_path():
-            tag = e.error.get_path()
-            if hasattr(tag, "is_conflict") and tag.is_conflict():
-                return
-        # Catch the common "path/conflict/folder" error shape
-        pass
-
-
-# ── Sync helpers ─────────────────────────────────────────────────────────
-def _checkpoint_wal(db_path: Path) -> None:
-    """Force WAL data into the main DB file so it's self-contained for upload."""
-    if not db_path.exists():
-        return
-    try:
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-    except Exception:
-        pass
-
-
-def sync_db_to_dropbox(
-    username: str | None = None,
-    *,
-    errors: list[str] | None = None,
-) -> bool:
-    """Upload the current user's DB to Dropbox if it has changed.
-
-    Returns True if an upload was performed.
-    """
-    if not _dropbox_sync_enabled():
-        return False
-    if username:
-        db_path = _get_user_db_path(username)
-        remote = f"/{_sanitize_username(username)}.db"
-    else:
-        db_path = DB_PATH
-        remote = f"/{db_path.name}"
-    if not db_path.exists():
-        return False
-
-    _checkpoint_wal(db_path)
-
-    # Check if the file actually changed since last download/upload
-    local_hash = _file_content_hash(db_path)
-    if _last_download_hash.get(remote) == local_hash:
-        return False
-
-    try:
-        _dbx_upload(db_path, remote)
-        print(f"[dropbox] Uploaded {db_path.name}")
-        return True
-    except (ApiError, AuthError) as e:
-        print(f"[dropbox] Upload failed for {db_path.name}: {e}")
-        if errors is not None:
-            errors.append(f"Upload failed for {db_path.name}: {e}")
-        return False
-    except Exception as e:
-        print(f"[dropbox] Upload error: {e}")
-        if errors is not None:
-            errors.append(f"Upload error for {db_path.name}: {e}")
-        return False
-
-
-def _file_content_hash(path: Path) -> str:
-    """Compute a Dropbox-compatible content hash for a local file.
-
-    Dropbox uses a specific chunked SHA-256 algorithm:
-    split file into 4 MB blocks, SHA-256 each, then SHA-256
-    the concatenation of those hashes.
-    """
-    BLOCK = 4 * 1024 * 1024
-    block_hashes = b""
-    with open(path, "rb") as f:
-        while True:
-            chunk = f.read(BLOCK)
-            if not chunk:
-                break
-            block_hashes += hashlib.sha256(chunk).digest()
-    return hashlib.sha256(block_hashes).hexdigest()
-
-
-def sync_users_json_to_dropbox(*, errors: list[str] | None = None) -> bool:
-    """Upload users.json to Dropbox."""
-    if not _dropbox_sync_enabled() or not USERS_FILE.exists():
-        return False
-    try:
-        _dbx_upload(USERS_FILE, "/users.json")
-        return True
-    except Exception as e:
-        print(f"[dropbox] Failed to upload users.json: {e}")
-        if errors is not None:
-            errors.append(f"Failed to upload users.json: {e}")
-        return False
-
-
-def _perform_upload_sync(
-    reason: str = "manual", *, wait_for_lock: bool = False
-) -> bool:
-    """Upload changed local data without downloading remote files."""
-    if not _dropbox_sync_enabled():
-        return False
-
-    if wait_for_lock:
-        lock_acquired = _sync_operation_lock.acquire(timeout=_SYNC_LOCK_WAIT_SECONDS)
-    else:
-        lock_acquired = _sync_operation_lock.acquire(blocking=False)
-    if not lock_acquired:
-        return False
-
-    try:
-        errors: list[str] = []
-        users_data = _load_users()
-        for user in users_data["users"]:
-            sync_db_to_dropbox(user["name"], errors=errors)
-        sync_users_json_to_dropbox(errors=errors)
-        if errors:
-            print(f"[dropbox] {reason} sync completed with errors: {'; '.join(errors)}")
-            return False
-        _record_sync_success()
-        return True
-    except AuthError as error:
-        print(f"[dropbox] Authentication failed during {reason} sync: {error}")
-        _clear_auth()
-        _reset_dropbox_client()
-        return False
-    except Exception as error:
-        print(f"[dropbox] Upload sync failed: {error}")
-        return False
-    finally:
-        _sync_operation_lock.release()
-
-
-def _download_images_from_dropbox(users_data: dict | None = None) -> None:
-    """Download remote images without blocking application readiness."""
-    global _startup_sync_progress
-    users_data = users_data or _load_users()
-
-    _startup_sync_progress = "Syncing images…"
-    for u in users_data["users"]:
-        slug = _sanitize_username(u["name"])
-        for subfolder in ("covers", "authors", "characters"):
-            remote_dir = f"/images/{slug}/{subfolder}"
-            try:
-                entries = _dbx_list_folder(remote_dir)
-            except Exception as error:
-                print(f"[dropbox] Could not list {remote_dir}: {error}")
-                continue
-            local_dir = IMAGES_DIR / slug / subfolder
-            local_dir.mkdir(parents=True, exist_ok=True)
-            for entry in entries:
-                local_file = local_dir / entry.name
-                if local_file.exists():
-                    continue
-                try:
-                    _dbx_download(f"{remote_dir}/{entry.name}", local_file)
-                except Exception as error:
-                    print(f"[dropbox] Image download failed ({entry.name}): {error}")
-
-
-def _download_all_from_dropbox(*, include_images: bool = True) -> None:
-    """Download users.json and all user DBs from Dropbox to DATA_DIR.
-
-    Called at startup when authenticated.  Updates
-    ``_startup_sync_progress`` so the loading page can show status.
-    """
-    global _startup_sync_progress
-    if not _dropbox_sync_enabled():
-        return
-
-    # Download users.json
-    _startup_sync_progress = "Downloading user data…"
-    try:
-        _dbx_download("/users.json", USERS_FILE)
-    except Exception as error:
-        print(f"[dropbox] Could not download users.json: {error}")
-
-    # Download all user DBs
-    users_data = _load_users()
-    total = len(users_data["users"])
-    for idx, u in enumerate(users_data["users"], 1):
-        slug = _sanitize_username(u["name"])
-        remote = f"/{slug}.db"
-        local = DATA_DIR / f"{slug}.db"
-        _startup_sync_progress = f"Syncing database {idx}/{total}…"
-        try:
-            h = _dbx_download(remote, local)
-            if h:
-                print(f"[dropbox] Downloaded {slug}.db")
-        except Exception as error:
-            print(f"[dropbox] Could not download {slug}.db: {error}")
-
-    # Ensure backups folder exists
-    _dbx_ensure_folder("/backups")
-
-    if include_images:
-        _download_images_from_dropbox(users_data)
-
-
-def _upload_all_to_dropbox() -> None:
-    """Upload users.json and all user DBs to Dropbox.
-
-    Called during initial migration of existing local data.
-    """
-    # Upload users.json
-    if USERS_FILE.exists():
-        _dbx_upload(USERS_FILE, "/users.json")
-
-    # Upload all user DBs
-    users_data = _load_users()
-    for u in users_data["users"]:
-        slug = _sanitize_username(u["name"])
-        db_path = DATA_DIR / f"{slug}.db"
-        if db_path.exists():
-            _checkpoint_wal(db_path)
-            _dbx_upload(db_path, f"/{slug}.db")
-            print(f"[dropbox] Uploaded {slug}.db")
-
-    _dbx_ensure_folder("/backups")
-
-    # Upload images
-    for u in users_data["users"]:
-        slug = _sanitize_username(u["name"])
-        img_dir = IMAGES_DIR / slug
-        if not img_dir.exists():
-            continue
-        for subfolder in ("covers", "authors", "characters"):
-            sub = img_dir / subfolder
-            if not sub.exists():
-                continue
-            _dbx_ensure_folder(f"/images/{slug}/{subfolder}")
-            for img_file in sub.iterdir():
-                if img_file.is_file():
-                    _dbx_upload(img_file, f"/images/{slug}/{subfolder}/{img_file.name}")
-            print(f"[dropbox] Uploaded {slug}/{subfolder} images")
-
-
-def _start_periodic_sync() -> None:
-    """Start a daemon thread that uploads modified DBs every 5 minutes."""
-    global _sync_thread
-
-    if not _dropbox_sync_enabled():
-        return
-
-    def _sync_loop():
-        import time
-        while True:
-            time.sleep(300)  # 5 minutes
-            try:
-                _perform_upload_sync("periodic")
-            except Exception as e:
-                print(f"[dropbox] Periodic sync error: {e}")
-
-    with _sync_thread_lock:
-        if _sync_thread is not None and _sync_thread.is_alive():
-            return
-        _sync_thread = threading.Thread(target=_sync_loop, daemon=True, name="dropbox-sync")
-        _sync_thread.start()
-
-
 # ── HTML sanitiser (allowlist-based) ───────────────────────────────────
 _ALLOWED_TAGS = frozenset({
     'b', 'strong', 'i', 'em', 'u', 's', 'h4',
@@ -1105,7 +476,7 @@ def validate_and_restore_db() -> None:
 
 
 # ── Backup ───────────────────────────────────────────────────────────────
-def backup_database(*, skip_if_recent: bool = True, upload_to_dropbox: bool = True) -> str | None:
+def backup_database(*, skip_if_recent: bool = True) -> str | None:
     """Create a timestamped backup of the database, keeping the last MAX_BACKUPS.
 
     Uses SQLite's Online Backup API so the copy is always consistent,
@@ -1114,9 +485,6 @@ def backup_database(*, skip_if_recent: bool = True, upload_to_dropbox: bool = Tr
     When *skip_if_recent* is True (startup call), skips if a backup from
     the current date already exists.  Manual calls pass False to always
     create a new backup.
-    When *upload_to_dropbox* is False, skip the Dropbox upload (used at
-    startup after a fresh download, or during shutdown which handles
-    Dropbox sync separately).
     Returns the backup filename on success, or None if skipped.
     """
     if not DB_PATH.exists():
@@ -1145,21 +513,6 @@ def backup_database(*, skip_if_recent: bool = True, upload_to_dropbox: bool = Tr
     backups = sorted(BACKUP_DIR.glob("librarium_*.db"))
     for old in backups[:-MAX_BACKUPS]:
         old.unlink()
-
-    # Upload backup to Dropbox
-    if upload_to_dropbox and _dropbox_sync_enabled():
-        try:
-            _dbx_upload(backup_file, f"/backups/{backup_file.name}")
-            # Prune old backups on Dropbox too
-            entries = _dbx_list_folder("/backups")
-            db_entries = sorted(
-                [e for e in entries if e.name.endswith(".db")],
-                key=lambda e: e.name,
-            )
-            for old_entry in db_entries[:-MAX_BACKUPS]:
-                _dbx_delete(f"/backups/{old_entry.name}")
-        except Exception as e:
-            print(f"[dropbox] Backup upload failed: {e}")
 
     return backup_file.name
 
@@ -1201,30 +554,15 @@ def _character_portrait_path(character_id: int | str, username: str | None = Non
 
 
 def _save_image_file(dest: Path, blob: bytes) -> None:
-    """Write an image BLOB to the filesystem and upload to Dropbox."""
+    """Write a full-size image to the local AppData filesystem."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(blob)
-    # Upload to Dropbox
-    if _is_authenticated():
-        username = dest.parent.parent.name  # images/<user>/covers|authors|characters
-        remote = f"/images/{username}/{dest.parent.name}/{dest.name}"
-        try:
-            _dbx_upload(dest, remote)
-        except Exception as e:
-            print(f"[dropbox] Image upload failed ({dest.name}): {e}")
 
 
 def _delete_image_file(path: Path) -> None:
-    """Remove an image file from disk and Dropbox."""
+    """Remove a full-size image from the local AppData filesystem."""
     if path.exists():
         path.unlink()
-    if _dropbox_sync_enabled():
-        username = path.parent.parent.name
-        remote = f"/images/{username}/{path.parent.name}/{path.name}"
-        try:
-            _dbx_delete(remote)
-        except Exception:
-            pass
 
 
 def _load_users() -> dict:
@@ -1268,10 +606,9 @@ def _get_valid_current_user() -> str:
 
 
 def _save_users(data: dict) -> None:
-    """Save users.json locally and upload to Dropbox."""
+    """Save users.json locally."""
     USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
     USERS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    sync_users_json_to_dropbox()
 
 
 def _get_user_db_path(username: str) -> Path:
@@ -1574,7 +911,6 @@ def _run_all_migrations() -> None:
     migrate_add_character_portrait()
     migrate_add_character_deceased()
     migrate_add_session_page_range()
-    migrate_add_sync_metadata()
     migrate_add_finish_plan_mode()
 
 
@@ -2737,22 +2073,6 @@ def migrate_externalize_images() -> None:
         print("   Running VACUUM to reclaim space ...")
         db.execute("VACUUM")
 
-    # Upload extracted images to Dropbox in background
-    if _dropbox_sync_enabled() and (cover_count > 0 or photo_count > 0):
-        print("   Uploading extracted images to Dropbox ...")
-        for subfolder in ("covers", "authors"):
-            sub = IMAGES_DIR / username / subfolder
-            if not sub.exists():
-                continue
-            _dbx_ensure_folder(f"/images/{username}/{subfolder}")
-            for img_file in sub.iterdir():
-                if img_file.is_file():
-                    try:
-                        _dbx_upload(img_file, f"/images/{username}/{subfolder}/{img_file.name}")
-                    except Exception as e:
-                        print(f"[dropbox] Image upload failed ({img_file.name}): {e}")
-        print("   Image upload to Dropbox complete.")
-
     db.close()
     print(">> Migration complete — images externalized.")
 
@@ -3042,49 +2362,6 @@ def migrate_add_character_deceased() -> None:
     db.close()
 
 
-def _ensure_sync_update_triggers(db: sqlite3.Connection) -> None:
-    tables = db.execute(
-        "SELECT name FROM sqlite_master "
-        "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != ?",
-        (_SYNC_METADATA_TABLE,),
-    ).fetchall()
-    for row in tables:
-        table_name = row[0]
-        table_hash = hashlib.sha256(table_name.encode("utf-8")).hexdigest()[:16]
-        quoted_table = _quote_sql_identifier(table_name)
-        for operation in ("INSERT", "UPDATE", "DELETE"):
-            trigger_name = f"librarium_sync_{table_hash}_{operation.lower()}"
-            db.execute(
-                f"CREATE TRIGGER IF NOT EXISTS {_quote_sql_identifier(trigger_name)} "
-                f"AFTER {operation} ON {quoted_table} BEGIN "
-                f"UPDATE {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
-                "SET last_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
-                "WHERE id = 1; END"
-            )
-
-
-def migrate_add_sync_metadata() -> None:
-    """Store the last committed database update and track all table writes."""
-    if not DB_PATH.exists():
-        return
-
-    db = sqlite3.connect(str(DB_PATH))
-    db.execute(
-        f"CREATE TABLE IF NOT EXISTS {_quote_sql_identifier(_SYNC_METADATA_TABLE)} ("
-        "id INTEGER PRIMARY KEY CHECK (id = 1), "
-        "last_updated_at TEXT NOT NULL"
-        ")"
-    )
-    db.execute(
-        f"INSERT OR IGNORE INTO {_quote_sql_identifier(_SYNC_METADATA_TABLE)} "
-        "(id, last_updated_at) VALUES (1, ?)",
-        (_current_sync_timestamp(),),
-    )
-    _ensure_sync_update_triggers(db)
-    db.commit()
-    db.close()
-
-
 # ── Cover colour helper ─────────────────────────────────────────────────
 THUMB_MAX_WIDTH = 300
 
@@ -3340,7 +2617,6 @@ def inject_library_context():
 
         current_user = _get_valid_current_user()
         backup_dir = str(_get_user_backup_dir(current_user)) if current_user else str(BACKUP_DIR)
-        sync_status = _sync_status_payload()
         return {
             "selected_library_ids": sel_ids,
             "all_libraries": all_lib_dicts,
@@ -3350,8 +2626,6 @@ def inject_library_context():
             "current_user": current_user,
             "backup_dir": backup_dir,
             "db_path": str(DB_PATH),
-            "dropbox_connected": _is_authenticated(),
-            "sync_status": sync_status,
             "author_page_name": author_page_name,
         }
     except Exception:
@@ -3367,8 +2641,6 @@ def inject_library_context():
             "current_user": _get_valid_current_user() if request else "",
             "backup_dir": str(BACKUP_DIR),
             "db_path": str(DB_PATH),
-            "dropbox_connected": _is_authenticated(),
-            "sync_status": _sync_status_payload(),
             "author_page_name": author_page_name,
         }
 
@@ -10484,7 +9756,7 @@ def new_book():
                 book_id,
             ))
 
-        # Save full-size cover image to filesystem + Dropbox
+        # Save the full-size cover image to the local filesystem
         if _cover_blob_for_file:
             _save_image_file(_cover_path(book_id), _cover_blob_for_file)
 
@@ -10707,25 +9979,6 @@ def update_similar_works_settings():
     return resp
 
 
-@app.route("/api/sync-status")
-def sync_status():
-    """Return the timestamp and state for the header sync control."""
-    return jsonify(_sync_status_payload())
-
-
-@app.route("/api/sync-now", methods=["POST"])
-def sync_now():
-    """Run one upload-only sync for the manual sync button."""
-    if not _is_authenticated():
-        return jsonify({"ok": False, "error": "Dropbox is not connected.", **_sync_status_payload()}), 401
-    if _sync_operation_lock.locked():
-        return jsonify({"ok": False, "error": "A sync is already in progress.", **_sync_status_payload()}), 409
-
-    successful = _perform_upload_sync("manual")
-    status_code = 200 if successful else 500
-    return jsonify({"ok": successful, **_sync_status_payload()}), status_code
-
-
 # ── Manual backup ────────────────────────────────────────────────────────
 
 @app.route("/backup/create", methods=["POST"])
@@ -10741,61 +9994,14 @@ def create_backup():
 
 @app.route("/api/shutdown-backup", methods=["POST"])
 def shutdown_backup():
-    """Create a backup and sync to Dropbox before the Electron shell quits."""
-    errors: list[str] = []
-
-    # Create the local backup before any network work so a slow Dropbox
-    # request cannot prevent a fresh machine-local recovery point.
+    """Create a local backup before the Electron shell quits."""
     try:
-        name = backup_database(skip_if_recent=False, upload_to_dropbox=False)
+        name = backup_database(skip_if_recent=False)
     except Exception as e:
         print(f"[backup] Local shutdown backup failed: {e}")
-        errors.append(f"Local backup failed: {e}")
-        name = None
-
-    # Sync all user DBs to Dropbox first (single upload per user)
-    if _dropbox_sync_enabled():
-        try:
-            if not _perform_upload_sync("shutdown", wait_for_lock=True):
-                errors.append("Dropbox upload sync failed.")
-            else:
-                users_data = _load_users()
-                # Create server-side backup copies on Dropbox (no re-upload)
-                _dbx_ensure_folder("/backups")
-                stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                for u in users_data["users"]:
-                    slug = _sanitize_username(u["name"])
-                    remote_db = f"/{slug}.db"
-                    remote_bk = f"/backups/{slug}_{stamp}.db"
-                    _dbx_copy(remote_db, remote_bk)
-                # Prune old remote backups
-                try:
-                    entries = _dbx_list_folder("/backups")
-                    db_entries = sorted(
-                        [e for e in entries if e.name.endswith(".db")],
-                        key=lambda e: e.name,
-                    )
-                    for old_entry in db_entries[:-MAX_BACKUPS]:
-                        _dbx_delete(f"/backups/{old_entry.name}")
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"[dropbox] Shutdown sync failed: {e}")
-            errors.append(f"Dropbox sync failed: {e}")
-
-    if errors:
-        return jsonify({"ok": False, "backup": name, "error": "; ".join(errors)}), 500
+        return jsonify({"ok": False, "backup": None, "error": f"Local backup failed: {e}"}), 500
 
     return jsonify({"ok": True, "backup": name})
-
-
-@app.route("/api/startup-status")
-def startup_status():
-    """Return startup sync progress for the loading page."""
-    return jsonify({
-        "done": _startup_sync_done.is_set(),
-        "progress": _startup_sync_progress,
-    })
 
 
 @app.route("/library/create", methods=["POST"])
@@ -10912,239 +10118,10 @@ def delete_library(lib_id: int):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Routes – Dropbox authentication
+# Routes – User management
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Module-level state shared between the main Flask server and the
-# temporary OAuth callback server running on port 48721.
-_oauth_session: dict = {}        # stores CSRF + PKCE verifier across requests
-
-_CALLBACK_PORT = int(DROPBOX_REDIRECT_URI.rsplit(":", 1)[-1].split("/")[0])  # 48721
-
-
-def _complete_oauth(query_params: dict) -> bool:
-    """Exchange the auth code for tokens and persist auth data.
-
-    Called from the temporary callback server.  Returns True on success.
-    """
-    flow = dropbox.DropboxOAuth2Flow(
-        consumer_key=DROPBOX_APP_KEY,
-        consumer_secret="",
-        redirect_uri=DROPBOX_REDIRECT_URI,
-        session=_oauth_session,
-        csrf_token_session_key="dbx-csrf",
-        token_access_type="offline",
-        use_pkce=True,
-        scope=DROPBOX_SCOPES,
-    )
-    # Restore the original PKCE code_verifier from the start() call
-    saved_verifier = _oauth_session.pop("_pkce_verifier", None)
-    if saved_verifier:
-        flow.code_verifier = saved_verifier
-    try:
-        result = flow.finish(query_params)
-    except Exception as e:
-        print(f"[auth] OAuth token exchange failed: {e}")
-        return False
-
-    # Fetch account info
-    dbx = dropbox.Dropbox(oauth2_access_token=result.access_token)
-    try:
-        account = dbx.users_get_current_account()
-        display_name = account.name.display_name
-        email = account.email
-    except Exception:
-        display_name = ""
-        email = ""
-
-    _save_auth({
-        "refresh_token": result.refresh_token,
-        "account_id": result.account_id,
-        "display_name": display_name,
-        "email": email,
-    })
-    _reset_dropbox_client()
-
-    # Initial sync
-    try:
-        _dbx_ensure_folder("/backups")
-        remote_users = _dbx_file_exists("/users.json")
-        local_users = _load_users()
-        if remote_users and not local_users["users"]:
-            _download_all_from_dropbox()
-        elif not remote_users and local_users["users"]:
-            _upload_all_to_dropbox()
-        elif remote_users and local_users["users"]:
-            _download_all_from_dropbox()
-        _record_sync_success()
-    except Exception as e:
-        print(f"[dropbox] Initial sync error: {e}")
-
-    _start_periodic_sync()
-    return True
-
-
-def _oauth_callback_html(ok: bool) -> bytes:
-        """Return a small browser page for the OAuth callback tab."""
-        if ok:
-                title = "Dropbox connected"
-                message = "Librarium will continue in the desktop app. This browser tab can now be closed."
-                button = "Close tab"
-        else:
-                title = "Authentication failed"
-                message = "Please close this tab and try again from Librarium."
-                button = "Close tab"
-
-        html = f"""<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-    <title>{title}</title>
-    <style>
-        body {{ font-family: system-ui, sans-serif; text-align: center; padding: 3rem 1.5rem; background: #f7f3ef; color: #2a4a5a; }}
-        .wrap {{ max-width: 32rem; margin: 0 auto; }}
-        button {{ border: 0; border-radius: 999px; padding: 0.8rem 1.4rem; background: #ec8f8d; color: white; cursor: pointer; font: inherit; }}
-    </style>
-</head>
-<body>
-    <div class=\"wrap\">
-        <h2>{title}</h2>
-        <p>{message}</p>
-        <button type=\"button\" onclick=\"window.close()\">{button}</button>
-    </div>
-    <script>setTimeout(function() {{ window.close(); }}, 1500);</script>
-</body>
-</html>"""
-        return html.encode("utf-8")
-
-
-def _start_oauth_callback_server() -> bool:
-    """Start a one-shot HTTP server on port 48721 to receive the OAuth callback.
-
-    Runs in a daemon thread.  Shuts itself down after handling one request.
-    """
-    import http.server
-    import urllib.parse as _up
-
-    class _Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            parsed = _up.urlparse(self.path)
-            if not parsed.path.rstrip("/").endswith("/auth/callback"):
-                self.send_error(404)
-                return
-            params = {k: v[0] for k, v in _up.parse_qs(parsed.query).items()}
-            ok = _complete_oauth(params)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(_oauth_callback_html(ok))
-            # Shut down the server after handling the callback
-            threading.Thread(target=self.server.shutdown, daemon=True).start()
-
-        def log_message(self, format, *args):
-            print(f"[auth-callback] {args[0]}" if args else "")
-
-    try:
-        server = http.server.HTTPServer(("127.0.0.1", _CALLBACK_PORT), _Handler)
-    except OSError as e:
-        print(f"[auth] Cannot start callback server on port {_CALLBACK_PORT}: {e}")
-        return False
-    t = threading.Thread(target=server.serve_forever, daemon=True, name="oauth-cb")
-    t.start()
-    print(f"[auth] Callback server listening on port {_CALLBACK_PORT}")
-    return True
-
-
-@app.route("/auth/login")
-def auth_login():
-    """Show the Dropbox login page."""
-    return render_template("auth_login.html")
-
-
-@app.route("/auth/start")
-def auth_start():
-    """Initiate the Dropbox OAuth2 PKCE flow.
-
-    1. Stores PKCE / CSRF state in a module-level dict (not Flask session)
-       because the callback arrives on a different port / process.
-    2. Starts a temporary HTTP server on port 48721 for the callback.
-    3. Opens the Dropbox auth URL in the **system browser**.
-    4. Returns a waiting page to the Electron window that polls /auth/status.
-    """
-    global _oauth_session
-    _oauth_session = {}
-
-    flow = dropbox.DropboxOAuth2Flow(
-        consumer_key=DROPBOX_APP_KEY,
-        consumer_secret="",
-        redirect_uri=DROPBOX_REDIRECT_URI,
-        session=_oauth_session,
-        csrf_token_session_key="dbx-csrf",
-        token_access_type="offline",
-        use_pkce=True,
-        scope=DROPBOX_SCOPES,
-    )
-    authorize_url = flow.start()
-
-    # Persist the PKCE code_verifier so _complete_oauth can reuse it.
-    # The SDK stores it on the flow object, not in the session dict.
-    _oauth_session["_pkce_verifier"] = flow.code_verifier
-
-    # Start the temporary callback server
-    if not _start_oauth_callback_server():
-        return render_template(
-            "auth_login.html",
-            error=(
-                f"Dropbox sign-in could not start because port {_CALLBACK_PORT} is already in use. "
-                "Close the conflicting app and try again."
-            ),
-        )
-
-    # Open the auth URL in the system browser
-    import webbrowser
-    webbrowser.open(authorize_url)
-
-    # Return a waiting page to the Electron window
-    return render_template("auth_waiting.html")
-
-
-@app.route("/auth/callback")
-def auth_callback():
-    """Fallback callback if the browser reaches Flask directly."""
-    params = dict(request.args)
-    ok = _complete_oauth(params)
-    if ok:
-        return render_template("auth_success.html")
-    return render_template("auth_login.html", error="Authentication failed. Please try again.")
-
-
-@app.route("/auth/logout", methods=["POST"])
-def auth_logout():
-    """Revoke Dropbox token and log out."""
-    try:
-        dbx = get_dropbox_client()
-        dbx.auth_token_revoke()
-    except Exception:
-        pass
-    _clear_auth()
-    _reset_dropbox_client()
-    return redirect(url_for("auth_login"))
-
-
-@app.route("/auth/status")
-def auth_status():
-    """JSON endpoint: is the user authenticated with Dropbox?"""
-    auth = _load_auth()
-    if auth:
-        return jsonify({
-            "authenticated": True,
-            "display_name": auth.get("display_name", ""),
-            "email": auth.get("email", ""),
-        })
-    return jsonify({"authenticated": False})
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Routes – User management
 # ═══════════════════════════════════════════════════════════════════════════
@@ -11154,9 +10131,8 @@ def user_select():
     """Show user selection / creation page."""
     users_data = _load_users()
     legacy_exists = (DATA_DIR / "librarium.db").exists() and not users_data["users"]
-    dropbox_info = _load_auth()
     return render_template("users.html", users=users_data["users"],
-                           legacy_exists=legacy_exists, dropbox_info=dropbox_info)
+                           legacy_exists=legacy_exists)
 
 
 @app.route("/users/create", methods=["POST"])
@@ -11198,9 +10174,6 @@ def user_create():
     # Set the user cookie and run migrations for their DB
     _set_active_user_db(name)
     _run_all_migrations()
-
-    # Upload new DB to Dropbox
-    sync_db_to_dropbox(name)
 
     resp = make_response(redirect(url_for("index")))
     resp.set_cookie("librarium_user", name, max_age=60 * 60 * 24 * 365 * 5,
@@ -11421,23 +10394,10 @@ def navigation_back():
 
 @app.before_request
 def check_user_selected():
-    """Redirect to Dropbox auth if not authenticated, then to user selection if no user is set."""
-    exempt = (
-        "/auth/",
-        "/static",
-        "/api/startup-status",
-        "/api/shutdown-backup",
-        "/api/sync-status",
-        "/api/sync-now",
-    )
+    """Redirect to user selection if no local user is set."""
+    exempt = ("/static", "/api/shutdown-backup")
     if any(request.path.startswith(p) for p in exempt):
         return
-    # Check Dropbox authentication first
-    if not _is_authenticated():
-        return redirect(url_for("auth_login"))
-    # Block while startup sync is in progress
-    if not _startup_sync_done.is_set():
-        return render_template("startup_sync.html")
     # Then check user selection
     exempt_user = ("/users",)
     if any(request.path.startswith(p) for p in exempt_user):
@@ -11790,69 +10750,22 @@ if __name__ == "__main__":
     port = int(os.environ.get("LIBRARIUM_PORT", 5000))
     is_electron = os.environ.get("LIBRARIUM_ELECTRON") == "1"
 
-    # ── Background startup: Dropbox download + migrations ───────────────
-    def _startup_sync_thread():
-        """Download data from Dropbox, run migrations, then signal ready."""
-        global _startup_sync_progress
-        try:
-            if _dropbox_sync_enabled():
-                try:
-                    print("[dropbox] Downloading data from Dropbox...")
-                    _download_all_from_dropbox()
-                    _record_sync_success()
-                    print("[dropbox] Sync complete.")
-                except Exception as e:
-                    print(f"[dropbox] Startup sync failed (working offline): {e}")
-
-            _startup_sync_progress = "Running migrations…"
-            users_data = _load_users()
-            if users_data["users"]:
-                for _u in users_data["users"]:
-                    _set_active_user_db(_u["name"])
-                    _run_all_migrations()
-                    backup_database(upload_to_dropbox=False)
-                # Restore active user to last_user (or first)
-                _last = users_data.get("last_user", "")
-                if _last and any(u["name"] == _last for u in users_data["users"]):
-                    _set_active_user_db(_last)
-                else:
-                    _set_active_user_db(users_data["users"][0]["name"])
-            elif DB_PATH.exists():
-                validate_and_restore_db()
-                backup_database(upload_to_dropbox=False)
-                _run_all_migrations()
-
-            # Start periodic sync after initial download is done
-            if _dropbox_sync_enabled():
-                if is_electron or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-                    _start_periodic_sync()
-        finally:
-            _startup_sync_progress = ""
-            _startup_sync_done.set()
-            print("[startup] Sync and migrations complete — app ready.")
-
-    if not _dropbox_sync_enabled():
-        # No active Dropbox sync → run migrations synchronously (fast) and mark ready
-        users_data = _load_users()
-        if users_data["users"]:
-            for _u in users_data["users"]:
-                _set_active_user_db(_u["name"])
-                _run_all_migrations()
-                backup_database(upload_to_dropbox=False)
-            _last = users_data.get("last_user", "")
-            if _last and any(u["name"] == _last for u in users_data["users"]):
-                _set_active_user_db(_last)
-            else:
-                _set_active_user_db(users_data["users"][0]["name"])
-        elif DB_PATH.exists():
-            validate_and_restore_db()
-            backup_database(upload_to_dropbox=False)
+    # ── Local startup migrations and backups ─────────────────────────────
+    users_data = _load_users()
+    if users_data["users"]:
+        for _u in users_data["users"]:
+            _set_active_user_db(_u["name"])
             _run_all_migrations()
-        _startup_sync_done.set()
-    else:
-        # Dropbox download may be slow — run in background so Flask starts immediately
-        _bg = threading.Thread(target=_startup_sync_thread, daemon=True, name="startup-sync")
-        _bg.start()
+            backup_database()
+        _last = users_data.get("last_user", "")
+        if _last and any(u["name"] == _last for u in users_data["users"]):
+            _set_active_user_db(_last)
+        else:
+            _set_active_user_db(users_data["users"][0]["name"])
+    elif DB_PATH.exists():
+        validate_and_restore_db()
+        backup_database()
+        _run_all_migrations()
 
     app.run(
         debug=not is_electron,
