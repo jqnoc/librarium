@@ -96,6 +96,8 @@ It answers:
 - Literary Fiction
 - Gothic Fiction
 - Thriller
+- Mystery Fiction
+- Cozy Mystery
 - Romance
 - Horror
 - Satirical Fiction
