@@ -101,11 +101,15 @@ CHARACTER_IMPORTANCE_OPTIONS = (
 CHARACTER_ROLE_OPTIONS = (
     {"value": "Protagonist", "label_key": "book.characterRoleProtagonist"},
     {"value": "Antagonist", "label_key": "book.characterRoleAntagonist"},
+    {"value": "Rival", "label_key": "book.characterRoleRival"},
+    {"value": "Investigator", "label_key": "book.characterRoleInvestigator"},
+    {"value": "Victim", "label_key": "book.characterRoleVictim"},
+    {"value": "Suspect", "label_key": "book.characterRoleSuspect"},
     {"value": "Narrator", "label_key": "book.characterRoleNarrator"},
     {"value": "Mentor", "label_key": "book.characterRoleMentor"},
-    {"value": "Rival", "label_key": "book.characterRoleRival"},
     {"value": "Love interest", "label_key": "book.characterRoleLoveInterest"},
     {"value": "Foil", "label_key": "book.characterRoleFoil"},
+    {"value": "Confidant", "label_key": "book.characterRoleConfidant"},
     {"value": "Other", "label_key": "book.characterRoleOther"},
 )
 CHARACTER_IMPORTANCE_VALUES = {item["value"] for item in CHARACTER_IMPORTANCE_OPTIONS}

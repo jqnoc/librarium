@@ -4443,6 +4443,24 @@ body.reading-session-modal-open { overflow: hidden; }
     border-color: #FECACA;
 }
 
+.character-role-investigator {
+    background: #F0FDFA;
+    color: #0F766E;
+    border-color: #99F6E4;
+}
+
+.character-role-victim {
+    background: #FFF1F2;
+    color: #BE123C;
+    border-color: #FECDD3;
+}
+
+.character-role-suspect {
+    background: #FFF7ED;
+    color: #C2410C;
+    border-color: #FED7AA;
+}
+
 .character-role-narrator {
     background: #F3E8FF;
     color: #7E22CE;
@@ -4471,6 +4489,12 @@ body.reading-session-modal-open { overflow: hidden; }
     background: #ECFEFF;
     color: #0E7490;
     border-color: #A5F3FC;
+}
+
+.character-role-confidant {
+    background: #EEF2FF;
+    color: #4338CA;
+    border-color: #C7D2FE;
 }
 
 .character-role-other {
@@ -5193,6 +5217,21 @@ html[data-theme="dark"] .character-role-antagonist {
     color: #FFB0B5;
     border-color: #8C3B45;
 }
+html[data-theme="dark"] .character-role-investigator {
+    background: #143C3D;
+    color: #8DE7D5;
+    border-color: #287D78;
+}
+html[data-theme="dark"] .character-role-victim {
+    background: #4D2530;
+    color: #FFB6C5;
+    border-color: #91465B;
+}
+html[data-theme="dark"] .character-role-suspect {
+    background: #4A2D1B;
+    color: #FFC08A;
+    border-color: #8D5635;
+}
 html[data-theme="dark"] .character-role-narrator {
     background: #30254B;
     color: #D0B8FF;
@@ -5207,6 +5246,11 @@ html[data-theme="dark"] .character-role-foil {
     background: #153E48;
     color: #8DE7F2;
     border-color: #287A87;
+}
+html[data-theme="dark"] .character-role-confidant {
+    background: #2A2D52;
+    color: #BFC5FF;
+    border-color: #555FA3;
 }
 
 html[data-theme="dark"] .flash-success {

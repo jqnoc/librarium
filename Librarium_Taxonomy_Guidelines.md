@@ -579,14 +579,17 @@ Assess Importance across the whole work, not from a single scene, chapter, or cu
 
 Roles describe what the character does in the narrative. Select every applicable value; roles are not mutually exclusive. At least one Role is required.
 
-- **Protagonist** — a central character whose experience, goals, or choices organize the narrative.
-- **Antagonist** — a character who opposes the protagonist or the protagonist's central aims.
-- **Narrator** — a character who tells, frames, or mediates the story.
-- **Mentor** — a character who guides, teaches, trains, or otherwise helps another character develop.
-- **Rival** — a character who competes with or obstructs another character's aims, without necessarily being the principal Antagonist.
-- **Love interest** — a character who is the focus of another character's romantic or amorous interest.
-- **Foil** — a character whose contrasting traits, choices, or circumstances illuminate another character.
-- **Other** — use only when a meaningful narrative role does not fit the controlled values above.
+The controlled values are grouped below by their primary narrative function. The groups are explanatory only; a character may have roles from multiple groups.
+
+- **Narrative centrality:** **Protagonist** — a central character whose experience, goals, or choices organize the narrative.
+- **Opposition:** **Antagonist** — a character who opposes the protagonist or the protagonist's central aims. **Rival** — a character who competes with or obstructs another character's aims without necessarily being the principal Antagonist.
+- **Mystery/crime function:** **Investigator** — a character who actively investigates a mystery, crime, or unexplained event. **Victim** — a character who suffers a crime, abuse, exploitation, or other central harm in the work. **Suspect** — a character regarded as potentially responsible for a mystery or crime, whether or not that suspicion proves correct.
+- **Narrative mediation:** **Narrator** — a character who tells, frames, or mediates the story.
+- **Character development:** **Mentor** — a character who guides, teaches, trains, or otherwise helps another character develop.
+- **Romance:** **Love interest** — a character who is the focus of another character's romantic or amorous interest.
+- **Character contrast:** **Foil** — a character whose contrasting traits, choices, or circumstances illuminate another character.
+- **Emotional/intellectual relationship:** **Confidant** — a trusted character with whom another character shares thoughts, feelings, plans, or secrets, often serving as an emotional or intellectual sounding board.
+- **Everything else:** **Other** — use only when a meaningful narrative role does not fit the controlled values above.
 
 Do not force a role simply because a character shares a superficial trait with its definition. Use **Other** when necessary, and prefer the established values whenever they genuinely apply.
 
