@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard rows now render in the order: Recent Activity / Last Books Acquired / Top Rated, Author Spotlight / Records, Format & Source / Languages, then full-width Wishlist, full-width To Be Read, then standalone Series Progress, Library Health, and Tag Cloud sections
 - Dashboard's Last Books Acquired shelf now merges owned, gifted, and borrowed books and shows the acquisition date plus lender/source details for borrowed entries
 - Dashboard's TBR pile now includes a persisted sort selector that can show a random set, the most recently acquired books, or the least recently acquired books; entries without an acquisition date sort as the oldest books, sort changes now update the shelf in place without reloading or resetting the page scroll, and both the Wishlist and TBR cover rows now show as many books as fit their current width without clipping
-- Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
+- Library selector in the header now uses staged multi-selection like SciY Product Management, with an explicit All Libraries shortcut plus Cancel and Apply actions that persist the chosen subset; the dropdown also renders the current All Libraries state as fully checked instead of appearing empty
 
 ### Fixed
 - Borrowed-book acquisitions now appear in the Dashboard Recent Activity feed and Calendar events, and calendar year navigation now includes years that only have borrowed-book dates
