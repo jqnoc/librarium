@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add incremental SHA-256 image snapshots that deduplicate unchanged full-size images and restore each database with its matching image manifest
+- Add incremental SHA-256 image snapshots that deduplicate unchanged full-size images, restore each database with its matching image manifest, and finalize snapshots without relying on a Windows-incompatible directory rename
 - Add a reusable session-based back button with bounded history across page visits, including POST redirects and refreshes, while clearing stale single-entry history before dashboard fallback redirects and treating Series sort variants as one page
 - Add optional dates to annotations with persisted date/page sorting across books
 - Add unchecked-by-default per-book `Group by Day` and `Summarize by Day` options for organizing reading-session rows under left-aligned day separators or standard-styled daily aggregate rows, hiding the redundant Date heading text and cells in grouped mode while retaining the header background, hiding only the Actions heading text in summary mode, emphasizing pages and duration in every view, collapsing the redundant Date cell when both are enabled, while preserving individual session actions and keeping only the Actions column flexible
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reorganize the shared Add New Book and Edit Metadata forms with consistent field ordering, full-width row-based classification editing on the Book Details tab, modal character editing, a wider single-column classification editor dialog with shared-book counts and whitish bubble backgrounds, and aligned publication, contributor, source, and binding fields
 - consolidate taxonomy guidance into the canonical guide, define major genres, separate Forms from Subgenres, clarify category boundaries, designate High Fantasy over Epic Fantasy and Secondary World Fantasy, document controlled values including Epic as a canonical Form, add Cozy Mystery and Mystery Fiction as Fiction Subgenres, add v2.1 whole-work Subgenre and Theme/Subject principles plus a classification workflow, and require classification requests to follow the guide in Copilot instructions
 - Separate Genres from Tags with independent Book Details, Dashboard, and Global Stats displays
-- Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, and shorter duration labels
+- Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, shorter duration labels, and reread progress scoped to the current reading
 - Allow Words of the Day to be edited directly from the Dashboard and saved to their books
 - Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
 - Improve Author cards with grammatical reading metrics and sorting by books read or time read

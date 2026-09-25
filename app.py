@@ -538,9 +538,8 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
     snapshot_name = f"librarium_{stamp}"
     snapshot_dir = snapshots_dir / snapshot_name
-    temporary_snapshot = snapshots_dir / f".{snapshot_name}.{uuid_module.uuid4().hex}.tmp"
-    temporary_snapshot.mkdir(parents=True, exist_ok=False)
-    backup_file = temporary_snapshot / BACKUP_DATABASE_FILENAME
+    snapshot_dir.mkdir(parents=True, exist_ok=False)
+    backup_file = snapshot_dir / BACKUP_DATABASE_FILENAME
 
     try:
         # Use the Online Backup API for a safe, consistent database copy.
@@ -559,13 +558,12 @@ def backup_database(*, skip_if_recent: bool = True) -> str | None:
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "images": images,
         }
-        (temporary_snapshot / BACKUP_MANIFEST_FILENAME).write_text(
+        (snapshot_dir / BACKUP_MANIFEST_FILENAME).write_text(
             json.dumps(manifest, indent=2, sort_keys=True),
             encoding="utf-8",
         )
-        temporary_snapshot.rename(snapshot_dir)
     except Exception:
-        shutil.rmtree(temporary_snapshot, ignore_errors=True)
+        shutil.rmtree(snapshot_dir, ignore_errors=True)
         raise
 
     _prune_backup_snapshots(BACKUP_DIR, username)
@@ -4774,17 +4772,28 @@ def dashboard():
                s.last_date, p.last_period,
                COALESCE(pct.max_pct, 0) AS max_pct
         FROM books b
-        LEFT JOIN (SELECT book_id, SUM(pages) AS tp, SUM(duration_seconds) AS ts, MAX(date) AS last_date
-                   FROM sessions WHERE date != '' GROUP BY book_id) s ON s.book_id = b.id
-        LEFT JOIN (SELECT book_id, SUM(pages) AS pp, SUM(COALESCE(duration_seconds, 0)) AS ps, MAX(end_date) AS last_period
-                   FROM periods GROUP BY book_id) p ON p.book_id = b.id
         LEFT JOIN (
-            SELECT book_id, MAX(pct) AS max_pct FROM (
-                SELECT book_id, MAX(progress_pct) AS pct FROM sessions WHERE progress_pct IS NOT NULL GROUP BY book_id
+            SELECT r.book_id, r.id AS reading_id
+            FROM readings r
+            WHERE r.id = (
+                SELECT r2.id
+                FROM readings r2
+                WHERE r2.book_id = r.book_id
+                ORDER BY r2.reading_number DESC, r2.id DESC
+                LIMIT 1
+            )
+        ) current_reading ON current_reading.book_id = b.id
+        LEFT JOIN (SELECT reading_id, SUM(pages) AS tp, SUM(duration_seconds) AS ts, MAX(date) AS last_date
+                   FROM sessions WHERE date != '' GROUP BY reading_id) s ON s.reading_id = current_reading.reading_id
+        LEFT JOIN (SELECT reading_id, SUM(pages) AS pp, SUM(COALESCE(duration_seconds, 0)) AS ps, MAX(end_date) AS last_period
+                   FROM periods GROUP BY reading_id) p ON p.reading_id = current_reading.reading_id
+        LEFT JOIN (
+            SELECT reading_id, MAX(pct) AS max_pct FROM (
+                SELECT reading_id, MAX(progress_pct) AS pct FROM sessions WHERE progress_pct IS NOT NULL GROUP BY reading_id
                 UNION ALL
-                SELECT book_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY book_id
-            ) GROUP BY book_id
-        ) pct ON pct.book_id = b.id
+                SELECT reading_id, MAX(progress_pct) AS pct FROM periods WHERE progress_pct IS NOT NULL GROUP BY reading_id
+            ) GROUP BY reading_id
+        ) pct ON pct.reading_id = current_reading.reading_id
         WHERE b.status = 'reading' AND {lf_b}
     """, lp_b).fetchall():
         sp = row["starting_page"] or 0
