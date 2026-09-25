@@ -4494,9 +4494,7 @@ def _build_index_per_reading(db, lib_ids):
 
     Selection logic per edition:
     - 1 reading  → show it
-    - >1 readings, some finished → show each finished one
-    - >1 readings, none finished → show the one with highest priority
-            (reading > abandoned > not-started > wishlist > draft)
+    - >1 readings → show every reading
     """
     lf, lp = _lib_filter(lib_ids)
     taxonomy_columns = ", ".join(TAXONOMY_FIELD_NAMES)
@@ -4529,24 +4527,14 @@ def _build_index_per_reading(db, lib_ids):
     for r in all_readings:
         readings_by_book.setdefault(r["book_id"], []).append(dict(r))
 
-    RPRIO = {"reading": 0, "abandoned": 1, "not-started": 2, "wishlist": 3, "draft": 4, "finished": 5}
     selected: list[tuple] = []  # (book_id, reading_id, reading_number, status)
     for bid in bids:
         rlist = readings_by_book.get(bid, [])
         if not rlist:
             selected.append((bid, None, None, bk_map[bid]["status"]))
             continue
-        if len(rlist) == 1:
-            r = rlist[0]
+        for r in rlist:
             selected.append((bid, r["id"], r["reading_number"], r["status"]))
-        else:
-            finished = [r for r in rlist if r["status"] == "finished"]
-            if finished:
-                for r in finished:
-                    selected.append((bid, r["id"], r["reading_number"], r["status"]))
-            else:
-                best = min(rlist, key=lambda r: RPRIO.get(r["status"], 99))
-                selected.append((bid, best["id"], best["reading_number"], best["status"]))
 
     # Bulk-fetch per-reading stats
     rids = [s[1] for s in selected if s[1] is not None]
