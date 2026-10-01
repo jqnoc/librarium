@@ -1011,6 +1011,7 @@ h3 {
     border-color: var(--lb-orange);
     box-shadow: 0 0 0 3px var(--lb-accent-glow);
 }
+.year-author-card.author-filter-hidden { display: none !important; }
 .author-filter-empty { padding-top: 2rem; }
 
 .year-author-card .cover-wrap {

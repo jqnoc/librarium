@@ -105,6 +105,7 @@ function updateAuthorSort() {
             var authorName = (card.dataset.authorName || '').toLowerCase();
             var matches = !query || authorName.indexOf(query) !== -1;
             card.hidden = !matches;
+            card.classList.toggle('author-filter-hidden', !matches);
             if (matches) visibleCount += 1;
         });
 

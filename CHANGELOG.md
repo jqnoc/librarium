@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refine Currently Reading cards with clearer progress and time hierarchy, estimated time remaining, shorter duration labels, and reread progress scoped to the current reading
 - Allow Words of the Day to be edited directly from the Dashboard and saved to their books
 - Expand the Dashboard Top Rated shelf to 25 books while preserving its existing height
-- Improve Author cards with grammatical reading metrics, sorting by books read or time read, and a real-time name filter
+- Improve Author cards with grammatical reading metrics, sorting by books read or time read, and a real-time name filter that hides non-matching cards
 - Make Reading Session annotation controls use five equal-width columns, keep session controls in three equal-width columns, and stabilize the responsive dialog width for long book titles
 - Show per-session pace as `pages/hour` with signed average differences and centered comparison bars in a separate titleless column between Pace and Actions, coloring bars from slowest red through fastest green along a constant-lightness OKLCH hue arc based on the visible session or day range
 - Match the spacing between annotation section headings and their first cards
