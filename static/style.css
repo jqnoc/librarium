@@ -973,6 +973,46 @@ h3 {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
+.authors-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+.authors-page-heading,
+.authors-page-controls,
+.author-filter-control,
+.author-sort-control {
+    display: flex;
+    align-items: center;
+}
+.authors-page-heading { gap: 1rem; }
+.authors-page-controls { gap: 1rem; flex-wrap: wrap; }
+.author-filter-control,
+.author-sort-control {
+    gap: .5rem;
+    font-size: .9rem;
+    color: var(--lb-text-light);
+}
+.author-filter-input {
+    width: min(18rem, 45vw);
+    padding: .35rem .55rem;
+    font-size: .9rem;
+    font-family: inherit;
+    border: 1px solid var(--lb-border);
+    border-radius: 4px;
+    background: var(--lb-bg);
+    color: var(--lb-text-dark);
+}
+.author-filter-input:focus {
+    outline: none;
+    border-color: var(--lb-orange);
+    box-shadow: 0 0 0 3px var(--lb-accent-glow);
+}
+.author-filter-empty { padding-top: 2rem; }
+
 .year-author-card .cover-wrap {
     height: auto;
     aspect-ratio: 4 / 5;

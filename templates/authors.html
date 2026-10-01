@@ -14,21 +14,30 @@
     }
 })();
 </script>
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem;">
-    <div style="display: flex; align-items: center; gap: 1rem;">
+<div class="authors-page-header">
+    <div class="authors-page-heading">
         <h1 style="margin: 0; color: var(--lb-text-dark);" data-i18n="authors.title">Authors</h1>
         <span style="color: var(--lb-text-light); font-size: 1rem;">{{ authors | length }} author{{ 's' if authors | length != 1 else '' }}</span>
     </div>
-    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--lb-text-light);">
-        <span data-i18n="authors.sortBy">Sort by:</span>
-        <select id="authorSort" onchange="updateAuthorSort()"
-                style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
-            <option value="name"  {% if sort == 'name'  %}selected{% endif %} data-i18n="authors.sortName">Name</option>
-            <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="authors.sortBooks">Number of Books</option>
-            <option value="books_read" {% if sort == 'books_read' %}selected{% endif %} data-i18n="authors.sortBooksRead">Books Read</option>
-            <option value="time_read" {% if sort == 'time_read' %}selected{% endif %} data-i18n="authors.sortTimeRead">Time Read</option>
-        </select>
-    </label>
+    <div class="authors-page-controls">
+        <label class="author-filter-control" for="authorFilter">
+            <span data-i18n="authors.filterByName">Filter by name:</span>
+            <input type="search" id="authorFilter" class="author-filter-input"
+                   data-i18n-placeholder="authors.filterPlaceholder"
+                   data-i18n-aria-label="authors.filterAriaLabel"
+                   aria-controls="authorGrid" autocomplete="off">
+        </label>
+        <label class="author-sort-control">
+            <span data-i18n="authors.sortBy">Sort by:</span>
+            <select id="authorSort" onchange="updateAuthorSort()"
+                    style="font-size: 0.9rem; padding: 0.25rem 0.5rem; border: 1px solid var(--lb-border); border-radius: 4px; background: var(--lb-bg); color: var(--lb-text-dark); cursor: pointer;">
+                <option value="name"  {% if sort == 'name'  %}selected{% endif %} data-i18n="authors.sortName">Name</option>
+                <option value="books" {% if sort == 'books' %}selected{% endif %} data-i18n="authors.sortBooks">Number of Books</option>
+                <option value="books_read" {% if sort == 'books_read' %}selected{% endif %} data-i18n="authors.sortBooksRead">Books Read</option>
+                <option value="time_read" {% if sort == 'time_read' %}selected{% endif %} data-i18n="authors.sortTimeRead">Time Read</option>
+            </select>
+        </label>
+    </div>
 </div>
 
 <script>
@@ -40,9 +49,9 @@ function updateAuthorSort() {
 </script>
 
 {% if authors %}
-<div class="book-grid year-author-grid" style="margin-top: 0;">
+<div class="book-grid year-author-grid" id="authorGrid" style="margin-top: 0;">
     {% for author in authors %}
-    <a href="{{ url_for('author_detail', author_name=author.name) }}" class="card book-card year-author-card" style="text-decoration: none; color: inherit;">
+    <a href="{{ url_for('author_detail', author_name=author.name) }}" class="card book-card year-author-card" data-author-name="{{ author.name }}" style="text-decoration: none; color: inherit;">
         <div class="cover-wrap">
             {% if author.has_photo %}
             <img src="{{ url_for('author_photo_thumb', author_name=author.name, v=author.photo_hash) }}" alt="{{ author.name }}" loading="lazy" style="object-position: center top;">
@@ -77,6 +86,34 @@ function updateAuthorSort() {
     </a>
     {% endfor %}
 </div>
+<div id="authorFilterEmpty" class="empty-state author-filter-empty" aria-live="polite" hidden>
+    <p data-i18n="authors.noMatches">No authors match that name.</p>
+</div>
+
+<script>
+(function() {
+    var filter = document.getElementById('authorFilter');
+    var cards = Array.prototype.slice.call(document.querySelectorAll('[data-author-name]'));
+    var emptyState = document.getElementById('authorFilterEmpty');
+    if (!filter || !cards.length) return;
+
+    function filterAuthors() {
+        var query = filter.value.trim().toLowerCase();
+        var visibleCount = 0;
+
+        cards.forEach(function(card) {
+            var authorName = (card.dataset.authorName || '').toLowerCase();
+            var matches = !query || authorName.indexOf(query) !== -1;
+            card.hidden = !matches;
+            if (matches) visibleCount += 1;
+        });
+
+        emptyState.hidden = visibleCount !== 0;
+    }
+
+    filter.addEventListener('input', filterAuthors);
+}());
+</script>
 
 {% else %}
 <div class="empty-state">

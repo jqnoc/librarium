@@ -440,6 +440,10 @@
 
         // ── Authors page ────────────────────────────────────────────────
         'authors.title':     { en: 'Authors',       es: 'Autores' },
+        'authors.filterByName': { en: 'Filter by name:', es: 'Filtrar por nombre:' },
+        'authors.filterPlaceholder': { en: 'Author name', es: 'Nombre del autor' },
+        'authors.filterAriaLabel': { en: 'Filter authors by name', es: 'Filtrar autores por nombre' },
+        'authors.noMatches':  { en: 'No authors match that name.', es: 'Ningún autor coincide con ese nombre.' },
         'authors.sortBy':    { en: 'Sort by:',      es: 'Ordenar por:' },
         'authors.sortName':  { en: 'Name',          es: 'Nombre' },
         'authors.sortBooks': { en: 'Number of Books', es: 'Número de Libros' },
