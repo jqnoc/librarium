@@ -57,31 +57,32 @@
                 <td><span class="badge source-type-{{ s.type }}"><span data-i18n="sources.type.{{ s.type }}">{{ s.type | source_type_label }}</span></span></td>
                 <td>
                     <div class="source-table-details">
+                        <span class="source-table-detail-with-action">
                         {% if s.type == 'web_store' and s.url %}
-                        <span class="source-table-detail-with-action">
                             <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
-                        </span>
                         {% elif is_place_type and s.address %}
-                        <span class="source-table-detail-with-action">
                             <span>{{ s.address }}</span>
-                            {% if has_coordinates %}
-                            <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
-                            {% endif %}
-                        </span>
-                        {% else %}
-                        <span class="source-table-detail-with-action">
+                        {% elif not (is_event_type and (s.start_date or s.end_date)) %}
                             <span>—</span>
-                            {% if is_place_type and has_coordinates %}
-                            <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                        {% endif %}
+
+                        {% if is_event_type and (s.start_date or s.end_date) %}
+                        {% if s.address %}<span class="source-table-event-separator" aria-hidden="true">·</span>{% endif %}
+                        <span class="source-table-event-dates">
+                            {% if s.start_date and s.end_date %}
+                            <span data-i18n="sources.eventRangeFrom">from</span> {{ s.start_date | display_date }} <span data-i18n="sources.eventRangeTo">to</span> {{ s.end_date | display_date }}
+                            {% elif s.start_date %}
+                            <span data-i18n="sources.eventFromDate">from</span> {{ s.start_date | display_date }}
+                            {% else %}
+                            <span data-i18n="sources.eventUntilDate">until</span> {{ s.end_date | display_date }}
                             {% endif %}
                         </span>
                         {% endif %}
-                        {% if is_event_type and (s.start_date or s.end_date) %}
-                        <span class="source-table-event-dates">
-                            {% if s.start_date %}<span><span data-i18n="sources.eventStarts">Starts</span>: {{ s.start_date | display_date }}</span>{% endif %}
-                            {% if s.end_date %}<span><span data-i18n="sources.eventEnds">Ends</span>: {{ s.end_date | display_date }}</span>{% endif %}
-                        </span>
+
+                        {% if is_place_type and has_coordinates %}
+                        <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
                         {% endif %}
+                        </span>
                     </div>
                 </td>
                 <td>

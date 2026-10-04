@@ -1798,15 +1798,20 @@ select.form-control { cursor: pointer; }
 }
 
 .source-table-details {
-    display: grid;
-    gap: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
 }
 
 .source-table-event-dates {
-    display: grid;
-    gap: 0.15rem;
     color: var(--lb-text-light);
     font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.source-table-event-separator {
+    color: var(--lb-text-light);
 }
 
 .source-table-link {
