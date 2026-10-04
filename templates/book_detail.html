@@ -199,7 +199,7 @@
             {% if source_obj %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="{{ 'book.giftFrom' if info.get('is_gift') else 'book.purchasePlace' }}">{{ 'Gift From' if info.get('is_gift') else 'Purchase Place' }}</div>
-                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--lb-text-light); font-size: 0.85em;">({{ source_obj.type | source_type_label }})</span></div>
+                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--lb-text-light); font-size: 0.85em;">(<span data-i18n="sources.type.{{ source_obj.type }}">{{ source_obj.type | source_type_label }}</span>)</span></div>
             </div>
             {% endif %}
             {% if info.get('purchase_date') %}
@@ -222,7 +222,7 @@
             {% if source_obj %}
             <div class="meta-item">
                 <div class="meta-label" data-i18n="book.originalOwner">Original Owner</div>
-                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--lb-text-light); font-size: 0.85em;">({{ source_obj.type | source_type_label }})</span></div>
+                <div class="meta-value">{{ source_obj.name }} <span style="color: var(--lb-text-light); font-size: 0.85em;">(<span data-i18n="sources.type.{{ source_obj.type }}">{{ source_obj.type | source_type_label }}</span>)</span></div>
             </div>
             {% endif %}
             {% if info.get('borrowed_start') %}

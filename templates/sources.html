@@ -9,7 +9,7 @@
 {% block content %}
 <h1 data-i18n="sources.title">Sources</h1>
 <p style="color: var(--lb-text-light); margin-bottom: 1.5rem;" data-i18n="sources.desc">
-    Manage places and people from where you acquire or borrow books.
+    Manage places, people, and events from where you acquire or borrow books.
 </p>
 
 {% if source_map_points or source_map_missing_count %}
@@ -17,7 +17,7 @@
     <div class="source-panel-header">
         <div>
             <h2 data-i18n="sources.mapTitle">Place Map</h2>
-            <p data-i18n="sources.mapDesc">Physical stores and libraries with coordinates appear here.</p>
+            <p data-i18n="sources.mapDesc">Physical stores, libraries, and events with coordinates appear here.</p>
         </div>
         {% if source_map_missing_count %}
         <span class="badge source-meta-badge">{{ source_map_missing_count }} <span data-i18n="sources.missingCoordinates">missing coordinates</span></span>
@@ -26,7 +26,7 @@
     {% if source_map_points %}
     <div id="sourcesMap" class="sources-map" aria-label="Sources map"></div>
     {% else %}
-    <div class="sources-map-empty" data-i18n="sources.mapEmpty">Add coordinates to your physical stores and libraries to display them on the map.</div>
+    <div class="sources-map-empty" data-i18n="sources.mapEmpty">Add coordinates to your physical stores, libraries, and events to display them on the map.</div>
     {% endif %}
 </section>
 {% endif %}
@@ -45,32 +45,44 @@
         <tbody>
             {% for s in sources %}
             {% set is_place_type = s.type in place_source_types %}
+            {% set is_event_type = s.type in event_source_types %}
+            {% set is_closable_type = s.type in closable_source_types %}
             {% set has_coordinates = s.latitude and s.longitude %}
             <tr id="source-row-{{ loop.index0 }}">
                 <td>
                     <div class="source-table-name">
-                        <strong class="source-table-name-text{{ ' source-table-name-text-closed' if is_place_type and s.is_permanently_closed else '' }}">{{ s | source_display_label(false) }}</strong>
+                        <strong class="source-table-name-text{{ ' source-table-name-text-closed' if is_closable_type and s.is_permanently_closed else '' }}">{{ s | source_display_label(false) }}</strong>
                     </div>
                 </td>
-                <td><span class="badge source-type-{{ s.type }}">{{ s.type | source_type_label }}</span></td>
+                <td><span class="badge source-type-{{ s.type }}"><span data-i18n="sources.type.{{ s.type }}">{{ s.type | source_type_label }}</span></span></td>
                 <td>
-                    {% if s.type == 'web_store' and s.url %}
-                    <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
-                    {% elif is_place_type and s.address %}
-                    <span class="source-table-detail-with-action">
-                        <span>{{ s.address }}</span>
-                        {% if has_coordinates %}
-                        <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                    <div class="source-table-details">
+                        {% if s.type == 'web_store' and s.url %}
+                        <span class="source-table-detail-with-action">
+                            <a href="{{ s.url }}" target="_blank" rel="noopener" class="source-table-link">{{ s.url }}</a>
+                        </span>
+                        {% elif is_place_type and s.address %}
+                        <span class="source-table-detail-with-action">
+                            <span>{{ s.address }}</span>
+                            {% if has_coordinates %}
+                            <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                            {% endif %}
+                        </span>
+                        {% else %}
+                        <span class="source-table-detail-with-action">
+                            <span>—</span>
+                            {% if is_place_type and has_coordinates %}
+                            <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                            {% endif %}
+                        </span>
                         {% endif %}
-                    </span>
-                    {% else %}
-                    <span class="source-table-detail-with-action">
-                        <span>—</span>
-                        {% if is_place_type and has_coordinates %}
-                        <button type="button" class="source-table-link source-map-focus-btn" data-source-map-target="{{ s.id }}" data-i18n-title="sources.openInMap" aria-label="Show in Map" title="Show in Map">📍</button>
+                        {% if is_event_type and (s.start_date or s.end_date) %}
+                        <span class="source-table-event-dates">
+                            {% if s.start_date %}<span><span data-i18n="sources.eventStarts">Starts</span>: {{ s.start_date | display_date }}</span>{% endif %}
+                            {% if s.end_date %}<span><span data-i18n="sources.eventEnds">Ends</span>: {{ s.end_date | display_date }}</span>{% endif %}
+                        </span>
                         {% endif %}
-                    </span>
-                    {% endif %}
+                    </div>
                 </td>
                 <td>
                     <div class="source-actions">
@@ -90,7 +102,7 @@
                                 <label data-i18n="sources.type">Type</label>
                                 <select name="source_type" class="form-control" data-source-type-select>
                                     {% for key, label in source_types.items() %}
-                                    <option value="{{ key }}" {{ 'selected' if s.type == key }}>{{ label }}</option>
+                                    <option value="{{ key }}" data-i18n="sources.type.{{ key }}" {{ 'selected' if s.type == key }}>{{ label }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -123,10 +135,23 @@
                                     <input type="text" name="longitude" class="form-control" value="{{ s.longitude or '' }}" placeholder="-3.7038">
                                 </div>
                             </div>
-                            <label class="source-checkbox-row">
+                            <label class="source-checkbox-row" data-closable-fields>
                                 <input type="checkbox" name="is_permanently_closed" value="1" {{ 'checked' if s.is_permanently_closed else '' }}>
                                 <span data-i18n="sources.closedCheckbox">Permanently closed</span>
                             </label>
+                        </div>
+
+                        <div class="source-event-fields is-hidden" data-event-fields>
+                            <div class="form-row source-form-grid">
+                                <div class="form-group">
+                                    <label data-i18n="sources.eventStartDate">Event start date</label>
+                                    <input type="date" name="start_date" class="form-control" value="{{ s.start_date or '' }}">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="sources.eventEndDate">Event end date</label>
+                                    <input type="date" name="end_date" class="form-control" value="{{ s.end_date or '' }}">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -158,7 +183,7 @@
                 <label data-i18n="sources.type">Type</label>
                 <select name="source_type" class="form-control" required data-source-type-select>
                     {% for key, label in source_types.items() %}
-                    <option value="{{ key }}">{{ label }}</option>
+                    <option value="{{ key }}" data-i18n="sources.type.{{ key }}">{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -191,10 +216,23 @@
                     <input type="text" name="longitude" class="form-control" placeholder="-3.7038">
                 </div>
             </div>
-            <label class="source-checkbox-row">
+            <label class="source-checkbox-row" data-closable-fields>
                 <input type="checkbox" name="is_permanently_closed" value="1">
                 <span data-i18n="sources.closedCheckbox">Permanently closed</span>
             </label>
+        </div>
+
+        <div class="source-event-fields is-hidden" data-event-fields>
+            <div class="form-row source-form-grid">
+                <div class="form-group">
+                    <label data-i18n="sources.eventStartDate">Event start date</label>
+                    <input type="date" name="start_date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="sources.eventEndDate">Event end date</label>
+                    <input type="date" name="end_date" class="form-control">
+                </div>
+            </div>
         </div>
 
         <div class="form-group">
@@ -213,6 +251,8 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 const PLACE_SOURCE_TYPES = new Set({{ place_source_types | tojson }});
+const EVENT_SOURCE_TYPES = new Set({{ event_source_types | tojson }});
+const CLOSABLE_SOURCE_TYPES = new Set({{ closable_source_types | tojson }});
 const SOURCE_MAP_POINTS = {{ source_map_points | tojson }};
 let activeSourceMarkerEl = null;
 let activeSourceMarkerTimer = null;
@@ -223,11 +263,22 @@ function toggleSourceEdit(id) {
     panel.classList.toggle('active');
 }
 
-function updatePlaceFields(form) {
+function updateSourceFields(form) {
     const select = form.querySelector('[data-source-type-select]');
     const placeFields = form.querySelector('[data-place-fields]');
-    if (!select || !placeFields) return;
-    placeFields.classList.toggle('is-hidden', !PLACE_SOURCE_TYPES.has(select.value));
+    const eventFields = form.querySelector('[data-event-fields]');
+    const closableFields = form.querySelector('[data-closable-fields]');
+    if (!select) return;
+    const sourceType = select.value;
+    if (placeFields) {
+        placeFields.classList.toggle('is-hidden', !PLACE_SOURCE_TYPES.has(sourceType));
+    }
+    if (eventFields) {
+        eventFields.classList.toggle('is-hidden', !EVENT_SOURCE_TYPES.has(sourceType));
+    }
+    if (closableFields) {
+        closableFields.classList.toggle('is-hidden', !CLOSABLE_SOURCE_TYPES.has(sourceType));
+    }
 }
 
 function sourceT(key, fallback) {
@@ -240,9 +291,9 @@ function sourceT(key, fallback) {
 document.querySelectorAll('[data-source-form]').forEach(function(form) {
     const select = form.querySelector('[data-source-type-select]');
     if (!select) return;
-    updatePlaceFields(form);
+    updateSourceFields(form);
     select.addEventListener('change', function() {
-        updatePlaceFields(form);
+        updateSourceFields(form);
     });
 });
 
@@ -274,7 +325,7 @@ if (SOURCE_MAP_POINTS.length) {
             ).addTo(map);
             const popup = [
                 '<strong>' + point.name + '</strong>',
-                point.type_label,
+                sourceT('sources.type.' + point.type_key, point.type_label),
                 point.location || point.address || '',
                 point.is_permanently_closed ? sourceT('sources.closed', 'Permanently Closed') : '',
                 point.url ? '<a href="' + point.url + '" target="_blank" rel="noopener">' + sourceT('sources.url', 'URL') + '</a>' : ''

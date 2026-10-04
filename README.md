@@ -139,8 +139,8 @@ group's average, so groups with fewer ratings are not under-weighted.
 
 ### Sources
 
-- Track where books were acquired (bookshop, library, gift, person, etc.)
-- Store name, type, city, country, URL, and notes for each source
+- Track where books were acquired (bookshop, library, gift, person, event, etc.)
+- Store name, type, address, coordinates, event dates, URL, and notes for each source
 - Sources are shared across all libraries
 
 ### Statistics
@@ -470,8 +470,8 @@ group's average, so groups with fewer ratings are not under-weighted.
 
 ### Sources
 
-- Track where books were acquired (bookshop, library, gift, etc.)
-- Store name, type, city, country, URL, and notes for each source
+- Track where books were acquired (bookshop, library, gift, event, etc.)
+- Store name, type, address, coordinates, event dates, URL, and notes for each source
 - Sources are shared across all libraries
 
 ### Statistics

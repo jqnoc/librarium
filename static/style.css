@@ -61,6 +61,8 @@
     --lb-source-library-fg:        #065F46;
     --lb-source-person-bg:         #EDE9FE;
     --lb-source-person-fg:         #5B21B6;
+    --lb-source-event-bg:          #FCE7D6;
+    --lb-source-event-fg:          #9A3412;
 
     --lb-table-header:  var(--lb-dark-mid);
 }
@@ -98,6 +100,8 @@ html[data-theme="dark"] {
     --lb-source-library-fg:        #8BE0C2;
     --lb-source-person-bg:         #30254B;
     --lb-source-person-fg:         #D0B8FF;
+    --lb-source-event-bg:          #4A2C1D;
+    --lb-source-event-fg:          #FFB38A;
     --lb-table-header:             #294957;
 }
 
@@ -1793,6 +1797,18 @@ select.form-control { cursor: pointer; }
     gap: 0.45rem;
 }
 
+.source-table-details {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.source-table-event-dates {
+    display: grid;
+    gap: 0.15rem;
+    color: var(--lb-text-light);
+    font-size: 0.9rem;
+}
+
 .source-table-link {
     color: var(--lb-deep-orange);
     text-decoration: none;
@@ -1885,6 +1901,11 @@ select.form-control { cursor: pointer; }
 .source-map-marker-library {
     background: var(--lb-source-library-bg);
     color: var(--lb-source-library-fg);
+}
+
+.source-map-marker-event {
+    background: var(--lb-source-event-bg);
+    color: var(--lb-source-event-fg);
 }
 
 .source-map-marker-physical_store.source-map-marker-closed {
@@ -2045,7 +2066,8 @@ select.form-control { cursor: pointer; }
     gap: 0.6rem;
 }
 
-.source-place-fields {
+.source-place-fields,
+.source-event-fields {
     display: grid;
     gap: 0.85rem;
     padding: 1rem;
@@ -2054,7 +2076,9 @@ select.form-control { cursor: pointer; }
     background: rgba(83, 125, 150, 0.05);
 }
 
-.source-place-fields.is-hidden {
+.source-place-fields.is-hidden,
+.source-event-fields.is-hidden,
+.source-checkbox-row.is-hidden {
     display: none;
 }
 
@@ -2889,6 +2913,7 @@ body.reading-session-modal-open { overflow: hidden; }
 .source-type-web_store      { background: var(--lb-source-web-store-bg); color: var(--lb-source-web-store-fg); }
 .source-type-library        { background: var(--lb-source-library-bg); color: var(--lb-source-library-fg); }
 .source-type-person         { background: var(--lb-source-person-bg); color: var(--lb-source-person-fg); }
+.source-type-event          { background: var(--lb-source-event-bg); color: var(--lb-source-event-fg); }
 .modal-box .btn-group { justify-content: center; }
 
 /* ── Ratings section ───────────────────────────────────────────────────── */
@@ -5312,7 +5337,8 @@ html[data-theme="dark"] .rating-badge {
     color: #F8D889;
     border-color: #846820;
 }
-html[data-theme="dark"] .source-place-fields {
+html[data-theme="dark"] .source-place-fields,
+html[data-theme="dark"] .source-event-fields {
     background: rgba(100, 160, 177, .12);
 }
 html[data-theme="dark"] .modal-overlay {

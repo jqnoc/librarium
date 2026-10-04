@@ -967,6 +967,8 @@ def init_schema() -> None:
             address                 TEXT    NOT NULL DEFAULT '',
             latitude                TEXT    NOT NULL DEFAULT '',
             longitude               TEXT    NOT NULL DEFAULT '',
+            start_date              TEXT    NOT NULL DEFAULT '',
+            end_date                TEXT    NOT NULL DEFAULT '',
             is_permanently_closed   INTEGER NOT NULL DEFAULT 0,
             url                     TEXT    NOT NULL DEFAULT '',
             notes                   TEXT    NOT NULL DEFAULT ''
@@ -1194,6 +1196,7 @@ def _run_all_migrations() -> None:
     migrate_add_performance_indexes()
     migrate_remove_source_short_name()
     migrate_add_source_place_details()
+    migrate_add_source_event_dates()
     migrate_add_genres()
     migrate_add_taxonomy_fields()
     migrate_add_work_taxonomy()
@@ -2504,6 +2507,29 @@ def migrate_add_source_place_details() -> None:
     if changed:
         db.commit()
         print(">> Migration complete — sources now include place metadata.")
+
+    db.close()
+
+
+def migrate_add_source_event_dates() -> None:
+    """Add the date range fields used by event sources."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    cols = [r[1] for r in db.execute("PRAGMA table_info(sources)").fetchall()]
+    changed = False
+
+    if "start_date" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN start_date TEXT NOT NULL DEFAULT ''")
+        changed = True
+    if "end_date" not in cols:
+        db.execute("ALTER TABLE sources ADD COLUMN end_date TEXT NOT NULL DEFAULT ''")
+        changed = True
+
+    if changed:
+        db.commit()
+        print(">> Migration complete — sources now include event dates.")
 
     db.close()
 
@@ -4356,9 +4382,12 @@ SOURCE_TYPES = {
     "web_store": "Web Store",
     "library": "Library",
     "person": "Person",
+    "event": "Event",
 }
-PLACE_SOURCE_TYPES = {"physical_store", "library"}
-PURCHASE_SOURCE_TYPES = {"physical_store", "web_store"}
+PLACE_SOURCE_TYPES = {"physical_store", "library", "event"}
+EVENT_SOURCE_TYPES = {"event"}
+CLOSABLE_SOURCE_TYPES = {"physical_store", "library"}
+PURCHASE_SOURCE_TYPES = {"physical_store", "web_store", "event"}
 BORROW_SOURCE_TYPES = {"library", "person"}
 GIFT_SOURCE_TYPES = {"person"}
 
@@ -4414,6 +4443,8 @@ def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str
         "address": "",
         "latitude": "",
         "longitude": "",
+        "start_date": "",
+        "end_date": "",
         "is_permanently_closed": 0,
         "url": form.get("url", "").strip(),
         "notes": form.get("notes", "").strip(),
@@ -4424,7 +4455,9 @@ def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str
 
     if source_type in PLACE_SOURCE_TYPES:
         data["address"] = form.get("address", "").strip()
-        data["is_permanently_closed"] = 1 if form.get("is_permanently_closed") else 0
+        data["is_permanently_closed"] = (
+            1 if source_type in CLOSABLE_SOURCE_TYPES and form.get("is_permanently_closed") else 0
+        )
         latitude_raw = form.get("latitude", "").strip()
         longitude_raw = form.get("longitude", "").strip()
 
@@ -4444,6 +4477,28 @@ def _clean_source_place_fields(form, source_type: str) -> tuple[dict | None, str
             data["latitude"] = _format_coordinate(latitude)
             data["longitude"] = _format_coordinate(longitude)
 
+    if source_type in EVENT_SOURCE_TYPES:
+        start_date_raw = form.get("start_date", "").strip()
+        end_date_raw = form.get("end_date", "").strip()
+        start_day = None
+        end_day = None
+
+        if start_date_raw:
+            try:
+                start_day = date.fromisoformat(start_date_raw)
+            except ValueError:
+                return None, "Event start date must be a valid date."
+        if end_date_raw:
+            try:
+                end_day = date.fromisoformat(end_date_raw)
+            except ValueError:
+                return None, "Event end date must be a valid date."
+        if start_day and end_day and end_day < start_day:
+            return None, "Event end date cannot be before the start date."
+
+        data["start_date"] = start_day.isoformat() if start_day else ""
+        data["end_date"] = end_day.isoformat() if end_day else ""
+
     return data, None
 
 
@@ -4457,6 +4512,8 @@ def _prepare_source_directory_rows(sources: list[dict]) -> tuple[list[dict], lis
         rows = [dict(source) for source in sources if source.get("type") == type_key]
         for source in rows:
             source["is_place_type"] = type_key in PLACE_SOURCE_TYPES
+            source["is_event_type"] = type_key in EVENT_SOURCE_TYPES
+            source["is_closable_type"] = type_key in CLOSABLE_SOURCE_TYPES
             source["has_coordinates"] = bool((source.get("latitude") or "").strip() and (source.get("longitude") or "").strip())
             if source["is_place_type"]:
                 if source["has_coordinates"]:
@@ -10155,6 +10212,8 @@ def sources_list():
         sources=sources,
         source_types=SOURCE_TYPES,
         place_source_types=sorted(PLACE_SOURCE_TYPES),
+        event_source_types=sorted(EVENT_SOURCE_TYPES),
+        closable_source_types=sorted(CLOSABLE_SOURCE_TYPES),
         source_sections=source_sections,
         source_map_points=source_map_points,
         source_map_missing_count=source_map_missing_count,
@@ -10171,7 +10230,7 @@ def add_source():
         return redirect(url_for("sources_list"))
 
     db.execute(
-        "INSERT INTO sources (id, type, name, location, address, latitude, longitude, is_permanently_closed, url, notes) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO sources (id, type, name, location, address, latitude, longitude, start_date, end_date, is_permanently_closed, url, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             str(uuid_module.uuid4()),
             payload["source_type"],
@@ -10180,6 +10239,8 @@ def add_source():
             payload["address"],
             payload["latitude"],
             payload["longitude"],
+            payload["start_date"],
+            payload["end_date"],
             payload["is_permanently_closed"],
             payload["url"],
             payload["notes"],
@@ -10206,7 +10267,7 @@ def edit_source(source_id: str):
     db.execute("""
         UPDATE sources
         SET type=?, name=?, location=?, address=?, latitude=?, longitude=?,
-            is_permanently_closed=?, url=?, notes=?
+            start_date=?, end_date=?, is_permanently_closed=?, url=?, notes=?
         WHERE id=?
     """, (
         payload["source_type"],
@@ -10215,6 +10276,8 @@ def edit_source(source_id: str):
         payload["address"],
         payload["latitude"],
         payload["longitude"],
+        payload["start_date"],
+        payload["end_date"],
         payload["is_permanently_closed"],
         payload["url"],
         payload["notes"],
