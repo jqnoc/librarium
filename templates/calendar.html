@@ -31,6 +31,10 @@
     <a href="{{ url_for('calendar_view', year=next_year, month=next_month, mode='month') }}" class="cal-nav-btn" title="Next month">›</a>
     {% else %}
     <div class="cal-year-controls">
+        <label class="cal-group-months-toggle">
+            <input id="calGroupByMonth" type="checkbox"{% if group_by_month %} checked{% endif %}>
+            <span data-i18n="cal.groupByMonth">Organize books by month</span>
+        </label>
         <select id="calYearScope" class="cal-select" data-i18n-aria-label="cal.yearScope" aria-label="Year scope">
             <option value="current"{% if year_scope == 'current' %} selected{% endif %} data-i18n="cal.currentYear">Current Year</option>
             <option value="five"{% if year_scope == 'five' %} selected{% endif %} data-i18n="cal.lastFiveYears">Last Five Years</option>
@@ -57,7 +61,7 @@
         </div>
     </div>
     {% endif %}
-    <a href="{{ url_for('calendar_view', mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
+    <a href="{{ url_for('calendar_view', year=today_year, month=today_month, mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -106,34 +110,52 @@
 </div>
 {% else %}
 <div class="cal-grid cal-year-grid">
+    {% if group_by_month %}
     <div class="cal-year-header">
         <div class="cal-year-corner"></div>
         {% for month_key in month_keys %}
         <div class="cal-header-cell" data-i18n="{{ month_key }}">{{ month_names[loop.index0] }}</div>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="cal-year-header cal-year-header--all">
+        <div class="cal-year-corner"></div>
+        <div class="cal-header-cell" data-i18n="cal.booksRead">Books read</div>
+    </div>
+    {% endif %}
     {% for row in year_rows %}
     <div class="cal-year-row">
         <div class="cal-year-label">{{ row.year }}</div>
+        {% if group_by_month %}
         {% for cell in row.cells %}
         <div class="cal-month-cell{% if cell.is_today %} cal-month-cell--today{% endif %}{% if cell.events %} cal-month-cell--has-events{% endif %}"
              data-cal-period="{{ cell.key }}" aria-label="{{ month_names[cell.month - 1] }} {{ row.year }}">
             {% if cell.books %}
             <div class="cal-covers cal-month-covers">
-                {% for book in cell.books[:8] %}
+                {% for book in cell.books %}
                 {% if book.has_cover %}
                 <img src="/cover_thumb/{{ book.book_id }}?v={{ book.cover_hash }}" class="cal-cover-thumb" loading="lazy" alt="">
                 {% else %}
                 <div class="cal-cover-ph">📖</div>
                 {% endif %}
                 {% endfor %}
-                {% if cell.books|length > 8 %}
-                <span class="cal-dot-more">+{{ cell.books|length - 8 }}</span>
-                {% endif %}
             </div>
             {% endif %}
         </div>
         {% endfor %}
+        {% else %}
+        <div class="cal-year-books-cell" data-cal-period="{{ row.year }}">
+            <div class="cal-covers cal-year-covers">
+                {% for book in row.books %}
+                {% if book.has_cover %}
+                <img src="/cover_thumb/{{ book.book_id }}?v={{ book.cover_hash }}" class="cal-cover-thumb" loading="lazy" alt="">
+                {% else %}
+                <div class="cal-cover-ph">📖</div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -158,7 +180,9 @@
     // Pre-build event data keyed by date for fast lookup
     const eventsByDate = {{ _events_json | safe }};
     const eventsByMonth = {{ _period_events_json | safe }};
+    const eventsByYear = {{ _year_events_json | safe }};
     const calendarMode = '{{ mode }}';
+    const groupByMonth = {{ 'true' if group_by_month else 'false' }};
     const currentYear = {{ year }};
     const todayYear = {{ today_year }};
     const todayMonth = {{ today_month }};
@@ -484,13 +508,16 @@
     }
 
     function initYearMode() {
-        var cells = Array.prototype.slice.call(document.querySelectorAll('.cal-month-cell[data-cal-period]'));
+        var cellSelector = groupByMonth ? '.cal-month-cell[data-cal-period]' : '.cal-year-books-cell[data-cal-period]';
+        var selectedClass = groupByMonth ? 'cal-month-cell--selected' : 'cal-year-books-cell--selected';
+        var cells = Array.prototype.slice.call(document.querySelectorAll(cellSelector));
         var periodOrder = cells.map(function(cell) { return cell.getAttribute('data-cal-period'); });
+        var eventMap = groupByMonth ? eventsByMonth : eventsByYear;
         var selectedPeriods = [];
         var lastClickedPeriod = null;
 
         function clearPeriodSelection() {
-            cells.forEach(function(cell) { cell.classList.remove('cal-month-cell--selected'); });
+            cells.forEach(function(cell) { cell.classList.remove(selectedClass); });
             selectedPeriods = [];
         }
 
@@ -503,6 +530,17 @@
             return periodOrder.slice(start, end + 1);
         }
 
+        function getCellForPeriod(period) {
+            for (var i = 0; i < cells.length; i++) {
+                if (cells[i].getAttribute('data-cal-period') === period) return cells[i];
+            }
+            return null;
+        }
+
+        function formatSelectedPeriod(period) {
+            return groupByMonth ? formatPeriod(period) : period;
+        }
+
         function updateYearDetail() {
             if (selectedPeriods.length === 0) {
                 detail.style.display = 'none';
@@ -511,11 +549,11 @@
 
             selectedPeriods.sort();
             if (selectedPeriods.length === 1) {
-                detailTitle.textContent = formatPeriod(selectedPeriods[0]);
+                detailTitle.textContent = formatSelectedPeriod(selectedPeriods[0]);
             } else {
-                detailTitle.textContent = formatPeriod(selectedPeriods[0]) + ' - ' + formatPeriod(selectedPeriods[selectedPeriods.length - 1]);
+                detailTitle.textContent = formatSelectedPeriod(selectedPeriods[0]) + ' - ' + formatSelectedPeriod(selectedPeriods[selectedPeriods.length - 1]);
             }
-            var agg = agglutinateByBook(selectedPeriods, eventsByMonth);
+            var agg = agglutinateByBook(selectedPeriods, eventMap);
             detailBody.innerHTML = agg.map(renderAgglutinatedEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivityPeriod', 'No activity in this period') + '</p>';
             detail.style.display = '';
             detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -528,23 +566,23 @@
                     clearPeriodSelection();
                     selectedPeriods = getPeriodRange(lastClickedPeriod, period);
                     selectedPeriods.forEach(function(selectedPeriod) {
-                        var selectedCell = document.querySelector('.cal-month-cell[data-cal-period="' + selectedPeriod + '"]');
-                        if (selectedCell) selectedCell.classList.add('cal-month-cell--selected');
+                        var selectedCell = getCellForPeriod(selectedPeriod);
+                        if (selectedCell) selectedCell.classList.add(selectedClass);
                     });
                 } else if (e.ctrlKey || e.metaKey) {
                     var idx = selectedPeriods.indexOf(period);
                     if (idx >= 0) {
                         selectedPeriods.splice(idx, 1);
-                        this.classList.remove('cal-month-cell--selected');
+                        this.classList.remove(selectedClass);
                     } else {
                         selectedPeriods.push(period);
-                        this.classList.add('cal-month-cell--selected');
+                        this.classList.add(selectedClass);
                     }
                     lastClickedPeriod = period;
                 } else {
                     clearPeriodSelection();
                     selectedPeriods = [period];
-                    this.classList.add('cal-month-cell--selected');
+                    this.classList.add(selectedClass);
                     lastClickedPeriod = period;
                 }
                 updateYearDetail();
@@ -555,11 +593,13 @@
         var rangeControls = document.getElementById('calYearRange');
         var startYearSelect = document.getElementById('calStartYear');
         var endYearSelect = document.getElementById('calEndYear');
+        var groupByMonthControl = document.getElementById('calGroupByMonth');
 
         function navigateToYearScope() {
             var params = new URLSearchParams();
             params.set('mode', 'year');
             params.set('year_scope', scopeSelect.value);
+            params.set('group_by_month', groupByMonthControl.checked ? '1' : '0');
             if (scopeSelect.value === 'range') {
                 params.set('start_year', startYearSelect.value);
                 params.set('end_year', endYearSelect.value);
@@ -577,6 +617,7 @@
         });
         startYearSelect.addEventListener('change', navigateToYearScope);
         endYearSelect.addEventListener('change', navigateToYearScope);
+        groupByMonthControl.addEventListener('change', navigateToYearScope);
         updateRangeVisibility();
     }
 

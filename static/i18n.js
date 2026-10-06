@@ -829,6 +829,8 @@
         'cal.yearScope':             { en: 'Year scope',                 es: 'Intervalo de años' },
         'cal.startYear':             { en: 'Start',                     es: 'Inicio' },
         'cal.endYear':               { en: 'Finish',                    es: 'Fin' },
+        'cal.groupByMonth':          { en: 'Organize books by month',    es: 'Organizar libros por mes' },
+        'cal.booksRead':             { en: 'Books read',                 es: 'Libros leídos' },
         'cal.today':                 { en: 'Today',                    es: 'Hoy' },
         'cal.noActivity':            { en: 'No activity on this day',  es: 'Sin actividad este día' },
         'cal.noActivityPeriod':      { en: 'No activity in this period', es: 'Sin actividad en este período' },

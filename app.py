@@ -6832,15 +6832,25 @@ def calendar_view():
     lf, lp = _lib_filter(lib_ids)
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
 
-    mode = request.args.get("mode", "month").strip().lower()
+    today = date.today()
+    mode = (request.args.get("mode") or request.cookies.get("librarium_calendar_mode", "month")).strip().lower()
     if mode not in ("month", "year"):
         mode = "month"
+    requested_group_by_month = request.args.get("group_by_month")
+    if requested_group_by_month is None:
+        requested_group_by_month = request.cookies.get("librarium_calendar_group_by_month")
+    group_by_month = str(requested_group_by_month or "1").strip().lower() not in ("0", "false", "off", "no")
 
     # Determine requested month (defaults to current)
-    today = date.today()
+    requested_year = request.args.get("year")
+    if requested_year is None:
+        requested_year = request.cookies.get("librarium_calendar_year")
+    requested_month = request.args.get("month")
+    if requested_month is None:
+        requested_month = request.cookies.get("librarium_calendar_month")
     try:
-        year = int(request.args.get("year", today.year))
-        month = int(request.args.get("month", today.month))
+        year = int(requested_year) if requested_year is not None else today.year
+        month = int(requested_month) if requested_month is not None else today.month
         if month < 1 or month > 12:
             raise ValueError
         # Clamp year to a reasonable range
@@ -6934,7 +6944,10 @@ def calendar_view():
         avail_years.add(year)
     available_years = sorted(avail_years, reverse=True)
 
-    year_scope = (request.args.get("year_scope") or "all").strip().lower()
+    requested_year_scope = request.args.get("year_scope")
+    if requested_year_scope is None:
+        requested_year_scope = request.cookies.get("librarium_calendar_year_scope")
+    year_scope = (requested_year_scope or "all").strip().lower()
     if year_scope not in ("current", "five", "all", "range"):
         year_scope = "all"
 
@@ -6947,8 +6960,14 @@ def calendar_view():
             return None
         return max(2000, min(2099, parsed))
 
-    range_start_year = _parse_calendar_year(request.args.get("start_year"))
-    range_end_year = _parse_calendar_year(request.args.get("end_year"))
+    requested_start_year = request.args.get("start_year")
+    if requested_start_year is None:
+        requested_start_year = request.cookies.get("librarium_calendar_start_year")
+    requested_end_year = request.args.get("end_year")
+    if requested_end_year is None:
+        requested_end_year = request.cookies.get("librarium_calendar_end_year")
+    range_start_year = _parse_calendar_year(requested_start_year)
+    range_end_year = _parse_calendar_year(requested_end_year)
     if range_start_year is None:
         range_start_year = min(available_years) if available_years else today.year
     if range_end_year is None:
@@ -6973,6 +6992,7 @@ def calendar_view():
 
     year_rows: list[dict] = []
     _period_events_json = "{}"
+    _year_events_json = "{}"
     if mode == "year":
         all_events = _collect_activity_events(db, lf, lp, lf_b, lp_b)
         events_by_period: dict[str, list[dict]] = {}
@@ -6993,22 +7013,38 @@ def calendar_view():
                     "cover_hash": ev["cover_hash"],
                 }
 
+        events_by_year: dict[str, list[dict]] = {}
+        for period_key, period_events in events_by_period.items():
+            events_by_year.setdefault(period_key[:4], []).extend(period_events)
+
         for row_year in display_years:
             cells = []
+            year_books: dict[str, dict] = {}
+            year_events: list[dict] = []
             for row_month in range(1, 13):
                 period_key = f"{row_year:04d}-{row_month:02d}"
+                period_events = events_by_period.get(period_key, [])
+                period_books = books_by_period.get(period_key, {})
+                year_events.extend(period_events)
+                year_books.update(period_books)
                 cells.append({
                     "key": period_key,
                     "month": row_month,
                     "is_today": row_year == today.year and row_month == today.month,
-                    "events": events_by_period.get(period_key, []),
-                    "books": list(books_by_period.get(period_key, {}).values()),
+                    "events": period_events,
+                    "books": list(period_books.values()),
                 })
-            year_rows.append({"year": row_year, "cells": cells})
+            year_rows.append({
+                "year": row_year,
+                "cells": cells,
+                "events": year_events,
+                "books": list(year_books.values()),
+            })
 
         _period_events_json = json.dumps(events_by_period, ensure_ascii=False)
+        _year_events_json = json.dumps(events_by_year, ensure_ascii=False)
 
-    return render_template(
+    response = make_response(render_template(
         "calendar.html",
         mode=mode,
         year=year,
@@ -7022,13 +7058,25 @@ def calendar_view():
         next_year=next_year, next_month=next_month,
         _events_json=_events_json,
         _period_events_json=_period_events_json,
+        _year_events_json=_year_events_json,
         available_years=available_years,
         year_filter_options=year_filter_options,
         year_scope=year_scope,
         range_start_year=range_start_year,
         range_end_year=range_end_year,
+        group_by_month=group_by_month,
         year_rows=year_rows,
-    )
+    ))
+    calendar_cookie_age = 365 * 24 * 3600
+    response.set_cookie("librarium_calendar_mode", mode, max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_year", str(year), max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_month", str(month), max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_year_scope", year_scope, max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_start_year", str(range_start_year), max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_end_year", str(range_end_year), max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_group_by_month", "1" if group_by_month else "0",
+                       max_age=calendar_cookie_age, samesite="Lax")
+    return response
 
 
 # ═══════════════════════════════════════════════════════════════════════════
