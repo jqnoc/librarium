@@ -3988,6 +3988,10 @@ body.reading-session-modal-open { overflow: hidden; }
     --cal-cover-width: 64px;
     --cal-cover-height: 90px;
 }
+.cal-grid--cover-extra-large {
+    --cal-cover-width: 80px;
+    --cal-cover-height: 112px;
+}
 .cal-header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);

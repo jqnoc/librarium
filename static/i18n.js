@@ -835,6 +835,7 @@
         'cal.coverSmall':            { en: 'Small',                      es: 'Pequeño' },
         'cal.coverMedium':           { en: 'Medium',                     es: 'Mediano' },
         'cal.coverLarge':            { en: 'Large',                      es: 'Grande' },
+        'cal.coverExtraLarge':       { en: 'Extra Large',                 es: 'Extra grande' },
         'cal.today':                 { en: 'Today',                    es: 'Hoy' },
         'cal.noActivity':            { en: 'No activity on this day',  es: 'Sin actividad este día' },
         'cal.noActivityPeriod':      { en: 'No activity in this period', es: 'Sin actividad en este período' },

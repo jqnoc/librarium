@@ -67,6 +67,7 @@
             <option value="small"{% if cover_size == 'small' %} selected{% endif %} data-i18n="cal.coverSmall">Small</option>
             <option value="medium"{% if cover_size == 'medium' %} selected{% endif %} data-i18n="cal.coverMedium">Medium</option>
             <option value="large"{% if cover_size == 'large' %} selected{% endif %} data-i18n="cal.coverLarge">Large</option>
+            <option value="extra-large"{% if cover_size == 'extra-large' %} selected{% endif %} data-i18n="cal.coverExtraLarge">Extra Large</option>
         </select>
     </label>
     <a href="{{ url_for('calendar_view', year=today_year, month=today_month, mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>

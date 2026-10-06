@@ -6844,7 +6844,7 @@ def calendar_view():
     if requested_cover_size is None:
         requested_cover_size = request.cookies.get("librarium_calendar_cover_size")
     cover_size = (requested_cover_size or "medium").strip().lower()
-    if cover_size not in ("small", "medium", "large"):
+    if cover_size not in ("small", "medium", "large", "extra-large"):
         cover_size = "medium"
 
     # Determine requested month (defaults to current)
