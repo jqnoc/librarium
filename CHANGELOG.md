@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add an all-years Calendar mode with year rows, month columns, cover previews, and continuous month selection with aggregated activity details
 - add Event sources with address, map coordinates, natural-language date ranges, and purchase-source selection
 - Add incremental SHA-256 image snapshots that deduplicate unchanged full-size images, restore each database with its matching image manifest, and finalize snapshots without relying on a Windows-incompatible directory rename
 - Add a reusable session-based back button with bounded history across page visits, including POST redirects and refreshes, while clearing stale single-entry history before dashboard fallback redirects and treating Series sort variants as one page

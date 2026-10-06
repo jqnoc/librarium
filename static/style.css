@@ -3853,6 +3853,26 @@ body.reading-session-modal-open { overflow: hidden; }
     gap: 0.75rem;
     margin-bottom: 1.25rem;
 }
+.cal-mode-toggle {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-card-bg);
+}
+.cal-mode-btn {
+    padding: 0.4rem 0.75rem;
+    color: var(--lb-text-light);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+.cal-mode-btn:hover { color: var(--lb-deep-orange); }
+.cal-mode-btn.is-active {
+    background: var(--lb-deep-orange);
+    color: var(--lb-white);
+}
 .cal-select {
     padding: 0.35rem 0.6rem;
     border-radius: var(--lb-radius);
@@ -3995,6 +4015,74 @@ body.reading-session-modal-open { overflow: hidden; }
     font-weight: 600;
 }
 
+/* All-years calendar matrix */
+.cal-year-grid {
+    overflow-x: auto;
+}
+.cal-year-header,
+.cal-year-row {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, 0.8fr) repeat(12, minmax(72px, 1fr));
+    min-width: 1000px;
+}
+.cal-year-header {
+    background: var(--lb-dark);
+    color: rgba(255,255,255,.9);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.cal-year-corner {
+    border-right: 1px solid rgba(255,255,255,.12);
+}
+.cal-year-header .cal-header-cell {
+    min-width: 0;
+    padding: 0.6rem 0.25rem;
+    white-space: nowrap;
+}
+.cal-year-row {
+    border-top: 1px solid var(--lb-border);
+}
+.cal-year-label {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0.65rem 0.35rem;
+    background: var(--lb-card-bg);
+    border-right: 1px solid var(--lb-border);
+    color: var(--lb-text);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+.cal-month-cell {
+    min-height: 108px;
+    padding: 0.4rem;
+    border-right: 1px solid var(--lb-border);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.cal-month-cell:last-child { border-right: none; }
+.cal-month-cell:hover { background: rgba(83,125,150,.06); }
+.cal-month-cell--today { background: rgba(68,161,148,.08); }
+.cal-month-cell--selected {
+    background: rgba(83,125,150,.1);
+    box-shadow: inset 0 0 0 2px var(--lb-deep-orange);
+}
+.cal-month-covers {
+    max-height: 82px;
+    overflow: hidden;
+    align-content: flex-start;
+}
+.cal-month-cell .cal-cover-thumb,
+.cal-month-cell .cal-cover-ph {
+    width: 22px;
+    height: 32px;
+}
+
 /* Day detail panel */
 .cal-detail {
     margin-top: 1.25rem;
@@ -4032,6 +4120,11 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .cal-detail-close:hover { background: var(--lb-light-bg); color: var(--lb-text); }
 .cal-detail-body { max-height: 400px; overflow-y: auto; }
+
+@media (max-width: 700px) {
+    .cal-nav { flex-wrap: wrap; }
+    .cal-today-btn { margin-left: 0; }
+}
 
 /* Top rated list */
 .dash-top-rated {

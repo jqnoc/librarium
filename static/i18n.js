@@ -820,8 +820,12 @@
 
         // ── Calendar page ──────────────────────────────────────────────
         'cal.title':                 { en: 'Calendar',                 es: 'Calendario' },
+        'cal.monthView':             { en: 'Month',                    es: 'Mes' },
+        'cal.yearView':              { en: 'Year',                     es: 'Año' },
+        'cal.allYears':              { en: 'All years',                 es: 'Todos los años' },
         'cal.today':                 { en: 'Today',                    es: 'Hoy' },
         'cal.noActivity':            { en: 'No activity on this day',  es: 'Sin actividad este día' },
+        'cal.noActivityPeriod':      { en: 'No activity in this period', es: 'Sin actividad en este período' },
         'cal.mon':                   { en: 'Mon',                      es: 'Lun' },
         'cal.tue':                   { en: 'Tue',                      es: 'Mar' },
         'cal.wed':                   { en: 'Wed',                      es: 'Mié' },

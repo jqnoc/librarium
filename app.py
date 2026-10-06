@@ -6824,13 +6824,17 @@ def stats_year_bought(year: str):
 
 @app.route("/calendar")
 def calendar_view():
-    """Monthly calendar view with per-day activity feed."""
+    """Calendar views with per-day and all-years activity feeds."""
     import calendar as _cal
 
     db = get_db()
     lib_ids = _get_selected_library_ids()
     lf, lp = _lib_filter(lib_ids)
     lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+
+    mode = request.args.get("mode", "month").strip().lower()
+    if mode not in ("month", "year"):
+        mode = "month"
 
     # Determine requested month (defaults to current)
     today = date.today()
@@ -6851,31 +6855,38 @@ def calendar_view():
     date_from = first_day.isoformat()
     date_to = last_day.isoformat()
 
-    # Collect agglutinated events for the month
-    events = _collect_activity_events(db, lf, lp, lf_b, lp_b,
-                                      date_from=date_from, date_to=date_to)
-    # Group by date
-    events_by_date: dict[str, list[dict]] = {}
-    for ev in events:
-        events_by_date.setdefault(ev["date"], []).append(ev)
+    if mode == "month":
+        # Collect agglutinated events for the month
+        events = _collect_activity_events(db, lf, lp, lf_b, lp_b,
+                                          date_from=date_from, date_to=date_to)
+        # Group by date
+        events_by_date: dict[str, list[dict]] = {}
+        for ev in events:
+            events_by_date.setdefault(ev["date"], []).append(ev)
 
-    # Build calendar grid (weeks × 7)
-    cal = _cal.Calendar(firstweekday=0)  # Monday start
-    weeks: list[list[dict | None]] = []
-    for week in cal.monthdatescalendar(year, month):
-        row: list[dict | None] = []
-        for d in week:
-            if d.month != month:
-                row.append(None)  # outside current month
-            else:
-                ds = d.isoformat()
-                row.append({
-                    "day": d.day,
-                    "date": ds,
-                    "is_today": d == today,
-                    "events": events_by_date.get(ds, []),
-                })
-        weeks.append(row)
+        # Build calendar grid (weeks × 7)
+        cal = _cal.Calendar(firstweekday=0)  # Monday start
+        weeks: list[list[dict | None]] = []
+        for week in cal.monthdatescalendar(year, month):
+            row: list[dict | None] = []
+            for d in week:
+                if d.month != month:
+                    row.append(None)  # outside current month
+                else:
+                    ds = d.isoformat()
+                    row.append({
+                        "day": d.day,
+                        "date": ds,
+                        "is_today": d == today,
+                        "events": events_by_date.get(ds, []),
+                    })
+            weeks.append(row)
+
+        # Serialize events_by_date to JSON for the JS detail panel
+        _events_json = json.dumps(events_by_date, ensure_ascii=False)
+    else:
+        weeks = []
+        _events_json = "{}"
 
     # Prev / next month
     if month == 1:
@@ -6886,9 +6897,6 @@ def calendar_view():
         next_year, next_month = year + 1, 1
     else:
         next_year, next_month = year, month + 1
-
-    # Serialize events_by_date to JSON for the JS detail panel
-    _events_json = json.dumps(events_by_date, ensure_ascii=False)
 
     # Available years for the year selector (union of all years with activity)
     avail_years: set[int] = set()
@@ -6926,8 +6934,46 @@ def calendar_view():
         avail_years.add(year)
     available_years = sorted(avail_years)
 
+    year_rows: list[dict] = []
+    _period_events_json = "{}"
+    if mode == "year":
+        all_events = _collect_activity_events(db, lf, lp, lf_b, lp_b)
+        events_by_period: dict[str, list[dict]] = {}
+        books_by_period: dict[str, dict[str, dict]] = {}
+        for ev in all_events:
+            if not (ev.get("pages", 0) or ev.get("seconds", 0) or ev.get("started") or ev.get("finished")):
+                continue
+            period_key = (ev.get("date") or "")[:7]
+            if len(period_key) != 7:
+                continue
+            events_by_period.setdefault(period_key, []).append(ev)
+            period_books = books_by_period.setdefault(period_key, {})
+            if ev["book_id"] not in period_books:
+                period_books[ev["book_id"]] = {
+                    "book_id": ev["book_id"],
+                    "book_name": ev["book_name"],
+                    "has_cover": ev["has_cover"],
+                    "cover_hash": ev["cover_hash"],
+                }
+
+        for row_year in available_years:
+            cells = []
+            for row_month in range(1, 13):
+                period_key = f"{row_year:04d}-{row_month:02d}"
+                cells.append({
+                    "key": period_key,
+                    "month": row_month,
+                    "is_today": row_year == today.year and row_month == today.month,
+                    "events": events_by_period.get(period_key, []),
+                    "books": list(books_by_period.get(period_key, {}).values()),
+                })
+            year_rows.append({"year": row_year, "cells": cells})
+
+        _period_events_json = json.dumps(events_by_period, ensure_ascii=False)
+
     return render_template(
         "calendar.html",
+        mode=mode,
         year=year,
         month=month,
         month_name=first_day.strftime("%B"),
@@ -6938,7 +6984,9 @@ def calendar_view():
         prev_year=prev_year, prev_month=prev_month,
         next_year=next_year, next_month=next_month,
         _events_json=_events_json,
+        _period_events_json=_period_events_json,
         available_years=available_years,
+        year_rows=year_rows,
     )
 
 

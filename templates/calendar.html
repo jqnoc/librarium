@@ -4,31 +4,41 @@
 {% block content %}
 <h1 data-i18n="cal.title">Calendar</h1>
 
+{% set month_keys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june','cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'] %}
+{% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Month Navigation with Year / Month selectors                           -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div class="cal-nav">
-    <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}" class="cal-nav-btn" title="Previous month">‹</a>
+    <div class="cal-mode-toggle" role="group" aria-label="Calendar view">
+        <a href="{{ url_for('calendar_view', year=year, month=month, mode='month') }}" class="cal-mode-btn{% if mode == 'month' %} is-active{% endif %}" data-i18n="cal.monthView">Month</a>
+        <a href="{{ url_for('calendar_view', mode='year') }}" class="cal-mode-btn{% if mode == 'year' %} is-active{% endif %}" data-i18n="cal.yearView">Year</a>
+    </div>
+    {% if mode == 'month' %}
+    <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month, mode='month') }}" class="cal-nav-btn" title="Previous month">‹</a>
     <select id="calYearSelect" class="cal-select">
         {% for y in available_years %}
         <option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>
         {% endfor %}
     </select>
     <select id="calMonthSelect" class="cal-select">
-        {% set month_keys = ['cal.january','cal.february','cal.march','cal.april','cal.may','cal.june','cal.july','cal.august','cal.september','cal.october','cal.november','cal.december'] %}
-        {% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
         {% set max_month = today_month if year == today_year else 12 %}
         {% for m in range(1, max_month + 1) %}
         <option value="{{ m }}"{% if m == month %} selected{% endif %} data-i18n-opt="{{ month_keys[m-1] }}">{{ month_names[m-1] }}</option>
         {% endfor %}
     </select>
-    <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}" class="cal-nav-btn" title="Next month">›</a>
-    <a href="{{ url_for('calendar_view') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
+    <a href="{{ url_for('calendar_view', year=next_year, month=next_month, mode='month') }}" class="cal-nav-btn" title="Next month">›</a>
+    {% else %}
+    <span class="cal-nav-title" data-i18n="cal.allYears">All years</span>
+    {% endif %}
+    <a href="{{ url_for('calendar_view', mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!-- Calendar Grid                                                          -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
+{% if mode == 'month' %}
 <div class="cal-grid">
     <div class="cal-header">
         <div class="cal-header-cell" data-i18n="cal.mon">Mon</div>
@@ -69,9 +79,43 @@
     </div>
     {% endfor %}
 </div>
+{% else %}
+<div class="cal-grid cal-year-grid">
+    <div class="cal-year-header">
+        <div class="cal-year-corner"></div>
+        {% for month_key in month_keys %}
+        <div class="cal-header-cell" data-i18n="{{ month_key }}">{{ month_names[loop.index0] }}</div>
+        {% endfor %}
+    </div>
+    {% for row in year_rows %}
+    <div class="cal-year-row">
+        <div class="cal-year-label">{{ row.year }}</div>
+        {% for cell in row.cells %}
+        <div class="cal-month-cell{% if cell.is_today %} cal-month-cell--today{% endif %}{% if cell.events %} cal-month-cell--has-events{% endif %}"
+             data-cal-period="{{ cell.key }}" aria-label="{{ month_names[cell.month - 1] }} {{ row.year }}">
+            {% if cell.books %}
+            <div class="cal-covers cal-month-covers">
+                {% for book in cell.books[:8] %}
+                {% if book.has_cover %}
+                <img src="/cover_thumb/{{ book.book_id }}?v={{ book.cover_hash }}" class="cal-cover-thumb" loading="lazy" alt="">
+                {% else %}
+                <div class="cal-cover-ph">📖</div>
+                {% endif %}
+                {% endfor %}
+                {% if cell.books|length > 8 %}
+                <span class="cal-dot-more">+{{ cell.books|length - 8 }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Day Detail Panel (shown on click)                                      -->
+<!-- Calendar Detail Panel (shown on click)                                 -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <div id="calDetail" class="cal-detail" style="display:none;">
     <div class="cal-detail-header">
@@ -88,6 +132,8 @@
 (function() {
     // Pre-build event data keyed by date for fast lookup
     const eventsByDate = {{ _events_json | safe }};
+    const eventsByMonth = {{ _period_events_json | safe }};
+    const calendarMode = '{{ mode }}';
     const currentYear = {{ year }};
     const todayYear = {{ today_year }};
     const todayMonth = {{ today_month }};
@@ -108,6 +154,14 @@
         var lang = window.librariumI18n ? window.librariumI18n.getLang() : 'en';
         var locale = lang === 'es' ? 'es-ES' : 'en-US';
         return dt.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function formatPeriod(periodKey) {
+        const [y, m] = periodKey.split('-').map(Number);
+        var dt = new Date(y, m - 1, 1);
+        var lang = window.librariumI18n ? window.librariumI18n.getLang() : 'en';
+        var locale = lang === 'es' ? 'es-ES' : 'en-US';
+        return dt.toLocaleDateString(locale, { year: 'numeric', month: 'long' });
     }
 
     function formatTime(seconds) {
@@ -201,11 +255,12 @@
     var selectedDates = [];
     var lastClickedDate = null;
 
-    function agglutinateByBook(dates) {
+    function agglutinateByBook(periods, eventMap) {
+        eventMap = eventMap || eventsByDate;
         var bookMap = {};
-        for (var i = 0; i < dates.length; i++) {
-            var ds = dates[i];
-            var evs = eventsByDate[ds] || [];
+        for (var i = 0; i < periods.length; i++) {
+            var period = periods[i];
+            var evs = eventMap[period] || [];
             for (var j = 0; j < evs.length; j++) {
                 var ev = evs[j];
                 var bid = ev.book_id;
@@ -251,7 +306,7 @@
         } else {
             // Multi-date selection: agglutinate per book
             detailTitle.textContent = formatDate(selectedDates[0]) + ' – ' + formatDate(selectedDates[selectedDates.length - 1]);
-            var agg = agglutinateByBook(selectedDates);
+            var agg = agglutinateByBook(selectedDates, eventsByDate);
             detailBody.innerHTML = agg.map(renderAgglutinatedEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivity', 'No activity') + '</p>';
         }
 
@@ -282,62 +337,24 @@
         return dates;
     }
 
-    // Click handler on calendar cells with events
-    document.querySelectorAll('.cal-cell[data-cal-date]').forEach(function(cell) {
-        cell.addEventListener('click', function(e) {
-            var ds = this.getAttribute('data-cal-date');
-
-            if (e.shiftKey && lastClickedDate) {
-                // Shift-click: select range from last clicked to this
-                clearSelection();
-                var range = getDateRange(lastClickedDate, ds);
-                selectedDates = range;
-                // Highlight all cells in ranges
-                range.forEach(function(rd) {
-                    var c = document.querySelector('.cal-cell[data-cal-date="' + rd + '"]');
-                    if (c) c.classList.add('cal-cell--selected');
-                });
-            } else if (e.ctrlKey || e.metaKey) {
-                // Ctrl-click: toggle this date
-                var idx = selectedDates.indexOf(ds);
-                if (idx >= 0) {
-                    selectedDates.splice(idx, 1);
-                    this.classList.remove('cal-cell--selected');
-                } else {
-                    selectedDates.push(ds);
-                    this.classList.add('cal-cell--selected');
-                }
-                lastClickedDate = ds;
-            } else {
-                // Normal click: single selection
-                clearSelection();
-                selectedDates = [ds];
-                this.classList.add('cal-cell--selected');
-                lastClickedDate = ds;
-            }
-
-            updateDetailPanel();
-        });
-    });
-
-    // Also allow clicking cells without events for multi-select
-    document.querySelectorAll('.cal-cell:not(.cal-cell--outside):not([data-cal-date])').forEach(function(cell) {
-        // Give these cells a date for range selection
-        var dayNum = cell.querySelector('.cal-day-num');
-        if (dayNum) {
-            var day = parseInt(dayNum.textContent, 10);
-            var ds = currentYear + '-' + String({{ month }}).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-            cell.setAttribute('data-cal-date', ds);
+    function initMonthMode() {
+        // Click handler on calendar cells with events
+        document.querySelectorAll('.cal-cell[data-cal-date]').forEach(function(cell) {
             cell.addEventListener('click', function(e) {
+                var ds = this.getAttribute('data-cal-date');
+
                 if (e.shiftKey && lastClickedDate) {
+                    // Shift-click: select range from last clicked to this
                     clearSelection();
                     var range = getDateRange(lastClickedDate, ds);
                     selectedDates = range;
+                    // Highlight all cells in ranges
                     range.forEach(function(rd) {
                         var c = document.querySelector('.cal-cell[data-cal-date="' + rd + '"]');
                         if (c) c.classList.add('cal-cell--selected');
                     });
                 } else if (e.ctrlKey || e.metaKey) {
+                    // Ctrl-click: toggle this date
                     var idx = selectedDates.indexOf(ds);
                     if (idx >= 0) {
                         selectedDates.splice(idx, 1);
@@ -348,51 +365,89 @@
                     }
                     lastClickedDate = ds;
                 } else {
+                    // Normal click: single selection
                     clearSelection();
                     selectedDates = [ds];
                     this.classList.add('cal-cell--selected');
                     lastClickedDate = ds;
                 }
+
                 updateDetailPanel();
             });
+        });
+
+        // Also allow clicking cells without events for multi-select
+        document.querySelectorAll('.cal-cell:not(.cal-cell--outside):not([data-cal-date])').forEach(function(cell) {
+            // Give these cells a date for range selection
+            var dayNum = cell.querySelector('.cal-day-num');
+            if (dayNum) {
+                var day = parseInt(dayNum.textContent, 10);
+                var ds = currentYear + '-' + String({{ month }}).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                cell.setAttribute('data-cal-date', ds);
+                cell.addEventListener('click', function(e) {
+                    if (e.shiftKey && lastClickedDate) {
+                        clearSelection();
+                        var range = getDateRange(lastClickedDate, ds);
+                        selectedDates = range;
+                        range.forEach(function(rd) {
+                            var c = document.querySelector('.cal-cell[data-cal-date="' + rd + '"]');
+                            if (c) c.classList.add('cal-cell--selected');
+                        });
+                    } else if (e.ctrlKey || e.metaKey) {
+                        var idx = selectedDates.indexOf(ds);
+                        if (idx >= 0) {
+                            selectedDates.splice(idx, 1);
+                            this.classList.remove('cal-cell--selected');
+                        } else {
+                            selectedDates.push(ds);
+                            this.classList.add('cal-cell--selected');
+                        }
+                        lastClickedDate = ds;
+                    } else {
+                        clearSelection();
+                        selectedDates = [ds];
+                        this.classList.add('cal-cell--selected');
+                        lastClickedDate = ds;
+                    }
+                    updateDetailPanel();
+                });
+            }
+        });
+
+        // ── Year / Month selector navigation ────────────────────────────
+        var yearSelect = document.getElementById('calYearSelect');
+        var monthSelect = document.getElementById('calMonthSelect');
+
+        function navigateToSelected() {
+            var y = yearSelect.value;
+            var m = monthSelect.value;
+            window.location.href = '/calendar?year=' + y + '&month=' + m + '&mode=month';
         }
-    });
 
-    // ── Year / Month selector navigation ────────────────────────────────
-    var yearSelect = document.getElementById('calYearSelect');
-    var monthSelect = document.getElementById('calMonthSelect');
+        yearSelect.addEventListener('change', function() {
+            var y = parseInt(yearSelect.value, 10);
+            var currentMonth = parseInt(monthSelect.value, 10);
+            // Repopulate months based on selected year
+            var maxMonth = (y === todayYear) ? todayMonth : 12;
+            monthSelect.innerHTML = '';
+            for (var i = 1; i <= maxMonth; i++) {
+                var opt = document.createElement('option');
+                opt.value = i;
+                var localMonth = t(monthKeys[i - 1]);
+                opt.textContent = (localMonth && localMonth !== monthKeys[i - 1]) ? localMonth : monthFallbacks[i - 1];
+                if (i === currentMonth && currentMonth <= maxMonth) opt.selected = true;
+                monthSelect.appendChild(opt);
+            }
+            // If current month exceeds max, select the last month
+            if (currentMonth > maxMonth) {
+                monthSelect.value = maxMonth;
+            }
+            navigateToSelected();
+        });
 
-    function navigateToSelected() {
-        var y = yearSelect.value;
-        var m = monthSelect.value;
-        window.location.href = '/calendar?year=' + y + '&month=' + m;
-    }
+        monthSelect.addEventListener('change', navigateToSelected);
 
-    yearSelect.addEventListener('change', function() {
-        var y = parseInt(yearSelect.value, 10);
-        var currentMonth = parseInt(monthSelect.value, 10);
-        // Repopulate months based on selected year
-        var maxMonth = (y === todayYear) ? todayMonth : 12;
-        monthSelect.innerHTML = '';
-        for (var i = 1; i <= maxMonth; i++) {
-            var opt = document.createElement('option');
-            opt.value = i;
-            var localMonth = t(monthKeys[i - 1]);
-            opt.textContent = (localMonth && localMonth !== monthKeys[i - 1]) ? localMonth : monthFallbacks[i - 1];
-            if (i === currentMonth && currentMonth <= maxMonth) opt.selected = true;
-            monthSelect.appendChild(opt);
-        }
-        // If current month exceeds max, select the last month
-        if (currentMonth > maxMonth) {
-            monthSelect.value = maxMonth;
-        }
-        navigateToSelected();
-    });
-
-    monthSelect.addEventListener('change', navigateToSelected);
-
-    // Localise month names in the month selector
-    (function() {
+        // Localise month names in the month selector
         var opts = monthSelect.querySelectorAll('option');
         opts.forEach(function(opt) {
             var key = opt.getAttribute('data-i18n-opt');
@@ -401,7 +456,82 @@
                 if (localized && localized !== key) opt.textContent = localized;
             }
         });
-    })();
+    }
+
+    function initYearMode() {
+        var cells = Array.prototype.slice.call(document.querySelectorAll('.cal-month-cell[data-cal-period]'));
+        var periodOrder = cells.map(function(cell) { return cell.getAttribute('data-cal-period'); });
+        var selectedPeriods = [];
+        var lastClickedPeriod = null;
+
+        function clearPeriodSelection() {
+            cells.forEach(function(cell) { cell.classList.remove('cal-month-cell--selected'); });
+            selectedPeriods = [];
+        }
+
+        function getPeriodRange(periodA, periodB) {
+            var indexA = periodOrder.indexOf(periodA);
+            var indexB = periodOrder.indexOf(periodB);
+            if (indexA < 0 || indexB < 0) return [];
+            var start = Math.min(indexA, indexB);
+            var end = Math.max(indexA, indexB);
+            return periodOrder.slice(start, end + 1);
+        }
+
+        function updateYearDetail() {
+            if (selectedPeriods.length === 0) {
+                detail.style.display = 'none';
+                return;
+            }
+
+            selectedPeriods.sort();
+            if (selectedPeriods.length === 1) {
+                detailTitle.textContent = formatPeriod(selectedPeriods[0]);
+            } else {
+                detailTitle.textContent = formatPeriod(selectedPeriods[0]) + ' - ' + formatPeriod(selectedPeriods[selectedPeriods.length - 1]);
+            }
+            var agg = agglutinateByBook(selectedPeriods, eventsByMonth);
+            detailBody.innerHTML = agg.map(renderAgglutinatedEvent).join('') || '<p style="color:var(--lb-text-light);">' + t('cal.noActivityPeriod', 'No activity in this period') + '</p>';
+            detail.style.display = '';
+            detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        cells.forEach(function(cell) {
+            cell.addEventListener('click', function(e) {
+                var period = this.getAttribute('data-cal-period');
+                if (e.shiftKey && lastClickedPeriod) {
+                    clearPeriodSelection();
+                    selectedPeriods = getPeriodRange(lastClickedPeriod, period);
+                    selectedPeriods.forEach(function(selectedPeriod) {
+                        var selectedCell = document.querySelector('.cal-month-cell[data-cal-period="' + selectedPeriod + '"]');
+                        if (selectedCell) selectedCell.classList.add('cal-month-cell--selected');
+                    });
+                } else if (e.ctrlKey || e.metaKey) {
+                    var idx = selectedPeriods.indexOf(period);
+                    if (idx >= 0) {
+                        selectedPeriods.splice(idx, 1);
+                        this.classList.remove('cal-month-cell--selected');
+                    } else {
+                        selectedPeriods.push(period);
+                        this.classList.add('cal-month-cell--selected');
+                    }
+                    lastClickedPeriod = period;
+                } else {
+                    clearPeriodSelection();
+                    selectedPeriods = [period];
+                    this.classList.add('cal-month-cell--selected');
+                    lastClickedPeriod = period;
+                }
+                updateYearDetail();
+            });
+        });
+    }
+
+    if (calendarMode === 'year') {
+        initYearMode();
+    } else {
+        initMonthMode();
+    }
 })();
 </script>
 {% endblock %}
