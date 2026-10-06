@@ -4014,7 +4014,7 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .cal-cell {
     min-height: 80px;
-    padding: 0.4rem 0.5rem;
+    padding: 1rem;
     border-right: 1px solid var(--lb-border);
     cursor: default;
     transition: background 0.12s;
@@ -4055,7 +4055,7 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .cal-covers {
     display: flex;
-    gap: 3px;
+    gap: 6px;
     flex-wrap: wrap;
     align-items: flex-end;
     margin-top: auto;
@@ -4135,7 +4135,7 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .cal-month-cell {
     min-height: 108px;
-    padding: 0.4rem;
+    padding: 1rem;
     border-right: 1px solid var(--lb-border);
     cursor: pointer;
     transition: background 0.12s;
@@ -4158,7 +4158,7 @@ body.reading-session-modal-open { overflow: hidden; }
 .cal-year-books-cell {
     grid-column: 2 / -1;
     min-height: 108px;
-    padding: 0.4rem;
+    padding: 1rem;
     border-right: 1px solid var(--lb-border);
     cursor: pointer;
     transition: background 0.12s;
