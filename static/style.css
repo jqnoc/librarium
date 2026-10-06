@@ -3894,6 +3894,19 @@ body.reading-session-modal-open { overflow: hidden; }
     accent-color: var(--lb-deep-orange);
     cursor: pointer;
 }
+.cal-cover-size-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--lb-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.cal-cover-size-control .cal-select {
+    padding: 0.35rem 0.45rem;
+    font-size: 0.85rem;
+}
 .cal-year-range {
     display: flex;
     align-items: center;
@@ -3962,6 +3975,18 @@ body.reading-session-modal-open { overflow: hidden; }
     border-radius: var(--lb-radius-lg);
     box-shadow: var(--lb-shadow);
     overflow: hidden;
+}
+.cal-grid--cover-small {
+    --cal-cover-width: 32px;
+    --cal-cover-height: 46px;
+}
+.cal-grid--cover-medium {
+    --cal-cover-width: 48px;
+    --cal-cover-height: 68px;
+}
+.cal-grid--cover-large {
+    --cal-cover-width: 64px;
+    --cal-cover-height: 90px;
 }
 .cal-header {
     display: grid;
@@ -4032,15 +4057,15 @@ body.reading-session-modal-open { overflow: hidden; }
     margin-top: auto;
 }
 .cal-cover-thumb {
-    width: 48px;
-    height: 68px;
+    width: var(--cal-cover-width, 48px);
+    height: var(--cal-cover-height, 68px);
     object-fit: cover;
     border-radius: 2px;
     box-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
 .cal-cover-ph {
-    width: 48px;
-    height: 68px;
+    width: var(--cal-cover-width, 48px);
+    height: var(--cal-cover-height, 68px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4123,8 +4148,8 @@ body.reading-session-modal-open { overflow: hidden; }
 }
 .cal-month-cell .cal-cover-thumb,
 .cal-month-cell .cal-cover-ph {
-    width: 48px;
-    height: 68px;
+    width: var(--cal-cover-width, 48px);
+    height: var(--cal-cover-height, 68px);
 }
 .cal-year-books-cell {
     grid-column: 2 / -1;

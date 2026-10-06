@@ -6840,6 +6840,12 @@ def calendar_view():
     if requested_group_by_month is None:
         requested_group_by_month = request.cookies.get("librarium_calendar_group_by_month")
     group_by_month = str(requested_group_by_month or "1").strip().lower() not in ("0", "false", "off", "no")
+    requested_cover_size = request.args.get("cover_size")
+    if requested_cover_size is None:
+        requested_cover_size = request.cookies.get("librarium_calendar_cover_size")
+    cover_size = (requested_cover_size or "medium").strip().lower()
+    if cover_size not in ("small", "medium", "large"):
+        cover_size = "medium"
 
     # Determine requested month (defaults to current)
     requested_year = request.args.get("year")
@@ -6873,6 +6879,11 @@ def calendar_view():
         events_by_date: dict[str, list[dict]] = {}
         for ev in events:
             events_by_date.setdefault(ev["date"], []).append(ev)
+        for day_events in events_by_date.values():
+            day_events.sort(key=lambda ev: (
+                0 if (ev.get("pages", 0) or ev.get("seconds", 0) or ev.get("started") or ev.get("finished")) else 1,
+                ev.get("book_name", "").casefold(),
+            ))
 
         # Build calendar grid (weeks × 7)
         cal = _cal.Calendar(firstweekday=0)  # Monday start
@@ -7011,7 +7022,10 @@ def calendar_view():
                     "book_name": ev["book_name"],
                     "has_cover": ev["has_cover"],
                     "cover_hash": ev["cover_hash"],
+                    "first_reading_date": ev["date"],
                 }
+            elif ev["date"] < period_books[ev["book_id"]]["first_reading_date"]:
+                period_books[ev["book_id"]]["first_reading_date"] = ev["date"]
 
         events_by_year: dict[str, list[dict]] = {}
         for period_key, period_events in events_by_period.items():
@@ -7026,19 +7040,28 @@ def calendar_view():
                 period_events = events_by_period.get(period_key, [])
                 period_books = books_by_period.get(period_key, {})
                 year_events.extend(period_events)
-                year_books.update(period_books)
+                for book_id, book in period_books.items():
+                    existing_book = year_books.get(book_id)
+                    if existing_book is None or book["first_reading_date"] < existing_book["first_reading_date"]:
+                        year_books[book_id] = book
                 cells.append({
                     "key": period_key,
                     "month": row_month,
                     "is_today": row_year == today.year and row_month == today.month,
                     "events": period_events,
-                    "books": list(period_books.values()),
+                    "books": sorted(
+                        period_books.values(),
+                        key=lambda book: (book["first_reading_date"], book["book_name"].casefold()),
+                    ),
                 })
             year_rows.append({
                 "year": row_year,
                 "cells": cells,
                 "events": year_events,
-                "books": list(year_books.values()),
+                "books": sorted(
+                    year_books.values(),
+                    key=lambda book: (book["first_reading_date"], book["book_name"].casefold()),
+                ),
             })
 
         _period_events_json = json.dumps(events_by_period, ensure_ascii=False)
@@ -7065,6 +7088,7 @@ def calendar_view():
         range_start_year=range_start_year,
         range_end_year=range_end_year,
         group_by_month=group_by_month,
+        cover_size=cover_size,
         year_rows=year_rows,
     ))
     calendar_cookie_age = 365 * 24 * 3600
@@ -7075,6 +7099,8 @@ def calendar_view():
     response.set_cookie("librarium_calendar_start_year", str(range_start_year), max_age=calendar_cookie_age, samesite="Lax")
     response.set_cookie("librarium_calendar_end_year", str(range_end_year), max_age=calendar_cookie_age, samesite="Lax")
     response.set_cookie("librarium_calendar_group_by_month", "1" if group_by_month else "0",
+                       max_age=calendar_cookie_age, samesite="Lax")
+    response.set_cookie("librarium_calendar_cover_size", cover_size,
                        max_age=calendar_cookie_age, samesite="Lax")
     return response
 

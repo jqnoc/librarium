@@ -31,10 +31,6 @@
     <a href="{{ url_for('calendar_view', year=next_year, month=next_month, mode='month') }}" class="cal-nav-btn" title="Next month">›</a>
     {% else %}
     <div class="cal-year-controls">
-        <label class="cal-group-months-toggle">
-            <input id="calGroupByMonth" type="checkbox"{% if group_by_month %} checked{% endif %}>
-            <span data-i18n="cal.groupByMonth">Organize books by month</span>
-        </label>
         <select id="calYearScope" class="cal-select" data-i18n-aria-label="cal.yearScope" aria-label="Year scope">
             <option value="current"{% if year_scope == 'current' %} selected{% endif %} data-i18n="cal.currentYear">Current Year</option>
             <option value="five"{% if year_scope == 'five' %} selected{% endif %} data-i18n="cal.lastFiveYears">Last Five Years</option>
@@ -59,8 +55,20 @@
                 </select>
             </label>
         </div>
+        <label class="cal-group-months-toggle">
+            <input id="calGroupByMonth" type="checkbox"{% if group_by_month %} checked{% endif %}>
+            <span data-i18n="cal.groupByMonth">Organize books by month</span>
+        </label>
     </div>
     {% endif %}
+    <label class="cal-cover-size-control">
+        <span data-i18n="cal.coverSize">Cover size</span>
+        <select id="calCoverSize" class="cal-select">
+            <option value="small"{% if cover_size == 'small' %} selected{% endif %} data-i18n="cal.coverSmall">Small</option>
+            <option value="medium"{% if cover_size == 'medium' %} selected{% endif %} data-i18n="cal.coverMedium">Medium</option>
+            <option value="large"{% if cover_size == 'large' %} selected{% endif %} data-i18n="cal.coverLarge">Large</option>
+        </select>
+    </label>
     <a href="{{ url_for('calendar_view', year=today_year, month=today_month, mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
 </div>
 
@@ -68,7 +76,7 @@
 <!-- Calendar Grid                                                          -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 {% if mode == 'month' %}
-<div class="cal-grid">
+<div class="cal-grid cal-grid--cover-{{ cover_size }}">
     <div class="cal-header">
         <div class="cal-header-cell" data-i18n="cal.mon">Mon</div>
         <div class="cal-header-cell" data-i18n="cal.tue">Tue</div>
@@ -109,7 +117,7 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="cal-grid cal-year-grid">
+<div class="cal-grid cal-year-grid cal-grid--cover-{{ cover_size }}">
     {% if group_by_month %}
     <div class="cal-year-header">
         <div class="cal-year-corner"></div>
@@ -620,6 +628,14 @@
         groupByMonthControl.addEventListener('change', navigateToYearScope);
         updateRangeVisibility();
     }
+
+    var coverSizeSelect = document.getElementById('calCoverSize');
+    coverSizeSelect.addEventListener('change', function() {
+        var params = new URLSearchParams(window.location.search);
+        params.set('mode', calendarMode);
+        params.set('cover_size', this.value);
+        window.location.href = '/calendar?' + params.toString();
+    });
 
     if (calendarMode === 'year') {
         initYearMode();
