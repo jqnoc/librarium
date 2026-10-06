@@ -6932,7 +6932,44 @@ def calendar_view():
     avail_years.add(today.year)
     if year not in avail_years:
         avail_years.add(year)
-    available_years = sorted(avail_years)
+    available_years = sorted(avail_years, reverse=True)
+
+    year_scope = (request.args.get("year_scope") or "all").strip().lower()
+    if year_scope not in ("current", "five", "all", "range"):
+        year_scope = "all"
+
+    def _parse_calendar_year(value: str | None) -> int | None:
+        try:
+            parsed = int(value) if value is not None else None
+        except (ValueError, TypeError):
+            return None
+        if parsed is None:
+            return None
+        return max(2000, min(2099, parsed))
+
+    range_start_year = _parse_calendar_year(request.args.get("start_year"))
+    range_end_year = _parse_calendar_year(request.args.get("end_year"))
+    if range_start_year is None:
+        range_start_year = min(available_years) if available_years else today.year
+    if range_end_year is None:
+        range_end_year = today.year
+
+    year_filter_options = set(available_years)
+    year_filter_options.update(range(today.year - 4, today.year + 1))
+    year_filter_options.add(range_start_year)
+    year_filter_options.add(range_end_year)
+    year_filter_options = sorted(year_filter_options, reverse=True)
+
+    if year_scope == "current":
+        display_years = [today.year]
+    elif year_scope == "five":
+        display_years = list(range(today.year, today.year - 5, -1))
+    elif year_scope == "range":
+        range_low = min(range_start_year, range_end_year)
+        range_high = max(range_start_year, range_end_year)
+        display_years = list(range(range_high, range_low - 1, -1))
+    else:
+        display_years = available_years
 
     year_rows: list[dict] = []
     _period_events_json = "{}"
@@ -6956,7 +6993,7 @@ def calendar_view():
                     "cover_hash": ev["cover_hash"],
                 }
 
-        for row_year in available_years:
+        for row_year in display_years:
             cells = []
             for row_month in range(1, 13):
                 period_key = f"{row_year:04d}-{row_month:02d}"
@@ -6986,6 +7023,10 @@ def calendar_view():
         _events_json=_events_json,
         _period_events_json=_period_events_json,
         available_years=available_years,
+        year_filter_options=year_filter_options,
+        year_scope=year_scope,
+        range_start_year=range_start_year,
+        range_end_year=range_end_year,
         year_rows=year_rows,
     )
 

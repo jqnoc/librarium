@@ -3873,6 +3873,29 @@ body.reading-session-modal-open { overflow: hidden; }
     background: var(--lb-deep-orange);
     color: var(--lb-white);
 }
+.cal-year-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.cal-year-range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.cal-year-range[hidden] { display: none; }
+.cal-year-range-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--lb-text-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.cal-year-range-field .cal-select {
+    padding: 0.35rem 0.45rem;
+    font-size: 0.85rem;
+}
 .cal-select {
     padding: 0.35rem 0.6rem;
     border-radius: var(--lb-radius);
@@ -4123,6 +4146,8 @@ body.reading-session-modal-open { overflow: hidden; }
 
 @media (max-width: 700px) {
     .cal-nav { flex-wrap: wrap; }
+    .cal-year-controls,
+    .cal-year-range { flex-wrap: wrap; }
     .cal-today-btn { margin-left: 0; }
 }
 

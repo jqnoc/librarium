@@ -30,7 +30,32 @@
     </select>
     <a href="{{ url_for('calendar_view', year=next_year, month=next_month, mode='month') }}" class="cal-nav-btn" title="Next month">›</a>
     {% else %}
-    <span class="cal-nav-title" data-i18n="cal.allYears">All years</span>
+    <div class="cal-year-controls">
+        <select id="calYearScope" class="cal-select" data-i18n-aria-label="cal.yearScope" aria-label="Year scope">
+            <option value="current"{% if year_scope == 'current' %} selected{% endif %} data-i18n="cal.currentYear">Current Year</option>
+            <option value="five"{% if year_scope == 'five' %} selected{% endif %} data-i18n="cal.lastFiveYears">Last Five Years</option>
+            <option value="all"{% if year_scope == 'all' %} selected{% endif %} data-i18n="cal.allYears">All Years</option>
+            <option value="range"{% if year_scope == 'range' %} selected{% endif %} data-i18n="cal.yearRange">Range</option>
+        </select>
+        <div id="calYearRange" class="cal-year-range"{% if year_scope != 'range' %} hidden{% endif %}>
+            <label class="cal-year-range-field">
+                <span data-i18n="cal.startYear">Start</span>
+                <select id="calStartYear" class="cal-select">
+                    {% for y in year_filter_options %}
+                    <option value="{{ y }}"{% if y == range_start_year %} selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="cal-year-range-field">
+                <span data-i18n="cal.endYear">Finish</span>
+                <select id="calEndYear" class="cal-select">
+                    {% for y in year_filter_options %}
+                    <option value="{{ y }}"{% if y == range_end_year %} selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+    </div>
     {% endif %}
     <a href="{{ url_for('calendar_view', mode='month') }}" class="cal-today-btn" data-i18n="cal.today">Today</a>
 </div>
@@ -525,6 +550,34 @@
                 updateYearDetail();
             });
         });
+
+        var scopeSelect = document.getElementById('calYearScope');
+        var rangeControls = document.getElementById('calYearRange');
+        var startYearSelect = document.getElementById('calStartYear');
+        var endYearSelect = document.getElementById('calEndYear');
+
+        function navigateToYearScope() {
+            var params = new URLSearchParams();
+            params.set('mode', 'year');
+            params.set('year_scope', scopeSelect.value);
+            if (scopeSelect.value === 'range') {
+                params.set('start_year', startYearSelect.value);
+                params.set('end_year', endYearSelect.value);
+            }
+            window.location.href = '/calendar?' + params.toString();
+        }
+
+        function updateRangeVisibility() {
+            rangeControls.hidden = scopeSelect.value !== 'range';
+        }
+
+        scopeSelect.addEventListener('change', function() {
+            updateRangeVisibility();
+            navigateToYearScope();
+        });
+        startYearSelect.addEventListener('change', navigateToYearScope);
+        endYearSelect.addEventListener('change', navigateToYearScope);
+        updateRangeVisibility();
     }
 
     if (calendarMode === 'year') {
