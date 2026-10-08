@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add chapter tracking with inclusive page-range totals, optional skipped entries, CRUD controls, inferred per-reading completion dates from readable page ranges, automatic consecutive numbering across preceding numbered-series volumes, and aggregate chapter tables on Series details
+- Add chapter tracking with inclusive page-range totals, optional skipped entries, CRUD controls, inferred per-reading completion dates with the first date emphasized in book and series tables, aligned reading-count columns, automatic consecutive numbering across preceding numbered-series volumes, and aggregate chapter tables on Series details with a persisted per-series volume-number visibility toggle
 - Add an all-years Calendar mode with descending year rows, optional monthly organization or one books row per year, four persisted cover-size options including Extra Large, larger untruncated cover previews sorted by first reading date, 1rem cover-cell padding, 6px cover spacing, selectable current/five/all-year scopes, custom year ranges, continuous month selection with aggregated activity details, persistent calendar selector state, and the organization checkbox positioned after the scope and range controls
 - add Event sources with address, map coordinates, natural-language date ranges, and purchase-source selection
 - Add incremental SHA-256 image snapshots that deduplicate unchanged full-size images, restore each database with its matching image manifest, and finalize snapshots without relying on a Windows-incompatible directory rename

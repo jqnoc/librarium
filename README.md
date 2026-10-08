@@ -80,7 +80,7 @@ Node.js, or pip installed to run it.
 
 - Add, edit, and delete named chapter page ranges from Book Details
 - Calculate inclusive chapter page totals automatically and optionally skip entries from numbering
-- Continue chapter numbers from earlier books in the same numbered series, infer completed reads with their completion dates, and aggregate chapter history on Series details
+- Continue chapter numbers from earlier books in the same numbered series, infer completed reads with their completion dates, and aggregate chapter history on Series details with a per-series volume-number display preference
 
 ### Annotations
 

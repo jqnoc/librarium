@@ -73,8 +73,14 @@
 {% endif %}
 
 {% if series_chapters %}
-<section class="series-chapters-section">
-    <h2 data-i18n="book.chapters">Chapters</h2>
+<section class="series-chapters-section" data-series-id="{{ series.id }}">
+    <div class="series-chapters-heading">
+        <h2 data-i18n="book.chapters">Chapters</h2>
+        <label class="series-hide-volume-number">
+            <input type="checkbox" data-hide-volume-number-toggle>
+            <span data-i18n="series.hideChapterVolumeNumber">Hide volume number</span>
+        </label>
+    </div>
     <div class="table-wrap">
         <table class="series-chapters-table">
             <thead>
@@ -95,7 +101,7 @@
                     </td>
                     <td>
                         <a class="series-chapter-volume" href="{{ url_for('book_detail', book_id=series_chapter.volume_id) }}">
-                            {% if series_chapter.volume_index %}<span>#{{ series_chapter.volume_index }}</span>{% endif %}
+                            {% if series_chapter.volume_index %}<span class="series-chapter-volume-number">#{{ series_chapter.volume_index }}</span>{% endif %}
                             {{ series_chapter.volume_name }}
                         </a>
                     </td>
@@ -104,7 +110,7 @@
                     <td class="series-chapter-reading-dates">
                         {% if series_chapter.reading_completion_dates %}
                             {% for completion_date in series_chapter.reading_completion_dates %}
-                            <span>{{ completion_date | display_date }}</span>{% if not loop.last %}, {% endif %}
+                            {% if loop.first %}<strong>{% endif %}<span>{{ completion_date | display_date }}</span>{% if loop.first %}</strong>{% endif %}{% if not loop.last %}, {% endif %}
                             {% endfor %}
                         {% else %}
                         &mdash;
@@ -117,4 +123,24 @@
     </div>
 </section>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    var section = document.querySelector('.series-chapters-section');
+    if (!section) return;
+
+    var checkbox = section.querySelector('[data-hide-volume-number-toggle]');
+    var storageKey = 'librarium_series_hide_volume_number_' + section.dataset.seriesId;
+    checkbox.checked = localStorage.getItem(storageKey) === 'true';
+    section.dataset.hideVolumeNumber = checkbox.checked ? 'true' : 'false';
+
+    checkbox.addEventListener('change', function () {
+        section.dataset.hideVolumeNumber = checkbox.checked ? 'true' : 'false';
+        localStorage.setItem(storageKey, String(checkbox.checked));
+    });
+})();
+</script>
 {% endblock %}

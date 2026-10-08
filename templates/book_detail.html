@@ -327,7 +327,7 @@
                 <th scope="col" data-i18n="book.chapterName">Name</th>
                 <th scope="col" data-i18n="book.chapterStartPage">Start Page</th>
                 <th scope="col" data-i18n="book.chapterPageCount">Pages</th>
-                <th scope="col" data-i18n="book.chapterReadingCount">Number of Readings</th>
+                <th scope="col" class="chapter-reading-count-column" data-i18n="book.chapterReadingCount">Number of Readings</th>
                 <th scope="col" data-i18n="book.readings">Readings</th>
                 <th scope="col" data-i18n="book.chapterActions">Actions</th>
             </tr>
@@ -343,7 +343,7 @@
                 <td class="chapter-reading-dates-cell">
                     {% if chapter.completion_dates %}
                         {% for completion_date in chapter.completion_dates %}
-                        <span>{{ completion_date | display_date }}</span>{% if not loop.last %}, {% endif %}
+                        {% if loop.first %}<strong>{% endif %}<span>{{ completion_date | display_date }}</span>{% if loop.first %}</strong>{% endif %}{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     {% else %}
                     &mdash;

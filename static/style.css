@@ -899,6 +899,10 @@ img { max-width: 100%; height: auto; }
     white-space: nowrap;
 }
 
+.chapters-table th.chapter-reading-count-column {
+    text-align: center;
+}
+
 .chapter-reading-dates-cell {
     min-width: 15rem;
     color: var(--lb-text-light);
@@ -3842,8 +3846,30 @@ body.reading-session-modal-open { overflow: hidden; }
 .series-chapters-section {
     margin-top: 2rem;
 }
+.series-chapters-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
 .series-chapters-section h2 {
     margin-bottom: .85rem;
+}
+.series-hide-volume-number {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    margin-bottom: .85rem;
+    color: var(--lb-text-light);
+    font-size: .85rem;
+    cursor: pointer;
+}
+.series-hide-volume-number input {
+    margin: 0;
+}
+.series-chapters-section[data-hide-volume-number="true"] .series-chapter-volume-number {
+    display: none;
 }
 .series-chapters-table {
     min-width: 760px;

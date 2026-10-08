@@ -491,6 +491,7 @@
         'series.noBooks':      { en: 'No books in this series yet.', es: 'Aún no hay libros en esta serie.' },
         'series.chapterVolume': { en: 'Volume',          es: 'Volumen' },
         'series.chapterReadingDates': { en: 'Reading Dates', es: 'Fechas de lectura' },
+        'series.hideChapterVolumeNumber': { en: 'Hide volume number', es: 'Ocultar número de volumen' },
 
         // ── Author detail ───────────────────────────────────────────────
         'authorDetail.backToAuthors': { en: '← Back to Authors',  es: '← Volver a Autores' },
