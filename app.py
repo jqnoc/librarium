@@ -4078,10 +4078,30 @@ def _page_ranges_cover(
     return False
 
 
+def _chapter_completion(
+    chapter_start_page: int,
+    chapter_end_page: int,
+    reading_ranges: list[dict[str, object]],
+) -> tuple[bool, str]:
+    """Return whether a chapter is complete and the date of its completing activity."""
+    covered_ranges = []
+    for reading_range in reading_ranges:
+        covered_ranges.append((
+            int(reading_range["start_page"]),
+            int(reading_range["end_page"]),
+        ))
+        if _page_ranges_cover(chapter_start_page, chapter_end_page, covered_ranges):
+            completion_date = str(
+                reading_range["date_end"] or reading_range["date_start"] or ""
+            )
+            return True, completion_date
+    return False, ""
+
+
 def _infer_chapter_readings(
     db: sqlite3.Connection, book_id: str, chapters: list[dict[str, object]]
 ) -> None:
-    """Attach completed reading passes and contributing dates to each chapter."""
+    """Attach completed reading passes and completion dates to each chapter."""
     if not chapters:
         return
 
@@ -4191,41 +4211,29 @@ def _infer_chapter_readings(
 
     for chapter in chapters:
         chapter_readings = []
-        chapter_start_page = int(chapter["start_page"])
+        chapter_start_page = max(int(chapter["start_page"]), first_readable_page)
         chapter_end_page = int(chapter["end_page"])
+        if chapter_start_page > chapter_end_page:
+            continue
         for reading_id, ranges in ranges_by_reading.items():
-            page_ranges = [
-                (int(reading_range["start_page"]), int(reading_range["end_page"]))
-                for reading_range in ranges
-            ]
-            if not _page_ranges_cover(chapter_start_page, chapter_end_page, page_ranges):
+            is_complete, completion_date = _chapter_completion(
+                chapter_start_page,
+                chapter_end_page,
+                ranges,
+            )
+            if not is_complete:
                 continue
-
-            date_ranges = []
-            seen_date_ranges = set()
-            for reading_range in ranges:
-                if (
-                    int(reading_range["end_page"]) < chapter_start_page
-                    or int(reading_range["start_page"]) > chapter_end_page
-                ):
-                    continue
-                date_start = str(reading_range["date_start"] or "")
-                date_end = str(reading_range["date_end"] or date_start)
-                if not date_start and not date_end:
-                    continue
-                date_range = (date_start or date_end, date_end or date_start)
-                if date_range not in seen_date_ranges:
-                    seen_date_ranges.add(date_range)
-                    date_ranges.append({
-                        "start_date": date_range[0],
-                        "end_date": date_range[1],
-                    })
-
             chapter_readings.append({
                 "reading_number": reading_numbers[reading_id],
-                "date_ranges": date_ranges,
+                "completion_date": completion_date,
             })
         chapter["readings"] = chapter_readings
+        chapter["reading_count"] = len(chapter_readings)
+        chapter["completion_dates"] = list(dict.fromkeys(
+            reading["completion_date"]
+            for reading in chapter_readings
+            if reading["completion_date"]
+        ))
 
 
 def _load_chapters(
@@ -4246,6 +4254,8 @@ def _load_chapters(
         chapter["is_skippable"] = bool(chapter["is_skippable"])
         chapter["page_count"] = chapter["end_page"] - chapter["start_page"] + 1
         chapter["readings"] = []
+        chapter["reading_count"] = 0
+        chapter["completion_dates"] = []
         if chapter["is_skippable"]:
             chapter["number"] = None
         else:
@@ -7982,27 +7992,13 @@ def series_detail(series_id: int):
     for book in books:
         chapters, _ = _load_chapters(db, book["id"])
         for chapter in chapters:
-            reading_date_ranges = []
-            seen_date_ranges = set()
-            for chapter_reading in chapter["readings"]:
-                for date_range in chapter_reading["date_ranges"]:
-                    date_key = (
-                        date_range["start_date"],
-                        date_range["end_date"],
-                    )
-                    if date_key not in seen_date_ranges:
-                        seen_date_ranges.add(date_key)
-                        reading_date_ranges.append({
-                            "start_date": date_key[0],
-                            "end_date": date_key[1],
-                        })
             series_chapters.append({
                 **chapter,
                 "volume_id": book["id"],
                 "volume_name": book["name"],
                 "volume_index": book["series_index"],
-                "reading_count": len(chapter["readings"]),
-                "reading_date_ranges": reading_date_ranges,
+                "reading_count": chapter["reading_count"],
+                "reading_completion_dates": chapter["completion_dates"],
             })
 
     return render_template(

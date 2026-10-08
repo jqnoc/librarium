@@ -102,9 +102,9 @@
                     <td>{{ series_chapter.page_count }}</td>
                     <td class="series-chapter-reading-count">{{ series_chapter.reading_count }}</td>
                     <td class="series-chapter-reading-dates">
-                        {% if series_chapter.reading_date_ranges %}
-                            {% for date_range in series_chapter.reading_date_ranges %}
-                            <span>{{ date_range.start_date | display_date }}{% if date_range.end_date != date_range.start_date %} &ndash; {{ date_range.end_date | display_date }}{% endif %}</span>{% if not loop.last %}, {% endif %}
+                        {% if series_chapter.reading_completion_dates %}
+                            {% for completion_date in series_chapter.reading_completion_dates %}
+                            <span>{{ completion_date | display_date }}</span>{% if not loop.last %}, {% endif %}
                             {% endfor %}
                         {% else %}
                         &mdash;

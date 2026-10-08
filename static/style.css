@@ -878,7 +878,7 @@ img { max-width: 100%; height: auto; }
 }
 
 .chapters-table {
-    min-width: 820px;
+    min-width: 960px;
 }
 
 .chapter-number-column {
@@ -891,36 +891,19 @@ img { max-width: 100%; height: auto; }
     font-weight: 700;
 }
 
-.chapter-readings-cell {
-    min-width: 13rem;
-}
-
-.chapter-read-count {
+.chapter-reading-count-cell {
     color: var(--lb-deep-orange);
+    text-align: center;
     font-size: .9rem;
     font-weight: 700;
+    white-space: nowrap;
 }
 
-.chapter-reading-list {
-    display: flex;
-    flex-direction: column;
-    gap: .2rem;
-    margin: .3rem 0 0;
-    padding: 0;
-    list-style: none;
-    color: var(--lb-text);
-    font-size: .8rem;
-}
-
-.chapter-reading-dates {
-    display: block;
-    margin-top: .1rem;
-    color: var(--lb-text-light);
-}
-
-.chapter-not-read {
+.chapter-reading-dates-cell {
+    min-width: 15rem;
     color: var(--lb-text-light);
     font-size: .82rem;
+    white-space: nowrap;
 }
 
 .chapter-actions,
@@ -3893,6 +3876,7 @@ body.reading-session-modal-open { overflow: hidden; }
     min-width: 15rem;
     color: var(--lb-text-light);
     font-size: .88rem;
+    white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */

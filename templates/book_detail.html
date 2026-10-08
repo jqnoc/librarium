@@ -327,6 +327,7 @@
                 <th scope="col" data-i18n="book.chapterName">Name</th>
                 <th scope="col" data-i18n="book.chapterStartPage">Start Page</th>
                 <th scope="col" data-i18n="book.chapterPageCount">Pages</th>
+                <th scope="col" data-i18n="book.chapterReadingCount">Number of Readings</th>
                 <th scope="col" data-i18n="book.readings">Readings</th>
                 <th scope="col" data-i18n="book.chapterActions">Actions</th>
             </tr>
@@ -338,25 +339,14 @@
                 <td>{{ chapter.name }}</td>
                 <td>{{ chapter.start_page }}</td>
                 <td>{{ chapter.page_count }}</td>
-                <td class="chapter-readings-cell">
-                    {% if chapter.readings %}
-                    <span class="chapter-read-count">{{ chapter.readings | length }}&times;</span>
-                    <ul class="chapter-reading-list">
-                        {% for chapter_reading in chapter.readings %}
-                        <li>
-                            <strong><span data-i18n="book.readingSessionFor">Reading</span> #{{ chapter_reading.reading_number }}</strong>
-                            {% if chapter_reading.date_ranges %}
-                            <span class="chapter-reading-dates">
-                                {% for date_range in chapter_reading.date_ranges %}
-                                <span>{{ date_range.start_date | display_date }}{% if date_range.end_date != date_range.start_date %} &ndash; {{ date_range.end_date | display_date }}{% endif %}</span>{% if not loop.last %}, {% endif %}
-                                {% endfor %}
-                            </span>
-                            {% endif %}
-                        </li>
+                <td class="chapter-reading-count-cell">{{ chapter.reading_count }}</td>
+                <td class="chapter-reading-dates-cell">
+                    {% if chapter.completion_dates %}
+                        {% for completion_date in chapter.completion_dates %}
+                        <span>{{ completion_date | display_date }}</span>{% if not loop.last %}, {% endif %}
                         {% endfor %}
-                    </ul>
                     {% else %}
-                    <span class="chapter-not-read" data-i18n="book.chapterNotRead">Not read yet</span>
+                    &mdash;
                     {% endif %}
                 </td>
                 <td class="chapter-actions">
@@ -367,7 +357,7 @@
                 </td>
             </tr>
             <tr class="chapter-edit-row" id="chapter-edit-{{ chapter.id }}">
-                <td colspan="6">
+                <td colspan="7">
                     <form method="POST" action="{{ url_for('edit_chapter', book_id=book_id, chapter_id=chapter.id) }}" class="chapter-form chapter-edit-form" data-chapter-form>
                         <label class="chapter-form-field" for="edit-chapter-name-{{ chapter.id }}">
                             <span data-i18n="book.chapterName">Name</span>

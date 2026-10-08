@@ -179,7 +179,7 @@
         'book.chapterEndPage':  { en: 'End Page',              es: 'Página final' },
         'book.chapterPageCount': { en: 'Pages',                es: 'Páginas' },
         'book.chapterSkippable': { en: 'Skip in numbering',    es: 'Omitir de la numeración' },
-        'book.chapterNotRead':  { en: 'Not read yet',          es: 'Aún no se ha leído' },
+        'book.chapterReadingCount': { en: 'Number of Readings', es: 'Número de lecturas' },
         'book.chapterActions':  { en: 'Actions',               es: 'Acciones' },
         'book.addChapter':      { en: 'Add Chapter',           es: 'Añadir capítulo' },
         'book.addChapterBtn':   { en: 'Add Chapter',           es: 'Añadir capítulo' },
