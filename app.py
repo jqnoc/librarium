@@ -1152,6 +1152,20 @@ def init_schema() -> None:
             portrait_hash TEXT NOT NULL DEFAULT '',
             portrait_thumb BLOB DEFAULT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS chapters (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id      TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name         TEXT    NOT NULL DEFAULT '',
+            start_page   INTEGER NOT NULL,
+            end_page     INTEGER NOT NULL,
+            is_skippable INTEGER NOT NULL DEFAULT 0 CHECK(is_skippable IN (0, 1)),
+            CHECK(start_page >= 1),
+            CHECK(end_page >= start_page)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_chapters_book_page
+            ON chapters(book_id, start_page, end_page, id);
     """)
     # Insert the default "Books" library for fresh databases
     if db.execute("SELECT COUNT(*) FROM libraries").fetchone()[0] == 0:
@@ -1209,6 +1223,7 @@ def _run_all_migrations() -> None:
     migrate_add_character_deceased()
     migrate_add_session_page_range()
     migrate_add_finish_plan_mode()
+    migrate_add_chapters()
 
 
 # ── Migration: Add readings table ───────────────────────────────────────
@@ -2682,6 +2697,40 @@ def migrate_add_character_deceased() -> None:
     db.close()
 
 
+# ── Migration: Add book chapters ─────────────────────────────────────────
+def migrate_add_chapters() -> None:
+    """Create the table used to store book chapter ranges."""
+    if not DB_PATH.exists():
+        return
+
+    db = sqlite3.connect(str(DB_PATH))
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chapters'"
+    ).fetchone()
+    if not exists:
+        print(">> Migrating: adding book chapters...")
+        db.execute("""
+            CREATE TABLE chapters (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id      TEXT    NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                name         TEXT    NOT NULL DEFAULT '',
+                start_page   INTEGER NOT NULL,
+                end_page     INTEGER NOT NULL,
+                is_skippable INTEGER NOT NULL DEFAULT 0 CHECK(is_skippable IN (0, 1)),
+                CHECK(start_page >= 1),
+                CHECK(end_page >= start_page)
+            )
+        """)
+        db.commit()
+        print(">> Migration complete — books now support chapters.")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chapters_book_page "
+        "ON chapters(book_id, start_page, end_page, id)"
+    )
+    db.commit()
+    db.close()
+
+
 # ── Cover colour helper ─────────────────────────────────────────────────
 THUMB_MAX_WIDTH = 300
 
@@ -3935,6 +3984,303 @@ def _parse_optional_page(value: str) -> int | None:
     except (TypeError, ValueError):
         return None
     return max(1, page)
+
+
+def _parse_numeric_series_index(value: object) -> float | None:
+    """Return a finite numeric series index, if the stored value has one."""
+    try:
+        series_index = float(str(value or "").strip())
+    except (TypeError, ValueError):
+        return None
+    return series_index if math.isfinite(series_index) else None
+
+
+def _chapter_numbering_context(
+    db: sqlite3.Connection, book_id: str
+) -> dict[str, object] | None:
+    """Return the preceding numbered-series context for a book's chapters."""
+    series_rows = db.execute("""
+        SELECT s.id, s.name, bs.series_index
+        FROM book_series bs
+        JOIN series s ON s.id = bs.series_id
+        WHERE bs.book_id = ?
+    """, (book_id,)).fetchall()
+
+    candidates = []
+    for row in series_rows:
+        series_index = _parse_numeric_series_index(row["series_index"])
+        if series_index is not None:
+            candidates.append({
+                "series_id": row["id"],
+                "series_name": row["name"],
+                "series_index": series_index,
+            })
+
+    for candidate in sorted(
+        candidates,
+        key=lambda value: (value["series_index"], str(value["series_name"]).casefold()),
+    ):
+        series_books = db.execute("""
+            SELECT b.id, b.name, bs.series_index
+            FROM book_series bs
+            JOIN books b ON b.id = bs.book_id
+            WHERE bs.series_id = ? AND b.id != ?
+                  AND (b.work_id IS NULL OR b.is_primary_edition = 1)
+        """, (candidate["series_id"], book_id)).fetchall()
+        previous_books = []
+        for series_book in series_books:
+            series_index = _parse_numeric_series_index(series_book["series_index"])
+            if series_index is not None and series_index < candidate["series_index"]:
+                previous_books.append({
+                    "id": series_book["id"],
+                    "name": series_book["name"],
+                    "series_index": series_index,
+                })
+        if not previous_books:
+            continue
+
+        previous_books.sort(
+            key=lambda value: (
+                value["series_index"],
+                str(value["name"]).casefold(),
+                value["id"],
+            )
+        )
+        prior_book_ids = [book["id"] for book in previous_books]
+        placeholders = ", ".join("?" for _ in prior_book_ids)
+        number_offset = db.execute(
+            f"SELECT COUNT(*) AS count FROM chapters "
+            f"WHERE book_id IN ({placeholders}) AND is_skippable = 0",
+            prior_book_ids,
+        ).fetchone()["count"]
+        previous_book = previous_books[-1]
+        return {
+            "series_name": candidate["series_name"],
+            "previous_book_name": previous_book["name"],
+            "number_offset": number_offset,
+        }
+    return None
+
+
+def _page_ranges_cover(
+    range_start: int, range_end: int, page_ranges: list[tuple[int, int]]
+) -> bool:
+    """Return whether contiguous page ranges cover an inclusive target range."""
+    next_uncovered_page = range_start
+    for page_start, page_end in sorted(page_ranges):
+        if page_end < next_uncovered_page:
+            continue
+        if page_start > next_uncovered_page:
+            return False
+        next_uncovered_page = page_end + 1
+        if next_uncovered_page > range_end:
+            return True
+    return False
+
+
+def _infer_chapter_readings(
+    db: sqlite3.Connection, book_id: str, chapters: list[dict[str, object]]
+) -> None:
+    """Attach completed reading passes and contributing dates to each chapter."""
+    if not chapters:
+        return
+
+    book = db.execute(
+        "SELECT starting_page, format FROM books WHERE id = ?",
+        (book_id,),
+    ).fetchone()
+    if not book or (book["format"] or "paper") in ("audiobook", "ebook"):
+        return
+
+    reading_rows = db.execute(
+        "SELECT id, reading_number FROM readings WHERE book_id = ? ORDER BY reading_number",
+        (book_id,),
+    ).fetchall()
+    if not reading_rows:
+        return
+
+    reading_numbers = {row["id"]: row["reading_number"] for row in reading_rows}
+    default_reading_id = reading_rows[0]["id"]
+    try:
+        first_readable_page = max(1, int(book["starting_page"] or 0))
+    except (TypeError, ValueError):
+        first_readable_page = 1
+
+    activities_by_reading = {reading_id: [] for reading_id in reading_numbers}
+    activity_order = 0
+    for session_row in db.execute("""
+        SELECT id, date, pages, reading_id, start_page, end_page
+        FROM sessions
+        WHERE book_id = ?
+        ORDER BY id
+    """, (book_id,)).fetchall():
+        reading_id = session_row["reading_id"]
+        if reading_id not in reading_numbers:
+            reading_id = default_reading_id
+        activities_by_reading[reading_id].append({
+            "kind": "session",
+            "pages": max(0, int(session_row["pages"] or 0)),
+            "start_page": session_row["start_page"],
+            "end_page": session_row["end_page"],
+            "date_start": session_row["date"] or "",
+            "date_end": session_row["date"] or "",
+            "sort_date": session_row["date"] or "",
+            "order": activity_order,
+        })
+        activity_order += 1
+
+    for period_row in db.execute("""
+        SELECT id, start_date, end_date, pages, reading_id
+        FROM periods
+        WHERE book_id = ?
+        ORDER BY id
+    """, (book_id,)).fetchall():
+        reading_id = period_row["reading_id"]
+        if reading_id not in reading_numbers:
+            reading_id = default_reading_id
+        start_date = period_row["start_date"] or ""
+        end_date = period_row["end_date"] or start_date
+        activities_by_reading[reading_id].append({
+            "kind": "period",
+            "pages": max(0, int(period_row["pages"] or 0)),
+            "start_page": None,
+            "end_page": None,
+            "date_start": start_date,
+            "date_end": end_date,
+            "sort_date": start_date or end_date,
+            "order": activity_order,
+        })
+        activity_order += 1
+
+    ranges_by_reading: dict[int, list[dict[str, object]]] = {}
+    for reading_id, activities in activities_by_reading.items():
+        next_page = first_readable_page
+        ranges = []
+        for activity in sorted(
+            activities,
+            key=lambda value: (str(value["sort_date"] or "9999-12-31"), value["order"]),
+        ):
+            pages = int(activity["pages"])
+            saved_start_page = activity["start_page"]
+            saved_end_page = activity["end_page"]
+            if activity["kind"] == "session" and saved_start_page is not None:
+                page_start = max(1, int(saved_start_page))
+                if saved_end_page is not None:
+                    page_end = int(saved_end_page) - 1
+                else:
+                    page_end = page_start + pages - 1
+            elif activity["kind"] == "session" and saved_end_page is not None and pages:
+                page_end = int(saved_end_page) - 1
+                page_start = max(first_readable_page, page_end - pages + 1)
+            elif pages:
+                page_start = next_page
+                page_end = page_start + pages - 1
+            else:
+                continue
+
+            if page_end < page_start:
+                continue
+            next_page = max(next_page, page_end + 1)
+            ranges.append({
+                "start_page": page_start,
+                "end_page": page_end,
+                "date_start": activity["date_start"],
+                "date_end": activity["date_end"],
+            })
+        ranges_by_reading[reading_id] = ranges
+
+    for chapter in chapters:
+        chapter_readings = []
+        chapter_start_page = int(chapter["start_page"])
+        chapter_end_page = int(chapter["end_page"])
+        for reading_id, ranges in ranges_by_reading.items():
+            page_ranges = [
+                (int(reading_range["start_page"]), int(reading_range["end_page"]))
+                for reading_range in ranges
+            ]
+            if not _page_ranges_cover(chapter_start_page, chapter_end_page, page_ranges):
+                continue
+
+            date_ranges = []
+            seen_date_ranges = set()
+            for reading_range in ranges:
+                if (
+                    int(reading_range["end_page"]) < chapter_start_page
+                    or int(reading_range["start_page"]) > chapter_end_page
+                ):
+                    continue
+                date_start = str(reading_range["date_start"] or "")
+                date_end = str(reading_range["date_end"] or date_start)
+                if not date_start and not date_end:
+                    continue
+                date_range = (date_start or date_end, date_end or date_start)
+                if date_range not in seen_date_ranges:
+                    seen_date_ranges.add(date_range)
+                    date_ranges.append({
+                        "start_date": date_range[0],
+                        "end_date": date_range[1],
+                    })
+
+            chapter_readings.append({
+                "reading_number": reading_numbers[reading_id],
+                "date_ranges": date_ranges,
+            })
+        chapter["readings"] = chapter_readings
+
+
+def _load_chapters(
+    db: sqlite3.Connection, book_id: str
+) -> tuple[list[dict[str, object]], dict[str, object] | None]:
+    """Load a book's chapters with inclusive page counts and calculated numbers."""
+    rows = db.execute("""
+        SELECT id, name, start_page, end_page, is_skippable
+        FROM chapters
+        WHERE book_id = ?
+        ORDER BY start_page, end_page, id
+    """, (book_id,)).fetchall()
+    numbering_context = _chapter_numbering_context(db, book_id) if rows else None
+    next_number = int(numbering_context["number_offset"]) if numbering_context else 0
+    chapters = []
+    for row in rows:
+        chapter = dict(row)
+        chapter["is_skippable"] = bool(chapter["is_skippable"])
+        chapter["page_count"] = chapter["end_page"] - chapter["start_page"] + 1
+        chapter["readings"] = []
+        if chapter["is_skippable"]:
+            chapter["number"] = None
+        else:
+            next_number += 1
+            chapter["number"] = next_number
+        chapters.append(chapter)
+    _infer_chapter_readings(db, book_id, chapters)
+    return chapters, numbering_context
+
+
+def _chapter_form_values() -> tuple[tuple[str, int, int, int] | None, str | None]:
+    """Validate and normalize a submitted chapter form."""
+    name = request.form.get("name", "").strip()
+    start_page_value = request.form.get("start_page", "").strip()
+    end_page_value = request.form.get("end_page", "").strip()
+
+    if not name:
+        return None, "Chapter name is required."
+    try:
+        start_page = int(start_page_value)
+        end_page = int(end_page_value)
+    except (TypeError, ValueError):
+        return None, "Chapter start and end pages must be whole numbers."
+    if start_page < 1 or end_page < 1:
+        return None, "Chapter pages must be at least 1."
+    if end_page < start_page:
+        return None, "Chapter end page cannot be before its start page."
+
+    is_skippable = 1 if request.form.get("is_skippable") == "1" else 0
+    return (name, start_page, end_page, is_skippable), None
+
+
+def _chapter_redirect(book_id: str):
+    """Return to the chapter tab after a chapter form submission."""
+    return redirect(url_for("book_detail", book_id=book_id, tab="chapters"))
 
 
 def _collect_languages() -> list[str]:
@@ -7632,7 +7978,39 @@ def series_detail(series_id: int):
     unindexed.sort(key=lambda b: (b["original_publication_date"] or "9999", b["name"].lower()))
     books = indexed + unindexed
 
-    return render_template("series_detail.html", series=series_info, books=books)
+    series_chapters = []
+    for book in books:
+        chapters, _ = _load_chapters(db, book["id"])
+        for chapter in chapters:
+            reading_date_ranges = []
+            seen_date_ranges = set()
+            for chapter_reading in chapter["readings"]:
+                for date_range in chapter_reading["date_ranges"]:
+                    date_key = (
+                        date_range["start_date"],
+                        date_range["end_date"],
+                    )
+                    if date_key not in seen_date_ranges:
+                        seen_date_ranges.add(date_key)
+                        reading_date_ranges.append({
+                            "start_date": date_key[0],
+                            "end_date": date_key[1],
+                        })
+            series_chapters.append({
+                **chapter,
+                "volume_id": book["id"],
+                "volume_name": book["name"],
+                "volume_index": book["series_index"],
+                "reading_count": len(chapter["readings"]),
+                "reading_date_ranges": reading_date_ranges,
+            })
+
+    return render_template(
+        "series_detail.html",
+        series=series_info,
+        books=books,
+        series_chapters=series_chapters,
+    )
 
 
 @app.route("/series/<int:series_id>/rename", methods=["POST"])
@@ -8341,6 +8719,7 @@ def book_detail(book_id: str):
     reading_num_map = {rr["id"]: rr["reading_number"] for rr in readings_rows}
 
     similar_works = _build_similar_works(db, book_id, info, _get_similar_works_fields())
+    chapters, chapter_numbering = _load_chapters(db, book_id)
 
     # Series info (many-to-many)
     series_list_book = []
@@ -8454,6 +8833,9 @@ def book_detail(book_id: str):
         has_multiple_readings=len(readings_data) > 1,
         book_gantt=book_gantt_data,
         series_list_book=series_list_book,
+        chapters=chapters,
+        chapter_count=sum(not chapter["is_skippable"] for chapter in chapters),
+        chapter_numbering=chapter_numbering,
         editions=editions,
         work_total_readings=work_total_readings,
         all_linkable_books=all_linkable_books,
@@ -8684,6 +9066,75 @@ def save_ratings(book_id: str):
     _save_ratings(book_id, ratings)
     flash("Ratings saved.", "success")
     return redirect(url_for("book_detail", book_id=book_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Routes – Chapter CRUD
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/book/<book_id>/chapters/add", methods=["POST"])
+def add_chapter(book_id: str):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+
+    values, validation_error = _chapter_form_values()
+    if validation_error:
+        flash(validation_error, "error")
+        return _chapter_redirect(book_id)
+
+    name, start_page, end_page, is_skippable = values
+    db.execute(
+        "INSERT INTO chapters (book_id, name, start_page, end_page, is_skippable) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (book_id, name, start_page, end_page, is_skippable),
+    )
+    db.commit()
+    flash("Chapter added.", "success")
+    return _chapter_redirect(book_id)
+
+
+@app.route("/book/<book_id>/chapters/<int:chapter_id>/edit", methods=["POST"])
+def edit_chapter(book_id: str, chapter_id: int):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+    if not db.execute(
+        "SELECT id FROM chapters WHERE id = ? AND book_id = ?",
+        (chapter_id, book_id),
+    ).fetchone():
+        abort(404)
+
+    values, validation_error = _chapter_form_values()
+    if validation_error:
+        flash(validation_error, "error")
+        return _chapter_redirect(book_id)
+
+    name, start_page, end_page, is_skippable = values
+    db.execute(
+        "UPDATE chapters SET name = ?, start_page = ?, end_page = ?, is_skippable = ? "
+        "WHERE id = ? AND book_id = ?",
+        (name, start_page, end_page, is_skippable, chapter_id, book_id),
+    )
+    db.commit()
+    flash("Chapter updated.", "success")
+    return _chapter_redirect(book_id)
+
+
+@app.route("/book/<book_id>/chapters/<int:chapter_id>/delete", methods=["POST"])
+def delete_chapter(book_id: str, chapter_id: int):
+    db = get_db()
+    if not db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone():
+        abort(404)
+    result = db.execute(
+        "DELETE FROM chapters WHERE id = ? AND book_id = ?",
+        (chapter_id, book_id),
+    )
+    if result.rowcount == 0:
+        abort(404)
+    db.commit()
+    flash("Chapter deleted.", "success")
+    return _chapter_redirect(book_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -11107,6 +11558,8 @@ def delete_book(book_id: str):
     sessions_data = [dict(s) for s in sessions]
     periods = db.execute("SELECT * FROM periods WHERE book_id = ?", (book_id,)).fetchall()
     periods_data = [dict(p) for p in periods]
+    chapters = db.execute("SELECT * FROM chapters WHERE book_id = ?", (book_id,)).fetchall()
+    chapters_data = [dict(chapter) for chapter in chapters]
     character_ids = [
         row["id"]
         for row in db.execute("SELECT id FROM characters WHERE book_id = ?", (book_id,)).fetchall()
@@ -11120,6 +11573,7 @@ def delete_book(book_id: str):
         "readings": readings_data,
         "sessions": sessions_data,
         "periods": periods_data,
+        "chapters": chapters_data,
         "ratings": ratings_data,
         "work_taxonomy": _get_work_taxonomy(db, work_id) if work_id else None,
         "work_members": work_members,
@@ -11223,6 +11677,7 @@ def undo_delete_book():
         restore_rows("readings", backup["readings"])
         restore_rows("sessions", backup["sessions"])
         restore_rows("periods", backup["periods"])
+        restore_rows("chapters", backup.get("chapters", []))
         restore_rows("ratings", backup["ratings"])
         
         db.commit()

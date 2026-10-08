@@ -267,6 +267,10 @@
         <span data-i18n="book.readingsTab">Readings</span>
         <span class="book-tab-count" aria-hidden="true">({{ readings | length }})</span>
     </button>
+    <button type="button" class="book-tab" id="book-tab-chapters" role="tab" aria-controls="book-tab-chapters-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="chapters">
+        <span data-i18n="book.chaptersTab">Chapters</span>
+        <span class="book-tab-count" aria-hidden="true">({{ chapter_count }})</span>
+    </button>
     <button type="button" class="book-tab" id="book-tab-rating" role="tab" aria-controls="book-tab-rating-panel" aria-selected="false" tabindex="-1" data-book-tab-trigger="rating">
         <span data-i18n="book.ratingTab">Rating</span>
     </button>
@@ -298,6 +302,136 @@
         <span class="book-tab-count" aria-hidden="true">({{ editions | length }})</span>
     </button>
 </nav>
+
+<section id="book-tab-chapters-panel" class="book-tab-panel" data-book-tab-panel="chapters" role="tabpanel" aria-labelledby="book-tab-chapters" hidden>
+<!-- ── Chapters ─────────────────────────────────────────────────────── -->
+<div class="chapter-section-heading">
+    <h2 id="chapters"><span data-i18n="book.chapters">Chapters</span> <span class="annotation-count">({{ chapter_count }})</span></h2>
+</div>
+
+{% if chapter_numbering %}
+<p class="chapter-numbering-note">
+    <span data-i18n="book.chapterNumberingContinues">Numbering continues after</span>
+    <strong>{{ chapter_numbering.previous_book_name }}</strong>
+    <span data-i18n="book.chapterNumberingInSeries">in the series</span>
+    <strong>{{ chapter_numbering.series_name }}</strong>.
+</p>
+{% endif %}
+
+{% if chapters %}
+<div class="table-wrap">
+    <table class="chapters-table">
+        <thead>
+            <tr>
+                <th scope="col" class="chapter-number-column" data-i18n="book.chapterNumber">Number</th>
+                <th scope="col" data-i18n="book.chapterName">Name</th>
+                <th scope="col" data-i18n="book.chapterStartPage">Start Page</th>
+                <th scope="col" data-i18n="book.chapterPageCount">Pages</th>
+                <th scope="col" data-i18n="book.readings">Readings</th>
+                <th scope="col" data-i18n="book.chapterActions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for chapter in chapters %}
+            <tr id="chapter-{{ chapter.id }}">
+                <td class="chapter-number-column">{% if chapter.number is not none %}{{ chapter.number }}{% else %}&mdash;{% endif %}</td>
+                <td>{{ chapter.name }}</td>
+                <td>{{ chapter.start_page }}</td>
+                <td>{{ chapter.page_count }}</td>
+                <td class="chapter-readings-cell">
+                    {% if chapter.readings %}
+                    <span class="chapter-read-count">{{ chapter.readings | length }}&times;</span>
+                    <ul class="chapter-reading-list">
+                        {% for chapter_reading in chapter.readings %}
+                        <li>
+                            <strong><span data-i18n="book.readingSessionFor">Reading</span> #{{ chapter_reading.reading_number }}</strong>
+                            {% if chapter_reading.date_ranges %}
+                            <span class="chapter-reading-dates">
+                                {% for date_range in chapter_reading.date_ranges %}
+                                <span>{{ date_range.start_date | display_date }}{% if date_range.end_date != date_range.start_date %} &ndash; {{ date_range.end_date | display_date }}{% endif %}</span>{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            </span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span class="chapter-not-read" data-i18n="book.chapterNotRead">Not read yet</span>
+                    {% endif %}
+                </td>
+                <td class="chapter-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleChapterEdit({{ chapter.id }})" data-i18n="book.editChapter">Edit</button>
+                    <form method="POST" action="{{ url_for('delete_chapter', book_id=book_id, chapter_id=chapter.id) }}" onsubmit="return confirmDeleteChapter();">
+                        <button type="submit" class="btn btn-danger btn-sm" data-i18n="book.deleteChapter">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            <tr class="chapter-edit-row" id="chapter-edit-{{ chapter.id }}">
+                <td colspan="6">
+                    <form method="POST" action="{{ url_for('edit_chapter', book_id=book_id, chapter_id=chapter.id) }}" class="chapter-form chapter-edit-form" data-chapter-form>
+                        <label class="chapter-form-field" for="edit-chapter-name-{{ chapter.id }}">
+                            <span data-i18n="book.chapterName">Name</span>
+                            <input type="text" id="edit-chapter-name-{{ chapter.id }}" name="name" value="{{ chapter.name }}" required>
+                        </label>
+                        <label class="chapter-form-field" for="edit-chapter-start-page-{{ chapter.id }}">
+                            <span data-i18n="book.chapterStartPage">Start Page</span>
+                            <input type="number" id="edit-chapter-start-page-{{ chapter.id }}" name="start_page" value="{{ chapter.start_page }}" min="1" step="1" required data-chapter-start-page>
+                        </label>
+                        <label class="chapter-form-field" for="edit-chapter-end-page-{{ chapter.id }}">
+                            <span data-i18n="book.chapterEndPage">End Page</span>
+                            <input type="number" id="edit-chapter-end-page-{{ chapter.id }}" name="end_page" value="{{ chapter.end_page }}" min="1" step="1" required data-chapter-end-page>
+                        </label>
+                        <label class="chapter-form-field chapter-page-count-field">
+                            <span data-i18n="book.chapterPageCount">Pages</span>
+                            <output data-chapter-page-count aria-live="polite">{{ chapter.page_count }}</output>
+                        </label>
+                        <label class="chapter-skip-toggle">
+                            <input type="checkbox" name="is_skippable" value="1" {{ 'checked' if chapter.is_skippable else '' }}>
+                            <span data-i18n="book.chapterSkippable">Skippable</span>
+                        </label>
+                        <div class="chapter-form-actions">
+                            <button type="submit" class="btn btn-primary btn-sm" data-i18n="form.save">Save</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleChapterEdit({{ chapter.id }})" data-i18n="form.cancel">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state chapter-empty-state">
+    <p data-i18n="book.noChapters">No chapters yet.</p>
+</div>
+{% endif %}
+
+<div class="add-chapter-panel">
+    <h3 data-i18n="book.addChapter">Add Chapter</h3>
+    <form method="POST" action="{{ url_for('add_chapter', book_id=book_id) }}" class="chapter-form chapter-add-form">
+        <label class="chapter-form-field" for="add-chapter-name">
+            <span data-i18n="book.chapterName">Name</span>
+            <input type="text" id="add-chapter-name" name="name" required placeholder="Chapter name" data-i18n-placeholder="book.chapterNamePlaceholder">
+        </label>
+        <label class="chapter-form-field" for="add-chapter-start-page">
+            <span data-i18n="book.chapterStartPage">Start Page</span>
+            <input type="number" id="add-chapter-start-page" name="start_page" min="1" step="1" required data-chapter-start-page>
+        </label>
+        <label class="chapter-form-field" for="add-chapter-end-page">
+            <span data-i18n="book.chapterEndPage">End Page</span>
+            <input type="number" id="add-chapter-end-page" name="end_page" min="1" step="1" required data-chapter-end-page>
+        </label>
+        <label class="chapter-skip-toggle">
+            <input type="checkbox" name="is_skippable" value="1">
+            <span data-i18n="book.chapterSkippable">Skippable</span>
+        </label>
+        <div class="chapter-form-actions">
+            <button type="submit" class="btn btn-primary btn-sm" data-i18n="book.addChapterBtn">Add Chapter</button>
+        </div>
+    </form>
+</div>
+
+</section>
 
 <section id="book-tab-rating-panel" class="book-tab-panel" data-book-tab-panel="rating" role="tabpanel" aria-labelledby="book-tab-rating" hidden>
 <!-- ── Ratings ────────────────────────────────────────────────────────── -->
@@ -3868,6 +4002,39 @@ function toggleAnnotationEdit(type, id) {
     const row = document.getElementById(type + '-edit-' + id);
     row.classList.toggle('active');
 }
+
+function toggleChapterEdit(id) {
+    const row = document.getElementById('chapter-edit-' + id);
+    row.classList.toggle('active');
+}
+
+function confirmDeleteChapter() {
+    const message = window.librariumI18n
+        ? window.librariumI18n.t('book.deleteChapterConfirm')
+        : 'Delete this chapter?';
+    return window.confirm(message);
+}
+
+(function () {
+    document.querySelectorAll('[data-chapter-form]').forEach(function (form) {
+        const startPage = form.querySelector('[data-chapter-start-page]');
+        const endPage = form.querySelector('[data-chapter-end-page]');
+        const pageCount = form.querySelector('[data-chapter-page-count]');
+        if (!startPage || !endPage || !pageCount) return;
+
+        function updatePageCount() {
+            const start = Number(startPage.value);
+            const end = Number(endPage.value);
+            pageCount.textContent = (
+                Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start
+            ) ? String(end - start + 1) : '—';
+        }
+
+        startPage.addEventListener('input', updatePageCount);
+        endPage.addEventListener('input', updatePageCount);
+        updatePageCount();
+    });
+}());
 
 (function () {
     var controls = document.querySelector('[data-annotation-sort-controls]');

@@ -71,4 +71,50 @@
     <p data-i18n="series.noBooks">No books in this series yet.</p>
 </div>
 {% endif %}
+
+{% if series_chapters %}
+<section class="series-chapters-section">
+    <h2 data-i18n="book.chapters">Chapters</h2>
+    <div class="table-wrap">
+        <table class="series-chapters-table">
+            <thead>
+                <tr>
+                    <th scope="col" data-i18n="book.chapterName">Name</th>
+                    <th scope="col" data-i18n="series.chapterVolume">Volume</th>
+                    <th scope="col" data-i18n="book.pages">Pages</th>
+                    <th scope="col" data-i18n="book.readings">Readings</th>
+                    <th scope="col" data-i18n="series.chapterReadingDates">Reading Dates</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for series_chapter in series_chapters %}
+                <tr>
+                    <td class="series-chapter-name">
+                        {% if series_chapter.number is not none %}<span class="series-chapter-number">#{{ series_chapter.number }}</span>{% endif %}
+                        {{ series_chapter.name }}
+                    </td>
+                    <td>
+                        <a class="series-chapter-volume" href="{{ url_for('book_detail', book_id=series_chapter.volume_id) }}">
+                            {% if series_chapter.volume_index %}<span>#{{ series_chapter.volume_index }}</span>{% endif %}
+                            {{ series_chapter.volume_name }}
+                        </a>
+                    </td>
+                    <td>{{ series_chapter.page_count }}</td>
+                    <td class="series-chapter-reading-count">{{ series_chapter.reading_count }}</td>
+                    <td class="series-chapter-reading-dates">
+                        {% if series_chapter.reading_date_ranges %}
+                            {% for date_range in series_chapter.reading_date_ranges %}
+                            <span>{{ date_range.start_date | display_date }}{% if date_range.end_date != date_range.start_date %} &ndash; {{ date_range.end_date | display_date }}{% endif %}</span>{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

@@ -76,6 +76,12 @@ Node.js, or pip installed to run it.
 - **Re-reads**: start a new reading of the same book; each reading has its
   own sessions and periods
 
+### Chapter Tracking
+
+- Add, edit, and delete named chapter page ranges from Book Details
+- Calculate inclusive chapter page totals automatically and optionally skip entries from numbering
+- Continue chapter numbers from earlier books in the same numbered series, infer completed reads with their logged dates, and aggregate chapter history on Series details
+
 ### Annotations
 
 - Quotes, annotations, and words per book edition
@@ -557,7 +563,7 @@ Librarium/
 ├── templates/
 │   ├── base.html             # Base layout (navbar, CDNs)
 │   ├── index.html            # Library (card / cover / list views)
-│   ├── book_detail.html      # Book detail, sessions, periods, ratings
+│   ├── book_detail.html      # Book detail, sessions, periods, ratings, chapters
 │   ├── edit_metadata.html    # Edit book metadata form
 │   ├── new_book.html         # Add book form
 │   ├── stats.html            # Global statistics dashboard

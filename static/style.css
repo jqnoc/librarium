@@ -853,6 +853,199 @@ img { max-width: 100%; height: auto; }
     display: none !important;
 }
 
+/* ── Book chapters ────────────────────────────────────────────────────── */
+.chapter-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.chapter-section-heading h2 {
+    margin-bottom: 0;
+}
+
+.chapter-numbering-note {
+    margin: 0 0 1rem;
+    padding: .7rem .9rem;
+    border-left: 3px solid var(--lb-deep-orange);
+    border-radius: var(--lb-radius);
+    background: var(--lb-light-bg);
+    color: var(--lb-text-light);
+    font-size: .9rem;
+}
+
+.chapters-table {
+    min-width: 820px;
+}
+
+.chapter-number-column {
+    width: 5.5rem;
+    text-align: right;
+}
+
+.chapters-table td.chapter-number-column {
+    color: var(--lb-deep-orange);
+    font-weight: 700;
+}
+
+.chapter-readings-cell {
+    min-width: 13rem;
+}
+
+.chapter-read-count {
+    color: var(--lb-deep-orange);
+    font-size: .9rem;
+    font-weight: 700;
+}
+
+.chapter-reading-list {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    margin: .3rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--lb-text);
+    font-size: .8rem;
+}
+
+.chapter-reading-dates {
+    display: block;
+    margin-top: .1rem;
+    color: var(--lb-text-light);
+}
+
+.chapter-not-read {
+    color: var(--lb-text-light);
+    font-size: .82rem;
+}
+
+.chapter-actions,
+.chapter-form-actions {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+
+.chapter-actions form {
+    margin: 0;
+}
+
+.chapter-edit-row {
+    display: none;
+}
+
+.chapter-edit-row.active {
+    display: table-row;
+}
+
+.chapter-edit-row td {
+    padding: .85rem;
+    background: var(--lb-light-bg);
+}
+
+.chapter-form {
+    display: grid;
+    grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(7rem, 1fr)) minmax(5rem, .6fr) auto auto;
+    align-items: end;
+    gap: .65rem;
+}
+
+.chapter-add-form {
+    grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(7rem, 1fr)) auto auto;
+}
+
+.chapter-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    min-width: 0;
+    color: var(--lb-text-light);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.chapter-form input[type="text"],
+.chapter-form input[type="number"] {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: .45rem .6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-white);
+    color: var(--lb-text);
+    font: inherit;
+    font-size: .92rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.chapter-page-count-field output {
+    display: flex;
+    align-items: center;
+    min-height: 2.35rem;
+    padding: .45rem .6rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius);
+    background: var(--lb-card-bg);
+    color: var(--lb-text);
+    font-size: .92rem;
+    font-weight: 700;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.chapter-skip-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.35rem;
+    gap: .45rem;
+    color: var(--lb-text);
+    font-size: .86rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chapter-skip-toggle input {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--lb-orange);
+}
+
+.add-chapter-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--lb-border);
+    border-radius: var(--lb-radius-lg);
+    background: var(--lb-card-bg);
+}
+
+.add-chapter-panel h3 {
+    margin: 0 0 .75rem;
+    color: var(--lb-dark);
+    font-size: 1rem;
+}
+
+@media (max-width: 760px) {
+    .chapter-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .chapter-form-field:first-child,
+    .chapter-form-actions {
+        grid-column: 1 / -1;
+    }
+}
+
 /* ── Page headings (SciY style) ────────────────────────────────────────── */
 h1 {
     font-size: 1.8rem;
@@ -3663,6 +3856,44 @@ body.reading-session-modal-open { overflow: hidden; }
     box-shadow: var(--lb-shadow-lg);
     transform: translateY(-2px);
 }
+.series-chapters-section {
+    margin-top: 2rem;
+}
+.series-chapters-section h2 {
+    margin-bottom: .85rem;
+}
+.series-chapters-table {
+    min-width: 760px;
+}
+.series-chapter-name {
+    min-width: 13rem;
+    color: var(--lb-text);
+    font-weight: 600;
+}
+.series-chapter-number,
+.series-chapter-reading-count {
+    color: var(--lb-deep-orange);
+    font-weight: 700;
+}
+.series-chapter-number {
+    margin-right: .35rem;
+}
+.series-chapter-volume {
+    color: var(--lb-orange);
+    font-weight: 600;
+    text-decoration: none;
+}
+.series-chapter-volume:hover {
+    text-decoration: underline;
+}
+.series-chapter-volume span {
+    margin-right: .25rem;
+}
+.series-chapter-reading-dates {
+    min-width: 15rem;
+    color: var(--lb-text-light);
+    font-size: .88rem;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* Dashboard                                                                  */
@@ -5534,6 +5765,3 @@ html[data-theme="dark"] .source-event-fields {
 html[data-theme="dark"] .modal-overlay {
     background: rgba(0, 0, 0, .62);
 }
-
-
-
