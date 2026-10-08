@@ -893,14 +893,10 @@ img { max-width: 100%; height: auto; }
 
 .chapter-reading-count-cell {
     color: var(--lb-deep-orange);
-    text-align: center;
+    text-align: left;
     font-size: .9rem;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.chapters-table th.chapter-reading-count-column {
-    text-align: center;
 }
 
 .chapter-reading-dates-cell {
