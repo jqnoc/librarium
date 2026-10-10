@@ -717,6 +717,8 @@
         'stats.title':              { en: 'Global Reading Statistics',   es: 'Estadísticas Globales de Lectura' },
         'stats.booksFinished':      { en: 'Books Finished by Year',     es: 'Libros Terminados por Año' },
         'stats.clickCovers':        { en: '(click to view covers)',     es: '(clic para ver portadas)' },
+        'stats.chaptersRead':       { en: 'Chapters Read by Year',      es: 'Capítulos Leídos por Año' },
+        'stats.chaptersReadCount':  { en: 'chapters read',              es: 'capítulos leídos' },
         'stats.pagesRead':          { en: 'Pages Read by Year',        es: 'Páginas Leídas por Año' },
         'stats.clickDetails':       { en: '(click to view details)',    es: '(clic para ver detalles)' },
         'stats.timeReadByYear':     { en: 'Time Read by Year',         es: 'Tiempo Leído por Año' },
@@ -801,6 +803,17 @@
         'yearBooks.infographic.readingDaySingular': { en: 'reading day',    es: 'día de lectura' },
         'yearBooks.infographic.readingDayPlural':   { en: 'reading days',   es: 'días de lectura' },
         'yearBooks.infographic.generatedWith': { en: 'Generated with Librarium v{version}', es: 'Generado con Librarium v{version}' },
+
+        // ── Year chapters ────────────────────────────────────────────────
+        'yearChapters.title':       { en: 'Chapters Read in',            es: 'Capítulos Leídos en' },
+        'yearChapters.total':       { en: 'Chapter completion entries:', es: 'Registros de capítulos completados:' },
+        'yearChapters.cover':       { en: 'Cover',                       es: 'Portada' },
+        'yearChapters.book':        { en: 'Book',                        es: 'Libro' },
+        'yearChapters.chapter':     { en: 'Chapter',                     es: 'Capítulo' },
+        'yearChapters.pages':       { en: 'Pages',                       es: 'Páginas' },
+        'yearChapters.reading':     { en: 'Reading',                     es: 'Lectura' },
+        'yearChapters.dateRead':    { en: 'Date Read',                   es: 'Fecha de Lectura' },
+        'yearChapters.empty':       { en: 'No chapters were read in',    es: 'No se leyeron capítulos en' },
 
         // ── Year time ──────────────────────────────────────────────────
         'yearTime.backToGlobal':   { en: '← Back to Global Stats',     es: '← Volver a Estadísticas Globales' },

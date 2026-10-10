@@ -4266,6 +4266,42 @@ def _load_chapters(
     return chapters, numbering_context
 
 
+def _load_chapter_read_events(
+    db: sqlite3.Connection, library_filter: str, library_params
+) -> list[dict[str, object]]:
+    """Return one dated event for every inferred chapter completion."""
+    chapter_books = db.execute(f"""
+        SELECT DISTINCT b.id, b.name, b.subtitle, b.has_cover, b.cover_hash
+        FROM books b
+        JOIN chapters c ON c.book_id = b.id
+        WHERE {library_filter}
+        ORDER BY b.name COLLATE NOCASE, b.id
+    """, library_params).fetchall()
+
+    events: list[dict[str, object]] = []
+    for book in chapter_books:
+        chapters, _ = _load_chapters(db, book["id"])
+        for chapter in chapters:
+            for chapter_reading in chapter["readings"]:
+                completion_date = str(chapter_reading["completion_date"] or "")
+                if not completion_date:
+                    continue
+                events.append({
+                    "book_id": book["id"],
+                    "book_name": book["name"] or "",
+                    "book_subtitle": book["subtitle"] or "",
+                    "has_cover": bool(book["has_cover"]),
+                    "cover_hash": book["cover_hash"] or "",
+                    "chapter_name": chapter["name"] or "",
+                    "chapter_number": chapter["number"],
+                    "start_page": chapter["start_page"],
+                    "end_page": chapter["end_page"],
+                    "reading_number": chapter_reading["reading_number"],
+                    "completion_date": completion_date,
+                })
+    return events
+
+
 def _chapter_form_values() -> tuple[tuple[str, int, int, int] | None, str | None]:
     """Validate and normalize a submitted chapter form."""
     name = request.form.get("name", "").strip()
@@ -6106,6 +6142,14 @@ def global_stats():
         if year_authors:
             authors_read_by_year[year] = len(year_authors)
 
+    chapters_read_by_year: dict[str, int] = {}
+    for chapter_read_event in _load_chapter_read_events(db, lf_b, lp_b):
+        completion_year = str(chapter_read_event["completion_date"])[:4]
+        if len(completion_year) == 4:
+            chapters_read_by_year[completion_year] = (
+                chapters_read_by_year.get(completion_year, 0) + 1
+            )
+
     # Books finished by year – count ALL finished readings across all editions
     books_finished_by_year: dict[str, int] = {}
     finished_readings = db.execute(
@@ -6125,9 +6169,11 @@ def global_stats():
         | set(books_finished_by_year.keys())
         | set(time_by_year.keys())
         | set(authors_read_by_year.keys())
+        | set(chapters_read_by_year.keys())
     )
     pages_data = [pages_by_year.get(y, 0) for y in all_years]
     books_data = [books_finished_by_year.get(y, 0) for y in all_years]
+    chapters_data = [chapters_read_by_year.get(y, 0) for y in all_years]
     time_data = [time_by_year.get(y, 0) for y in all_years]
     authors_read_data = [authors_read_by_year.get(y, 0) for y in all_years]
 
@@ -6221,6 +6267,7 @@ def global_stats():
         years=all_years,
         pages_data=pages_data,
         books_data=books_data,
+        chapters_data=chapters_data,
         time_data=time_data,
         authors_read_data=authors_read_data,
         bought_years=bought_years,
@@ -7095,6 +7142,50 @@ def stats_year_books(year: str):
                            prev_year=prev_year, next_year=next_year,
                            year_pages=year_pages, year_seconds=year_seconds,
                            year_reading_days=year_reading_days)
+
+
+@app.route("/stats/year/<year>/chapters")
+def stats_year_chapters(year: str):
+    """Display every inferred chapter completion in a specific year."""
+    db = get_db()
+    lib_ids = _get_selected_library_ids()
+    lf_b, lp_b = _lib_filter(lib_ids, "b.library_id")
+    chapter_read_events = _load_chapter_read_events(db, lf_b, lp_b)
+    chapter_readings = [
+        event
+        for event in chapter_read_events
+        if str(event["completion_date"])[:4] == year
+    ]
+    chapter_readings.sort(
+        key=lambda event: (
+            str(event["completion_date"]),
+            str(event["book_name"]).casefold(),
+            int(event["start_page"]),
+            int(event["reading_number"]),
+        )
+    )
+
+    chapter_years = sorted({
+        str(event["completion_date"])[:4]
+        for event in chapter_read_events
+        if len(str(event["completion_date"])) >= 4
+    })
+    prev_year = None
+    next_year = None
+    if year in chapter_years:
+        idx = chapter_years.index(year)
+        if idx > 0:
+            prev_year = chapter_years[idx - 1]
+        if idx < len(chapter_years) - 1:
+            next_year = chapter_years[idx + 1]
+
+    return render_template(
+        "stats_year_chapters.html",
+        year=year,
+        chapter_readings=chapter_readings,
+        prev_year=prev_year,
+        next_year=next_year,
+    )
 
 
 @app.route("/stats/year/<year>/bought")

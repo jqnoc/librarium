@@ -906,6 +906,58 @@ img { max-width: 100%; height: auto; }
     white-space: nowrap;
 }
 
+.year-chapters-table {
+    min-width: 760px;
+}
+
+.year-chapter-cover-cell {
+    width: 4.5rem;
+    padding: .45rem .75rem;
+}
+
+.year-chapter-cover {
+    display: block;
+    width: 2.75rem;
+    height: 4rem;
+    overflow: hidden;
+    border: 1px solid var(--lb-border);
+    border-radius: 3px;
+    background: var(--lb-bg-hover);
+}
+
+.year-chapter-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.year-chapter-cover .cover-placeholder {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.year-chapter-book {
+    color: var(--lb-text-dark);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.year-chapter-book:hover {
+    color: var(--lb-deep-orange);
+    text-decoration: underline;
+}
+
+.year-chapter-pages,
+.year-chapter-reading,
+.year-chapter-date {
+    white-space: nowrap;
+}
+
 .chapter-actions,
 .chapter-form-actions {
     display: flex;

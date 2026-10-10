@@ -13,6 +13,16 @@
     </div>
 </div>
 
+<!-- ── Chapters read by year ─────────────────────────────────────────── -->
+{% if chapters_data and chapters_data|sum > 0 %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-body">
+        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--lb-deep-orange);"><span data-i18n="stats.chaptersRead">Chapters Read by Year</span> <span style="font-size: 0.8rem; color: var(--lb-text-light);" data-i18n="stats.clickDetails">(click to view details)</span></h3>
+        <canvas id="chaptersChart" style="max-height: 350px; cursor: pointer;"></canvas>
+    </div>
+</div>
+{% endif %}
+
 <!-- ── Cumulative pages read by year ─────────────────────────────────── -->
 <div class="card" style="margin-bottom: 2rem;">
     <div class="card-body">
@@ -342,6 +352,75 @@ const booksChart = new Chart(booksCtx, {
         }
     }
 });
+
+// ── Chapters Read by Year Chart ───────────────────────────────────────
+const chaptersData = {{ chapters_data | tojson }};
+if (chaptersData.some(v => v > 0)) {
+    const chaptersReadLabel = window.librariumI18n.t('stats.chaptersReadCount');
+    const chaptersCtx = document.getElementById('chaptersChart').getContext('2d');
+    new Chart(chaptersCtx, {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [{
+                label: window.librariumI18n.t('stats.chaptersRead'),
+                data: chaptersData,
+                backgroundColor: cssVar('--lb-chart-bar1'),
+                borderColor: cssVar('--lb-chart-line'),
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    if (chaptersData[index] > 0) {
+                        window.location.href = `/stats/year/${years[index]}/chapters`;
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: cssVar('--lb-chart-tooltip-bg'),
+                    titleColor: cssVar('--lb-chart-tooltip-title'),
+                    bodyColor: '#fff',
+                    borderColor: cssVar('--lb-chart-tooltip-border'),
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y} ${chaptersReadLabel}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#6B7280',
+                        stepSize: 1,
+                        callback: function(value) {
+                            return Number.isInteger(value) ? value : null;
+                        }
+                    },
+                    grid: { color: 'rgba(229, 231, 235, 0.5)' }
+                },
+                x: {
+                    ticks: { color: '#6B7280', font: { size: 14, weight: 600 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
 
 // ── Time Read by Year Chart ───────────────────────────────────────────
 const timeData = {{ time_data | tojson }};
