@@ -3281,10 +3281,10 @@ body.reading-session-modal-open { overflow: hidden; }
     min-width: 2px;
     border-radius: inherit;
     background: var(--lb-deep-orange);
-    background: oklch(
-        0.68
-        0.17
+    background: hsl(
         calc(25deg + var(--session-pace-color-score, 50) * 1.3deg)
+        72%
+        52%
     );
 }
 .session-pace-average-marker {
